@@ -1,7 +1,9 @@
 "metric","value"
-"AUC",0.936093487394959
-"Threshold (Youden)",0.487037929312669
-"Sensitivity",0.815126050420168
-"Specificity",0.901
-"Accuracy",0.891867739052726
-"TSS",0.716126050420168
+"Spatial CV AUC mean",0.606507123140603
+"Spatial CV AUC sd",0.069874825484401
+"Spatial CV TSS mean",0.21725460128736
+"Spatial CV TSS sd",0.114484112263155
+"Spatial CV threshold median",0.599560334542331
+"Current novelty fraction (>0)",0.151029331390053
+"Mean prediction SD (spatial CV)",0.052461828484267
+"Threshold used for binary map",0.599560334542331
