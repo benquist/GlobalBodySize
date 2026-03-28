@@ -1,0 +1,303 @@
+wr---
+title: "California Poppy (Eschscholzia californica) Species Distribution Model"
+author: "GitHub Copilot"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    theme: cerulean
+    code_folding: show
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+required_pkgs <- c(
+  "dplyr", "terra", "raster", "maxnet", "ggplot2", "BIEN",
+  "knitr", "pROC", "viridis", "geodata"
+)
+
+to_install <- required_pkgs[!vapply(required_pkgs, requireNamespace, logical(1), quietly = TRUE)]
+if (length(to_install) > 0) {
+  install.packages(to_install, repos = "https://cran.rstudio.com")
+}
+
+library(dplyr)
+library(terra)
+library(raster)
+library(maxnet)
+library(ggplot2)
+library(BIEN)
+library(knitr)
+library(pROC)
+library(viridis)
+library(geodata)
+
+set.seed(123)
+```
+
+## 1. Occurrence data from BIEN
+
+```{r occ-data}
+species_name <- "Eschscholzia californica"
+
+occ <- BIEN::BIEN_occurrence_species(species_name)
+
+if (!all(c("latitude", "longitude") %in% names(occ))) {
+  stop("BIEN output does not include latitude/longitude columns.")
+}
+
+occ <- occ %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  distinct(latitude, longitude, .keep_all = TRUE)
+
+nrow(occ)
+head(occ)
+```
+
+## 2. Define California extent and crop occurrences
+
+```{r ca-extent}
+ca_bbox <- terra::ext(-125, -114, 32, 42)
+
+occ_ca <- occ %>%
+  filter(longitude >= -125, longitude <= -114, latitude >= 32, latitude <= 42)
+
+if (nrow(occ_ca) < 30) {
+  stop("Too few California occurrences after filtering; cannot build a stable SDM.")
+}
+
+nrow(occ_ca)
+```
+
+## 3. WorldClim climate predictors (v2.1, 2.5 arc-min)
+
+```{r climate}
+wc <- geodata::worldclim_global(var = "bio", res = 2.5, path = "worldclim_data")
+wc_ca <- terra::crop(wc, ca_bbox)
+
+pred_names <- names(wc_ca)
+pred_names
+```
+
+## 4. Background points (pseudo-absences)
+
+```{r background}
+bg_pts <- terra::spatSample(
+  wc_ca[[1]], size = 10000, method = "random",
+  na.rm = TRUE, xy = TRUE, values = FALSE
+)
+bg_df <- data.frame(x = bg_pts[, "x"], y = bg_pts[, "y"])
+
+pres_df <- data.frame(x = occ_ca$longitude, y = occ_ca$latitude)
+
+plot_df <- bind_rows(
+  data.frame(x = pres_df$x, y = pres_df$y, type = "Presence"),
+  data.frame(x = bg_df$x, y = bg_df$y, type = "Background")
+)
+
+ggplot(plot_df, aes(x, y, color = type)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  coord_quickmap(xlim = c(-125, -114), ylim = c(32, 42)) +
+  scale_color_manual(values = c("Presence" = "red3", "Background" = "gray50")) +
+  labs(title = "Sampling points for California poppy SDM", x = "Longitude", y = "Latitude")
+```
+
+## 5. Prepare presence-background data for maxnet
+
+```{r pb-data}
+pres_vals_raw <- terra::extract(wc_ca, as.matrix(pres_df))
+bg_vals_raw <- terra::extract(wc_ca, as.matrix(bg_df))
+
+pres_vals <- as.data.frame(pres_vals_raw)[, intersect(pred_names, names(pres_vals_raw)), drop = FALSE]
+bg_vals <- as.data.frame(bg_vals_raw)[, intersect(pred_names, names(bg_vals_raw)), drop = FALSE]
+
+pres_dat <- cbind(pres_df, presence = 1, pres_vals)
+bg_dat <- cbind(bg_df, presence = 0, bg_vals)
+
+model_input <- bind_rows(pres_dat, bg_dat) %>%
+  filter(if_all(all_of(pred_names), ~ !is.na(.x)))
+
+head(model_input)
+dim(model_input)
+```
+
+## 6. Train/test split and maxnet fit
+
+```{r maxnet-model}
+pres_idx <- which(model_input$presence == 1)
+bg_idx <- which(model_input$presence == 0)
+
+train_pres <- sample(pres_idx, size = floor(0.8 * length(pres_idx)))
+train_bg <- sample(bg_idx, size = floor(0.8 * length(bg_idx)))
+train_idx <- c(train_pres, train_bg)
+test_idx <- setdiff(seq_len(nrow(model_input)), train_idx)
+
+train_df <- model_input[train_idx, , drop = FALSE]
+test_df <- model_input[test_idx, , drop = FALSE]
+
+x_train <- train_df[, pred_names, drop = FALSE]
+p_train <- train_df$presence
+
+mx <- maxnet::maxnet(
+  p = p_train,
+  data = x_train,
+  f = maxnet.formula(p_train, x_train, classes = "lqhp")
+)
+
+mx
+```
+
+## 7. Standard SDM diagnostics on held-out test data
+
+```{r diagnostics}
+x_test <- test_df[, pred_names, drop = FALSE]
+test_labels <- test_df$presence
+test_score <- predict(mx, x_test, type = "cloglog")
+
+roc_obj <- pROC::roc(response = test_labels, predictor = test_score, quiet = TRUE)
+auc_val <- as.numeric(pROC::auc(roc_obj))
+
+youden <- pROC::coords(roc_obj, x = "best", best.method = "youden", ret = c("threshold", "sensitivity", "specificity"))
+thr <- as.numeric(youden["threshold"])
+
+pred_class <- ifelse(test_score >= thr, 1, 0)
+cm <- table(
+  Truth = factor(test_labels, levels = c(0, 1)),
+  Pred = factor(pred_class, levels = c(0, 1))
+)
+
+tn <- cm[1, 1]
+fp <- cm[1, 2]
+fn <- cm[2, 1]
+tp <- cm[2, 2]
+
+sensitivity <- tp / (tp + fn)
+specificity <- tn / (tn + fp)
+accuracy <- (tp + tn) / sum(cm)
+tss <- sensitivity + specificity - 1
+
+diag_tbl <- data.frame(
+  metric = c("AUC", "Threshold (Youden)", "Sensitivity", "Specificity", "Accuracy", "TSS"),
+  value = c(auc_val, thr, sensitivity, specificity, accuracy, tss)
+)
+
+knitr::kable(diag_tbl, digits = 4, caption = "Held-out test diagnostics")
+
+cm
+```
+
+## 8. ROC and score distribution plots
+
+```{r roc-plot}
+roc_df <- data.frame(
+  fpr = 1 - roc_obj$specificities,
+  tpr = roc_obj$sensitivities
+)
+
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_line(color = "dodgerblue3", linewidth = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = 2, color = "gray50") +
+  coord_equal() +
+  labs(
+    title = "ROC curve on held-out test set",
+    subtitle = paste("AUC =", round(auc_val, 4)),
+    x = "False Positive Rate",
+    y = "True Positive Rate"
+  )
+
+score_df <- data.frame(score = test_score, class = factor(test_labels, levels = c(0, 1), labels = c("Background", "Presence")))
+
+ggplot(score_df, aes(x = score, fill = class)) +
+  geom_histogram(position = "identity", alpha = 0.45, bins = 40) +
+  geom_vline(xintercept = thr, linetype = 2, color = "black") +
+  scale_fill_manual(values = c("Background" = "gray60", "Presence" = "firebrick3")) +
+  labs(title = "Predicted suitability distributions", x = "cloglog score", y = "Count")
+```
+
+## 9. Predict full-region suitability and maps
+
+```{r predict}
+pred_ca <- raster::predict(raster::stack(wc_ca), mx, type = "cloglog", progress = "text")
+
+pred_df <- as.data.frame(raster::rasterToPoints(pred_ca), stringsAsFactors = FALSE)
+colnames(pred_df) <- c("x", "y", "suitability")
+
+ggplot(pred_df, aes(x = x, y = y, fill = suitability)) +
+  geom_raster() +
+  scale_fill_viridis_c(name = "Suitability") +
+  geom_point(data = pres_df, aes(x = x, y = y), color = "red", size = 0.9, alpha = 0.6, inherit.aes = FALSE) +
+  coord_quickmap() +
+  labs(title = "Predicted suitability for California poppy", subtitle = "Maxnet model, cloglog output")
+
+bin_map <- pred_ca > thr
+bin_df <- as.data.frame(raster::rasterToPoints(bin_map), stringsAsFactors = FALSE)
+colnames(bin_df) <- c("x", "y", "suitability")
+
+ggplot(bin_df, aes(x = x, y = y, fill = factor(suitability))) +
+  geom_raster() +
+  scale_fill_manual(values = c("lightgray", "darkgreen"), name = "Suitable") +
+  coord_quickmap() +
+  labs(title = sprintf("Binary suitability map > %.3f", thr))
+```
+
+## 10. Response curves and permutation importance
+
+```{r importance}
+med <- apply(model_input[, pred_names, drop = FALSE], 2, median, na.rm = TRUE)
+
+vars_for_response <- intersect(c("bio1", "bio5", "bio6", "bio12"), pred_names)
+if (length(vars_for_response) == 0) {
+  vars_for_response <- head(pred_names, 4)
+}
+
+response_df <- do.call(rbind, lapply(vars_for_response, function(v) {
+  xseq <- seq(min(model_input[[v]], na.rm = TRUE), max(model_input[[v]], na.rm = TRUE), length.out = 100)
+  nd <- as.data.frame(matrix(rep(med, each = length(xseq)), nrow = length(xseq)))
+  names(nd) <- pred_names
+  nd[[v]] <- xseq
+  yhat <- predict(mx, nd, type = "cloglog")
+  data.frame(variable = v, x = xseq, suitability = yhat)
+}))
+
+ggplot(response_df, aes(x = x, y = suitability)) +
+  geom_line(color = "midnightblue") +
+  facet_wrap(~ variable, scales = "free_x") +
+  labs(title = "Response curves", x = "Predictor value", y = "Predicted suitability")
+
+baseline_auc <- auc_val
+perm_imp <- lapply(pred_names, function(v) {
+  x_perm <- x_test
+  x_perm[[v]] <- sample(x_perm[[v]])
+  p_perm <- predict(mx, x_perm, type = "cloglog")
+  auc_perm <- as.numeric(pROC::auc(pROC::roc(test_labels, p_perm, quiet = TRUE)))
+  data.frame(variable = v, importance = baseline_auc - auc_perm)
+})
+perm_imp <- bind_rows(perm_imp) %>% arrange(desc(importance))
+
+knitr::kable(head(perm_imp, 10), digits = 4, caption = "Top permutation importance (AUC drop)")
+
+ggplot(perm_imp, aes(x = reorder(variable, importance), y = importance)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Permutation importance", x = "Climate variable", y = "AUC drop after permutation")
+```
+
+## 11. Save outputs
+
+```{r save}
+raster::writeRaster(pred_ca, filename = "california_poppy_suitability.tif", overwrite = TRUE)
+raster::writeRaster(bin_map, filename = "california_poppy_suitability_binary.tif", overwrite = TRUE)
+write.csv(diag_tbl, "sdm_diagnostics.csv", row.names = FALSE)
+write.csv(perm_imp, "sdm_permutation_importance.csv", row.names = FALSE)
+
+cat("Saved outputs:\n")
+cat("- california_poppy_suitability.tif\n")
+cat("- california_poppy_suitability_binary.tif\n")
+cat("- sdm_diagnostics.csv\n")
+cat("- sdm_permutation_importance.csv\n")
+```
+
+## 12. Session info
+
+```{r session-info}
+sessionInfo()
+```

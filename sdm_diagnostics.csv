@@ -1,0 +1,7 @@
+"metric","value"
+"AUC",0.936093487394959
+"Threshold (Youden)",0.487037929312669
+"Sensitivity",0.815126050420168
+"Specificity",0.901
+"Accuracy",0.891867739052726
+"TSS",0.716126050420168
