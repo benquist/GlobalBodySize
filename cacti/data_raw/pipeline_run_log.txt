@@ -1,0 +1,13 @@
+[1/5] BIEN taxonomy...
+Getting page 1 of records
+  Accepted species: 2650 
+[2/5] BIEN all traits...
+Getting page 1 of records
+  BIEN trait records: 1913 
+  Clean BIEN rows: 1799 
+[3/5] Wikipedia scraping for 2650 species...
+  Wikipedia: 1 / 2650 (0%) — Acanthocalycium ferrarii
+Error in add("flower color", tolower(str_squish(fc2[1, 2])), note = "text extraction") : 
+  unused argument (note = "text extraction")
+Calls: parse_wp_text_fallback
+Execution halted

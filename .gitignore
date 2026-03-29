@@ -1,0 +1,14 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Output files (keep source, ignore large binary outputs)
+*.html
+*.tif
+worldclim_data/
+
+# OS
+.DS_Store
+.flickrExclusion

@@ -1,0 +1,16 @@
+Package: EvoPowerEfficiencyExplorer
+Type: Package
+Title: Interactive Explorer for Metabolic Scaling and Efficiency
+Version: 0.1.0
+Authors@R: person(given = "Brian", family = "Jenquist", role = c("aut", "cre"), email = "brian@example.com")
+Description: Provides an interactive Shiny app to explore metabolic scaling,
+    energetic efficiency, clade-level variation, and bounded-size predictions
+    derived from the EvoPowerEfficiency analysis workflow.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports:
+    shiny,
+    ggplot2,
+    dplyr
+RoxygenNote: 7.3.2

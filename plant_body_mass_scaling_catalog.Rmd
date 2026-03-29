@@ -1,0 +1,214 @@
+---
+title: "Plant Body-Mass Scaling Relationships: Physiology, Ecology, and Evolution"
+author: "Working synthesis"
+date: "2026-03-28"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+## Scope
+
+This document is a structured starting synthesis of measured allometric relationships in plant biology where a trait or life-history attribute scales with plant size (mass, diameter, height, or closely related size proxies).
+
+Because the literature is very large and continuously updated, treat this as a living catalog: add rows as you encounter clade-specific, biome-specific, and method-specific estimates.
+
+## How To Read The Table
+
+- Scaling form: reported as a common power-law form on log-log scale.
+- First discovery year: earliest widely cited statement or empirical demonstration in plant biology.
+- Key citations: seminal and/or highly influential references.
+- Assumptions: conditions typically required for the relationship to hold.
+
+## Master Table
+
+```{r}
+library(tibble)
+library(dplyr)
+library(knitr)
+
+scaling_tbl <- tribble(
+  ~Domain, ~Relationship, ~Typical_scaling_form, ~First_discovery_year, ~Key_citations, ~Explanation, ~Core_assumptions,
+
+  "Theory / architecture",
+  "Allometric growth law (general form)",
+  "y = a * M^b",
+  1932,
+  "Huxley (1932)",
+  "Formalized how biological traits scale non-isometrically with size; conceptual foundation for plant allometry.",
+  "Traits follow multiplicative power laws; log-linearization is appropriate; slope b is biologically meaningful and approximately stable over analyzed size range.",
+
+  "Plant architecture",
+  "Pipe model: leaf area vs sapwood area",
+  "A_leaf proportional to A_sapwood",
+  1964,
+  "Shinozaki et al. (1964a, 1964b)",
+  "Leaf area supported by a stem segment is proportional to conductive sapwood area ('pipe units').",
+  "Each unit leaf area requires a roughly fixed conductive pipe area; conductive tissue is functional and comparable across sampled size classes; little heartwood bias in measured sapwood.",
+
+  "Plant architecture",
+  "Pipe model extension: leaf mass vs supporting stem mass",
+  "M_leaf proportional to M_supporting_stem (often near isometry locally)",
+  1964,
+  "Shinozaki et al. (1964a, 1964b); Niklas (1994)",
+  "Biomass investment in leaves and supporting axes scales predictably due to hydraulic and mechanical support coupling.",
+  "Branches are sampled comparably; ontogenetic stage is controlled; dead/support tissues are separated consistently from active tissues.",
+
+  "Plant architecture",
+  "Branching area preservation (Leonardo-like rule)",
+  "sum(child branch areas) ~ parent branch area",
+  1500,
+  "Leonardo da Vinci notebooks (~1500); modern tests in tree allometry literature",
+  "Across branch points, summed daughter cross-sectional area tends to match parent area, linking branching geometry and transport/mechanics.",
+  "Cross sections are measured at comparable distances from nodes; taper and secondary growth effects are either negligible or modeled.",
+
+  "Plant architecture / biomechanics",
+  "Height-diameter scaling",
+  "H = a * D^b (b often between 0.5 and 1, context dependent)",
+  1973,
+  "McMahon (1973); Niklas (1994)",
+  "Plant height increases predictably with stem diameter due to combined hydraulic delivery and buckling/mechanical constraints.",
+  "Individuals are not severely top-damaged; diameter is measured at standard height; environment does not induce extreme plastic departures.",
+
+  "Biomechanics",
+  "Whole-plant mass vs stem diameter",
+  "M = a * D^b (commonly b > 2)",
+  1994,
+  "Niklas (1994); Niklas and Spatz (2004)",
+  "Diameter provides an accessible proxy for biomass, with exponents reflecting architecture and wood density patterns.",
+  "Wood density variation is accounted for or modest; species/site effects are either modeled or sampling is restricted.",
+
+  "Physiology / metabolic scaling",
+  "Whole-plant metabolic rate vs body mass",
+  "B = a * M^(3/4) (canonical expectation; empirical b varies)",
+  1998,
+  "Enquist, Brown, and West (1998); West, Brown, and Enquist (1999)",
+  "Metabolic throughput scales sublinearly with plant mass, often interpreted via branching transport-network constraints.",
+  "Resource distribution networks are approximately space-filling and fractal-like; terminal units are size-invariant or weakly varying; near steady-state operation.",
+
+  "Physiology / growth",
+  "Absolute growth rate vs body mass",
+  "dM/dt = a * M^(3/4) (canonical)",
+  2001,
+  "Niklas and Enquist (2001)",
+  "Large plants add more biomass absolutely but less than proportionally to their mass, producing sublinear scaling.",
+  "Growth is measured over comparable windows; severe stress/disturbance is absent or modeled; mass is measured consistently.",
+
+  "Physiology / growth",
+  "Relative growth rate vs body mass",
+  "RGR = (1/M)dM/dt = a * M^(-1/4) (canonical)",
+  2001,
+  "Niklas and Enquist (2001)",
+  "Relative growth tends to decline with increasing size as maintenance and transport costs rise.",
+  "Same assumptions as absolute growth scaling; ontogenetic phase effects are controlled when estimating exponents.",
+
+  "Ecology / density dependence",
+  "Self-thinning law",
+  "mean plant mass proportional to N^(-3/2)",
+  1963,
+  "Yoda et al. (1963)",
+  "In crowded stands, density declines as surviving individuals gain mass, producing a characteristic negative log-log slope.",
+  "Stand is even-aged and strongly competitive; mortality is mainly competition-driven; similar size classes/species or controlled mixtures.",
+
+  "Forest ecology",
+  "Reineke stand density relationship",
+  "log(N) = a - 1.605*log(D_q)",
+  1933,
+  "Reineke (1933)",
+  "Maximum stand density follows a power-law decline with mean tree diameter, widely used in forestry.",
+  "Even-aged stands near density frontier; diameter metric is standardized; species/site differences handled via fitted intercepts.",
+
+  "Ecology / production",
+  "Constant final yield",
+  "Total stand biomass at high density approximately invariant across initial N",
+  1960,
+  "de Wit (1960)",
+  "Beyond a crowding threshold, extra initial individuals increase mortality rather than final biomass.",
+  "Resource limitation is stable and dominant; growth period is long enough for competitive exclusion/thinning dynamics.",
+
+  "Ecology / abundance-size",
+  "Population density vs individual mass (energetic equivalence form)",
+  "N = a * M^(-3/4) (canonical expectation)",
+  1998,
+  "Enquist et al. (1998); Enquist and Niklas (2001)",
+  "Larger plant species tend to occur at lower densities, often approximating inverse metabolic scaling expectations.",
+  "Communities are compared at similar resource supply or corrected for it; body-size estimates are comparable across taxa.",
+
+  "Hydraulic physiology",
+  "Conduit diameter tapering with plant size/path length",
+  "d_conduit = a * L_path^b",
+  2006,
+  "Anfodillo et al. (2006)",
+  "Xylem conduits widen from apex to base in a size-dependent way that partially offsets hydraulic resistance with size.",
+  "Path length is measured consistently; sampled conduits represent functional xylem; embolism history is not strongly biasing means.",
+
+  "Hydraulic physiology",
+  "Hydraulic conductance vs stem size",
+  "K = a * D^b (positive allometry)",
+  1985,
+  "Tyree and Zimmermann (1985) and subsequent empirical syntheses",
+  "Larger stems generally support disproportionately greater conductance via increased conduit size/number.",
+  "Measurements account for temperature/viscosity and segment length; conductivity losses from embolism are characterized or minimized.",
+
+  "Allocation ecology",
+  "Root mass vs shoot mass",
+  "M_root = a * M_shoot^b",
+  1963,
+  "Brouwer (1963); Poorter et al. syntheses",
+  "Biomass partitioning between roots and shoots follows predictable allometry, with exponent/intercept shifting across environments.",
+  "Plants are sampled at comparable ontogenetic stages; roots are adequately recovered; treatment effects are represented in the model.",
+
+  "Life-history evolution",
+  "Seed mass vs adult plant size",
+  "M_seed = a * M_adult^b (or with height proxy)",
+  1998,
+  "Westoby et al. (1998); Moles et al. (2005)",
+  "Larger species tend to produce larger seeds on average, reflecting establishment-survival and dispersal trade-offs.",
+  "Adult size is estimated comparably across taxa; phylogenetic non-independence is handled; life form differences are modeled.",
+
+  "Life-history evolution",
+  "Seed size-number trade-off",
+  "N_seeds = a * M_seed^(-b) (often near -1 for fixed reproductive allocation)",
+  1974,
+  "Smith and Fretwell (1974); Moles and Westoby literature",
+  "For a given reproductive budget, producing larger seeds generally reduces seed number.",
+  "Reproductive allocation is approximately constrained over comparison set; offspring quality increases with seed size in the focal environment.",
+
+  "Leaf economics / physiology",
+  "Leaf lifespan vs leaf mass per area",
+  "LL = a * LMA^b (positive)",
+  1992,
+  "Reich et al. (1992); Wright et al. (2004)",
+  "Heavier, denser leaves tend to live longer, linking construction investment to turnover strategy.",
+  "Leaves are sampled at comparable light positions/ages; LMA is measured consistently; evergreen/deciduous contrasts are modeled.",
+
+  "Whole-plant allocation",
+  "Reproductive biomass vs vegetative biomass",
+  "M_repro = a * M_veg^b",
+  2004,
+  "Weiner (2004); Weiner et al. (2009)",
+  "Reproductive output commonly scales allometrically with plant size, often revealing size-dependent allocation.",
+  "Reproductive effort is measured over complete reproductive period; damaged individuals are handled consistently; size hierarchy effects are considered."
+)
+
+kable(
+  scaling_tbl,
+  format = "html",
+  escape = TRUE,
+  caption = "Measured and widely used plant body-mass scaling relationships (starter synthesis)."
+)
+```
+
+## Notes On Discovery Year Interpretation
+
+"First discovery year" in the table indicates the earliest commonly cited statement, derivation, or demonstration in plant biology for the relationship in question. For some relationships, foundational ideas were proposed earlier and quantified later.
+
+## Priority Gaps To Add Next
+
+1. Clade-specific re-estimations (angiosperms, gymnosperms, bryophytes, crops).
+2. Biome-specific exponent shifts (arid, tropical, boreal, alpine systems).
+3. Disturbance effects (fire, herbivory, management) on scaling slopes/intercepts.
+4. Statistical-method dependence (OLS vs SMA/RMA; mixed-effects; phylogenetic correction).
+5. Ontogenetic phase dependence (seedling, sapling, mature).

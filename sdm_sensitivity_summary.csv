@@ -1,0 +1,6 @@
+"comparison","value"
+"Map correlation: main vs more complex model",0.982819078154349
+"Mean suitability: main model",0.278752653976621
+"Mean suitability: more complex model",0.271297024781418
+"Suitable fraction (> main threshold): main model",0.0870832574239388
+"Suitable fraction (> main threshold): more complex model",0.0787711787210785
