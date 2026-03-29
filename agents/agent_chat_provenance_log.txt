@@ -1,0 +1,207 @@
+Agent Chat Provenance Log
+=========================
+
+Purpose
+-------
+Track chats that led to creation, direction, or alteration of anything in:
+- agents/
+- .github/agents/
+- agent folder conventions/workflows
+
+Important Limitation
+--------------------
+No standalone historical chat transcript files were found in this workspace.
+This log reconstructs provenance from available evidence (git history + active chat context).
+
+Recovered Historical Provenance
+-------------------------------
+[1] Date: 2026-03-28 15:10:10 -0700
+Source: git commit history
+Commit: 6f40f31
+Author: benquist
+Message: Initial commit: California poppy SDM
+Agent evidence found in commit: .github/agents/coder.agent.md
+Notes: This is the earliest recoverable, repo-backed record tied to agent configuration.
+
+Current Chat Provenance Entry
+-----------------------------
+[2] Date: 2026-03-28
+Source: active chat request
+Request summary: User asked to compile all prior chats that created/directed agents and to keep an updated text file in agents folder.
+Action taken:
+- Searched workspace for chat/provenance records related to agents.
+- Checked git history for agents/ and .github/agents/.
+- Created this file: agents/agent_chat_provenance_log.txt.
+Outcome: Established an append-only provenance log for future agent-related chats.
+
+Update Rule (Append-Only)
+-------------------------
+For every future chat that causes creation/alteration/direction of agent files or the agent folder:
+1) Add a new numbered entry at the end of this file.
+2) Record: date, source chat summary, files affected, and actions taken.
+3) If git commit metadata exists, include commit hash and message.
+
+Entry Template
+--------------
+[N] Date: YYYY-MM-DD [time optional]
+Source: active chat | git commit | other evidence
+Request summary: ...
+Files affected: ...
+Action taken: ...
+Outcome: ...
+Commit (optional): <hash> - <message>
+
+[3] Date: 2026-03-28
+Source: active chat request
+Request summary: Create an always agent that always runs last and checks prompt logging, updated Rmd compilation, updated R package builds, and git push status.
+Files affected:
+- agents/always.agent.md
+- .github/agents/always.agent.md
+- agents/m.agent.md
+- .github/agents/m.agent.md
+- agents/prompt_log.md
+- AGENTS.md
+Action taken:
+- Created a new always agent in both agent registries.
+- Wired m supervisor to include always and enforce it as the final pre-return gate.
+- Added a dedicated prompt log file that always checks.
+- Added workspace policy in AGENTS.md to require always as final gate before return.
+Outcome: Always-run final gate established for operational checks before returning to user.
+
+[4] Date: 2026-03-28
+Source: active chat request
+Request summary: For always agent, only build Rmds/R packages when code changed; whenever a package build runs, return install R code.
+Files affected:
+- agents/always.agent.md
+- .github/agents/always.agent.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Updated always logic to skip Rmd/package builds when no relevant files changed.
+- Added required InstallCode output in always response format whenever package builds run.
+Outcome: Always gate now performs change-gated build checks and returns install commands when package builds occur.
+
+[5] Date: 2026-03-28
+Source: active chat request + VS Code session storage evidence
+Request summary: Update the agent chat log with all previous prompts by trying harder to recover history.
+Files affected:
+- agents/agent_chat_provenance_log.txt
+- agents/prompt_log.md
+Action taken:
+- Located persisted chat session files under VS Code workspace storage.
+- Parsed user prompt entries from session JSONL records.
+- Recovered and appended prior prompt history (including partial prompts saved during input editing).
+Outcome: Historical prompt recovery added to this log with session IDs and timestamps.
+
+Recovered Previous Prompts (from VS Code chatSessions)
+-----------------------------------------------------
+Source path:
+- /Users/brianjenquist/Library/Application Support/Code/User/workspaceStorage/077d64ac090184fbcfd5df1ba85184e5/chatSessions
+
+Recovered entries: 17
+
+1) Session: 4104f6cb-26c6-4bbb-80ac-3a87addd07e3 | Created: 2026-03-28 14:56:58 -0700
+Prompt: can you add those to just thius directory too
+
+2) Session: 4104f6cb-26c6-4bbb-80ac-3a87addd07e3 | Created: 2026-03-28 14:56:58 -0700
+Prompt: make an R shiny app that allows someone to explore the EvoPowerEfficiency.R code and
+
+3) Session: 4104f6cb-26c6-4bbb-80ac-3a87addd07e3 | Created: 2026-03-28 14:56:58 -0700
+Prompt: hey i
+
+4) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: I want to start a new document that is an RMD that has a table of every body mass scaling relationship that has been measured in plant biology, including physiology, ecology, and evolution. Include with each the key citations and an explanation about the relationship. List what year it was first discovered. Also give me a listing of the assumptions of each scaling relationship.
+
+5) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: start a subfolder calle cacti and get all the trait data from BIEN for all cacti species. then search the internet and find any other cacti data
+
+6) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: start a subfolder calle cacti and get all the trait data from BIEN for all cacti species. then search the internet and find any other cacti data to add to this. always record where you got the data that isn't from BIEN. You can just focus on the traits: body size (height or diameter or mass) and flower color
+
+7) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: I would like to create another agent for biodiversity, ecology and species analyses. This agent should be an expert on taxonomy, biodiversity informatics, and understanding how species are named and how names are recon
+
+8) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: And what about a biodiversity
+
+9) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: I dont see them in the explorer sidebar. Pu
+
+10) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: mak
+
+11) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+Prompt: make a new agent that pauses and asks me for feedback if the other agents are really uncertain or have been stuck on the same task a long time. and another agent that reports on progress any time a
+
+12) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: can you give me all the previous chats that gave rise to the creation and directon of all my agents. put in a separate text file in the agents folder. Update this file with any new chat that led to the creation/alteration etc.
+
+13) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: Now create an 'always agent' that always runs. It is called always. It always checks that prompts have been recoreded in teh propt file. That RMD
+
+14) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: Now create an 'always agent' that always runs. It is called 'always'. It always checks that prompts have been recoreded in teh propt file. That RMDs compile if they have been updated. That R packages build if updated. That results have been pushed to git. This always is the last to run before coming back to things.
+
+15) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: Now, I am pretty sure you can find the history of my chats to create age
+
+16) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: For the always
+
+17) Session: bba0dd2a-98ee-4a31-819c-944642ab4628 | Created: 2026-03-28 15:16:59 -0700
+Prompt: now add future projections of the range. use all rcps
+
+Additional Recovered Earlier Prompts (Retry Pass)
+------------------------------------------------
+18) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: Good. Now add all of my earlier prompt
+
+19) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: I would like to create another agent that makes sure that for each project created that we have a chat provenance log for the prompts that created the code and
+
+20) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+Prompt: I would like to create another agent that makes sure that for each project created that we have a chat provenance log for the prompts that created the code and created the work in that project. For example, 'cacti' should have its own provenance log, calipoppy SDM should have its own chat provenance log
+
+Recovered entries (updated): 20
+
+First Agent-Creation Prompt Index (Earliest Recovered)
+------------------------------------------------------
+- Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+	Prompt: I would like to create another agent for biodiversity, ecology and species analyses. This agent should be an expert on taxonomy, biodiversity informatics, and understanding how species are named and how names are recon
+- Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
+	Prompt: make a new agent that pauses and asks me for feedback if the other agents are really uncertain or have been stuck on the same task a long time. and another agent that reports on progress any time a
+- Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+	Prompt: Now create an 'always agent' that always runs. It is called 'always'. It always checks that prompts have been recoreded in teh propt file. That RMDs compile if they have been updated. That R packages build if updated. That results have been pushed to git. This always is the last to run before coming back to things.
+
+Note on Truncation
+------------------
+Some recovered prompts are partial because VS Code session storage captures intermediate input-state snapshots while typing.
+
+[6] Date: 2026-03-28
+Source: active chat request
+Request summary: User asked where the first prompts to create agents are in the agent log.
+Files affected:
+- agents/agent_chat_provenance_log.txt
+- agents/prompt_log.md
+Action taken:
+- Added an explicit "First Agent-Creation Prompt Index (Earliest Recovered)" section for quick lookup.
+- Confirmed the prompts are sourced from persisted VS Code chatSessions JSONL records.
+Outcome: First agent-creation prompts are now directly visible in a dedicated section.
+
+[7] Date: 2026-03-28
+Source: active chat request
+Request summary: User asked to add all earlier prompts to main agent log and create a new agent enforcing per-project chat provenance logs (examples: cacti and calipoppySDM).
+Files affected:
+- agents/agent_chat_provenance_log.txt
+- agents/project-provenance-guard.agent.md
+- .github/agents/project-provenance-guard.agent.md
+- cacti/chat_provenance_log.md
+- calipoppySDM/chat_provenance_log.md
+- agents/m.agent.md
+- .github/agents/m.agent.md
+- agents/prompt_log.md
+Action taken:
+- Appended missing recovered earlier prompts from persisted VS Code chatSessions.
+- Added project-provenance-guard agent and wired it into supervisor agent roster.
+- Created project-scoped provenance logs for cacti and calipoppySDM.
+Outcome: Central and project-specific provenance tracking is now in place with enforcement agent support.

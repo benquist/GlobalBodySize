@@ -84,312 +84,400 @@ safe_auc <- function(obs, pred) {
   as.numeric(pROC::auc(pROC::roc(response = obs, predictor = pred, quiet = TRUE)))
 }
 
-calc_metrics <- function(obs, pred) {
-  auc_val <- safe_auc(obs, pred)
-  if (length(unique(obs)) < 2) {
-    return(data.frame(
-      auc = auc_val,
-      sensitivity = NA_real_,
-      specificity = NA_real_,
-      tss = NA_real_,
-      threshold = NA_real_
-    ))
-  }
+## 1. Modeling objective, target, and assumptions
 
-  roc_obj <- pROC::roc(response = obs, predictor = pred, quiet = TRUE)
-  youden <- pROC::coords(
-    roc_obj,
-    x = "best",
-    best.method = "youden",
-    ret = c("threshold", "sensitivity", "specificity")
-  )
-  sens <- as.numeric(youden["sensitivity"])
-  spec <- as.numeric(youden["specificity"])
+This SDM is interpretation-first: estimate relative climatic suitability for *Eschscholzia californica* under current and future climates, then interpret ecological signal and transfer risks.
 
-  data.frame(
-    auc = auc_val,
-    sensitivity = sens,
-    specificity = spec,
-    tss = sens + spec - 1,
-    threshold = as.numeric(youden["threshold"])
-  )
-}
+Prediction target: gridded climatic suitability (cloglog output) at WorldClim resolution, not true occupancy probability.
 
-safe_sd <- function(x) {
-  if (sum(!is.na(x)) <= 1) {
-    return(NA_real_)
-  }
-  stats::sd(x, na.rm = TRUE)
-}
+Key assumptions:
 
-make_accessible_area <- function(points_df, calibration_bbox, buffer_km = 150) {
-  pres_pts_ll <- terra::vect(points_df, geom = c("longitude", "latitude"), crs = "EPSG:4326")
-  pres_pts_ca <- terra::project(pres_pts_ll, "EPSG:3310")
-  pres_hull <- terra::convHull(pres_pts_ca)
-  M_poly_ca <- terra::buffer(pres_hull, width = buffer_km * 1000)
-  bbox_poly <- terra::as.polygons(calibration_bbox, crs = "EPSG:4326")
-  M_poly_ll <- terra::project(M_poly_ca, "EPSG:4326")
-  M_poly_ll <- terra::intersect(M_poly_ll, bbox_poly)
-  if (is.null(M_poly_ll) || nrow(M_poly_ll) == 0) {
-    stop("Accessible area M could not be constructed.")
-  }
-  M_poly_ll
-}
+- occurrence records represent realized environmental associations after cleaning
+- calibration is restricted to an explicit accessible area ($M$)
+- background sampling approximates sampling effort (bias-aware)
+- temporal transfer to future climates is conditional on niche stability
+- extrapolation beyond calibration environments is flagged and constrained
 
-select_nonredundant_predictors <- function(env_df, candidate_vars, priority, cutoff = 0.7) {
-  keep <- intersect(candidate_vars, names(env_df))
-  if (length(keep) <= 1) {
-    return(keep)
-  }
+## 2. Occurrence data from BIEN and initial cleaning
 
-  repeat {
-    cor_mat <- abs(stats::cor(env_df[, keep, drop = FALSE], use = "pairwise.complete.obs"))
-    diag(cor_mat) <- 0
-    max_cor <- suppressWarnings(max(cor_mat, na.rm = TRUE))
-    if (!is.finite(max_cor) || max_cor < cutoff || length(keep) <= 1) {
-      break
-    }
-    pair_idx <- which(cor_mat == max_cor, arr.ind = TRUE)[1, ]
-    pair <- unique(c(rownames(cor_mat)[pair_idx[1]], colnames(cor_mat)[pair_idx[2]]))
-    drop_var <- pair[which.max(match(pair, priority))]
-    keep <- setdiff(keep, drop_var)
-  }
-
-  keep
-}
-
-fit_maxnet_model <- function(df, vars, classes = "lqh", regmult = 1.5) {
-  maxnet::maxnet(
-    p = df$presence,
-    data = df[, vars, drop = FALSE],
-    f = maxnet::maxnet.formula(df$presence, df[, vars, drop = FALSE], classes = classes),
-    regmult = regmult
-  )
-}
-```
-
-## 1. Ecological question and target of inference
-
-The inferential target is relative climatic suitability for *Eschscholzia californica* across California under current and future climate scenarios. The output is interpreted as a correlative climatic suitability surface on the cloglog scale, not as occupancy probability, abundance, colonization probability, or demographic performance.
-
-That distinction matters because California poppy occurrence reflects climate together with land use, disturbance, dispersal, soils, biotic interactions, and observation effort. The goal here is therefore not causal explanation, but defensible estimation of broad climatic association while keeping transfer risk and uncertainty visible.
-
-## 2. Occurrence audit and explicit calibration region M
-
-The reporting extent is California. Calibration is restricted to an explicit accessible area $M$: the convex hull of cleaned California records buffered by 150 km, then truncated to a California-centered calibration box. This is still an approximation, but it is more defensible than leaving extent implicit or drawing background from the full map.
-
-```{r occurrence-and-m}
+```{r occ-data}
 species_name <- "Eschscholzia californica"
-report_bbox <- terra::ext(-125, -114, 32, 42)
-calibration_bbox <- terra::ext(-125.5, -113.5, 31.5, 42.5)
-main_buffer_km <- 150
 
-occ_raw <- BIEN::BIEN_occurrence_species(species_name)
+occ <- BIEN::BIEN_occurrence_species(species_name)
 
-if (!all(c("latitude", "longitude") %in% names(occ_raw))) {
+if (!all(c("latitude", "longitude") %in% names(occ))) {
   stop("BIEN output does not include latitude/longitude columns.")
 }
 
-wc <- geodata::worldclim_global(var = "bio", res = 2.5, path = "worldclim_data")
-wc_calibration <- harmonize_bioc_names(terra::crop(wc, calibration_bbox))
-wc_report <- harmonize_bioc_names(terra::crop(wc, report_bbox))
-template_report <- wc_report[[1]]
+occ <- occ %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  distinct(latitude, longitude, .keep_all = TRUE)
 
-occ_basic <- occ_raw %>%
-  filter(is.finite(latitude), is.finite(longitude)) %>%
-  filter(abs(latitude) <= 90, abs(longitude) <= 180) %>%
-  filter(!(abs(latitude) < 1e-8 & abs(longitude) < 1e-8)) %>%
-  filter(
-    longitude >= terra::xmin(calibration_bbox), longitude <= terra::xmax(calibration_bbox),
-    latitude >= terra::ymin(calibration_bbox), latitude <= terra::ymax(calibration_bbox)
-  ) %>%
-  distinct(longitude, latitude, .keep_all = TRUE)
+ca_bbox <- terra::ext(-125, -114, 32, 42)
 
-climate_extract <- terra::extract(
-  template_report,
-  as.matrix(occ_basic[, c("longitude", "latitude")])
-)
-climate_hit <- climate_extract[[ncol(climate_extract)]]
-occ_on_grid <- occ_basic[!is.na(climate_hit), , drop = FALSE]
+occ_ca <- occ %>%
+  filter(longitude >= -125, longitude <= -114, latitude >= 32, latitude <= 42)
 
-occ_cells <- terra::cellFromXY(template_report, as.matrix(occ_on_grid[, c("longitude", "latitude")]))
-occ_cell_unique <- occ_on_grid[!duplicated(occ_cells) & !is.na(occ_cells), , drop = FALSE]
-
-if (nrow(occ_cell_unique) < 30) {
-  stop("Too few cleaned California occurrences remain for a stable SDM.")
+if (nrow(occ_ca) < 30) {
+  stop("Too few California occurrences after filtering; cannot build a stable SDM.")
 }
 
-occ_audit <- data.frame(
-  step = c(
-    "Raw BIEN records",
-    "After basic coordinate and extent filters",
-    "After removing points off the climate grid",
-    "After one record per raster cell"
-  ),
-  n_records = c(
-    nrow(occ_raw),
-    nrow(occ_basic),
-    nrow(occ_on_grid),
-    nrow(occ_cell_unique)
-  )
-)
-
-M_poly_ll <- make_accessible_area(
-  occ_cell_unique[, c("longitude", "latitude")],
-  calibration_bbox = calibration_bbox,
-  buffer_km = main_buffer_km
-)
-
-M_path <- as.data.frame(terra::geom(M_poly_ll)[, c("x", "y", "part")])
-
-knitr::kable(occ_audit, caption = "Occurrence filtering summary")
-
-ggplot() +
-  geom_path(data = M_path, aes(x = x, y = y, group = part), color = "black", linewidth = 0.5) +
-  geom_point(data = occ_cell_unique, aes(x = longitude, y = latitude), color = "red3", alpha = 0.6, size = 1) +
-  coord_quickmap(
-    xlim = c(terra::xmin(report_bbox), terra::xmax(report_bbox)),
-    ylim = c(terra::ymin(report_bbox), terra::ymax(report_bbox))
-  ) +
-  labs(
-    title = "Cleaned occurrences and explicit calibration region M",
-    subtitle = sprintf("M = occurrence hull buffered %s km and truncated to the calibration box", main_buffer_km),
-    x = "Longitude",
-    y = "Latitude"
-  )
+nrow(occ_ca)
+head(occ_ca)
 ```
 
-Filtering was limited to reproducible steps available with the installed toolchain: invalid coordinates removed, extent restricted, points off the climate grid removed, and duplicate records collapsed to one presence per raster cell. That does not solve all georeferencing or taxonomic issues, but it removes several common sources of spurious model signal.
+## 3. Define accessible area (M) for calibration
 
-## 3. Ecological predictor set and collinearity control
+```{r accessible-area}
+# Accessible area M: convex hull of California occurrences + 150 km buffer,
+# then clipped to California bounding extent.
+pres_pts_ll <- terra::vect(occ_ca[, c("longitude", "latitude")], geom = c("longitude", "latitude"), crs = "EPSG:4326")
+pres_pts_ca <- terra::project(pres_pts_ll, "EPSG:3310")
+pres_hull <- terra::convHull(pres_pts_ca)
+M_poly_ca <- terra::buffer(pres_hull, width = 150000)
+M_poly_ll <- terra::project(M_poly_ca, "EPSG:4326")
 
-Rather than fitting all 19 BIO variables, the workflow starts from a short, ecologically motivated candidate set for a Mediterranean-climate annual and then thins it for redundancy within $M$ using a simple $|r| < 0.7$ rule.
+ca_poly <- terra::as.polygons(ca_bbox, crs = "EPSG:4326")
+M_poly_ll <- terra::intersect(M_poly_ll, ca_poly)
 
-```{r predictors}
-wc_M <- terra::mask(terra::crop(wc_calibration, M_poly_ll), M_poly_ll)
+if (is.null(M_poly_ll) || nrow(M_poly_ll) == 0) {
+  stop("Accessible area M could not be constructed.")
+}
 
-candidate_predictors <- c("bio1", "bio6", "bio12", "bio15", "bio18", "bio4")
-predictor_rationale <- data.frame(
-  variable = candidate_predictors,
-  rationale = c(
-    "Annual thermal regime",
-    "Cold limitation and frost exposure",
-    "Overall moisture supply",
-    "Mediterranean precipitation seasonality",
-    "Warm-quarter moisture",
-    "Temperature seasonality"
-  ),
-  stringsAsFactors = FALSE
-)
+M_poly_ll
+```
 
-env_values <- na.omit(as.data.frame(wc_M[[candidate_predictors]], xy = FALSE))
-pred_names <- select_nonredundant_predictors(
-  env_values,
-  candidate_vars = candidate_predictors,
-  priority = candidate_predictors,
-  cutoff = 0.7
-)
+## 4. Climate predictors and calibration mask
 
-predictor_tbl <- predictor_rationale %>%
-  mutate(selected = ifelse(variable %in% pred_names, "Kept", "Dropped as redundant"))
+```{r climate}
+wc <- geodata::worldclim_global(var = "bio", res = 2.5, path = "worldclim_data")
+wc_ca <- terra::crop(wc, ca_bbox)
+wc_ca <- harmonize_bioc_names(wc_ca)
 
-cor_tbl <- as.data.frame(as.table(round(stats::cor(env_values[, candidate_predictors, drop = FALSE], use = "pairwise.complete.obs"), 2)))
-names(cor_tbl) <- c("var1", "var2", "correlation")
+pred_names <- names(wc_ca)
 
-knitr::kable(predictor_tbl, caption = "Candidate predictors and retained set")
-knitr::kable(cor_tbl, caption = "Candidate predictor correlations within M")
+wc_M <- terra::mask(terra::crop(wc_ca, M_poly_ll), M_poly_ll)
 
 pred_names
 ```
 
-## 4. Bias-aware background sampling
-
-Background points are sampled within $M$ with probability proportional to a smoothed presence density surface. This is a practical bias-aware approximation of sampling effort and is preferable here to naive uniform background over the entire study region.
+## 5. Sampling bias handling and target-group-style background
 
 ```{r background}
-template_M <- wc_M[[1]]
+template <- wc_M[[1]]
 
-pres_cells <- terra::cellFromXY(template_M, as.matrix(occ_cell_unique[, c("longitude", "latitude")]))
+pres_xy_raw <- as.matrix(occ_ca[, c("longitude", "latitude")])
+in_M <- !is.na(terra::extract(template, pres_xy_raw)[, 1])
+pres_xy_raw <- pres_xy_raw[in_M, , drop = FALSE]
+
+if (nrow(pres_xy_raw) < 30) {
+  stop("Too few occurrences inside M after filtering to climate coverage.")
+}
+
+# One presence per raster cell reduces duplicate sampling effort signals.
+pres_cells <- terra::cellFromXY(template, pres_xy_raw)
 pres_cells <- unique(pres_cells[!is.na(pres_cells)])
-pres_xy <- terra::xyFromCell(template_M, pres_cells)
+pres_xy <- terra::xyFromCell(template, pres_cells)
 pres_df <- data.frame(x = pres_xy[, 1], y = pres_xy[, 2])
 
-bias_r <- template_M
+# Bias-aware background: sample with probabilities proportional to smoothed
+# presence density across M (target-group-style effort proxy).
+bias_r <- template
 terra::values(bias_r) <- 0
 terra::values(bias_r)[pres_cells] <- 1
-bias_r <- terra::focal(bias_r, w = matrix(1, 9, 9), fun = sum, na.policy = "omit")
+bias_r <- terra::focal(bias_r, w = matrix(1, 7, 7), fun = sum, na.policy = "omit")
 
 bias_vals <- terra::values(bias_r)
-bg_candidates <- setdiff(which(!is.na(bias_vals)), pres_cells)
-bg_weights <- pmax(bias_vals[bg_candidates], 1e-6)
-bg_weights <- bg_weights / sum(bg_weights)
+valid_cells <- which(!is.na(bias_vals))
+w <- pmax(bias_vals[valid_cells], 1e-6)
+w <- w / sum(w)
 
-bg_n <- min(10000, length(bg_candidates))
-bg_cells <- sample(bg_candidates, size = bg_n, replace = FALSE, prob = bg_weights)
-bg_xy <- terra::xyFromCell(template_M, bg_cells)
+bg_n <- 10000
+bg_cells <- sample(valid_cells, size = bg_n, replace = TRUE, prob = w)
+bg_xy <- terra::xyFromCell(template, bg_cells)
 bg_df <- data.frame(x = bg_xy[, 1], y = bg_xy[, 2])
 
 plot_df <- bind_rows(
   data.frame(x = pres_df$x, y = pres_df$y, type = "Presence"),
-  data.frame(x = bg_df$x, y = bg_df$y, type = "Bias-aware background")
+  data.frame(x = bg_df$x, y = bg_df$y, type = "Background")
 )
 
-ggplot(plot_df, aes(x = x, y = y, color = type)) +
-  geom_point(size = 0.25, alpha = 0.5) +
-  geom_path(data = M_path, aes(x = x, y = y, group = part), inherit.aes = FALSE, color = "black") +
-  coord_quickmap(
-    xlim = c(terra::xmin(report_bbox), terra::xmax(report_bbox)),
-    ylim = c(terra::ymin(report_bbox), terra::ymax(report_bbox))
+ggplot(plot_df, aes(x, y, color = type)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  geom_path(
+    data = as.data.frame(terra::geom(M_poly_ll)[, c("x", "y", "part")]),
+    aes(x = x, y = y, group = part),
+    inherit.aes = FALSE,
+    color = "black",
+    linewidth = 0.4
   ) +
-  scale_color_manual(values = c("Presence" = "red3", "Bias-aware background" = "gray50")) +
-  labs(title = "Calibration data inside M", x = "Longitude", y = "Latitude")
+  coord_quickmap(xlim = c(-125, -114), ylim = c(32, 42)) +
+  scale_color_manual(values = c("Presence" = "red3", "Background" = "gray50")) +
+  labs(title = "Calibration data in M", x = "Longitude", y = "Latitude")
 ```
 
-```{r model-data}
-pres_vals <- as.data.frame(terra::extract(wc_M[[pred_names]], as.matrix(pres_df)))
-bg_vals <- as.data.frame(terra::extract(wc_M[[pred_names]], as.matrix(bg_df)))
+## 6. Presence-background matrix
 
-if ("ID" %in% names(pres_vals)) {
-  pres_vals <- pres_vals[, setdiff(names(pres_vals), "ID"), drop = FALSE]
-}
-if ("ID" %in% names(bg_vals)) {
-  bg_vals <- bg_vals[, setdiff(names(bg_vals), "ID"), drop = FALSE]
+```{r pb-data}
+```
+---
+title: "California Poppy (Eschscholzia californica) Species Distribution Model"
+author: "GitHub Copilot"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    theme: cerulean
+    code_folding: show
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+required_pkgs <- c(
+  "dplyr", "terra", "raster", "maxnet", "ggplot2", "BIEN",
+  "knitr", "pROC", "viridis", "geodata"
+)
+
+to_install <- required_pkgs[!vapply(required_pkgs, requireNamespace, logical(1), quietly = TRUE)]
+if (length(to_install) > 0) {
+  install.packages(to_install, repos = "https://cran.rstudio.com")
 }
 
-model_input <- bind_rows(
-  cbind(pres_df, presence = 1L, pres_vals),
-  cbind(bg_df, presence = 0L, bg_vals)
-) %>%
+library(dplyr)
+library(terra)
+library(raster)
+library(maxnet)
+library(ggplot2)
+library(BIEN)
+library(knitr)
+library(pROC)
+library(viridis)
+library(geodata)
+
+set.seed(123)
+
+harmonize_bioc_names <- function(x) {
+  nm <- names(x)
+  idx <- suppressWarnings(as.integer(sub("^bio0*([0-9]+)$", "\\1", nm, ignore.case = TRUE)))
+  if (any(is.na(idx))) {
+    idx <- suppressWarnings(as.integer(sub(".*_([0-9]+)$", "\\1", nm)))
+  }
+  if (all(!is.na(idx)) && length(idx) == terra::nlyr(x)) {
+    names(x) <- paste0("bio", idx)
+  }
+  x
+}
+
+assign_nearest_centroid <- function(points_xy, centers_xy) {
+  if (nrow(points_xy) == 0) {
+    return(integer(0))
+  }
+  out <- integer(nrow(points_xy))
+  for (i in seq_len(nrow(points_xy))) {
+    d2 <- (centers_xy[, 1] - points_xy[i, 1])^2 + (centers_xy[, 2] - points_xy[i, 2])^2
+    out[i] <- which.min(d2)
+  }
+  out
+}
+
+clamp_to_training_range <- function(x, ref_df, vars) {
+  mins <- vapply(ref_df[, vars, drop = FALSE], min, numeric(1), na.rm = TRUE)
+  maxs <- vapply(ref_df[, vars, drop = FALSE], max, numeric(1), na.rm = TRUE)
+  out <- x[[vars]]
+  for (v in vars) {
+    out[[v]] <- terra::clamp(out[[v]], lower = mins[[v]], upper = maxs[[v]], values = TRUE)
+  }
+  out
+}
+
+novelty_fraction <- function(x, ref_df, vars) {
+  mins <- vapply(ref_df[, vars, drop = FALSE], min, numeric(1), na.rm = TRUE)
+  maxs <- vapply(ref_df[, vars, drop = FALSE], max, numeric(1), na.rm = TRUE)
+  out_stack <- terra::rast(lapply(vars, function(v) {
+    (x[[v]] < mins[[v]]) | (x[[v]] > maxs[[v]])
+  }))
+  terra::app(out_stack, sum, na.rm = TRUE) / length(vars)
+}
+
+safe_auc <- function(obs, pred) {
+  if (length(unique(obs)) < 2) {
+    return(NA_real_)
+  }
+  as.numeric(pROC::auc(pROC::roc(response = obs, predictor = pred, quiet = TRUE)))
+}
+```
+
+## 1. Modeling objective, target, and assumptions
+
+This SDM is interpretation-first: estimate relative climatic suitability for *Eschscholzia californica* under current and future climates, then interpret ecological signal and transfer risks.
+
+Prediction target: gridded climatic suitability (cloglog output) at WorldClim resolution, not true occupancy probability.
+
+Key assumptions:
+
+- occurrence records represent realized environmental associations after cleaning
+- calibration is restricted to an explicit accessible area ($M$)
+- background sampling approximates sampling effort (bias-aware)
+- temporal transfer to future climates is conditional on niche stability
+- extrapolation beyond calibration environments is flagged and constrained
+
+## 2. Occurrence data from BIEN and initial cleaning
+
+```{r occ-data}
+species_name <- "Eschscholzia californica"
+
+occ <- BIEN::BIEN_occurrence_species(species_name)
+
+if (!all(c("latitude", "longitude") %in% names(occ))) {
+  stop("BIEN output does not include latitude/longitude columns.")
+}
+
+occ <- occ %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  distinct(latitude, longitude, .keep_all = TRUE)
+
+ca_bbox <- terra::ext(-125, -114, 32, 42)
+
+occ_ca <- occ %>%
+  filter(longitude >= -125, longitude <= -114, latitude >= 32, latitude <= 42)
+
+if (nrow(occ_ca) < 30) {
+  stop("Too few California occurrences after filtering; cannot build a stable SDM.")
+}
+
+nrow(occ_ca)
+head(occ_ca)
+```
+
+## 3. Define accessible area (M) for calibration
+
+```{r accessible-area}
+# Accessible area M: convex hull of California occurrences + 150 km buffer,
+# then clipped to California bounding extent.
+pres_pts_ll <- terra::vect(occ_ca[, c("longitude", "latitude")], geom = c("longitude", "latitude"), crs = "EPSG:4326")
+pres_pts_ca <- terra::project(pres_pts_ll, "EPSG:3310")
+pres_hull <- terra::convHull(pres_pts_ca)
+M_poly_ca <- terra::buffer(pres_hull, width = 150000)
+M_poly_ll <- terra::project(M_poly_ca, "EPSG:4326")
+
+ca_poly <- terra::as.polygons(ca_bbox, crs = "EPSG:4326")
+M_poly_ll <- terra::intersect(M_poly_ll, ca_poly)
+
+if (is.null(M_poly_ll) || nrow(M_poly_ll) == 0) {
+  stop("Accessible area M could not be constructed.")
+}
+
+M_poly_ll
+```
+
+## 4. Climate predictors and calibration mask
+
+```{r climate}
+wc <- geodata::worldclim_global(var = "bio", res = 2.5, path = "worldclim_data")
+wc_ca <- terra::crop(wc, ca_bbox)
+wc_ca <- harmonize_bioc_names(wc_ca)
+
+pred_names <- names(wc_ca)
+
+wc_M <- terra::mask(terra::crop(wc_ca, M_poly_ll), M_poly_ll)
+
+pred_names
+```
+
+## 5. Sampling bias handling and target-group-style background
+
+```{r background}
+template <- wc_M[[1]]
+
+pres_xy_raw <- as.matrix(occ_ca[, c("longitude", "latitude")])
+in_M <- !is.na(terra::extract(template, pres_xy_raw)[, 1])
+pres_xy_raw <- pres_xy_raw[in_M, , drop = FALSE]
+
+if (nrow(pres_xy_raw) < 30) {
+  stop("Too few occurrences inside M after filtering to climate coverage.")
+}
+
+# One presence per raster cell reduces duplicate sampling effort signals.
+pres_cells <- terra::cellFromXY(template, pres_xy_raw)
+pres_cells <- unique(pres_cells[!is.na(pres_cells)])
+pres_xy <- terra::xyFromCell(template, pres_cells)
+pres_df <- data.frame(x = pres_xy[, 1], y = pres_xy[, 2])
+
+# Bias-aware background: sample with probabilities proportional to smoothed
+# presence density across M (target-group-style effort proxy).
+bias_r <- template
+terra::values(bias_r) <- 0
+terra::values(bias_r)[pres_cells] <- 1
+bias_r <- terra::focal(bias_r, w = matrix(1, 7, 7), fun = sum, na.policy = "omit")
+
+bias_vals <- terra::values(bias_r)
+valid_cells <- which(!is.na(bias_vals))
+w <- pmax(bias_vals[valid_cells], 1e-6)
+w <- w / sum(w)
+
+bg_n <- 10000
+bg_cells <- sample(valid_cells, size = bg_n, replace = TRUE, prob = w)
+bg_xy <- terra::xyFromCell(template, bg_cells)
+bg_df <- data.frame(x = bg_xy[, 1], y = bg_xy[, 2])
+
+plot_df <- bind_rows(
+  data.frame(x = pres_df$x, y = pres_df$y, type = "Presence"),
+  data.frame(x = bg_df$x, y = bg_df$y, type = "Background")
+)
+
+ggplot(plot_df, aes(x, y, color = type)) +
+  geom_point(size = 0.3, alpha = 0.5) +
+  geom_path(
+    data = as.data.frame(terra::geom(M_poly_ll)[, c("x", "y", "part")]),
+    aes(x = x, y = y, group = part),
+    inherit.aes = FALSE,
+    color = "black",
+    linewidth = 0.4
+  ) +
+  coord_quickmap(xlim = c(-125, -114), ylim = c(32, 42)) +
+  scale_color_manual(values = c("Presence" = "red3", "Background" = "gray50")) +
+  labs(title = "Calibration data in M", x = "Longitude", y = "Latitude")
+```
+
+## 6. Presence-background matrix
+
+```{r pb-data}
+pres_vals_raw <- terra::extract(wc_M, as.matrix(pres_df))
+bg_vals_raw <- terra::extract(wc_M, as.matrix(bg_df))
+
+pres_vals <- as.data.frame(pres_vals_raw)[, intersect(pred_names, names(pres_vals_raw)), drop = FALSE]
+bg_vals <- as.data.frame(bg_vals_raw)[, intersect(pred_names, names(bg_vals_raw)), drop = FALSE]
+
+pres_dat <- cbind(pres_df, presence = 1, pres_vals)
+bg_dat <- cbind(bg_df, presence = 0, bg_vals)
+
+model_input <- bind_rows(pres_dat, bg_dat) %>%
   filter(if_all(all_of(pred_names), ~ !is.na(.x)))
 
-if (sum(model_input$presence == 1L) < 30) {
-  stop("Insufficient cleaned presence records remain after predictor extraction.")
+if (sum(model_input$presence == 1) < 30) {
+  stop("Insufficient cleaned presence records for modeling.")
 }
 
-data.frame(
-  class = c("Presence", "Background"),
-  n = c(sum(model_input$presence == 1L), sum(model_input$presence == 0L))
-) %>%
-  knitr::kable(caption = "Presence-background sample sizes used for calibration")
+head(model_input)
+dim(model_input)
 ```
 
-## 5. Complexity control and spatial validation
+## 7. Spatially structured validation (clustered folds)
 
-The main model is intentionally constrained: linear, quadratic, and hinge features with `regmult = 1.5`. Validation is based on spatially structured folds rather than only random splits, because nearby records often make random validation look better than the model will perform under spatial transfer.
-
-```{r validation}
+```{r spatial-cv}
 coords_ll <- as.matrix(model_input[, c("x", "y")])
 coords_m <- terra::project(coords_ll, from = "EPSG:4326", to = "EPSG:3310")
 
-pres_rows <- which(model_input$presence == 1L)
-bg_rows <- which(model_input$presence == 0L)
-k_folds <- min(5, max(3, floor(length(pres_rows) / 20)))
+pres_rows <- which(model_input$presence == 1)
+bg_rows <- which(model_input$presence == 0)
 
-if (k_folds < 3) {
-  stop("Too few cleaned presences for spatial cross-validation.")
+n_pres <- length(pres_rows)
+k_folds <- min(5, max(2, floor(n_pres / 20)))
+
+if (k_folds < 2) {
+  stop("Too few presence points for spatially structured validation.")
 }
 
-km <- kmeans(coords_m[pres_rows, , drop = FALSE], centers = k_folds, nstart = 25)
+km <- kmeans(coords_m[pres_rows, , drop = FALSE], centers = k_folds, nstart = 20)
 fold_id <- integer(nrow(model_input))
 fold_id[pres_rows] <- km$cluster
 fold_id[bg_rows] <- assign_nearest_centroid(coords_m[bg_rows, , drop = FALSE], km$centers)
@@ -405,73 +493,88 @@ for (fold in seq_len(k_folds)) {
   train_df <- model_input[train_idx, , drop = FALSE]
   test_df <- model_input[test_idx, , drop = FALSE]
 
-  mx_fold <- fit_maxnet_model(train_df, pred_names, classes = "lqh", regmult = 1.5)
-  fold_pred <- predict(mx_fold, test_df[, pred_names, drop = FALSE], type = "cloglog")
-  fold_metrics <- calc_metrics(test_df$presence, fold_pred)
+  x_train <- train_df[, pred_names, drop = FALSE]
+  p_train <- train_df$presence
+
+  mx_fold <- maxnet::maxnet(
+    p = p_train,
+    data = x_train,
+    f = maxnet.formula(p_train, x_train, classes = "lqhp")
+  )
+
+  x_test <- test_df[, pred_names, drop = FALSE]
+  p_test <- test_df$presence
+  score <- predict(mx_fold, x_test, type = "cloglog")
+  auc_val <- safe_auc(p_test, score)
+
+  if (length(unique(p_test)) >= 2) {
+    roc_obj <- pROC::roc(response = p_test, predictor = score, quiet = TRUE)
+    youden <- pROC::coords(
+      roc_obj,
+      x = "best",
+      best.method = "youden",
+      ret = c("threshold", "sensitivity", "specificity")
+    )
+    thr <- as.numeric(youden["threshold"])
+    sens <- as.numeric(youden["sensitivity"])
+    spec <- as.numeric(youden["specificity"])
+    tss <- sens + spec - 1
+  } else {
+    thr <- NA_real_
+    sens <- NA_real_
+    spec <- NA_real_
+    tss <- NA_real_
+  }
 
   cv_models[[fold]] <- mx_fold
-  cv_thresholds[fold] <- fold_metrics$threshold
-  cv_stats[[fold]] <- cbind(
-    data.frame(fold = fold, n_test = nrow(test_df), n_test_presence = sum(test_df$presence == 1L)),
-    fold_metrics
+  cv_thresholds[fold] <- thr
+  cv_stats[[fold]] <- data.frame(
+    fold = fold,
+    n_test = nrow(test_df),
+    n_test_presence = sum(p_test == 1),
+    auc = auc_val,
+    sensitivity = sens,
+    specificity = spec,
+    tss = tss,
+    threshold = thr
   )
 }
 
 cv_tbl <- bind_rows(cv_stats)
 
-spatial_summary <- data.frame(
-  metric = c(
-    "Spatial CV AUC mean",
-    "Spatial CV AUC sd",
-    "Spatial CV TSS mean",
-    "Spatial CV TSS sd",
-    "Spatial CV threshold median"
-  ),
+diag_tbl <- data.frame(
+  metric = c("Spatial CV AUC (mean)", "Spatial CV AUC (sd)", "Spatial CV TSS (mean)", "Spatial CV TSS (sd)"),
   value = c(
     mean(cv_tbl$auc, na.rm = TRUE),
-    safe_sd(cv_tbl$auc),
+    sd(cv_tbl$auc, na.rm = TRUE),
     mean(cv_tbl$tss, na.rm = TRUE),
-    safe_sd(cv_tbl$tss),
-    median(cv_tbl$threshold, na.rm = TRUE)
+    sd(cv_tbl$tss, na.rm = TRUE)
   )
 )
 
-set.seed(2026)
-rand_train_p <- sample(pres_rows, floor(0.8 * length(pres_rows)))
-rand_train_b <- sample(bg_rows, floor(0.8 * length(bg_rows)))
-rand_train <- c(rand_train_p, rand_train_b)
-rand_test <- setdiff(seq_len(nrow(model_input)), rand_train)
-
-rand_model <- fit_maxnet_model(model_input[rand_train, , drop = FALSE], pred_names, classes = "lqh", regmult = 1.5)
-rand_pred <- predict(rand_model, model_input[rand_test, pred_names, drop = FALSE], type = "cloglog")
-rand_metrics <- calc_metrics(model_input$presence[rand_test], rand_pred)
-
-validation_compare <- data.frame(
-  validation = c("Spatial CV mean", "Random 80/20 split"),
-  auc = c(mean(cv_tbl$auc, na.rm = TRUE), rand_metrics$auc),
-  tss = c(mean(cv_tbl$tss, na.rm = TRUE), rand_metrics$tss)
-)
-
-knitr::kable(cv_tbl, digits = 4, caption = "Fold-level diagnostics from spatial cross-validation")
-knitr::kable(validation_compare, digits = 4, caption = "Validation sensitivity: spatial folds versus random split")
-knitr::kable(spatial_summary, digits = 4, caption = "Primary validation summary")
+knitr::kable(cv_tbl, digits = 4, caption = "Spatially structured fold diagnostics")
+knitr::kable(diag_tbl, digits = 4, caption = "Summary diagnostics (spatial CV)")
 ```
 
-Random-split performance is retained only as a sensitivity comparison. If it is substantially higher than the spatial result, that should be interpreted as validation inflation rather than evidence of strong transferability.
-
-## 6. Final model, current suitability, and uncertainty
+## 8. Final model fit and current prediction
 
 ```{r final-model}
-mx <- fit_maxnet_model(model_input, pred_names, classes = "lqh", regmult = 1.5)
+x_all <- model_input[, pred_names, drop = FALSE]
+p_all <- model_input$presence
+
+mx <- maxnet::maxnet(
+  p = p_all,
+  data = x_all,
+  f = maxnet.formula(p_all, x_all, classes = "lqhp")
+)
+
+wc_ca_clamped <- clamp_to_training_range(wc_ca, model_input, pred_names)
+pred_ca <- raster::predict(raster::stack(wc_ca_clamped), mx, type = "cloglog", progress = "text")
 
 thr <- median(cv_thresholds, na.rm = TRUE)
 if (!is.finite(thr)) {
   thr <- 0.5
 }
-
-wc_report_selected <- wc_report[[pred_names]]
-wc_report_clamped <- clamp_to_training_range(wc_report_selected, model_input, pred_names)
-pred_ca <- raster::predict(raster::stack(wc_report_clamped), mx, type = "cloglog", progress = "text")
 bin_map <- pred_ca > thr
 
 pred_df <- as.data.frame(raster::rasterToPoints(pred_ca), stringsAsFactors = FALSE)
@@ -480,17 +583,20 @@ colnames(pred_df) <- c("x", "y", "suitability")
 ggplot(pred_df, aes(x = x, y = y, fill = suitability)) +
   geom_raster() +
   scale_fill_viridis_c(name = "Suitability") +
-  geom_point(data = pres_df, aes(x = x, y = y), inherit.aes = FALSE, color = "red3", alpha = 0.5, size = 0.7) +
+  geom_point(data = pres_df, aes(x = x, y = y), color = "red", size = 0.9, alpha = 0.5, inherit.aes = FALSE) +
   coord_quickmap() +
   labs(
-    title = "Current relative climatic suitability",
-    subtitle = "Projected over California with clamping to the calibration range"
+    title = "Current suitability prediction",
+    subtitle = "Final model calibrated in M, projected with predictor clamping"
   )
 ```
 
-```{r uncertainty-and-novelty}
+## 9. Uncertainty and extrapolation diagnostics
+
+```{r uncertainty-extrapolation}
+# Spatial CV model spread as model-structure uncertainty proxy.
 cv_pred_rasters <- lapply(cv_models, function(m) {
-  raster::predict(raster::stack(wc_report_clamped), m, type = "cloglog", progress = "text")
+  raster::predict(raster::stack(wc_ca_clamped), m, type = "cloglog", progress = "text")
 })
 
 cv_pred_stack <- raster::stack(cv_pred_rasters)
@@ -503,9 +609,10 @@ ggplot(sd_df, aes(x = x, y = y, fill = sd)) +
   geom_raster() +
   scale_fill_viridis_c(name = "SD") +
   coord_quickmap() +
-  labs(title = "Prediction uncertainty", subtitle = "SD across spatial CV models")
+  labs(title = "Prediction uncertainty (SD across spatial CV models)")
 
-novelty_current <- novelty_fraction(wc_report_selected, model_input, pred_names)
+# Novelty map: fraction of predictors outside calibration range.
+novelty_current <- novelty_fraction(wc_ca, model_input, pred_names)
 nov_df <- as.data.frame(terra::as.points(novelty_current), geom = "xy", na.rm = TRUE)
 colnames(nov_df) <- c("x", "y", "novelty")
 
@@ -513,29 +620,37 @@ ggplot(nov_df, aes(x = x, y = y, fill = novelty)) +
   geom_raster() +
   scale_fill_viridis_c(name = "Novelty", limits = c(0, 1)) +
   coord_quickmap() +
-  labs(title = "Current environmental novelty relative to calibration")
+  labs(title = "Current-climate environmental novelty relative to calibration")
+
+novelty_warn_current <- mean(terra::values(novelty_current) > 0, na.rm = TRUE)
+uncertainty_mean <- mean(raster::values(pred_sd), na.rm = TRUE)
 
 diag_tbl <- bind_rows(
-  spatial_summary,
-  data.frame(metric = "Current novelty fraction (>0)", value = mean(terra::values(novelty_current) > 0, na.rm = TRUE)),
-  data.frame(metric = "Mean prediction SD (spatial CV)", value = mean(raster::values(pred_sd), na.rm = TRUE)),
-  data.frame(metric = "Threshold used for binary map", value = thr)
+  diag_tbl,
+  data.frame(metric = "Current novelty fraction (>0)", value = novelty_warn_current),
+  data.frame(metric = "Mean prediction SD (spatial CV)", value = uncertainty_mean)
 )
 
-knitr::kable(diag_tbl, digits = 4, caption = "Diagnostics summarizing evaluation and uncertainty")
+knitr::kable(diag_tbl, digits = 4, caption = "Diagnostics including uncertainty and extrapolation")
 ```
 
-## 7. Variable effects and interpretation
+## 10. Variable effects, ecological interpretation, and limits
 
 ```{r interpretation}
 med <- apply(model_input[, pred_names, drop = FALSE], 2, median, na.rm = TRUE)
 
-response_df <- do.call(rbind, lapply(pred_names, function(v) {
+vars_for_response <- intersect(c("bio1", "bio5", "bio6", "bio12"), pred_names)
+if (length(vars_for_response) == 0) {
+  vars_for_response <- head(pred_names, 4)
+}
+
+response_df <- do.call(rbind, lapply(vars_for_response, function(v) {
   xseq <- seq(min(model_input[[v]], na.rm = TRUE), max(model_input[[v]], na.rm = TRUE), length.out = 120)
   nd <- as.data.frame(matrix(rep(med, each = length(xseq)), nrow = length(xseq)))
   names(nd) <- pred_names
   nd[[v]] <- xseq
-  data.frame(variable = v, x = xseq, suitability = predict(mx, nd, type = "cloglog"))
+  yhat <- predict(mx, nd, type = "cloglog")
+  data.frame(variable = v, x = xseq, suitability = yhat)
 }))
 
 ggplot(response_df, aes(x = x, y = suitability)) +
@@ -543,6 +658,7 @@ ggplot(response_df, aes(x = x, y = suitability)) +
   facet_wrap(~ variable, scales = "free_x") +
   labs(title = "Partial response curves", x = "Predictor value", y = "Predicted suitability")
 
+# Permutation importance estimated from spatial CV folds.
 perm_imp_list <- lapply(pred_names, function(v) {
   fold_drops <- lapply(seq_len(k_folds), function(fold) {
     test_idx <- which(fold_id == fold)
@@ -550,14 +666,17 @@ perm_imp_list <- lapply(pred_names, function(v) {
     if (nrow(test_df) == 0 || length(unique(test_df$presence)) < 2) {
       return(NA_real_)
     }
+    x_test <- test_df[, pred_names, drop = FALSE]
+    y_test <- test_df$presence
 
-    base_pred <- predict(cv_models[[fold]], test_df[, pred_names, drop = FALSE], type = "cloglog")
-    auc_base <- safe_auc(test_df$presence, base_pred)
+    base_pred <- predict(cv_models[[fold]], x_test, type = "cloglog")
+    auc_base <- safe_auc(y_test, base_pred)
 
-    perm_df <- test_df[, pred_names, drop = FALSE]
-    perm_df[[v]] <- sample(perm_df[[v]])
-    perm_pred <- predict(cv_models[[fold]], perm_df, type = "cloglog")
-    auc_perm <- safe_auc(test_df$presence, perm_pred)
+    x_perm <- x_test
+    x_perm[[v]] <- sample(x_perm[[v]])
+    perm_pred <- predict(cv_models[[fold]], x_perm, type = "cloglog")
+    auc_perm <- safe_auc(y_test, perm_pred)
+
     auc_base - auc_perm
   })
   data.frame(variable = v, importance = mean(unlist(fold_drops), na.rm = TRUE))
@@ -565,56 +684,22 @@ perm_imp_list <- lapply(pred_names, function(v) {
 
 perm_imp <- bind_rows(perm_imp_list) %>% arrange(desc(importance))
 
-knitr::kable(perm_imp, digits = 4, caption = "Permutation importance from spatial CV folds")
+knitr::kable(head(perm_imp, 10), digits = 4, caption = "Top permutation importance (spatial CV AUC drop)")
 
 ggplot(perm_imp, aes(x = reorder(variable, importance), y = importance)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
-  labs(title = "Permutation importance", x = "Predictor", y = "AUC drop")
+  labs(title = "Permutation importance", x = "Climate variable", y = "AUC drop")
 ```
 
-Interpretation should remain conditional and correlative:
+Interpretation guidance:
 
-- Higher suitability indicates climates more similar to the cleaned occurrence-background contrast used here, not a causal effect of climate alone.
-- Response curves and importance values depend on the chosen $M$, predictor set, bias model, and regularization settings.
-- Areas with high novelty or high cross-validation variability are weakly supported and should not be treated as strong evidence of future occupancy.
+- response curves are conditional and correlational, not causal effects
+- importance reflects predictive contribution in this calibration setup
+- uncertainty and novelty maps should temper strong biogeographic claims
+- forecast interpretation is strongest where novelty is low and uncertainty is low
 
-## 8. Sensitivity analysis
-
-At least one practical sensitivity comparison is useful because SDM conclusions can depend heavily on model settings. Here, the main model is compared with a more flexible alternative.
-
-```{r sensitivity}
-mx_complex <- fit_maxnet_model(model_input, pred_names, classes = "lqhp", regmult = 1.0)
-pred_complex <- raster::predict(raster::stack(wc_report_clamped), mx_complex, type = "cloglog", progress = "text")
-
-main_vals <- raster::values(pred_ca)
-complex_vals <- raster::values(pred_complex)
-
-sensitivity_tbl <- data.frame(
-  comparison = c(
-    "Map correlation: main vs more complex model",
-    "Mean suitability: main model",
-    "Mean suitability: more complex model",
-    "Suitable fraction (> main threshold): main model",
-    "Suitable fraction (> main threshold): more complex model"
-  ),
-  value = c(
-    stats::cor(main_vals, complex_vals, use = "complete.obs"),
-    mean(main_vals, na.rm = TRUE),
-    mean(complex_vals, na.rm = TRUE),
-    mean(main_vals > thr, na.rm = TRUE),
-    mean(complex_vals > thr, na.rm = TRUE)
-  )
-)
-
-knitr::kable(sensitivity_tbl, digits = 4, caption = "Sensitivity of current predictions to model complexity")
-```
-
-If that comparison changes broad spatial patterns substantially, interpretation should be conservative. If the maps remain similar, confidence is higher that the main results are not purely an artifact of one feature setting.
-
-## 9. Future projections, novelty, and transfer risk
-
-Future projections are treated as conditional transfer exercises rather than direct forecasts of realized occupancy. They assume that present-day climatic associations remain informative through time, while dispersal limits, habitat conversion, disturbance, and species interactions remain outside the fitted model.
+## 11. Future range projections (all SSP pathways, 3 random GCMs)
 
 ```{r future-projections, message=TRUE, warning=FALSE}
 ssp_levels <- c("126", "245", "370", "585")
@@ -625,7 +710,10 @@ available_gcms <- get(".cmods", envir = asNamespace("geodata"))
 set.seed(2026)
 selected_gcms <- sample(available_gcms, 3)
 
+selected_gcms
+
 future_pred_list <- list()
+future_novelty_list <- list()
 future_summary <- list()
 
 for (gcm in selected_gcms) {
@@ -641,68 +729,87 @@ for (gcm in selected_gcms) {
       path = "worldclim_data"
     )
 
-    fut_ca <- harmonize_bioc_names(terra::crop(fut, report_bbox))
+    fut_ca <- terra::crop(fut, ca_bbox)
+    fut_ca <- harmonize_bioc_names(fut_ca)
+
     missing_preds <- setdiff(pred_names, names(fut_ca))
     if (length(missing_preds) > 0) {
-      stop(sprintf("Missing predictors for %s SSP%s: %s", gcm, ssp, paste(missing_preds, collapse = ", ")))
+      stop(sprintf(
+        "Missing predictors for %s SSP%s: %s",
+        gcm, ssp, paste(missing_preds, collapse = ", ")
+      ))
     }
 
-    fut_selected <- fut_ca[[pred_names]]
-    fut_novelty <- novelty_fraction(fut_selected, model_input, pred_names)
-    fut_clamped <- clamp_to_training_range(fut_selected, model_input, pred_names)
-    fut_pred <- raster::predict(raster::stack(fut_clamped), mx, type = "cloglog", progress = "text")
+    fut_ca <- fut_ca[[pred_names]]
+    fut_novelty <- novelty_fraction(fut_ca, model_input, pred_names)
+    fut_ca_clamped <- clamp_to_training_range(fut_ca, model_input, pred_names)
+
+    fut_pred <- raster::predict(
+      raster::stack(fut_ca_clamped),
+      mx,
+      type = "cloglog",
+      progress = "text"
+    )
 
     key <- paste(gcm, paste0("SSP", ssp), sep = "__")
     future_pred_list[[key]] <- fut_pred
+    future_novelty_list[[key]] <- fut_novelty
+
+    suit_bin <- fut_pred > thr
+    vals <- raster::values(fut_pred)
+    bin_vals <- raster::values(suit_bin)
+    nov_vals <- terra::values(fut_novelty)
 
     future_summary[[key]] <- data.frame(
       gcm = gcm,
       scenario = paste0("RCP/SSP", ssp),
       period = future_time,
-      mean_suitability = mean(raster::values(fut_pred), na.rm = TRUE),
-      suitable_fraction = mean(raster::values(fut_pred > thr) == 1, na.rm = TRUE),
-      novelty_fraction = mean(terra::values(fut_novelty) > 0, na.rm = TRUE),
-      high_novelty_fraction = mean(terra::values(fut_novelty) > 0.2, na.rm = TRUE)
+      mean_suitability = mean(vals, na.rm = TRUE),
+      suitable_fraction = mean(bin_vals == 1, na.rm = TRUE),
+      novelty_fraction = mean(nov_vals > 0, na.rm = TRUE),
+      high_novelty_fraction = mean(nov_vals > 0.2, na.rm = TRUE)
     )
   }
 }
 
 future_summary_df <- bind_rows(future_summary)
 
+current_vals <- raster::values(pred_ca)
+current_bin_vals <- raster::values(bin_map)
+current_novelty_vals <- terra::values(novelty_current)
+
 current_baseline <- data.frame(
   gcm = "Current climate",
   scenario = "Current",
   period = "1970-2000",
-  mean_suitability = mean(raster::values(pred_ca), na.rm = TRUE),
-  suitable_fraction = mean(raster::values(bin_map) == 1, na.rm = TRUE),
-  novelty_fraction = mean(terra::values(novelty_current) > 0, na.rm = TRUE),
-  high_novelty_fraction = mean(terra::values(novelty_current) > 0.2, na.rm = TRUE)
+  mean_suitability = mean(current_vals, na.rm = TRUE),
+  suitable_fraction = mean(current_bin_vals == 1, na.rm = TRUE),
+  novelty_fraction = mean(current_novelty_vals > 0, na.rm = TRUE),
+  high_novelty_fraction = mean(current_novelty_vals > 0.2, na.rm = TRUE)
 )
 
 future_summary_w_baseline <- bind_rows(current_baseline, future_summary_df)
 
-future_uncertainty <- future_summary_df %>%
-  group_by(scenario) %>%
-  summarize(
-    mean_suitable_fraction = mean(suitable_fraction, na.rm = TRUE),
-    sd_suitable_fraction = safe_sd(suitable_fraction),
-    mean_novelty_fraction = mean(novelty_fraction, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-knitr::kable(future_summary_w_baseline, digits = 4, caption = "Current and future projections with novelty diagnostics")
-knitr::kable(future_uncertainty, digits = 4, caption = "Across-GCM summary by scenario")
+knitr::kable(
+  future_summary_w_baseline,
+  digits = 4,
+  caption = "Current and future suitability with novelty diagnostics"
+)
 ```
 
-```{r future-maps}
+## 12. Ensemble future maps and transferability signals
+
+```{r future-ensemble-maps}
 ensemble_by_ssp <- lapply(ssp_levels, function(ssp) {
   keys <- grep(paste0("__SSP", ssp, "$"), names(future_pred_list), value = TRUE)
-  raster::calc(raster::stack(future_pred_list[keys]), fun = mean, na.rm = TRUE)
+  rs <- future_pred_list[keys]
+  raster::calc(raster::stack(rs), fun = mean, na.rm = TRUE)
 })
 names(ensemble_by_ssp) <- paste0("RCP/SSP", ssp_levels)
 
 ensemble_df <- bind_rows(lapply(names(ensemble_by_ssp), function(scn) {
-  d <- as.data.frame(raster::rasterToPoints(ensemble_by_ssp[[scn]]), stringsAsFactors = FALSE)
+  r <- ensemble_by_ssp[[scn]]
+  d <- as.data.frame(raster::rasterToPoints(r), stringsAsFactors = FALSE)
   colnames(d) <- c("x", "y", "suitability")
   d$scenario <- scn
   d
@@ -714,9 +821,20 @@ ggplot(ensemble_df, aes(x = x, y = y, fill = suitability)) +
   coord_quickmap() +
   facet_wrap(~ scenario, ncol = 2) +
   labs(
-    title = sprintf("Future relative climatic suitability (%s)", future_time),
-    subtitle = "Ensemble means across three GCMs; predictors clamped to the calibration range"
+    title = sprintf("Future projected suitability (%s)", future_time),
+    subtitle = "Ensemble mean across 3 random GCMs; predictors clamped to calibration range"
   )
+
+future_uncertainty <- future_summary_df %>%
+  group_by(scenario) %>%
+  summarize(
+    mean_suitable_fraction = mean(suitable_fraction, na.rm = TRUE),
+    sd_suitable_fraction = sd(suitable_fraction, na.rm = TRUE),
+    mean_novelty_fraction = mean(novelty_fraction, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+knitr::kable(future_uncertainty, digits = 4, caption = "Across-GCM uncertainty and novelty by scenario")
 
 ggplot(future_summary_df, aes(x = scenario, y = suitable_fraction, fill = gcm)) +
   geom_col(position = position_dodge(width = 0.8)) +
@@ -727,27 +845,14 @@ ggplot(future_summary_df, aes(x = scenario, y = suitable_fraction, fill = gcm)) 
   )
 ```
 
-Future maps should therefore be read narrowly: they show where current climatic associations project into future climate space under a niche-stability assumption. They do not imply successful dispersal, persistence, or biotic release, and they are least trustworthy where novelty is high.
-
-## 10. Limitations
-
-- The occurrence audit is stronger than a raw BIEN pull but is not a full taxonomic or georeferencing review.
-- The explicit $M$ is defensible, but still approximate; different dispersal assumptions would change background composition and model calibration.
-- Climatic predictors are intentionally short and interpretable, which improves defensibility but omits soils, disturbance, habitat conversion, and biotic interactions.
-- Novelty is summarized with a simple range-based diagnostic rather than a full multivariate analog analysis.
-
-## 11. Save outputs
+## 13. Save outputs
 
 ```{r save}
 raster::writeRaster(pred_ca, filename = "california_poppy_suitability.tif", overwrite = TRUE)
 raster::writeRaster(bin_map, filename = "california_poppy_suitability_binary.tif", overwrite = TRUE)
-raster::writeRaster(pred_sd, filename = "california_poppy_prediction_uncertainty.tif", overwrite = TRUE)
-raster::writeRaster(raster::raster(novelty_current), filename = "california_poppy_current_novelty.tif", overwrite = TRUE)
-
 write.csv(diag_tbl, "sdm_diagnostics.csv", row.names = FALSE)
 write.csv(perm_imp, "sdm_permutation_importance.csv", row.names = FALSE)
 write.csv(future_summary_w_baseline, "sdm_future_projections_summary.csv", row.names = FALSE)
-write.csv(sensitivity_tbl, "sdm_sensitivity_summary.csv", row.names = FALSE)
 
 for (scn in names(ensemble_by_ssp)) {
   out_name <- paste0(
@@ -763,20 +868,18 @@ for (scn in names(ensemble_by_ssp)) {
 cat("Saved outputs:\n")
 cat("- california_poppy_suitability.tif\n")
 cat("- california_poppy_suitability_binary.tif\n")
-cat("- california_poppy_prediction_uncertainty.tif\n")
-cat("- california_poppy_current_novelty.tif\n")
 cat("- sdm_diagnostics.csv\n")
 cat("- sdm_permutation_importance.csv\n")
 cat("- sdm_future_projections_summary.csv\n")
-cat("- sdm_sensitivity_summary.csv\n")
 cat("- california_poppy_future_ensemble_126_20412060.tif\n")
 cat("- california_poppy_future_ensemble_245_20412060.tif\n")
 cat("- california_poppy_future_ensemble_370_20412060.tif\n")
 cat("- california_poppy_future_ensemble_585_20412060.tif\n")
 ```
 
-## 12. Session info
+## 14. Session info
 
 ```{r session-info}
 sessionInfo()
 ```
+
