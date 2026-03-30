@@ -14,5 +14,10 @@ Prompt: PATH="/opt/homebrew/bin:$PATH" Rscript -e 'rmarkdown::render("cacti/cact
 Source: terminal execution context
 Outcome: Rendered project provenance summary HTML for cacti.
 
+3. Date: 2026-03-28
+Prompt: Lets return to the cactus project. From BIEN compile a list of all cactus species. Figure out which traits you can get across many species of cactus then get them all. For those species search each wikipedia page for each species to then extract out values from those species. Compile a master list of species by each trait you were able to find. Include data sources and links for each. This summary file should be in the form of what a biodiversity expert and ecologists would want to use for scientific analyses
+Source session: current workspace session
+Outcome: Added the broader BIEN plus Wikipedia trait-harvesting workflow, master trait compilation logic, and related cacti summary outputs.
+
 ## Update Rule
 Append a new entry whenever prompts lead to created/modified code, data pipeline logic, or reports under cacti/.

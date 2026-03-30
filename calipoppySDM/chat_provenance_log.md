@@ -12,7 +12,12 @@ Outcome: Added future projection support and related updates in calipoppySDM app
 2. Date: 2026-03-28
 Prompt: make an R shiny app that allows someone to explore the EvoPowerEfficiency.R code and
 Source session: 4104f6cb-26c6-4bbb-80ac-3a87addd07e3
-Outcome: Related app/package workflow activity occurred in repository; project-level package updates and builds were executed.
+Outcome: Historical misfiled entry retained for provenance continuity; this prompt belongs to EvoPowerEfficiencyExplorer rather than calipoppySDM.
+
+3. Date: 2026-03-28
+Prompt: Push all California poppy code and results to the CaliPoppySDM GitHub repository.
+Source session: current workspace session
+Outcome: Confirmed and aligned California poppy package/repository scope and associated repository sync work for calipoppySDM.
 
 ## Update Rule
 Append a new entry whenever prompts lead to created/modified package code, app behavior, or documentation under calipoppySDM/.

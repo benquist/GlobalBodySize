@@ -16,6 +16,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/always.agent.md; .github/agents/always.agent.md; agents/m.agent.md; .github/agents/m.agent.md; agents/prompt_log.md; AGENTS.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
 
+- Date: 2026-03-29
+- Prompt summary: Make sure all projects have updated their chat provenance log.
+- Requested outcomes: Audit project-level provenance coverage, create missing project chat provenance logs, and update stale logs across workspace projects.
+- Files changed: chat_provenance_log.md; cacti/chat_provenance_log.md; calipoppySDM/chat_provenance_log.md; EvoPowerEfficiencyExplorer/chat_provenance_log.md; plant_body_mass_scaling_project/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-28
 - Prompt summary: For the always agent, only build Rmds and R packages if code changed; whenever an R package is built, return R install code.
 - Requested outcomes: Update always checks to be change-gated and emit install code after package builds.
@@ -97,5 +103,77 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-03-28
 - Prompt summary: Run final pre-return checks now that branch sync and latest prompt-log entry were pushed to both main and master.
 - Requested outcomes: Verify prompt logging, change-gated Rmd compile, change-gated package builds, and git push status; return strict output.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-28
+- Prompt summary: Create an expanded literature synthesis list of plant body-size allometric scaling relationships across physiology, ecology, and evolution.
+- Requested outcomes: Return a structured table-ready list with Domain, Relationship, Typical_scaling_form, First_discovery_year, Key_citations, Explanation, and Core_assumptions, with 30-50 concise scientifically accurate rows.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Supervisory review: Verify CaliPoppySDM GitHub repo contains only California poppy SDM work (no cacti, no EvoPowerEfficiency, no workspace infrastructure).
+- Requested outcomes: Confirm repo scope is clean. Verify all 17 tracked files are poppy-exclusive. Check commit history shows scoping cleanup.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (supervision)
+
+- Date: 2026-03-28
+- Prompt summary: Run final mandatory gate and return PASS/FAIL for prompt log recorded, updated Rmd compile, updated R packages build, git push status confirmed.
+- Requested outcomes: Execute mandatory final gate checks and return PASS/FAIL with evidence.
+- Files changed: plant_body_mass_scaling_project/plant_body_mass_scaling_comprehensive.Rmd; plant_body_mass_scaling_project/plant_body_mass_scaling_comprehensive.html; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Review and quality-check the comprehensive plant body-mass scaling project using biodiversity-focused standards, including taxonomy-reconciliation-equivalent logic.
+- Requested outcomes: Evaluate Rmd/README (and HTML if needed), return severity-ranked findings, assess literature-search exhaustiveness, and propose concrete search strings/databases/inclusion criteria.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Run final mandatory gate and return PASS/FAIL for prompt log recorded, updated Rmd compile, updated R packages build, git push status confirmed.
+- Requested outcomes: Execute mandatory final gate checks and return PASS/FAIL with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Make the body-mass scaling project a GitHub repository, push it, and provide a clear project description for GitHub.
+- Requested outcomes: Create/push a dedicated GitHub repo for the plant body-mass scaling catalog and ensure README/repo description is clear.
+- Files changed: plant_body_mass_scaling_project/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Run mandatory pre-return checks and report PASS/FAIL for prompt log, Rmd compile, R package build, and git push confirmation.
+- Requested outcomes: Execute final gate checks with concise evidence and identify any remaining blockers.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Confirm whether GitHub auth/setup is done and proceed to create/push the body-mass scaling repository.
+- Requested outcomes: Verify authentication and repository state; complete remote creation/push if possible.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Run mandatory pre-return checks and report PASS/FAIL with concise evidence for prompt log, updated Rmd compile, updated R package build, and git push status confirmation.
+- Requested outcomes: Execute mandatory final gate checks and return concise PASS/FAIL evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: Ask how to authorize GitHub CLI.
+- Requested outcomes: Provide clear authentication steps for gh CLI so repository creation and push can proceed.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: User indicates GitHub authorization is done and wants repository creation/push to proceed.
+- Requested outcomes: Verify auth status and complete creation/push of the plant body-mass scaling repository if possible.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-29
+- Prompt summary: User asks to run exact GitHub CLI authentication commands in terminal.
+- Requested outcomes: Execute gh auth login and gh auth status commands and report resulting authentication state.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
