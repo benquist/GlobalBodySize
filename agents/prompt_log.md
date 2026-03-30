@@ -189,3 +189,81 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Report PASS/FAIL for prompt log, Rmd compile, R package build, and git push status; context: commit db95306 pushed 11 files including california_poppy_sdm.Rmd; only .tar.gz binaries changed (no package source); push confirmed PUSH_OK.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User confirms completion ("Done") and expects body-mass repository creation/push to proceed.
+- Requested outcomes: Verify GitHub auth and nested project state, then create and push the plant body-mass scaling GitHub repository if possible.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Run mandatory pre-return checks and report PASS/FAIL with concise evidence for prompt log, updated Rmd compile status, updated R package build status, and git push status confirmation.
+- Requested outcomes: Execute final gate checks and report blockers before returning status update.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User provided the GitHub repository URL for the plant body-mass scaling catalog.
+- Requested outcomes: Configure remote, commit pending nested-project changes, and push main to https://github.com/benquist/plant-body-mass-scaling-catalog.git.
+- Files changed: plant_body_mass_scaling_project/plant_body_mass_scaling_comprehensive.Rmd; plant_body_mass_scaling_project/plant_body_mass_scaling_comprehensive.html; plant_body_mass_scaling_project/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User requested a cross-project status update ("@M check all of my different projects. Where are we with them?").
+- Requested outcomes: Audit all projects for git state, push sync, running/hung processes, blockers, and next actions.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User asked which projects do not have a GitHub repository.
+- Requested outcomes: Check top-level project directories for standalone git repos/remotes and identify projects without their own GitHub repo.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User requested a close workflow check by biodiversity agents after initial deep-search work.
+- Requested outcomes: Review the augmented plant body-mass workflow for methodological quality, biodiversity-informatics risks, and concrete improvements.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User requested a new deeper literature-search code path for plant allometry abstracts, as a separate subdirectory, while preserving the original approach.
+- Requested outcomes: Add an augmentation pipeline that mines online botany abstracts for broader allometric patterns and outputs ranked candidate papers without deleting existing workflow.
+- Files changed: plant_body_mass_scaling_project/deep_literature_search/scripts/deep_allometry_abstract_search.R; plant_body_mass_scaling_project/deep_literature_search/README.md; plant_body_mass_scaling_project/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Run mandatory pre-return checks and report PASS/FAIL with concise evidence for prompt log, updated Rmd compile status, updated R package build status, and git push status confirmation.
+- Requested outcomes: Execute final gate checks for this turn and report blockers before returning to user.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Perform a close workflow review of the plant body mass scaling project after adding deep-search augmentation.
+- Requested outcomes: Review workflow coherence and biodiversity-informatics risks across scoped README/Rmd/script files; rank concrete issues by severity with line references and minimal change recommendations; no edits to project files.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User approved implementation of the biodiversity-review recommendations for deep-search workflow hardening.
+- Requested outcomes: Add failure diagnostics, precision gating, provenance/run logs, taxonomy handoff guidance, and harmonized run instructions while preserving original approach.
+- Files changed: plant_body_mass_scaling_project/deep_literature_search/scripts/deep_allometry_abstract_search.R; plant_body_mass_scaling_project/deep_literature_search/README.md; plant_body_mass_scaling_project/README.md; plant_body_mass_scaling_project/plant_body_mass_scaling_comprehensive.Rmd; agents/prompt_log.md; plant_body_mass_scaling_project/chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User requested that the hardened deep-search pipeline be run.
+- Requested outcomes: Execute the new abstract-mining workflow and generate first-pass ranked literature outputs for the plant body-mass scaling project.
+- Files changed: plant_body_mass_scaling_project/deep_literature_search/output/openalex_abstract_candidates_raw.csv; plant_body_mass_scaling_project/deep_literature_search/output/openalex_pattern_hits_long.csv; plant_body_mass_scaling_project/deep_literature_search/output/openalex_deep_ranked_candidates_pre_gate.csv; plant_body_mass_scaling_project/deep_literature_search/output/openalex_deep_ranked_candidates.csv; plant_body_mass_scaling_project/deep_literature_search/output/openalex_precision_gate_rejections.csv; plant_body_mass_scaling_project/deep_literature_search/output/openalex_retrieval_diagnostics.csv; plant_body_mass_scaling_project/deep_literature_search/output/search_query_log.csv; plant_body_mass_scaling_project/deep_literature_search/output/run_parameters.csv; agents/prompt_log.md; plant_body_mass_scaling_project/chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User approved the next step after deep-search run.
+- Requested outcomes: Build a structured screening queue from ranked deep-search candidates with manual review and taxonomy handoff fields.
+- Files changed: plant_body_mass_scaling_project/deep_literature_search/scripts/build_screening_queue.R; plant_body_mass_scaling_project/deep_literature_search/README.md; plant_body_mass_scaling_project/deep_literature_search/screening/deep_search_screening_queue.csv; plant_body_mass_scaling_project/deep_literature_search/screening/deep_search_screening_queue_summary.csv; plant_body_mass_scaling_project/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Run mandatory pre-return checks after screening-queue and deep-search updates.
+- Requested outcomes: Verify prompt logging, changed Rmd compile status, package-build scope, and git push status.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
