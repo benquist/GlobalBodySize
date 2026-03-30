@@ -281,6 +281,24 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-03-30
+- Prompt summary: User asked how to see the generated results.
+- Requested outcomes: Explain how to inspect the deep-search output files and screening queue.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User requested an HTML and R Markdown summary of the deep-search results.
+- Requested outcomes: Create a browseable summary report in Rmd and render the corresponding HTML in the plant body-mass deep-search folder.
+- Files changed: plant_body_mass_scaling_project/deep_literature_search/deep_search_results_summary.Rmd; plant_body_mass_scaling_project/deep_literature_search/deep_search_results_summary.html; plant_body_mass_scaling_project/deep_literature_search/README.md; agents/prompt_log.md; plant_body_mass_scaling_project/chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: User requested that the newly added plant body-mass summary code and outputs be pushed to GitHub.
+- Requested outcomes: Commit and push the latest deep-search summary report changes to the plant body-mass repository, and update/push the root prompt log.
+- Files changed: plant_body_mass_scaling_project/deep_literature_search/deep_search_results_summary.Rmd; plant_body_mass_scaling_project/deep_search_results_summary.html; plant_body_mass_scaling_project/deep_literature_search/README.md; plant_body_mass_scaling_project/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
 - Prompt summary: Run mandatory pre-return checks and report PASS/FAIL with concise evidence for prompt log, updated Rmd compile status, updated R package build status, and git push status confirmation.
 - Requested outcomes: Execute mandatory final gate checks and report concise evidence for each required check.
 - Files changed: agents/prompt_log.md
