@@ -426,3 +426,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Confirm whether the README includes launch instructions and point to the exact section and lines.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User asked how to run the BIEN Shiny app after pasting README code fences into the shell.
+- Requested outcomes: Explain the shell quoting/code-fence issue and provide the exact working command to launch the app from bash.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
