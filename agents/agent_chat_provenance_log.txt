@@ -216,3 +216,25 @@ Action taken:
 - Added project-provenance-guard agent and wired it into supervisor agent roster.
 - Created project-scoped provenance logs for cacti and calipoppySDM.
 Outcome: Central and project-specific provenance tracking is now in place with enforcement agent support.
+
+[8] Date: 2026-03-30
+Source: active chat request
+Request summary: User requested a biodiversity-informatics quality review of the BIEN Shiny app project, focused on app.R and README.md.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the current BIEN review prompt to agents/prompt_log.md to satisfy final-gate prompt logging requirements.
+- Appended this provenance entry because an agent file was updated during the review workflow.
+Outcome: Agent logging compliance preserved for final pre-return checks.
+
+[9] Date: 2026-03-30
+Source: active chat request
+Request summary: User requested taxonomy reconciliation and species-name robustness review of BIEN Shiny App/app.R and README.md with structured findings and line evidence.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added a new prompt-log entry for this exact review request to satisfy the final-gate prompt logging rule.
+- Appended this provenance record because files under agents/ were updated during the compliance workflow.
+Outcome: Append-only provenance and prompt logging remain current for this review turn.

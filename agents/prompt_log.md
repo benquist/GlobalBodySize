@@ -258,6 +258,33 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 - Date: 2026-03-30
 - Prompt summary: User approved the next step after deep-search run.
+- Requested outcomes: Continue the plant body-mass scaling workflow after the first deep-search results.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Create a new BIEN Shiny App project using the BIEN R package for species-level observation, trait, and range exploration.
+- Requested outcomes: Build a Shiny app where a user can query a species, map observation points at different geographic scales, and explore species-level occurrence, trait, and range data.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Run final mandatory gate and return PASS/FAIL for: prompt log recorded, updated Rmd compile, updated R packages build, git push status confirmed.
+- Requested outcomes: Execute mandatory final gate checks and return PASS/FAIL with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Commit and push the BIEN Shiny App work, with a good project description.
+- Requested outcomes: Improve BIEN Shiny App README project description and run instructions, then commit and push pending BIEN app-related workspace changes.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Run final mandatory gate and return PASS/FAIL for: prompt log recorded, updated Rmd compile, updated R packages build, git push status confirmed.
+- Requested outcomes: Execute mandatory final gate checks and return PASS/FAIL with concise evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Requested outcomes: Build a structured screening queue from ranked deep-search candidates with manual review and taxonomy handoff fields.
 - Files changed: plant_body_mass_scaling_project/deep_literature_search/scripts/build_screening_queue.R; plant_body_mass_scaling_project/deep_literature_search/README.md; plant_body_mass_scaling_project/deep_literature_search/screening/deep_search_screening_queue.csv; plant_body_mass_scaling_project/deep_literature_search/screening/deep_search_screening_queue_summary.csv; plant_body_mass_scaling_project/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
@@ -313,6 +340,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-03-30
 - Prompt summary: Run mandatory pre-return checks and report PASS/FAIL with concise evidence for prompt log, updated Rmd compile status, updated R package build status, and git push status confirmation.
 - Requested outcomes: Execute mandatory final gate checks and report concise evidence for each required check.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Review BIEN Shiny app app.R and README.md for taxonomy reconciliation quality and species-name robustness in BIEN workflows.
+- Requested outcomes: Return blocking issues, major risks, reconciliation diagnostics, recommended code/data fixes, and minimal validation tests with file/line evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-30
+- Prompt summary: Review the BIEN Shiny app project for scientific and data-workflow quality with a biodiversity-informatics focus.
+- Requested outcomes: Return critical issues, likely issues, assumptions, evidence with file/line references, recommended fixes, and a validation plan emphasizing species-level exploration quality, reproducibility, and geospatial integrity.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
