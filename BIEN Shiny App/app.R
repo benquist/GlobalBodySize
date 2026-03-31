@@ -191,8 +191,10 @@ ui <- fluidPage(
       checkboxInput("natives_only", "Native records only", value = TRUE),
       checkboxInput("include_cultivated", "Include cultivated records", value = FALSE),
       checkboxInput("only_geovalid", "Only geovalid coordinates", value = TRUE),
+      numericInput("occurrence_limit", "Max occurrence records", value = 5000, min = 500, max = 50000, step = 500),
+      numericInput("trait_limit", "Max trait records", value = 5000, min = 200, max = 50000, step = 200),
       checkboxInput("include_range_query", "Run range query (can be slower)", value = TRUE),
-      numericInput("query_timeout", "Query timeout (seconds)", value = 90, min = 15, max = 300, step = 15),
+      numericInput("query_timeout", "Query timeout (seconds)", value = 60, min = 15, max = 300, step = 15),
       selectInput(
         "map_scale",
         "Map scale",
@@ -236,6 +238,10 @@ server <- function(input, output, session) {
 
     species_name <- str_squish(input$species)
     timeout_sec <- max(15, as.numeric(input$query_timeout))
+    occ_limit <- max(500, as.numeric(input$occurrence_limit))
+    trait_limit <- max(200, as.numeric(input$trait_limit))
+    occ_page_size <- min(2000, occ_limit)
+    trait_page_size <- min(2000, trait_limit)
     range_dir <- file.path(tempdir(), "bien_ranges_cache", gsub("\\s+", "_", species_name))
     dir.create(range_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -248,9 +254,12 @@ server <- function(input, output, session) {
           all.taxonomy = TRUE,
           native.status = TRUE,
           natives.only = input$natives_only,
-          political.boundaries = TRUE,
-          collection.info = TRUE,
-          only.geovalid = input$only_geovalid
+          political.boundaries = FALSE,
+          collection.info = FALSE,
+          only.geovalid = input$only_geovalid,
+          limit = occ_limit,
+          record_limit = occ_page_size,
+          fetch.query = FALSE
         ),
         timeout_sec = timeout_sec
       )
@@ -261,7 +270,10 @@ server <- function(input, output, session) {
         BIEN_trait_species(
           species = species_name,
           all.taxonomy = TRUE,
-          source.citation = TRUE
+          source.citation = TRUE,
+          limit = trait_limit,
+          record_limit = trait_page_size,
+          fetch.query = FALSE
         ),
         timeout_sec = timeout_sec
       )
@@ -278,7 +290,10 @@ server <- function(input, output, session) {
             directory = range_dir,
             matched = TRUE,
             match_names_only = FALSE,
-            include.gid = TRUE
+            include.gid = TRUE,
+            limit = 25,
+            record_limit = 25,
+            fetch.query = FALSE
           ),
           timeout_sec = timeout_sec
         )
@@ -305,6 +320,8 @@ server <- function(input, output, session) {
         range_sf = range_sf,
         range_dir = range_dir,
         timeout_sec = timeout_sec,
+        occ_limit = occ_limit,
+        trait_limit = trait_limit,
         query_errors = query_errors,
         reconciliation = reconciliation_tbl
       )
@@ -333,6 +350,8 @@ server <- function(input, output, session) {
       "<br><strong>Observation records removed by QA:</strong> ", res$occurrences_prepared$qa$removed,
       "<br><strong>Trait records:</strong> ", trait_n,
       "<br><strong>Query timeout:</strong> ", res$timeout_sec, " sec",
+      "<br><strong>Occurrence limit:</strong> ", res$occ_limit,
+      "<br><strong>Trait limit:</strong> ", res$trait_limit,
       "<br><strong>Range query status:</strong> ", range_status
     ))
   })
