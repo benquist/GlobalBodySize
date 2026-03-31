@@ -432,3 +432,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Explain the shell quoting/code-fence issue and provide the exact working command to launch the app from bash.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User invoked @m supervisor to fix BIEN app hanging on non-poppy species and coordinate biodiversity agent testing.
+- Requested outcomes: Fix the app hanging issue, run biodiversity-informatics-checker review, test across multiple species, and report results.
+- Files changed: agents/prompt_log.md (will be updated by supervisor and agents)
+- Completed by: (assigned to @m supervisor and biodiversity agents)
