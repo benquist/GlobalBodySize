@@ -1,49 +1,30 @@
-# BIEN Shiny App
+# BIEN Species Shiny App
 
-This project is a Shiny app for exploring species-level BIEN data from the BIEN R package.
+Interactive Shiny app for species-level exploration of BIEN data, including occurrences, traits, and BIEN range artifacts.
 
-## Project description
+## Project Description
 
-The app is intended for biodiversity and ecology workflows where users need to quickly inspect
-species-level evidence from BIEN across three linked views:
+This app supports biodiversity and ecology workflows where you want quick, transparent species-level evidence checks before downstream modeling.
 
-- occurrence points (map + table)
-- trait records (raw + summarized)
-- range artifacts (status table + mapped polygons when BIEN shapefiles are available)
+It provides three linked evidence views:
 
-It is designed for exploratory analysis and data triage before formal downstream modeling.
+- occurrence points (map and table)
+- trait records (raw table and summarized table)
+- range artifacts (status output and mapped polygons when BIEN shapefiles are available)
 
-## Main features
+## Features
 
-- Query a species by scientific name.
-- Plot occurrence records on an interactive map.
-- Change the geographic map scale.
-- Set query timeout to avoid long-running species calls hanging the UI.
-- Toggle whether BIEN range queries are executed (range calls can be slower).
-- Inspect occurrence records in a searchable table.
-- Inspect trait records and a summarized trait table.
-- Visualize BIEN range maps directly when shapefiles are downloaded.
-- Display returned range metadata and tabular range outputs.
-- Highlight useful ecological and biodiversity questions to explore for each species.
+- Query BIEN by scientific species name.
+- Interactive occurrence map with scale controls.
+- Coordinate QA filtering and duplicate thinning for mapped points.
+- Trait table and compact trait summary by trait name and unit.
+- Optional BIEN range query with mapped polygons when available.
+- Configurable query timeout and record limits.
+- Reconciliation and error log tab for transparent failure reporting.
 
-## Run the app
+## Requirements
 
-Most reliable (avoids path issues with spaces):
-
-```bash
-cd "/Users/brianjenquist/VSCode/BIEN Shiny App"
-Rscript -e 'shiny::runApp(".")'
-```
-
-Alternative from workspace root:
-
-```bash
-PATH="/opt/homebrew/bin:$PATH" Rscript -e 'shiny::runApp("BIEN Shiny App")'
-```
-
-## Dependencies
-
-The app installs missing CRAN dependencies automatically:
+R packages used by the app:
 
 - shiny
 - BIEN
@@ -53,9 +34,30 @@ The app installs missing CRAN dependencies automatically:
 - DT
 - sf
 
-## Notes
+The app auto-installs missing CRAN packages on startup.
 
-- BIEN occurrence and trait schemas can vary by query context, so the app detects key columns dynamically where possible.
-- BIEN range queries may return different object types depending on the species and matched range availability.
-- When BIEN returns only a range status table but downloads `.shp` files, the app reads and maps those polygons automatically.
-- The app is designed first for species-level observation exploration rather than publication-quality range modeling.
+## Run the App
+
+From the repository root:
+
+```bash
+PATH="/opt/homebrew/bin:$PATH" Rscript -e 'shiny::runApp(".")'
+```
+
+Alternative (interactive R session):
+
+```r
+shiny::runApp(".")
+```
+
+If your shell shows a continuation prompt (`>`), cancel with `Ctrl+C` and paste only the command line, not Markdown code fences.
+
+## Usage Notes
+
+- BIEN occurrence and trait schemas can vary by query context; the app detects key columns dynamically where possible.
+- BIEN range queries may return different object types depending on species and matched range availability.
+- Some broad or very common taxa may still produce slower BIEN responses depending on upstream service load.
+
+## Scope
+
+This app is designed for exploratory species-level data triage and interpretation support, not publication-grade range modeling.

@@ -456,3 +456,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Commit and push BIEN Shiny App app.R query-stability updates to GitHub.
 - Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User requested running the final mandatory gate now.
+- Requested outcomes: Verify prompt log, Rmd compile status, R package build status, and git push status; return PASS/FAIL with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User requested BIEN-SpeciesShinyApp to have a project description and a good README.
+- Requested outcomes: Upgrade BIEN app README for standalone repo use and publish it to BIEN-SpeciesShinyApp.
+- Files changed: BIEN Shiny App/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
