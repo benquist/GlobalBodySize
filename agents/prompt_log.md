@@ -438,3 +438,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Fix the app hanging issue, run biodiversity-informatics-checker review, test across multiple species, and report results.
 - Files changed: agents/prompt_log.md (will be updated by supervisor and agents)
 - Completed by: (assigned to @m supervisor and biodiversity agents)
+
+- Date: 2026-03-31
+- Prompt summary: Review BIEN Shiny App app.R for biodiversity-informatics robustness.
+- Requested outcomes: Provide concise severity-ranked findings focused on taxonomic handling, BIEN query choices, schema variability, occurrence QA, range integration, and failure-mode transparency; state acceptability for multi-species exploratory use.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User asked whether BIEN app now runs and works across non-poppy species after hanging issues.
+- Requested outcomes: Verify fixes with multi-species tests and report operational status and remaining risks.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
