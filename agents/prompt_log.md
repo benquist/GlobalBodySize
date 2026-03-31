@@ -420,3 +420,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Provide the exact working launch command for the BIEN Shiny App project in this workspace.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User asked whether README.md was updated with BIEN Shiny App run instructions.
+- Requested outcomes: Confirm whether the README includes launch instructions and point to the exact section and lines.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
