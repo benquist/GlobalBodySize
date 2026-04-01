@@ -88,29 +88,79 @@ R packages used by the app:
 
 The app auto-installs missing CRAN packages on startup.
 
-## Run the app
+## Install and run from GitHub
 
-From the repository root, point explicitly to the app folder:
+These steps are written for a collaborator who receives the GitHub repo link and wants to run the app locally.
+
+### 1. Install prerequisites
+
+Make sure the following are installed first:
+
+- **Git** — check with `git --version`
+- **R** — download from [CRAN](https://cran.r-project.org/)
+- **Optional:** RStudio for a point-and-click way to run the app
+
+On macOS, if package installation later fails for `sf`, it can help to run:
 
 ```bash
-PATH="/opt/homebrew/bin:$PATH" Rscript -e 'shiny::runApp("BIEN Shiny App")'
+xcode-select --install
 ```
 
-Or change into the app directory first:
+### 2. Clone the GitHub repository
 
 ```bash
-cd "BIEN Shiny App"
+git clone https://github.com/benquist/BIEN-SpeciesShinyApp.git
+cd BIEN-SpeciesShinyApp
+```
+
+### 3. Run the app from Terminal
+
+From the cloned repo folder, run:
+
+```bash
+Rscript -e 'shiny::runApp(".")'
+```
+
+If `Rscript` is not found on your system, try one of these macOS variants:
+
+```bash
 /usr/local/bin/Rscript -e 'shiny::runApp(".")'
 ```
 
-Alternative from an interactive R session:
+or
+
+```bash
+/opt/homebrew/bin/Rscript -e 'shiny::runApp(".")'
+```
+
+### 4. Run the app from R or RStudio
 
 ```r
-setwd("BIEN Shiny App")
+setwd("BIEN-SpeciesShinyApp")
 shiny::runApp(".")
 ```
 
-If the shell shows a continuation prompt (`>`), press `Ctrl+C` and paste only the command itself, not Markdown code fences.
+### 5. What to expect on first launch
+
+- The app will automatically install any missing CRAN packages it needs.
+- The first launch may take a little longer while packages are installed.
+- Once running, Shiny will print a local address such as `http://127.0.0.1:xxxx` in the console.
+- Open that address in a browser if it does not open automatically.
+- Stop the app at any time with `Ctrl+C` in Terminal.
+
+### 6. If you are running it from this larger monorepo instead
+
+If the app is being run from the broader `biodiversity-agents-lab` workspace rather than the dedicated app repo, use:
+
+```bash
+Rscript -e 'shiny::runApp("BIEN Shiny App")'
+```
+
+### Troubleshooting
+
+- If the shell shows a continuation prompt (`>`), press `Ctrl+C` and re-paste only the command itself.
+- If `Rscript: command not found` appears, install R and try the full path version above.
+- If package installation for `sf` fails on macOS, install the Apple command line tools first and then retry.
 
 ## Interpreting the map correctly
 

@@ -258,6 +258,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 - Date: 2026-03-30
 - Prompt summary: User approved the next step after deep-search run.
+
+- Date: 2026-03-31
+- Prompt summary: Put detailed GitHub-user install and run instructions for the BIEN Shiny app into the README on the GitHub repo.
+- Requested outcomes: Update the app README with collaborator-friendly clone, install, launch, and troubleshooting steps for both the dedicated repo and the monorepo context.
+- Files changed: BIEN Shiny App/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Requested outcomes: Continue the plant body-mass scaling workflow after the first deep-search results.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
