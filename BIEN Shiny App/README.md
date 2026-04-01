@@ -58,6 +58,7 @@ The app organizes BIEN output into several linked views:
 - Coordinate QA filtering and duplicate thinning for mapped points.
 - Configurable query timeout and record caps to keep the app responsive for common species.
 - Clear notices when the map is showing a range polygon instead of occurrence points.
+- Count-only BIEN occurrence totals and source-class fractions so users can compare the full matching record pool with the returned app sample.
 - Trait table and compact trait summary by trait name and unit.
 - Range visualization when BIEN shapefiles are available.
 - Reconciliation and error log tab for transparent debugging and interpretation.
@@ -73,6 +74,27 @@ The sidebar includes controls to tailor the biological interpretation of returne
 - **Only geovalid coordinates** — restrict results to BIEN-flagged geovalid points.
 
 These controls are useful because the “best” filtering choice depends on the study question. For example, conservation or native-range questions may prefer strict native filtering, while horticultural or broader occurrence reconnaissance may not.
+
+The app now also shows a short **plain-language filter summary** directly under these controls so users can see, at a glance, what kind of records they are currently requesting.
+
+### Default filter profile
+
+The default starting view is a **conservative ecological default**:
+
+- BIEN native / not introduced records only
+- cultivated records excluded
+- BIEN geovalid coordinates only
+
+This default is useful for biodiversity screening, native-range interpretation, and general occurrence QA. If the current species has no records under those strict settings, the app may broaden the actual query strategy to recover some BIEN evidence, and that behavior is reported in the `Summary Statistics` tab.
+
+### On-demand loading behavior
+
+To keep the first query responsive, the app now loads content in stages:
+
+- **Occurrence Map** and occurrence evidence load first
+- **Summary Statistics** fetches BIEN count-only totals and source fractions when that tab is opened
+- **Traits** load when a Traits tab is opened
+- **Range** loads only when the Range tab is opened and the optional range toggle is enabled
 
 ## Requirements
 
@@ -171,6 +193,16 @@ The Overview summary now tells you whether the map is showing:
 - **a BIEN range polygon instead of points** when occurrence rows are returned without usable coordinates.
 
 This is important for species where BIEN supplies records but not mappable coordinates in the current response.
+
+## Notes for biodiversity users
+
+The biodiversity review agents flagged a few interpretation points that are worth keeping in mind when using the app:
+
+- **Observation categories are heuristic summaries** derived from BIEN provenance text fields. They are meant to be scientist-friendly labels, not formal controlled-vocabulary assignments.
+- **The Reconciliation tab is provisional** and shows BIEN-returned candidate names and query outcomes. It is useful for auditing, but it is not a formal synonym or accepted-name resolver.
+- **Trait Graphics are deliberately conservative**: the app only plots continuous values that can be parsed as a single numeric measurement within one unit. Categorical traits and mixed-format strings such as ranges or date-like values remain in the tables instead of being forced into histograms.
+- **The Overview distinguishes BIEN totals from the returned sample** by showing a count-only total of matching occurrence records without downloading all of them into the app, along with heuristic source-class fractions for specimens, iNaturalist, plots, traits, and other records.
+- **Fallback query strategies matter biologically**. If the app relaxes native-only or geovalid filters to recover data, the Overview reports the strategy that was used.
 
 ## Known data caveats
 

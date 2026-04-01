@@ -9,5 +9,30 @@ Prompt: Lets create a new project in a new folder called BIEN Shiny App. Use the
 Source session: current workspace session
 Outcome: Created a new BIEN-based Shiny app project with species query, occurrence mapping, trait exploration, range query display, and project documentation.
 
+2. Date: 2026-04-01
+Prompt: For the Overview tab, move the occurrence map and the summary statistics onto separate tabs, with the occurrence map first on the tab bar and the statistics after it.
+Source session: current workspace session
+Outcome: Updated the Shiny UI so the first tab now leads with the occurrence map and the summary statistics appear in their own separate tab.
+
+3. Date: 2026-04-01
+Prompt: Speed up slow BIEN species queries, explain to users why some species take longer, and rewrite the native/introduced, cultivated, and geovalid toggles so it is clear which occurrence records are being shown or hidden.
+Source session: current workspace session
+Outcome: Updated the app with clearer filter labels, more explicit progress/wait messaging, query timing reporting, session caching for repeated searches, and a slower optional range lookup that is now off by default.
+
+4. Date: 2026-04-01
+Prompt: Do a second-pass speed optimization focused on lazy-loading BIEN trait and range data only when those tabs are opened.
+Source session: current workspace session
+Outcome: Refactored the app so the first query now loads occurrences and summary counts first, while the Traits and Range tabs fetch their BIEN data on demand and reuse cached results afterward.
+
+5. Date: 2026-04-01
+Prompt: The Shiny app is hung up and frozen.
+Source session: current workspace session
+Outcome: Removed the count-only BIEN summary queries from the first-load critical path and moved them to on-demand loading in the Summary Statistics tab so the app stays responsive sooner.
+
+6. Date: 2026-04-01
+Prompt: Push the new BIEN app details to GitHub, make sure the README is detailed, and add a summarized statement of what records the user is looking at based on the selected filters, including the default biodiversity-oriented setting.
+Source session: current workspace session
+Outcome: Added a plain-language filter summary panel to the app sidebar, documented the default conservative ecological filter profile and on-demand loading behavior in the README, and prepared the BIEN app updates for GitHub publication.
+
 ## Update Rule
 Append a new entry whenever prompts lead to created/modified app code, BIEN query logic, or documentation under BIEN Shiny App/.

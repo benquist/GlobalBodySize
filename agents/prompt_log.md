@@ -220,6 +220,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-01
+- Prompt summary: Review the current BIEN Shiny app structure from a biodiversity science perspective and return concise, ranked recommendations only.
+- Requested outcomes: Assess what ecologists, taxonomists, and conservation biologists would want surfaced first, which outputs are missing or should be elevated, and which caveats or uncertainty indicators should be more visible.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-30
 - Prompt summary: User requested a close workflow check by biodiversity agents after initial deep-search work.
 - Requested outcomes: Review the augmented plant body-mass workflow for methodological quality, biodiversity-informatics risks, and concrete improvements.
@@ -317,6 +323,36 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: User requested to finish the current plant body-mass scaling work without adding further workflow expansion.
 - Requested outcomes: Close out the current work as complete and leave the project at its present state.
 - Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Reorganize the BIEN Shiny app Overview so the occurrence map and summary statistics are on separate tabs, with the map first.
+- Requested outcomes: Split the old combined Overview into map-first and statistics tabs to avoid scrolling and improve usability.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Speed up slow BIEN species queries, explain the wait to users, and clarify the native/introduced, cultivated, and geovalid filter labels.
+- Requested outcomes: Improve the Shiny app’s perceived responsiveness, reduce unnecessary waiting by default, and make the filter controls clearly state which occurrence records are included or hidden.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Do a second-pass speed optimization for the BIEN Shiny app focused on lazy-loading traits and range data only when those tabs are opened.
+- Requested outcomes: Refactor the app so the first species query returns faster by loading occurrence evidence first and deferring trait and range requests until the user opens those tabs.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: The BIEN Shiny app appears hung and frozen; diagnose the cause and restore responsiveness.
+- Requested outcomes: Fix the immediate blocking path so the app stays responsive, especially during the first species query.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Push the new BIEN app details to GitHub, ensure the README is detailed, and add a clearer plain-language filter summary plus default-setting interpretation.
+- Requested outcomes: Expand the BIEN app README with the latest performance/filter behavior, add a user-facing summary of the selected occurrence filters in the app UI, clarify the default conservative ecological setting, and publish the updates.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-03-30
@@ -428,8 +464,6 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-03-31
 - Prompt summary: Run mandatory pre-return checks after BIEN app clone/run troubleshooting verification.
 - Requested outcomes: Verify prompt-log coverage, changed-Rmd/package-build applicability, and git push synchronization before returning the troubleshooting summary.
-- Files changed: agents/prompt_log.md
-- Completed by: GitHub Copilot
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
@@ -631,6 +665,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files reviewed: BIEN Shiny App/CODE_WORKFLOW_DOCUMENTATION.md; BIEN Shiny App/README.md; .github/agents/r-code-documenter.agent.md; .github/agents/biodiversity-science-guard.agent.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-01
+- Prompt summary: Review the BIEN Shiny app filter controls conceptually for a biodiversity audience.
+- Requested outcomes: Judge whether the current native/introduced, cultivated, and geovalid defaults are sensible for biodiversity experts; provide a one-sentence user-facing summary and a practical label for the default filter set; no app-file edits.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-31
 - Prompt summary: Add comments to `BIEN Shiny App/app.R` and push the pending BIEN app and agent updates to GitHub.
 - Requested outcomes: Make the Shiny code easier to read with section comments and publish the current repository changes to GitHub.
@@ -641,4 +681,22 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Fix the BIEN Shiny App so the trait graphics only show continuous variables and the occurrence-map legend is visible again.
 - Requested outcomes: Stop plotting categorical traits like flower color in the graphical overview and restore the map legend for the `Color map points by` setting.
 - Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Assess the BIEN Shiny app organization and reported information for biodiversity informatics best practices without modifying the app files.
+- Requested outcomes: Review `/Users/brianjenquist/VSCode/BIEN Shiny App` and return concise recommendations on provenance reporting, taxonomy/reconciliation transparency, QA summaries, filter visibility, and tab organization for an expert biodiversity audience.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Inspect `BIEN Shiny App/app.R` for the most likely causes of slow species queries and recommend speed-focused improvements without modifying the app code.
+- Requested outcomes: Identify the main query-sequence and timeout bottlenecks, then return a concise list of root causes and the top implementation changes that would materially improve perceived and actual speed while preserving functionality.
+- Files reviewed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Advise on a short scientist-friendly interpretation statement for the BIEN Shiny app occurrence filters and assess whether the default filter settings are appropriate for biodiversity exploration.
+- Requested outcomes: Recommend a concise sentence explaining that the default view shows native-only, non-cultivated, geovalid BIEN records and indicate whether that conservative default is suitable for exploratory biodiversity use.
+- Files reviewed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; agents/prompt_log.md
 - Completed by: GitHub Copilot

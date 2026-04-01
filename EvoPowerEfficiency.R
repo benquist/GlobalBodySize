@@ -6,6 +6,7 @@
 M <- 10^seq(-6, 6, length.out = 200)   # body mass range (g)
 B0 <- 1                                # normalization constant
 
+
 B <- B0 * M^(3/4)
 
 plot(M, B, log="xy",
