@@ -600,3 +600,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Make the Shiny code easier to read with section comments and publish the current repository changes to GitHub.
 - Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Fix the BIEN Shiny App so the trait graphics only show continuous variables and the occurrence-map legend is visible again.
+- Requested outcomes: Stop plotting categorical traits like flower color in the graphical overview and restore the map legend for the `Color map points by` setting.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot

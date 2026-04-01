@@ -814,6 +814,14 @@ server <- function(input, output, session) {
           map <- map %>% addCircleMarkers(data = sf_obj, radius = 4, stroke = FALSE, fillOpacity = 0.7)
         }
 
+        map <- map %>% addLegend(
+          position = "topright",
+          colors = "#1B9E77",
+          labels = "BIEN range polygon",
+          title = "Overview map",
+          opacity = 0.9
+        )
+
         bbox <- st_bbox(sf_obj)
         return(map %>% fitBounds(bbox[["xmin"]], bbox[["ymin"]], bbox[["xmax"]], bbox[["ymax"]]))
       }
@@ -824,7 +832,8 @@ server <- function(input, output, session) {
     lat_col <- occ_info$lat_col
     lon_col <- occ_info$lon_col
 
-    color_by <- if (is.null(input$map_color_by)) "category" else input$map_color_by
+    map_scale <- if (is.null(input$map_scale) || !nzchar(input$map_scale)) "auto" else input$map_scale
+    color_by <- if (is.null(input$map_color_by) || !nzchar(input$map_color_by)) "category" else input$map_color_by
     obs_type_col <- find_first_col(df, c("observation_type", "observation.type"))
 
     if (identical(color_by, "category") && "observation_category" %in% names(df)) {
@@ -836,9 +845,10 @@ server <- function(input, output, session) {
     }
 
     color_vals[is.na(color_vals) | color_vals == ""] <- "unknown"
+    legend_vals <- sort(unique(color_vals))
     pal <- colorFactor(
       palette = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666"),
-      domain = sort(unique(color_vals))
+      domain = legend_vals
     )
 
     map <- map %>% addCircleMarkers(
@@ -846,29 +856,28 @@ server <- function(input, output, session) {
       lat = df[[lat_col]],
       radius = 4,
       stroke = FALSE,
-      color = pal(color_vals),
       fillColor = pal(color_vals),
-      fillOpacity = 0.75,
+      fillOpacity = 0.8,
       popup = make_popup_text(df),
       options = pathOptions(pane = "markerPane")
     ) %>%
       addLegend(
-        position = "bottomright",
-        pal = pal,
-        values = color_vals,
+        position = "topright",
+        colors = unname(pal(legend_vals)),
+        labels = legend_vals,
         title = legend_title,
         opacity = 0.9
       )
 
-    if (input$map_scale == "world") {
+    if (map_scale == "world") {
       map %>% setView(lng = 0, lat = 20, zoom = 2)
-    } else if (input$map_scale == "regional") {
+    } else if (map_scale == "regional") {
       map %>% setView(
         lng = mean(df[[lon_col]], na.rm = TRUE),
         lat = mean(df[[lat_col]], na.rm = TRUE),
         zoom = 4
       )
-    } else if (input$map_scale == "local") {
+    } else if (map_scale == "local") {
       map %>% setView(
         lng = mean(df[[lon_col]], na.rm = TRUE),
         lat = mean(df[[lat_col]], na.rm = TRUE),
@@ -970,7 +979,25 @@ server <- function(input, output, session) {
       return(invisible(NULL))
     }
 
-    summary_tbl <- trait_vis$summary %>% slice_head(n = min(6, nrow(trait_vis$summary)))
+    summary_tbl <- trait_vis$summary %>%
+      filter(value_type == "continuous") %>%
+      slice_head(n = 6)
+
+    if (nrow(summary_tbl) == 0) {
+      plot.new()
+      text(
+        0.5, 0.55,
+        "No continuous trait variables are available to plot for this species.",
+        cex = 1.05
+      )
+      text(
+        0.5, 0.42,
+        "Categorical traits such as flower color are summarized in the table below.",
+        cex = 0.95
+      )
+      return(invisible(NULL))
+    }
+
     plot_df <- trait_vis$data
 
     n_panels <- nrow(summary_tbl)
@@ -987,31 +1014,17 @@ server <- function(input, output, session) {
       unit_txt <- trait_row$unit_std[[1]]
       unit_suffix <- if (!is.na(unit_txt) && nzchar(unit_txt)) paste0(" (", unit_txt, ")") else ""
       df <- plot_df %>% filter(trait_name_std == trait_name)
+      num_vals <- df$trait_value_num[!is.na(df$trait_value_num)]
 
-      if (trait_row$value_type[[1]] == "continuous") {
-        num_vals <- df$trait_value_num[!is.na(df$trait_value_num)]
-        hist(
-          num_vals,
-          main = paste0(trait_name, unit_suffix),
-          xlab = "Trait value",
-          col = "#66c2a5",
-          border = "white"
-        )
-        abline(v = mean(num_vals), col = "#d73027", lwd = 2)
-        mtext(trait_row$summary_note[[1]], side = 3, line = 0.2, cex = 0.8)
-      } else {
-        counts <- sort(table(df$trait_value_std), decreasing = TRUE)
-        top_counts <- head(counts, 6)
-        barplot(
-          top_counts,
-          las = 2,
-          col = "#8da0cb",
-          main = paste0(trait_name, unit_suffix),
-          ylab = "Count",
-          cex.names = 0.8
-        )
-        mtext(trait_row$summary_note[[1]], side = 3, line = 0.2, cex = 0.8)
-      }
+      hist(
+        num_vals,
+        main = paste0(trait_name, unit_suffix),
+        xlab = "Trait value",
+        col = "#66c2a5",
+        border = "white"
+      )
+      abline(v = mean(num_vals), col = "#d73027", lwd = 2)
+      mtext(trait_row$summary_note[[1]], side = 3, line = 0.2, cex = 0.8)
     }
   })
 
