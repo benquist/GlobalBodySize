@@ -540,3 +540,63 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Expand the BIEN app README overview and update the repo description to better explain scope, features, and use cases.
 - Files changed: BIEN Shiny App/README.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Run final mandatory gate now.
+- Requested outcomes: Verify prompt is recorded in agents/prompt_log.md, updated Rmd compile status, updated R package build status, and git push status confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Separate BIEN observation records into clear categories and allow random sampling of the kept occurrence records.
+- Requested outcomes: Represent specimen, plot/survey, trait, and citizen-science style records clearly in the app and let the displayed 1000-record sample be randomized.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Have the biodiversity agents review the BIEN Shiny App workflow against biodiversity scientist standards.
+- Requested outcomes: Assess whether the current workflow meets biodiversity-informatics expectations and identify any standards gaps or recommended improvements.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Review the new BIEN Shiny App documentation and agent setup for biodiversity-science, ecology, and taxonomy norms.
+- Requested outcomes: Assess `BIEN Shiny App/CODE_WORKFLOW_DOCUMENTATION.md`, `BIEN Shiny App/README.md`, `.github/agents/r-code-documenter.agent.md`, and `.github/agents/biodiversity-science-guard.agent.md` for critical issues, likely issues, strengths, and one future-improvement recommendation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Add family and record-quality counts to the BIEN app overview text.
+- Requested outcomes: Show family name under the species and include mapped-point summaries for native/introduced status, cultivated status, and coordinate/geovalid quality.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Run the BIEN Shiny app for the user.
+- Requested outcomes: Start the local Shiny app and provide the URL to access it.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Review BIEN Shiny App workflow/documentation needs for biodiversity-facing agents.
+- Requested outcomes: Provide concise enforcement checklists, deliverable headings, and reliable trigger phrases for a biodiversity-science documentation agent and a biodiversity norms agent.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Create a code-documentation agent and a biodiversity-standards agent, and document the BIEN Shiny App workflow in a scientist-readable way.
+- Requested outcomes: Add custom agents for R workflow documentation and biodiversity science norms, and create readable documentation that follows biodiversity, ecology, and taxonomy protocol.
+- Files changed: .github/agents/r-code-documenter.agent.md; agents/r-code-documenter.agent.md; .github/agents/biodiversity-science-guard.agent.md; agents/biodiversity-science-guard.agent.md; .github/agents/m.agent.md; agents/m.agent.md; BIEN Shiny App/CODE_WORKFLOW_DOCUMENTATION.md; BIEN Shiny App/README.md; BIEN Shiny App/app.R; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Review the BIEN Shiny App documentation and agent setup for biodiversity-science, ecology, and taxonomy norms.
+- Requested outcomes: Assess `BIEN Shiny App/CODE_WORKFLOW_DOCUMENTATION.md`, `BIEN Shiny App/README.md`, `.github/agents/r-code-documenter.agent.md`, and `.github/agents/biodiversity-science-guard.agent.md` for critical issues, likely issues, strengths, and future improvement needs.
+- Files reviewed: BIEN Shiny App/CODE_WORKFLOW_DOCUMENTATION.md; BIEN Shiny App/README.md; .github/agents/r-code-documenter.agent.md; .github/agents/biodiversity-science-guard.agent.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Add comments to `BIEN Shiny App/app.R` and push the pending BIEN app and agent updates to GitHub.
+- Requested outcomes: Make the Shiny code easier to read with section comments and publish the current repository changes to GitHub.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot

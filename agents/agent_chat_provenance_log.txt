@@ -118,6 +118,17 @@ Prompt: start a subfolder calle cacti and get all the trait data from BIEN for a
 6) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
 Prompt: start a subfolder calle cacti and get all the trait data from BIEN for all cacti species. then search the internet and find any other cacti data to add to this. always record where you got the data that isn't from BIEN. You can just focus on the traits: body size (height or diameter or mass) and flower color
 
+[6] Date: 2026-03-31
+Source: active chat request
+Request summary: Investigate BIEN Shiny App species query behavior (Pinus ponderosa empty results) and provide robust patch guidance.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the active prompt to agents/prompt_log.md to satisfy mandatory final gate logging.
+- Appended this provenance entry because an agent-folder file was updated during the task.
+Outcome: Agent-folder logging requirements remain append-only and up to date for this chat.
+
 [N] Date: 2026-03-30
 Source: active chat request
 Request summary: Audit statistical validity of quantitative synthesis in the integrated literature workflow; assess exponent extraction/comparability/heterogeneity and recommend robust cross-study modeling.
@@ -238,3 +249,28 @@ Action taken:
 - Added a new prompt-log entry for this exact review request to satisfy the final-gate prompt logging rule.
 - Appended this provenance record because files under agents/ were updated during the compliance workflow.
 Outcome: Append-only provenance and prompt logging remain current for this review turn.
+
+[2026-03-31] Added prompt-log entry for mandatory final gate request; validated gate checks in always mode.
+
+[10] Date: 2026-03-31
+Source: active chat request
+Request summary: Create a code-documentation agent and a biodiversity-focused standards agent, and document the BIEN Shiny App workflow in a scientist-readable form.
+Files affected:
+- .github/agents/r-code-documenter.agent.md
+- agents/r-code-documenter.agent.md
+- .github/agents/biodiversity-science-guard.agent.md
+- agents/biodiversity-science-guard.agent.md
+- .github/agents/m.agent.md
+- agents/m.agent.md
+- BIEN Shiny App/CODE_WORKFLOW_DOCUMENTATION.md
+- BIEN Shiny App/README.md
+- BIEN Shiny App/app.R
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Created a new R workflow documentation agent focused on methods-style, provenance-aware explanations.
+- Created a new biodiversity science guard agent focused on ecology, taxonomy, QA, and interpretation norms.
+- Registered both agents with the `m` supervisor workflow.
+- Added a dedicated code and workflow documentation file for the BIEN Shiny App and linked it from the README.
+- Fixed the trait-graphics runtime issue and re-verified the Shiny workflow.
+Outcome: The project now includes explicit documentation and review agents plus a scientist-readable workflow guide aligned with biodiversity-science norms.

@@ -16,6 +16,14 @@ Instead of jumping immediately into modeling workflows, the app helps answer bas
 
 This makes the app especially useful for exploratory biodiversity and ecology workflows where interpretation depends on understanding the data source and record structure, not just raw point counts.
 
+## Detailed code and workflow documentation
+
+For a scientist-readable description of the R code, BIEN query workflow, provenance expectations, QA steps, and interpretation caveats, see:
+
+- [`CODE_WORKFLOW_DOCUMENTATION.md`](./CODE_WORKFLOW_DOCUMENTATION.md)
+
+This companion document is written to be understandable by biodiversity-focused review agents as well as human collaborators in ecology and taxonomy.
+
 ## What the app shows
 
 The app organizes BIEN output into several linked views:
@@ -82,15 +90,23 @@ The app auto-installs missing CRAN packages on startup.
 
 ## Run the app
 
-From the repository root:
+From the repository root, point explicitly to the app folder:
 
 ```bash
-PATH="/opt/homebrew/bin:$PATH" Rscript -e 'shiny::runApp(".")'
+PATH="/opt/homebrew/bin:$PATH" Rscript -e 'shiny::runApp("BIEN Shiny App")'
+```
+
+Or change into the app directory first:
+
+```bash
+cd "BIEN Shiny App"
+/usr/local/bin/Rscript -e 'shiny::runApp(".")'
 ```
 
 Alternative from an interactive R session:
 
 ```r
+setwd("BIEN Shiny App")
 shiny::runApp(".")
 ```
 
