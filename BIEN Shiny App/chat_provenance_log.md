@@ -34,5 +34,15 @@ Prompt: Push the new BIEN app details to GitHub, make sure the README is detaile
 Source session: current workspace session
 Outcome: Added a plain-language filter summary panel to the app sidebar, documented the default conservative ecological filter profile and on-demand loading behavior in the README, and prepared the BIEN app updates for GitHub publication.
 
+7. Date: 2026-04-01
+Prompt: The app froze again, especially around Summary Statistics.
+Source session: current workspace session
+Outcome: Changed the BIEN count-only total and source-fraction fetch to a manual button-triggered action in the Summary Statistics tab so opening the tab no longer blocks the whole app.
+
+8. Date: 2026-04-01
+Prompt: Make sure the code is commented, README files are updated and useful, clarify that users must click Query BIEN again after changing filters, and push the latest BIEN app updates to GitHub.
+Source session: current workspace session
+Outcome: Added clearer inline comments to the Shiny app code, expanded the BIEN app README and workspace README, added an explicit re-query notice for filter changes, and prepared the latest app polish updates for publication.
+
 ## Update Rule
 Append a new entry whenever prompts lead to created/modified app code, BIEN query logic, or documentation under BIEN Shiny App/.

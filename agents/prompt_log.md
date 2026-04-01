@@ -355,6 +355,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-01
+- Prompt summary: The BIEN Shiny app froze again; remove the remaining blocking summary-count load so Summary Statistics stays responsive.
+- Requested outcomes: Stop the app from freezing by making the BIEN count-only totals and source-fraction fetch a manual on-demand action instead of an automatic tab-open query.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Make sure the BIEN app code is commented, README files are updated and useful, clarify that changing toggles requires clicking Query BIEN again, and push the latest updates to GitHub.
+- Requested outcomes: Improve code comments and documentation for the BIEN app, add a clear re-query note for filter changes, update the project and workspace READMEs, and publish the changes.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-30
 - Prompt summary: User asked whether the deep-search code was actually run and whether results exist.
 - Requested outcomes: Confirm execution status and point to the generated result files.

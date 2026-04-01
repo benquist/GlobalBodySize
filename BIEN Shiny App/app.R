@@ -669,9 +669,14 @@ ui <- fluidPage(
       tags$script(HTML("$(document).on('keydown', '#species', function(e) { if (e.key === 'Enter') { $('#run_query').click(); return false; } });")),
       tags$div(
         style = "font-size:0.92em;color:#555;margin:6px 0 10px 0;",
-        "The first query now loads occurrence records first for speed. Summary statistics, traits, and optional range layers are fetched when you open those tabs."
+        "Occurrence records load first for speed. Optional BIEN total counts can be loaded manually from the Summary Statistics tab, while traits and range layers are fetched only when those tabs are opened."
       ),
       tags$hr(),
+      tags$div(
+        style = "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:8px 10px;border-radius:6px;margin:0 0 10px 0;font-size:0.92em;",
+        tags$strong("Important: "),
+        "If you change any of the filters below, click ", tags$code("Query BIEN"), " again to refresh the occurrence records and summaries."
+      ),
       checkboxInput("use_introduced_filter", "Use BIEN native vs introduced status (turn off to show records regardless of introduced status)", value = TRUE),
       conditionalPanel(
         condition = "input.use_introduced_filter == true",
@@ -720,6 +725,12 @@ ui <- fluidPage(
         tabPanel(
           "Summary Statistics",
           br(),
+          tags$p(
+            style = "color:#555;max-width:900px;",
+            "Returned-record summaries appear below immediately. Optional BIEN count-only totals and source fractions can take longer, so they are loaded only if you request them."
+          ),
+          actionButton("load_summary_counts", "Load BIEN total counts and source mix (slower)", class = "btn-default btn-sm"),
+          br(), br(),
           htmlOutput("query_summary")
         ),
         tabPanel("Observation Table", br(), DTOutput("occurrence_table")),
@@ -842,7 +853,7 @@ server <- function(input, output, session) {
         occurrences_prepared = occ_prepared,
         occurrences_returned = occ_returned_n,
         occ_total_available = NA_real_,
-        occ_total_note = "Loading BIEN summary counts when you open this tab...", 
+        occ_total_note = "Click 'Load BIEN total counts and source mix (slower)' to fetch optional BIEN totals for this species.", 
         occ_source_mix = NULL,
         occurrence_sample_mode = if (sample_random) "random" else "head",
         traits = NULL,
@@ -872,6 +883,7 @@ server <- function(input, output, session) {
     })
   }, ignoreInit = TRUE)
 
+  # Lazy-load BIEN trait data only when the user opens one of the trait-focused tabs.
   trait_results <- reactive({
     res <- bien_results()
     req(res)
@@ -911,6 +923,7 @@ server <- function(input, output, session) {
     })
   })
 
+  # Lazy-load optional BIEN range artifacts only when the Range tab is opened.
   range_results <- reactive({
     res <- bien_results()
     req(res)
@@ -964,7 +977,9 @@ server <- function(input, output, session) {
     })
   })
 
-  summary_results <- reactive({
+  # Keep the potentially slower BIEN total-count and source-mix queries manual so
+  # opening Summary Statistics does not block the whole app.
+  summary_results <- eventReactive(input$load_summary_counts, {
     res <- bien_results()
     req(res)
     req(!is.null(input$main_tabs), identical(input$main_tabs, "Summary Statistics"))
@@ -1019,11 +1034,24 @@ server <- function(input, output, session) {
       assign(cache_key, out, envir = summary_cache)
       out
     })
-  })
+  }, ignoreInit = TRUE)
 
   output$query_summary <- renderUI({
     res <- bien_results()
-    summary_bundle <- summary_results()
+    summary_event <- summary_results()
+    summary_cache_key <- paste0(res$query_cache_key, "||summary")
+    summary_bundle <- get_cached_result(summary_cache, summary_cache_key)
+    if (is.null(summary_bundle) && !is.null(summary_event)) {
+      summary_bundle <- summary_event
+    }
+    if (is.null(summary_bundle)) {
+      summary_bundle <- list(
+        total = NA_real_,
+        note = "Click 'Load BIEN total counts and source mix (slower)' to fetch optional BIEN totals for this species.",
+        source_mix = NULL,
+        loaded = FALSE
+      )
+    }
 
     occ_n <- if (is.data.frame(res$occurrences)) nrow(res$occurrences) else 0
     occ_returned_n <- if (!is.null(res$occurrences_returned)) res$occurrences_returned else occ_n
@@ -1306,6 +1334,8 @@ server <- function(input, output, session) {
     }
   })
 
+  # Summarize the currently selected biological filters in plain language so users
+  # can see immediately what kind of occurrence evidence is being requested.
   output$filter_selection_summary <- renderUI({
     default_mode <- isTRUE(input$use_introduced_filter) && isTRUE(input$natives_only) &&
       isTRUE(input$use_cultivated_filter) && !isTRUE(input$include_cultivated) &&

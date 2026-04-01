@@ -28,25 +28,31 @@ This companion document is written to be understandable by biodiversity-focused 
 
 The app organizes BIEN output into several linked views:
 
-### 1. Overview map
+### 1. Occurrence Map
 - Maps occurrence points when usable latitude/longitude coordinates are available.
-- Colors points by BIEN `observation_type` so users can visually distinguish record source classes such as plot, specimen, literature, or checklist.
+- Colors points by BIEN `observation_type` or broader observation category so users can visually distinguish record source classes such as plot, specimen, literature, or checklist.
 - Falls back to the BIEN range polygon when occurrence rows exist but BIEN does not provide usable coordinates in the current response.
 - Reports whether the map is showing all points or a sampled subset for responsiveness.
 
-### 2. Observation table
+### 2. Summary Statistics
+- Shows the main returned-record summary immediately after a species query.
+- Can optionally fetch BIEN count-only totals and source-class fractions using the button **`Load BIEN total counts and source mix (slower)`**.
+- Reports the active filter interpretation, the actual BIEN query strategy used, and key QA summaries.
+
+### 3. Observation table
+
 - Displays the returned occurrence records in searchable tabular form.
 - Helps inspect provenance, taxonomic matching, and geographic structure directly.
 
-### 3. Traits and trait summary
+### 4. Traits and trait summary
 - Shows raw trait records returned by BIEN.
 - Summarizes trait availability by trait name, units, and number of records.
 
-### 4. Range tab
+### 5. Range tab
 - Displays BIEN range outputs and maps downloaded shapefiles when available.
 - Useful for species where BIEN range artifacts are more complete than occurrence coordinates.
 
-### 5. Reconciliation and error logging
+### 6. Reconciliation and error logging
 - Surfaces matching and query information so that missing points, API timeouts, or schema mismatches are visible rather than silent.
 
 ## Main features
@@ -67,15 +73,17 @@ The app organizes BIEN output into several linked views:
 
 The sidebar includes controls to tailor the biological interpretation of returned records:
 
-- **Use BIEN `is_cultivated` filter** — turn cultivated filtering on or off.
-- **Include cultivated records** — when the cultivated filter is active, decide whether cultivated records should be included.
-- **Use BIEN `is_introduced` filter** — turn native/introduced filtering on or off.
-- **Native records only** — when introduced filtering is active, keep only native records.
-- **Only geovalid coordinates** — restrict results to BIEN-flagged geovalid points.
+- **Use BIEN native vs introduced status** — if left on, BIEN native/introduced metadata is used in the current view; if turned off, records are shown regardless of introduced status.
+- **Keep native records only and hide introduced records** — when enabled, the app requests the stricter native-only subset.
+- **Use BIEN cultivated vs wild status** — if left on, BIEN cultivated metadata is used in the current view; if turned off, both cultivated and non-cultivated records can be shown.
+- **Include cultivated records** — when enabled, cultivated records are allowed in the returned subset; when off, they are hidden.
+- **Keep only BIEN geovalid coordinates** — restricts the view to BIEN-flagged geovalid points and hides flagged/non-geovalid coordinates.
 
 These controls are useful because the “best” filtering choice depends on the study question. For example, conservation or native-range questions may prefer strict native filtering, while horticultural or broader occurrence reconnaissance may not.
 
 The app now also shows a short **plain-language filter summary** directly under these controls so users can see, at a glance, what kind of records they are currently requesting.
+
+> **Important:** changing any of these toggles does not automatically rerun the BIEN query. After adjusting them, click **`Query BIEN`** again to refresh the results.
 
 ### Default filter profile
 
@@ -92,7 +100,7 @@ This default is useful for biodiversity screening, native-range interpretation, 
 To keep the first query responsive, the app now loads content in stages:
 
 - **Occurrence Map** and occurrence evidence load first
-- **Summary Statistics** fetches BIEN count-only totals and source fractions when that tab is opened
+- **Summary Statistics** shows fast returned-record summaries immediately and can fetch optional BIEN count-only totals and source fractions when you click the load button in that tab
 - **Traits** load when a Traits tab is opened
 - **Range** loads only when the Range tab is opened and the optional range toggle is enabled
 
