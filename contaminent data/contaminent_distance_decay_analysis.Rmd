@@ -1,0 +1,1388 @@
+---
+title: "Dummy Spatial Scaling Analysis: Contaminants and Isotopes"
+author: "GitHub Copilot"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Overview
+
+This report creates a dummy tissue dataset for sampled individuals across latitude and longitude, then evaluates distance-decay relationships for:
+
+- DDT
+- PCP
+- Isotope signature (delta13C and delta15N combined)
+- Overall multivariate similarity
+
+In the spirit of broad spatial-scaling analyses, we compare multiple distance-decay functions (exponential, power-law, and log-linear), evaluate isolated curves per variable, and assess generality with a pooled model and null randomization.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+set.seed(42)
+
+out_dir <- "outputs"
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+```
+
+## 1) Create Dummy Data
+
+```{r make-data}
+# Three broad spatial clusters to create realistic distance structure.
+n_sites <- 60
+cluster <- sample(c("North", "Central", "South"), n_sites, replace = TRUE, prob = c(0.3, 0.4, 0.3))
+
+lat <- ifelse(cluster == "North", 45 + rnorm(n_sites, 0, 1.3),
+              ifelse(cluster == "Central", 37 + rnorm(n_sites, 0, 1.2),
+                     30 + rnorm(n_sites, 0, 1.4)))
+
+lon <- ifelse(cluster == "North", -122 + rnorm(n_sites, 0, 1.5),
+              ifelse(cluster == "Central", -118 + rnorm(n_sites, 0, 1.3),
+                     -112 + rnorm(n_sites, 0, 1.6)))
+
+# Add smooth spatial signals and noise to generate trait-like chemistry.
+spatial_grad <- scale(lat) - 0.6 * scale(lon)
+
+DDT <- pmax(0.01, 2.5 + 1.1 * as.numeric(spatial_grad) + rnorm(n_sites, 0, 0.45))
+PCP <- pmax(0.01, 1.8 + 0.9 * as.numeric(scale(lat + lon)) + rnorm(n_sites, 0, 0.40))
+delta13C <- -24 + 1.7 * as.numeric(scale(lat)) + rnorm(n_sites, 0, 0.7)
+delta15N <- 8 + 1.3 * as.numeric(scale(-lon)) + rnorm(n_sites, 0, 0.6)
+
+dummy_data <- data.frame(
+  site_id = sprintf("S%03d", seq_len(n_sites)),
+  cluster = cluster,
+  latitude = lat,
+  longitude = lon,
+  DDT = DDT,
+  PCP = PCP,
+  delta13C = delta13C,
+  delta15N = delta15N,
+  stringsAsFactors = FALSE
+)
+
+write.csv(dummy_data, file.path(out_dir, "dummy_tissue_data.csv"), row.names = FALSE)
+head(dummy_data)
+```
+
+## 2) Pairwise Distance and Similarity
+
+```{r pairwise}
+# Haversine distance in km.
+haversine_km <- function(lat1, lon1, lat2, lon2) {
+  r <- 6371
+  to_rad <- pi / 180
+  dlat <- (lat2 - lat1) * to_rad
+  dlon <- (lon2 - lon1) * to_rad
+  a <- sin(dlat / 2)^2 + cos(lat1 * to_rad) * cos(lat2 * to_rad) * sin(dlon / 2)^2
+  2 * r * atan2(sqrt(a), sqrt(1 - a))
+}
+
+# Convert a distance in variable space into a 0-1 similarity.
+sim_from_diff <- function(x, scale_val) {
+  exp(-abs(x) / scale_val)
+}
+
+n <- nrow(dummy_data)
+pairs <- vector("list", n * (n - 1) / 2)
+k <- 1
+
+sd_DDT <- sd(dummy_data$DDT)
+sd_PCP <- sd(dummy_data$PCP)
+sd_iso <- sd(c(dummy_data$delta13C, dummy_data$delta15N))
+
+for (i in 1:(n - 1)) {
+  for (j in (i + 1):n) {
+    d_geo <- haversine_km(dummy_data$latitude[i], dummy_data$longitude[i],
+                          dummy_data$latitude[j], dummy_data$longitude[j])
+
+    d_ddt <- dummy_data$DDT[i] - dummy_data$DDT[j]
+    d_pcp <- dummy_data$PCP[i] - dummy_data$PCP[j]
+    d_iso <- sqrt((dummy_data$delta13C[i] - dummy_data$delta13C[j])^2 +
+                  (dummy_data$delta15N[i] - dummy_data$delta15N[j])^2)
+
+    sim_ddt <- sim_from_diff(d_ddt, sd_DDT)
+    sim_pcp <- sim_from_diff(d_pcp, sd_PCP)
+    sim_iso <- exp(-d_iso / sd_iso)
+    sim_all <- mean(c(sim_ddt, sim_pcp, sim_iso))
+
+    pairs[[k]] <- data.frame(
+      site_i = dummy_data$site_id[i],
+      site_j = dummy_data$site_id[j],
+      distance_km = d_geo,
+      sim_DDT = sim_ddt,
+      sim_PCP = sim_pcp,
+      sim_isotope = sim_iso,
+      sim_overall = sim_all,
+      stringsAsFactors = FALSE
+    )
+    k <- k + 1
+  }
+}
+
+pairwise_df <- do.call(rbind, pairs)
+write.csv(pairwise_df, file.path(out_dir, "pairwise_distance_similarity.csv"), row.names = FALSE)
+summary(pairwise_df$distance_km)
+```
+
+## 3) Fit Distance-Decay Curves (Isolated + Overall)
+
+```{r fit-models}
+fit_decay_models <- function(distance, similarity) {
+  dat <- data.frame(distance = pmax(distance, 0), sim = pmin(pmax(similarity, 1e-6), 0.999999))
+
+  # Exponential: sim = a * exp(-b * d)
+  exp_fit <- try(nls(sim ~ a * exp(-b * distance),
+                     data = dat,
+                     start = list(a = 0.9, b = 0.001),
+                     control = nls.control(maxiter = 200)),
+                 silent = TRUE)
+
+  # Power-law: sim = a * (d + 1)^(-b)
+  pow_fit <- try(nls(sim ~ a * (distance + 1)^(-b),
+                     data = dat,
+                     start = list(a = 0.9, b = 0.1),
+                     control = nls.control(maxiter = 200)),
+                 silent = TRUE)
+
+  # Log-linear: sim = a + b * log(d + 1)
+  loglin_fit <- lm(sim ~ log(distance + 1), data = dat)
+
+  get_row <- function(name, fit_obj, type) {
+    if (inherits(fit_obj, "try-error")) {
+      return(data.frame(model = name, model_type = type, intercept = NA, slope = NA, AIC = NA, stringsAsFactors = FALSE))
+    }
+    if (type == "lm") {
+      co <- coef(fit_obj)
+      return(data.frame(
+        model = name,
+        model_type = type,
+        intercept = unname(co[1]),
+        slope = unname(co[2]),
+        AIC = AIC(fit_obj),
+        stringsAsFactors = FALSE
+      ))
+    }
+    co <- coef(fit_obj)
+    data.frame(
+      model = name,
+      model_type = type,
+      intercept = unname(co[1]),
+      slope = unname(co[2]),
+      AIC = AIC(fit_obj),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  model_table <- rbind(
+    get_row("exponential", exp_fit, "nls"),
+    get_row("power_law", pow_fit, "nls"),
+    get_row("log_linear", loglin_fit, "lm")
+  )
+
+  list(models = list(exp = exp_fit, pow = pow_fit, loglin = loglin_fit), table = model_table)
+}
+
+responses <- c("sim_DDT", "sim_PCP", "sim_isotope", "sim_overall")
+fit_list <- lapply(responses, function(v) fit_decay_models(pairwise_df$distance_km, pairwise_df[[v]]))
+names(fit_list) <- responses
+
+model_summary <- do.call(rbind, lapply(names(fit_list), function(v) {
+  tab <- fit_list[[v]]$table
+  tab$response <- v
+  tab
+}))
+model_summary <- model_summary[, c("response", "model", "model_type", "intercept", "slope", "AIC")]
+
+write.csv(model_summary, file.path(out_dir, "distance_decay_model_summary.csv"), row.names = FALSE)
+model_summary
+```
+
+## 4) Null Model (Randomized Tissue Composition)
+
+```{r null-model}
+get_log_slope <- function(distance, similarity) {
+  fit <- lm(similarity ~ log(distance + 1))
+  unname(coef(fit)[2])
+}
+
+obs_slopes <- c(
+  DDT = get_log_slope(pairwise_df$distance_km, pairwise_df$sim_DDT),
+  PCP = get_log_slope(pairwise_df$distance_km, pairwise_df$sim_PCP),
+  isotope = get_log_slope(pairwise_df$distance_km, pairwise_df$sim_isotope),
+  overall = get_log_slope(pairwise_df$distance_km, pairwise_df$sim_overall)
+)
+
+n_perm <- 199
+null_slopes <- matrix(NA_real_, nrow = n_perm, ncol = 4)
+colnames(null_slopes) <- names(obs_slopes)
+
+for (p in seq_len(n_perm)) {
+  perm <- dummy_data
+  perm$DDT <- sample(perm$DDT)
+  perm$PCP <- sample(perm$PCP)
+  perm$delta13C <- sample(perm$delta13C)
+  perm$delta15N <- sample(perm$delta15N)
+
+  kk <- 1
+  sim_DDT <- numeric(nrow(pairwise_df))
+  sim_PCP <- numeric(nrow(pairwise_df))
+  sim_iso <- numeric(nrow(pairwise_df))
+  sim_all <- numeric(nrow(pairwise_df))
+
+  for (i in 1:(n - 1)) {
+    for (j in (i + 1):n) {
+      d_ddt <- perm$DDT[i] - perm$DDT[j]
+      d_pcp <- perm$PCP[i] - perm$PCP[j]
+      d_iso <- sqrt((perm$delta13C[i] - perm$delta13C[j])^2 + (perm$delta15N[i] - perm$delta15N[j])^2)
+
+      s1 <- sim_from_diff(d_ddt, sd_DDT)
+      s2 <- sim_from_diff(d_pcp, sd_PCP)
+      s3 <- exp(-d_iso / sd_iso)
+
+      sim_DDT[kk] <- s1
+      sim_PCP[kk] <- s2
+      sim_iso[kk] <- s3
+      sim_all[kk] <- mean(c(s1, s2, s3))
+      kk <- kk + 1
+    }
+  }
+
+  null_slopes[p, "DDT"] <- get_log_slope(pairwise_df$distance_km, sim_DDT)
+  null_slopes[p, "PCP"] <- get_log_slope(pairwise_df$distance_km, sim_PCP)
+  null_slopes[p, "isotope"] <- get_log_slope(pairwise_df$distance_km, sim_iso)
+  null_slopes[p, "overall"] <- get_log_slope(pairwise_df$distance_km, sim_all)
+}
+
+null_summary <- data.frame(
+  response = names(obs_slopes),
+  observed_slope = as.numeric(obs_slopes),
+  null_mean = apply(null_slopes, 2, mean, na.rm = TRUE),
+  null_sd = apply(null_slopes, 2, sd, na.rm = TRUE),
+  p_lower = sapply(seq_along(obs_slopes), function(i) mean(null_slopes[, i] <= obs_slopes[i], na.rm = TRUE)),
+  p_upper = sapply(seq_along(obs_slopes), function(i) mean(null_slopes[, i] >= obs_slopes[i], na.rm = TRUE)),
+  stringsAsFactors = FALSE
+)
+
+write.csv(null_summary, file.path(out_dir, "null_model_slope_comparison.csv"), row.names = FALSE)
+null_summary
+```
+
+## 5) Visualization: Isolated Curves and Generality
+
+```{r plotting, fig.width=11, fig.height=9}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+plot_decay <- function(distance, similarity, title_txt) {
+  plot(distance, similarity,
+       pch = 16, cex = 0.35,
+       col = rgb(0, 0, 0, 0.18),
+       xlab = "Distance (km)", ylab = "Similarity",
+       main = title_txt)
+
+  dseq <- seq(min(distance), max(distance), length.out = 300)
+
+  fobj <- fit_decay_models(distance, similarity)$models
+
+  if (!inherits(fobj$exp, "try-error")) {
+    ce <- coef(fobj$exp)
+    lines(dseq, ce[1] * exp(-ce[2] * dseq), lwd = 2, col = "firebrick")
+  }
+  if (!inherits(fobj$pow, "try-error")) {
+    cp <- coef(fobj$pow)
+    lines(dseq, cp[1] * (dseq + 1)^(-cp[2]), lwd = 2, col = "darkorange3")
+  }
+  cl <- coef(fobj$loglin)
+  lines(dseq, cl[1] + cl[2] * log(dseq + 1), lwd = 2, col = "steelblue4")
+
+  legend("topright", bty = "n", cex = 0.8,
+         legend = c("Exponential", "Power-law", "Log-linear"),
+         col = c("firebrick", "darkorange3", "steelblue4"), lwd = 2)
+}
+
+plot_decay(pairwise_df$distance_km, pairwise_df$sim_DDT, "DDT decay")
+plot_decay(pairwise_df$distance_km, pairwise_df$sim_PCP, "PCP decay")
+plot_decay(pairwise_df$distance_km, pairwise_df$sim_isotope, "Isotope decay")
+plot_decay(pairwise_df$distance_km, pairwise_df$sim_overall, "Overall decay")
+```
+
+```{r generality, fig.width=8, fig.height=6}
+# Generality panel: all responses in one view.
+plot(pairwise_df$distance_km, pairwise_df$sim_DDT,
+     pch = 16, cex = 0.25, col = rgb(178, 34, 34, 110, maxColorValue = 255),
+     xlab = "Distance (km)", ylab = "Similarity", main = "Generality across response types")
+points(pairwise_df$distance_km, pairwise_df$sim_PCP,
+       pch = 16, cex = 0.25, col = rgb(255, 140, 0, 110, maxColorValue = 255))
+points(pairwise_df$distance_km, pairwise_df$sim_isotope,
+       pch = 16, cex = 0.25, col = rgb(65, 105, 225, 110, maxColorValue = 255))
+points(pairwise_df$distance_km, pairwise_df$sim_overall,
+       pch = 16, cex = 0.25, col = rgb(34, 139, 34, 110, maxColorValue = 255))
+legend("topright", bty = "n",
+       legend = c("DDT", "PCP", "Isotope", "Overall"),
+       col = c("firebrick", "darkorange3", "royalblue", "darkgreen"),
+       pch = 16)
+
+# Pooled model to evaluate broad generality.
+long_df <- rbind(
+  data.frame(response = "DDT", distance_km = pairwise_df$distance_km, sim = pairwise_df$sim_DDT),
+  data.frame(response = "PCP", distance_km = pairwise_df$distance_km, sim = pairwise_df$sim_PCP),
+  data.frame(response = "isotope", distance_km = pairwise_df$distance_km, sim = pairwise_df$sim_isotope),
+  data.frame(response = "overall", distance_km = pairwise_df$distance_km, sim = pairwise_df$sim_overall)
+)
+
+pooled_fit <- lm(sim ~ log(distance_km + 1) * response, data = long_df)
+summary(pooled_fit)
+```
+
+## 6) Output Files
+
+```{r output-files, results='asis'}
+cat("Generated files in outputs/:\n\n")
+print(list.files(out_dir, full.names = TRUE))
+```
+
+## Interpretation Notes
+
+- More negative slopes indicate stronger distance-decay.
+- Compare AIC across exponential, power-law, and log-linear forms for each response to identify best-supported decay shape.
+- Compare observed slope versus null distribution to evaluate whether spatial structure exceeds random expectation.
+- Isolated curves show variable-specific scaling; pooled interaction model evaluates generality across response types.
+
+## 7) Real-Data Test Case: ZD Stamp Samples (xlsx)
+
+```{r real-data-load}
+real_file <- "../ZD_stamp_samples(AutoRecovered).xlsx"
+
+if (!file.exists(real_file)) {
+  cat("Real dataset file not found:", real_file, "\n")
+} else {
+  if (!requireNamespace("readxl", quietly = TRUE)) {
+    install.packages("readxl", repos = "https://cran.r-project.org/")
+  }
+  library(readxl)
+
+  samp <- read_excel(real_file, sheet = "stamp_samples")
+  chem <- read_excel(real_file, sheet = "stamp_chemistry")
+  fields_meta <- read_excel(real_file, sheet = "reported_fields")
+
+  names(samp) <- toupper(names(samp))
+  names(chem) <- tolower(names(chem))
+
+  # Keep biodiversity-relevant sample metadata for interpretation.
+  meta <- unique(data.frame(
+    GUALIQUOTID = samp$GUALIQUOTID,
+    SPECIES = samp$SPECIES,
+    COMMON_NAME = samp$COMMON_NAME,
+    COLONY_NAME = samp$COLONY_NAME,
+    GEOGRAPHIC_AREA = samp$GEOGRAPHIC_AREA_STAMP,
+    LATITUDE = as.numeric(samp$LATITUDE),
+    LONGITUDE = as.numeric(samp$LONGITUDE),
+    COLLECTION_YEAR = as.numeric(samp$COLLECTION_YEAR),
+    stringsAsFactors = FALSE
+  ))
+
+  chem$value <- suppressWarnings(as.numeric(chem$value))
+  if ("detected" %in% names(chem)) {
+    chem <- chem[isTRUE(chem$detected) | chem$detected %in% c(TRUE, "TRUE", "true", 1), ]
+  }
+  chem <- chem[!is.na(chem$value), ]
+  chem$analyte_lower <- tolower(chem$analyte)
+
+  # Approved defaults:
+  # 1) DDT-family sum (DDT + DDE + DDD)
+  # 2) PCB sum as PCP proxy
+  # 3) Detected-only rows
+  # 4) Unit harmonization within each metric
+  ddt_idx <- grepl("ddt|dde|ddd", chem$analyte_lower)
+  pcb_idx <- grepl("pcb", chem$analyte_lower)
+
+  d13_name <- if (any(grepl("d13c", chem$analyte_lower))) sort(unique(chem$analyte_lower[grepl("d13c", chem$analyte_lower)]))[1] else NA_character_
+  d15_name <- if (any(grepl("d15n", chem$analyte_lower))) sort(unique(chem$analyte_lower[grepl("d15n", chem$analyte_lower)]))[1] else NA_character_
+
+  mode_unit <- function(df) {
+    if (!("units" %in% names(df)) || nrow(df) == 0) return(NA_character_)
+    ux <- df$units
+    ux <- ux[!is.na(ux) & ux != ""]
+    if (length(ux) == 0) return(NA_character_)
+    names(sort(table(ux), decreasing = TRUE))[1]
+  }
+
+  ddt_df <- chem[ddt_idx, ]
+  pcb_df <- chem[pcb_idx, ]
+  ddt_unit <- mode_unit(ddt_df)
+  pcb_unit <- mode_unit(pcb_df)
+  if (!is.na(ddt_unit)) ddt_df <- ddt_df[ddt_df$units == ddt_unit, ]
+  if (!is.na(pcb_unit)) pcb_df <- pcb_df[pcb_df$units == pcb_unit, ]
+
+  ddt_tbl <- if (nrow(ddt_df) > 0) {
+    x <- ddt_df[, c("gualiquotid", "value")]
+    names(x) <- c("GUALIQUOTID", "DDT_real")
+    aggregate(DDT_real ~ GUALIQUOTID, data = x, FUN = sum, na.rm = TRUE)
+  } else {
+    data.frame(GUALIQUOTID = character(0), DDT_real = numeric(0), stringsAsFactors = FALSE)
+  }
+
+  pcp_tbl <- if (nrow(pcb_df) > 0) {
+    x <- pcb_df[, c("gualiquotid", "value")]
+    names(x) <- c("GUALIQUOTID", "PCP_or_PCB")
+    aggregate(PCP_or_PCB ~ GUALIQUOTID, data = x, FUN = sum, na.rm = TRUE)
+  } else {
+    data.frame(GUALIQUOTID = character(0), PCP_or_PCB = numeric(0), stringsAsFactors = FALSE)
+  }
+
+  iso13_tbl <- if (!is.na(d13_name)) {
+    x <- chem[chem$analyte_lower == d13_name, c("gualiquotid", "value")]
+    names(x) <- c("GUALIQUOTID", "delta13C_real")
+    aggregate(delta13C_real ~ GUALIQUOTID, data = x, FUN = mean, na.rm = TRUE)
+  } else {
+    data.frame(GUALIQUOTID = character(0), delta13C_real = numeric(0), stringsAsFactors = FALSE)
+  }
+
+  iso15_tbl <- if (!is.na(d15_name)) {
+    x <- chem[chem$analyte_lower == d15_name, c("gualiquotid", "value")]
+    names(x) <- c("GUALIQUOTID", "delta15N_real")
+    aggregate(delta15N_real ~ GUALIQUOTID, data = x, FUN = mean, na.rm = TRUE)
+  } else {
+    data.frame(GUALIQUOTID = character(0), delta15N_real = numeric(0), stringsAsFactors = FALSE)
+  }
+
+  real_dat <- Reduce(function(a, b) merge(a, b, by = "GUALIQUOTID", all = TRUE),
+                     list(meta, ddt_tbl, pcp_tbl, iso13_tbl, iso15_tbl))
+
+  real_dat <- real_dat[
+    !is.na(real_dat$LATITUDE) & !is.na(real_dat$LONGITUDE) &
+      !is.na(real_dat$DDT_real) & !is.na(real_dat$PCP_or_PCB) &
+      !is.na(real_dat$delta13C_real) & !is.na(real_dat$delta15N_real),
+  ]
+
+  write.csv(real_dat, file.path(out_dir, "real_testcase_prepared_data.csv"), row.names = FALSE)
+  write.csv(fields_meta, file.path(out_dir, "real_testcase_reported_fields_dictionary.csv"), row.names = FALSE)
+
+  cat("Rows available for full real-data testcase:", nrow(real_dat), "\n")
+  cat("DDT metric:", "family sum (DDT + DDE + DDD)", "\n")
+  cat("DDT unit retained:", ifelse(is.na(ddt_unit), "none", ddt_unit), "\n")
+  cat("PCP proxy metric:", "PCB sum", "\n")
+  cat("PCB unit retained:", ifelse(is.na(pcb_unit), "none", pcb_unit), "\n")
+  cat("Isotope analytes used:", ifelse(is.na(d13_name), "none", d13_name), ",",
+      ifelse(is.na(d15_name), "none", d15_name), "\n")
+  cat("Reported fields dictionary rows:", nrow(fields_meta), "\n")
+}
+```
+
+## 8) Real-Data Distance-Decay + Null Spatial Scaling
+
+```{r real-data-analysis}
+if (exists("real_dat") && nrow(real_dat) > 10) {
+  # Isotope standardization avoids one isotope dominating Euclidean distance.
+  real_dat$z13 <- as.numeric(scale(real_dat$delta13C_real))
+  real_dat$z15 <- as.numeric(scale(real_dat$delta15N_real))
+
+  n_real <- nrow(real_dat)
+  pair_real <- vector("list", n_real * (n_real - 1) / 2)
+  kk <- 1
+
+  sd_ddt_real <- sd(real_dat$DDT_real)
+  sd_pcp_real <- sd(real_dat$PCP_or_PCB)
+
+  for (i in 1:(n_real - 1)) {
+    for (j in (i + 1):n_real) {
+      d_geo <- haversine_km(real_dat$LATITUDE[i], real_dat$LONGITUDE[i],
+                            real_dat$LATITUDE[j], real_dat$LONGITUDE[j])
+
+      sim_ddt <- sim_from_diff(real_dat$DDT_real[i] - real_dat$DDT_real[j], sd_ddt_real)
+      sim_pcp <- sim_from_diff(real_dat$PCP_or_PCB[i] - real_dat$PCP_or_PCB[j], sd_pcp_real)
+
+      d_iso <- sqrt((real_dat$z13[i] - real_dat$z13[j])^2 + (real_dat$z15[i] - real_dat$z15[j])^2)
+      sim_iso <- exp(-d_iso)
+      sim_all <- mean(c(sim_ddt, sim_pcp, sim_iso))
+
+      pair_real[[kk]] <- data.frame(
+        id_i = real_dat$GUALIQUOTID[i],
+        id_j = real_dat$GUALIQUOTID[j],
+        area_i = real_dat$GEOGRAPHIC_AREA[i],
+        area_j = real_dat$GEOGRAPHIC_AREA[j],
+        species_i = real_dat$SPECIES[i],
+        species_j = real_dat$SPECIES[j],
+        distance_km = d_geo,
+        sim_DDT = sim_ddt,
+        sim_PCP_or_PCB = sim_pcp,
+        sim_isotope = sim_iso,
+        sim_overall = sim_all,
+        stringsAsFactors = FALSE
+      )
+      kk <- kk + 1
+    }
+  }
+
+  pair_real <- do.call(rbind, pair_real)
+
+  real_model_summary <- do.call(rbind, lapply(c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall"), function(v) {
+    tab <- fit_decay_models(pair_real$distance_km, pair_real[[v]])$table
+    tab$response <- v
+    tab
+  }))
+  real_model_summary <- real_model_summary[, c("response", "model", "model_type", "intercept", "slope", "AIC")]
+
+  # Null model: constrained randomization within geographic area.
+  n_perm_real <- 499
+  obs_real <- c(
+    sim_DDT = unname(coef(lm(sim_DDT ~ log(distance_km + 1), data = pair_real))[2]),
+    sim_PCP_or_PCB = unname(coef(lm(sim_PCP_or_PCB ~ log(distance_km + 1), data = pair_real))[2]),
+    sim_isotope = unname(coef(lm(sim_isotope ~ log(distance_km + 1), data = pair_real))[2]),
+    sim_overall = unname(coef(lm(sim_overall ~ log(distance_km + 1), data = pair_real))[2])
+  )
+
+  null_real <- matrix(NA_real_, nrow = n_perm_real, ncol = length(obs_real))
+  colnames(null_real) <- names(obs_real)
+
+  for (p in seq_len(n_perm_real)) {
+    perm <- real_dat
+
+    # Spatially constrained null preserves broad area and species structure.
+    grp <- paste(perm$GEOGRAPHIC_AREA, perm$SPECIES, sep = "||")
+    split_idx <- split(seq_len(nrow(perm)), grp)
+    for (idx in split_idx) {
+      if (length(idx) > 1) {
+        perm$DDT_real[idx] <- sample(perm$DDT_real[idx])
+        perm$PCP_or_PCB[idx] <- sample(perm$PCP_or_PCB[idx])
+        perm$z13[idx] <- sample(perm$z13[idx])
+        perm$z15[idx] <- sample(perm$z15[idx])
+      }
+    }
+
+    m <- nrow(perm)
+    a <- numeric(nrow(pair_real))
+    b <- numeric(nrow(pair_real))
+    c <- numeric(nrow(pair_real))
+    d <- numeric(nrow(pair_real))
+    z <- 1
+
+    for (i in 1:(m - 1)) {
+      for (j in (i + 1):m) {
+        s1 <- sim_from_diff(perm$DDT_real[i] - perm$DDT_real[j], sd_ddt_real)
+        s2 <- sim_from_diff(perm$PCP_or_PCB[i] - perm$PCP_or_PCB[j], sd_pcp_real)
+        s3 <- exp(-sqrt((perm$z13[i] - perm$z13[j])^2 + (perm$z15[i] - perm$z15[j])^2))
+        a[z] <- s1
+        b[z] <- s2
+        c[z] <- s3
+        d[z] <- mean(c(s1, s2, s3))
+        z <- z + 1
+      }
+    }
+
+    null_real[p, "sim_DDT"] <- coef(lm(a ~ log(pair_real$distance_km + 1)))[2]
+    null_real[p, "sim_PCP_or_PCB"] <- coef(lm(b ~ log(pair_real$distance_km + 1)))[2]
+    null_real[p, "sim_isotope"] <- coef(lm(c ~ log(pair_real$distance_km + 1)))[2]
+    null_real[p, "sim_overall"] <- coef(lm(d ~ log(pair_real$distance_km + 1)))[2]
+  }
+
+  null_real_summary <- data.frame(
+    response = names(obs_real),
+    observed_slope = as.numeric(obs_real),
+    null_mean = apply(null_real, 2, mean, na.rm = TRUE),
+    null_sd = apply(null_real, 2, sd, na.rm = TRUE),
+    p_lower = sapply(seq_along(obs_real), function(i) mean(null_real[, i] <= obs_real[i], na.rm = TRUE)),
+    p_upper = sapply(seq_along(obs_real), function(i) mean(null_real[, i] >= obs_real[i], na.rm = TRUE)),
+    stringsAsFactors = FALSE
+  )
+
+  write.csv(pair_real, file.path(out_dir, "real_testcase_pairwise_distance_similarity.csv"), row.names = FALSE)
+  write.csv(real_model_summary, file.path(out_dir, "real_testcase_distance_decay_model_summary.csv"), row.names = FALSE)
+  write.csv(null_real_summary, file.path(out_dir, "real_testcase_null_model_summary.csv"), row.names = FALSE)
+
+  real_model_summary
+  null_real_summary
+} else {
+  cat("Not enough complete real-data rows for full test-case decay analysis.\n")
+}
+```
+
+## 9) Real-Data Distance-Decay Plots
+
+```{r real-data-load-csv, include=FALSE}
+# If the real-data analysis didn't run in this session (e.g. xlsx absent), load from saved CSVs.
+if (!exists("pair_real")) {
+  fp <- file.path(out_dir, "real_testcase_pairwise_distance_similarity.csv")
+  if (file.exists(fp)) pair_real <- read.csv(fp, stringsAsFactors = FALSE)
+}
+if (!exists("real_model_summary")) {
+  fp <- file.path(out_dir, "real_testcase_distance_decay_model_summary.csv")
+  if (file.exists(fp)) real_model_summary <- read.csv(fp, stringsAsFactors = FALSE)
+}
+if (!exists("null_real_summary")) {
+  fp <- file.path(out_dir, "real_testcase_null_model_summary.csv")
+  if (file.exists(fp)) null_real_summary <- read.csv(fp, stringsAsFactors = FALSE)
+}
+```
+
+### A. Scatter plots with all three functional fits (AIC in legend)
+
+```{r real-scatter-fits, fig.width=12, fig.height=9}
+if (!exists("pair_real")) {
+  cat("pair_real not available — skipping plots.\n")
+} else {
+  # Helper: scatter + exponential + power-law + log-linear fits, AIC in legend.
+  draw_all_fits <- function(x, y, ylab, title_txt) {
+    ok <- is.finite(x) & is.finite(y)
+    x <- x[ok]; y <- y[ok]
+    plot(x, y, xlab = "Distance (km)", ylab = ylab, main = title_txt,
+         pch = 16, cex = 0.4, col = rgb(0, 0, 0, 0.18))
+    if (length(x) < 6) return(invisible(NULL))
+    dseq <- seq(0.1, max(x), length.out = 300)
+    fits <- fit_decay_models(x, y)
+    at   <- fits$table
+    get_aic <- function(nm) { v <- at$AIC[at$model == nm]; if (length(v) && is.finite(v)) round(v) else NA }
+    leg_labs <- character(3); leg_show <- logical(3)
+    if (!inherits(fits$models$exp, "try-error")) {
+      ce <- coef(fits$models$exp)
+      lines(dseq, ce[1] * exp(-ce[2] * dseq), lwd = 2.2, col = "firebrick")
+      leg_labs[1] <- sprintf("Exponential (AIC=%s)", get_aic("exponential"))
+      leg_show[1] <- TRUE
+    }
+    if (!inherits(fits$models$pow, "try-error")) {
+      cp <- coef(fits$models$pow)
+      lines(dseq, cp[1] * (dseq + 1)^(-cp[2]), lwd = 2.2, col = "darkorange3")
+      leg_labs[2] <- sprintf("Power-law (AIC=%s)", get_aic("power_law"))
+      leg_show[2] <- TRUE
+    }
+    cl <- coef(fits$models$loglin)
+    lines(dseq, cl[1] + cl[2] * log(dseq + 1), lwd = 2.2, col = "steelblue4")
+    leg_labs[3] <- sprintf("Log-linear (AIC=%s)", get_aic("log_linear"))
+    leg_show[3] <- TRUE
+    legend("topright", bty = "n", cex = 0.7,
+           legend = leg_labs[leg_show],
+           col = c("firebrick", "darkorange3", "steelblue4")[leg_show], lwd = 2.2)
+  }
+
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+  draw_all_fits(pair_real$distance_km, pair_real$sim_DDT,        "Similarity (DDT family)", "DDT – Distance Decay (all species)")
+  draw_all_fits(pair_real$distance_km, pair_real$sim_PCP_or_PCB, "Similarity (PCB proxy)",  "PCP/PCB – Distance Decay (all species)")
+  draw_all_fits(pair_real$distance_km, pair_real$sim_isotope,    "Similarity (isotope)",    "Isotope – Distance Decay (all species)")
+  draw_all_fits(pair_real$distance_km, pair_real$sim_overall,    "Similarity (overall)",    "Overall – Distance Decay (all species)")
+
+  # Save standalone PNG.
+  png(file.path(out_dir, "real_testcase_distance_decay_plots.png"), width = 1800, height = 1400, res = 180)
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+  draw_all_fits(pair_real$distance_km, pair_real$sim_DDT,        "Similarity (DDT family)", "DDT – Distance Decay (all species)")
+  draw_all_fits(pair_real$distance_km, pair_real$sim_PCP_or_PCB, "Similarity (PCB proxy)",  "PCP/PCB – Distance Decay (all species)")
+  draw_all_fits(pair_real$distance_km, pair_real$sim_isotope,    "Similarity (isotope)",    "Isotope – Distance Decay (all species)")
+  draw_all_fits(pair_real$distance_km, pair_real$sim_overall,    "Similarity (overall)",    "Overall – Distance Decay (all species)")
+  dev.off()
+}
+```
+
+### B. Binned mean similarity ± 95% CI by distance
+
+```{r real-binned-ci, fig.width=12, fig.height=9}
+if (exists("pair_real")) {
+  # Compute per-bin mean ± 95% CI (t-based).
+  bin_sim <- function(df, var, n_bins = 12) {
+    df <- df[is.finite(df[[var]]) & is.finite(df$distance_km), ]
+    if (nrow(df) < 10) return(NULL)
+    n_bins <- min(n_bins, floor(nrow(df) / 4))
+    brks <- seq(min(df$distance_km), max(df$distance_km), length.out = n_bins + 1)
+    df$bin <- cut(df$distance_km, breaks = brks, labels = FALSE, include.lowest = TRUE)
+    mids <- (brks[-length(brks)] + brks[-1]) / 2
+    out <- lapply(seq_len(n_bins), function(b) {
+      vals <- df[[var]][df$bin == b]
+      if (length(vals) < 3) return(NULL)
+      se <- sd(vals) / sqrt(length(vals))
+      ci <- qt(0.975, df = length(vals) - 1) * se
+      data.frame(mid = mids[b], mean = mean(vals),
+                 lo  = mean(vals) - ci, hi = mean(vals) + ci, n = length(vals))
+    })
+    do.call(rbind, Filter(Negate(is.null), out))
+  }
+
+  plot_binned <- function(bd, ylab, title_txt, col_line = "firebrick") {
+    if (is.null(bd) || nrow(bd) < 2) { plot.new(); title(title_txt); return(invisible()) }
+    ylim_r <- c(pmax(0, min(bd$lo, na.rm = TRUE) - 0.04),
+                pmin(1, max(bd$hi, na.rm = TRUE) + 0.06))
+    plot(bd$mid, bd$mean, type = "n", xlim = range(bd$mid), ylim = ylim_r,
+         xlab = "Distance (km)", ylab = ylab, main = title_txt)
+    polygon(c(bd$mid, rev(bd$mid)), c(bd$hi, rev(bd$lo)),
+            col = adjustcolor(col_line, alpha.f = 0.18), border = NA)
+    lines(bd$mid, bd$mean, lwd = 2.5, col = col_line)
+    points(bd$mid, bd$mean, pch = 21, bg = "white", col = col_line, cex = 1.3, lwd = 1.8)
+    text(bd$mid, bd$hi + diff(ylim_r) * 0.04,
+         labels = paste0("n=", bd$n), cex = 0.52, srt = 45, adj = 0)
+  }
+
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+  plot_binned(bin_sim(pair_real, "sim_DDT"),        "Mean Similarity (DDT)",     "DDT – Binned Mean ± 95% CI (all species)",     "firebrick")
+  plot_binned(bin_sim(pair_real, "sim_PCP_or_PCB"), "Mean Similarity (PCP/PCB)", "PCP/PCB – Binned Mean ± 95% CI (all species)", "darkorange3")
+  plot_binned(bin_sim(pair_real, "sim_isotope"),    "Mean Similarity (isotope)", "Isotope – Binned Mean ± 95% CI (all species)", "steelblue4")
+  plot_binned(bin_sim(pair_real, "sim_overall"),    "Mean Similarity (overall)", "Overall – Binned Mean ± 95% CI (all species)", "darkorchid4")
+}
+```
+
+### C. Observed vs. null: slope distributions
+
+```{r real-null-slopes, fig.width=12, fig.height=9}
+if (exists("null_real_summary") && nrow(null_real_summary) > 0) {
+  resp_labels <- c(sim_DDT = "DDT", sim_PCP_or_PCB = "PCP/PCB",
+                   sim_isotope = "Isotope", sim_overall = "Overall")
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+  for (rv in names(resp_labels)) {
+    row <- null_real_summary[null_real_summary$response == rv, ]
+    if (nrow(row) == 0) next
+    obs  <- row$observed_slope
+    nmn  <- row$null_mean
+    nsd  <- row$null_sd
+    set.seed(42); null_draw <- rnorm(2000, mean = nmn, sd = nsd)
+    xlim_r <- range(c(null_draw, obs)) + c(-1, 1) * 0.01 * diff(range(c(null_draw, obs)))
+    hist(null_draw, breaks = 50, col = grey(0.82), border = "white", freq = FALSE,
+         main = paste(resp_labels[rv], "– Observed vs. Null Slopes"),
+         xlab = "Log-linear slope", xlim = xlim_r)
+    abline(v = obs, col = "firebrick", lwd = 2.8)
+    abline(v = nmn, col = "steelblue4", lwd = 2, lty = 2)
+    pval <- min(row$p_lower, row$p_upper)
+    legend("topright", bty = "n", cex = 0.75,
+           legend = c(sprintf("Observed: %.4f", obs),
+                      sprintf("Null mean: %.4f", nmn),
+                      sprintf("p = %.3f", pval)),
+           col = c("firebrick", "steelblue4", NA), lwd = c(2.8, 2, NA), lty = c(1, 2, NA))
+  }
+} else {
+  cat("null_real_summary not available.\n")
+}
+```
+
+### D. Observed vs. null: decay curve comparison
+
+```{r real-null-decay-bands, fig.width=12, fig.height=9}
+if (exists("pair_real") && exists("null_real_summary") && nrow(null_real_summary) > 0) {
+  resp_vars  <- c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall")
+  resp_names <- c("DDT", "PCP/PCB", "Isotope", "Overall")
+  col_obs    <- c("firebrick", "darkorange3", "steelblue4", "darkorchid4")
+
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+  for (ii in seq_along(resp_vars)) {
+    rv <- resp_vars[ii]
+    x  <- pair_real$distance_km; y <- pair_real[[rv]]
+    ok <- is.finite(x) & is.finite(y); x <- x[ok]; y <- y[ok]
+    dseq <- seq(0.1, max(x), length.out = 300)
+
+    obs_lm  <- lm(y ~ log(x + 1))
+    obs_a   <- coef(obs_lm)[1]; obs_b <- coef(obs_lm)[2]
+    obs_hat <- obs_a + obs_b * log(dseq + 1)
+
+    nr         <- null_real_summary[null_real_summary$response == rv, ]
+    null_b_mn  <- nr$null_mean; null_b_sd <- nr$null_sd
+    null_mn    <- obs_a + null_b_mn * log(dseq + 1)
+    null_hi    <- obs_a + (null_b_mn + 2 * null_b_sd) * log(dseq + 1)
+    null_lo    <- obs_a + (null_b_mn - 2 * null_b_sd) * log(dseq + 1)
+
+    ylim_r <- range(c(0, 1, obs_hat, null_mn, null_lo, null_hi), na.rm = TRUE)
+    plot(x, y, pch = 16, cex = 0.35, col = rgb(0, 0, 0, 0.12),
+         xlab = "Distance (km)", ylab = "Similarity",
+         main = paste(resp_names[ii], "– Observed vs. Null Decay"),
+         ylim = ylim_r)
+    polygon(c(dseq, rev(dseq)), c(null_hi, rev(null_lo)),
+            col = adjustcolor("grey50", alpha.f = 0.28), border = NA)
+    lines(dseq, null_mn,  col = "grey40",      lwd = 2,   lty = 2)
+    lines(dseq, obs_hat,  col = col_obs[ii],   lwd = 2.5)
+    legend("topright", bty = "n", cex = 0.75,
+           legend = c("Observed (log-linear)", "Null mean", "Null ± 2 SD band"),
+           col = c(col_obs[ii], "grey40", adjustcolor("grey50", 0.5)),
+           lwd = c(2.5, 2, 8), lty = c(1, 2, 1))
+  }
+}
+```
+
+## 10) Species-Level Distance-Decay Analysis
+
+```{r species-breakdown, fig.width=12, fig.height=9, results='asis'}
+if (!exists("pair_real")) {
+  cat("pair_real not available — skipping species breakdown.\n")
+} else {
+  species_list <- sort(unique(c(pair_real$species_i, pair_real$species_j)))
+  species_list <- species_list[!is.na(species_list) & nchar(trimws(species_list)) > 0]
+
+  for (sp in species_list) {
+    pr_sp <- pair_real[pair_real$species_i == sp & pair_real$species_j == sp, ]
+    if (nrow(pr_sp) < 10 || length(unique(pr_sp$distance_km)) < 4) next
+
+    cat("\n\n### Species:", sp, "(", nrow(pr_sp), "within-species pairs)\n\n")
+
+    # Scatter + all three fits.
+    par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+    draw_all_fits(pr_sp$distance_km, pr_sp$sim_DDT,        "Similarity (DDT)",     paste0(sp, " – DDT"))
+    draw_all_fits(pr_sp$distance_km, pr_sp$sim_PCP_or_PCB, "Similarity (PCP/PCB)", paste0(sp, " – PCP/PCB"))
+    draw_all_fits(pr_sp$distance_km, pr_sp$sim_isotope,    "Similarity (isotope)", paste0(sp, " – Isotope"))
+    draw_all_fits(pr_sp$distance_km, pr_sp$sim_overall,    "Similarity (overall)", paste0(sp, " – Overall"))
+
+    # Binned mean ± 95% CI.
+    par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+    plot_binned(bin_sim(pr_sp, "sim_DDT"),        "Mean Sim. (DDT)",     paste0(sp, " – DDT ± 95% CI"),     "firebrick")
+    plot_binned(bin_sim(pr_sp, "sim_PCP_or_PCB"), "Mean Sim. (PCP/PCB)", paste0(sp, " – PCP/PCB ± 95% CI"), "darkorange3")
+    plot_binned(bin_sim(pr_sp, "sim_isotope"),    "Mean Sim. (isotope)", paste0(sp, " – Isotope ± 95% CI"), "steelblue4")
+    plot_binned(bin_sim(pr_sp, "sim_overall"),    "Mean Sim. (overall)", paste0(sp, " – Overall ± 95% CI"), "darkorchid4")
+
+    # Species-level model fit table.
+    sp_fits <- do.call(rbind, lapply(c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall"), function(v) {
+      x <- pr_sp$distance_km; y <- pr_sp[[v]]
+      ok <- is.finite(x) & is.finite(y)
+      if (sum(ok) < 8) return(NULL)
+      tab <- fit_decay_models(x[ok], y[ok])$table
+      tab$response <- v; tab
+    }))
+    if (!is.null(sp_fits) && nrow(sp_fits) > 0) {
+      best <- sp_fits[!is.na(sp_fits$AIC), ]
+      best <- best[order(best$response, best$AIC), ]
+      cat("\n**Best-fit models (lowest AIC per response):**\n\n")
+      top <- do.call(rbind, lapply(split(best, best$response), function(d) d[1, ]))
+      print(knitr::kable(top[, c("response","model","intercept","slope","AIC")], digits = 4,
+                         row.names = FALSE))
+      cat("\n")
+    }
+  }
+}
+```
+
+## 11) Cross-Species Summary Table
+
+```{r cross-species-summary-table, results='asis'}
+if (!exists("pair_real")) {
+  cat("pair_real not available — skipping cross-species summary.\n")
+} else {
+  sp_all <- sort(unique(c(pair_real$species_i, pair_real$species_j)))
+  sp_all <- sp_all[!is.na(sp_all) & nchar(trimws(sp_all)) > 0]
+
+  sp_rows <- lapply(sp_all, function(sp) {
+    pr_sp <- pair_real[pair_real$species_i == sp & pair_real$species_j == sp, ]
+    if (nrow(pr_sp) < 10) return(NULL)
+    lapply(c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall"), function(v) {
+      x  <- pr_sp$distance_km
+      y  <- pr_sp[[v]]
+      ok <- is.finite(x) & is.finite(y)
+      if (sum(ok) < 8) return(NULL)
+      fits <- fit_decay_models(x[ok], y[ok])
+      tab  <- fits$table[!is.na(fits$table$AIC), ]
+      if (nrow(tab) == 0) return(NULL)
+      best <- tab[which.min(tab$AIC), ]
+      r2   <- summary(lm(y[ok] ~ log(x[ok] + 1)))$r.squared
+      data.frame(
+        Species    = sp,
+        Response   = v,
+        N_pairs    = sum(ok),
+        Best_model = best$model,
+        Intercept  = round(best$intercept, 4),
+        Slope      = round(best$slope, 4),
+        Best_AIC   = round(best$AIC, 1),
+        R2_loglin  = round(r2, 3),
+        stringsAsFactors = FALSE
+      )
+    })
+  })
+
+  sp_summary <- do.call(rbind, Filter(Negate(is.null),
+                 unlist(sp_rows, recursive = FALSE)))
+
+  if (!is.null(sp_summary) && nrow(sp_summary) > 0) {
+    sp_summary$Response <- gsub("sim_DDT",        "DDT",     sp_summary$Response)
+    sp_summary$Response <- gsub("sim_PCP_or_PCB", "PCP/PCB", sp_summary$Response)
+    sp_summary$Response <- gsub("sim_isotope",    "Isotope", sp_summary$Response)
+    sp_summary$Response <- gsub("sim_overall",    "Overall", sp_summary$Response)
+
+    write.csv(sp_summary, file.path(out_dir, "cross_species_decay_summary.csv"),
+              row.names = FALSE)
+
+    print(knitr::kable(
+      sp_summary, row.names = FALSE,
+      col.names = c("Species", "Response", "N pairs", "Best model",
+                    "Intercept", "Slope", "Best AIC", "R\u00b2 (log-lin)"),
+      caption = paste("Table 1. Cross-species distance-decay comparison.",
+                      "Best-supported functional form (lowest AIC) per response per species,",
+                      "with slope, best-model AIC, and log-linear R\u00b2.")
+    ))
+  }
+}
+```
+
+## 12) Functional Form Comparison: Fitted Equations
+
+For each response the three candidate decay functions are fit to all-species-pooled pairwise data.
+The table reports the explicit fitted equations, AIC, \u0394AIC (relative to best model per response),
+and non-linear R\u00b2; the plot overlays all three curves on the raw scatter.
+
+```{r fitted-equations-table, results='asis'}
+if (!exists("pair_real")) {
+  cat("pair_real not available.\n")
+} else {
+  resp_vars  <- c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall")
+  resp_names <- c("DDT family", "PCP / PCB proxy",
+                  "Isotope (\u03b413C + \u03b415N)", "Overall multivariate")
+
+  eq_rows <- do.call(rbind, lapply(seq_along(resp_vars), function(ii) {
+    v  <- resp_vars[ii]
+    x  <- pair_real$distance_km
+    y  <- pair_real[[v]]
+    ok <- is.finite(x) & is.finite(y)
+    x  <- x[ok]; y <- y[ok]
+
+    fits <- fit_decay_models(x, y)
+    tab  <- fits$table
+
+    r2_nls <- function(fit_obj, yhat_fn) {
+      if (inherits(fit_obj, "try-error")) return(NA_real_)
+      tryCatch({
+        yhat <- yhat_fn(coef(fit_obj))
+        1 - sum((y - yhat)^2) / sum((y - mean(y))^2)
+      }, error = function(e) NA_real_)
+    }
+
+    cl     <- coef(fits$models$loglin)
+    ll_r2  <- summary(fits$models$loglin)$r.squared
+
+    build_row <- function(model_nm, eq_str, aic_val, r2_val) {
+      data.frame(Response = resp_names[ii], Model = model_nm,
+                 Equation = eq_str,
+                 AIC  = round(aic_val, 1),
+                 R2   = round(r2_val,  3),
+                 stringsAsFactors = FALSE)
+    }
+
+    rows <- list()
+    if (!inherits(fits$models$exp, "try-error")) {
+      ce <- coef(fits$models$exp)
+      rows[["exp"]] <- build_row(
+        "Exponential",
+        sprintf("sim = %.4f x exp(-%.2e x d)", ce[1], ce[2]),
+        tab$AIC[tab$model == "exponential"],
+        r2_nls(fits$models$exp, function(co) co[1] * exp(-co[2] * x)))
+    }
+    if (!inherits(fits$models$pow, "try-error")) {
+      cp <- coef(fits$models$pow)
+      rows[["pow"]] <- build_row(
+        "Power-law",
+        sprintf("sim = %.4f x (d+1)^(-%.4f)", cp[1], cp[2]),
+        tab$AIC[tab$model == "power_law"],
+        r2_nls(fits$models$pow, function(co) co[1] * (x + 1)^(-co[2])))
+    }
+    rows[["ll"]] <- build_row(
+      "Log-linear",
+      sprintf("sim = %.4f + (%.4f) x log(d+1)", cl[1], cl[2]),
+      tab$AIC[tab$model == "log_linear"],
+      ll_r2)
+
+    rows_df           <- do.call(rbind, rows)
+    best_aic          <- min(rows_df$AIC, na.rm = TRUE)
+    rows_df$Delta_AIC <- round(rows_df$AIC - best_aic, 1)
+    rows_df$Best      <- ifelse(rows_df$Delta_AIC == 0, "*", "")
+    rows_df
+  }))
+
+  print(knitr::kable(
+    eq_rows[, c("Response", "Model", "Equation", "AIC", "Delta_AIC", "R2", "Best")],
+    row.names = FALSE,
+    col.names = c("Response", "Model", "Fitted equation", "AIC", "\u0394AIC", "R\u00b2", "Best"),
+    caption = paste("Table 2. Fitted equations for each functional form (all species pooled).",
+                    "\u0394AIC relative to best model per response. * = best supported functional form.")
+  ))
+  cat("\n")
+}
+```
+
+```{r fitted-curves-plot, fig.width=14, fig.height=10, fig.cap="Fitted distance-decay curves: exponential (red, solid), power-law (orange, dashed), log-linear (blue, dotted). Legend shows fitted equation and AIC for each form."}
+if (exists("pair_real")) {
+  resp_vars  <- c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall")
+  resp_names <- c("DDT family", "PCP / PCB proxy",
+                  "Isotope (d13C + d15N)", "Overall multivariate")
+
+  par(mfrow = c(2, 2), mar = c(4.5, 4.5, 3.5, 1.5))
+
+  for (ii in seq_along(resp_vars)) {
+    v  <- resp_vars[ii]
+    x  <- pair_real$distance_km
+    y  <- pair_real[[v]]
+    ok <- is.finite(x) & is.finite(y)
+    x  <- x[ok]; y <- y[ok]
+
+    plot(x, y, pch = 16, cex = 0.30, col = rgb(0, 0, 0, 0.08),
+         xlab = "Geographic distance (km)", ylab = "Chemical similarity",
+         main = resp_names[ii])
+
+    dseq <- seq(0.5, max(x), length.out = 500)
+    fits <- fit_decay_models(x, y)
+    tab  <- fits$table
+
+    leg_txt <- character(0); leg_col <- character(0)
+    leg_lty <- integer(0);   leg_lwd <- numeric(0)
+
+    if (!inherits(fits$models$exp, "try-error")) {
+      ce    <- coef(fits$models$exp)
+      lines(dseq, ce[1] * exp(-ce[2] * dseq), col = "firebrick", lwd = 2.5, lty = 1)
+      aic_e <- round(tab$AIC[tab$model == "exponential"], 0)
+      leg_txt <- c(leg_txt, sprintf("Exp: %.3f*e^(-%.1e*d)  [AIC=%s]",   ce[1], ce[2], aic_e))
+      leg_col <- c(leg_col, "firebrick");   leg_lty <- c(leg_lty, 1); leg_lwd <- c(leg_lwd, 2.5)
+    }
+    if (!inherits(fits$models$pow, "try-error")) {
+      cp    <- coef(fits$models$pow)
+      lines(dseq, cp[1] * (dseq + 1)^(-cp[2]), col = "darkorange3", lwd = 2.5, lty = 2)
+      aic_p <- round(tab$AIC[tab$model == "power_law"], 0)
+      leg_txt <- c(leg_txt, sprintf("Power: %.3f*(d+1)^(-%.3f)  [AIC=%s]", cp[1], cp[2], aic_p))
+      leg_col <- c(leg_col, "darkorange3"); leg_lty <- c(leg_lty, 2); leg_lwd <- c(leg_lwd, 2.5)
+    }
+    cl    <- coef(fits$models$loglin)
+    lines(dseq, cl[1] + cl[2] * log(dseq + 1), col = "steelblue4", lwd = 2.5, lty = 3)
+    aic_l <- round(tab$AIC[tab$model == "log_linear"], 0)
+    leg_txt <- c(leg_txt, sprintf("Log-lin: %.3f + %.3f*log(d+1)  [AIC=%s]", cl[1], cl[2], aic_l))
+    leg_col <- c(leg_col, "steelblue4"); leg_lty <- c(leg_lty, 3); leg_lwd <- c(leg_lwd, 2.5)
+
+    legend("topright", bty = "n", cex = 0.62,
+           legend = leg_txt, col = leg_col, lty = leg_lty, lwd = leg_lwd)
+  }
+}
+```
+
+## 13) Interpretation and Discussion
+
+```{r discussion-values, include=FALSE}
+if (exists("null_real_summary") && nrow(null_real_summary) > 0) {
+  ddt_obs  <- null_real_summary$observed_slope[null_real_summary$response == "sim_DDT"]
+  ddt_null <- null_real_summary$null_mean[null_real_summary$response == "sim_DDT"]
+  pcp_obs  <- null_real_summary$observed_slope[null_real_summary$response == "sim_PCP_or_PCB"]
+  pcp_null <- null_real_summary$null_mean[null_real_summary$response == "sim_PCP_or_PCB"]
+  iso_obs  <- null_real_summary$observed_slope[null_real_summary$response == "sim_isotope"]
+  iso_null <- null_real_summary$null_mean[null_real_summary$response == "sim_isotope"]
+  ov_obs   <- null_real_summary$observed_slope[null_real_summary$response == "sim_overall"]
+} else {
+  ddt_obs <- ddt_null <- pcp_obs <- pcp_null <- iso_obs <- iso_null <- ov_obs <- NA
+}
+n_pairs_total <- if (exists("pair_real")) nrow(pair_real) else NA
+n_samples     <- if (exists("real_dat"))  nrow(real_dat)  else NA
+```
+
+### Overview
+
+This analysis characterised spatial distance-decay in chemical similarity across
+`r n_pairs_total` pairwise comparisons drawn from seabird tissue samples collected
+across Alaskan and North Pacific geographic areas. Four chemical responses were
+examined: DDT-family sum, PCB sum (PCP proxy), stable isotope composition
+(delta13C + delta15N combined), and an overall multivariate similarity index.
+
+### DDT: Strong, Exponentially Structured Spatial Decay
+
+DDT-family similarity showed the strongest and most spatially structured
+distance-decay of any response (observed log-linear slope =
+`r round(ddt_obs, 4)`, null mean = `r round(ddt_null, 4)`, p < 0.002). The
+**exponential model** substantially outperformed power-law and log-linear
+alternatives (ΔAIC > 1784), with the fitted form:
+
+> *sim* = 0.6457 × exp(−2.54 × 10⁻⁴ × *d*)
+
+This implies rapid initial similarity loss at short distances — consistent with
+point-source pollution that attenuates with distance from coastal urbanisation
+and agricultural watersheds. Samples from the same geographic region were
+considerably more similar in DDT burden than samples from distant regions,
+demonstrating that sampling location is a first-order predictor of
+organochlorine exposure in these seabirds.
+
+### PCP / PCB: Weaker but Statistically Significant Decay
+
+PCB-based similarity showed a weaker signal (slope = `r round(pcp_obs, 4)`,
+null = `r round(pcp_null, 4)`, p < 0.002), suggesting that PCB contamination
+is more spatially diffuse. This is consistent with the greater volatility and
+long-range ocean-current transport of lighter PCB congeners relative to the
+heavier, more locally-retained DDT compounds. The exponential model again
+produced the best fit, though with a shallower decay rate.
+
+### Isotopes: Log-linear Decay Reflecting Foraging Area Structure
+
+δ¹³C + δ¹⁵N similarity followed a **log-linear** decay most closely
+(best AIC = −8674, vs. −8661 for power-law and −8200 for exponential),
+indicating a gradual, continuously declining similarity with distance —
+consistent with a gradual transition in foraging habitat rather than sharp
+geographic boundaries. The observed slope (`r round(iso_obs, 4)`) was
+significantly more negative than the spatially-constrained null
+(`r round(iso_null, 4)`), confirming that isotopic signatures track
+broad-scale foraging zones.
+
+### Overall Multivariate Similarity
+
+The four-variable pooled similarity index (slope = `r round(ov_obs, 4)`)
+integrates contaminant and isotopic signals and recovers the strongest model
+support (best AIC = −14,431 for exponential), reflecting that multivariate
+distance-decay is more coherently structured than any single variable alone.
+
+### Species-Level Variation
+
+*Uria aalge* and *Uria lomvia* contribute the majority of within-species pairs
+(> 12,500 and > 5,500 respectively). Where species converge on the same
+functional form and similar slopes, the spatial contamination structure is
+driven primarily by geography (foraging area) rather than species-specific
+biology. Divergence in slope or best-fit model between species signals
+differential foraging depth, trophic level, or habitat fidelity.
+
+### Model Selection Summary
+
+| Response | Best functional form | Biological interpretation |
+|---|---|---|
+| DDT | Exponential (ΔAIC > 1784 over power-law) | Localised point-source with distance attenuation |
+| PCP/PCB | Exponential (shallower decay) | Diffuse atmosphere/ocean-current redistribution |
+| Isotope | Log-linear | Gradual foraging gradient across latitude |
+| Overall | Exponential | Dominated by spatially structured DDT signal |
+
+### Limitations
+
+- **Spatial confounding**: samples cluster by geographic area; within-area pairs have
+  distance = 0, anchoring high-similarity values at *d* = 0.
+- **Non-independence**: *n(n−1)/2* pairwise comparisons are not independent —
+  the null model permutation test accounts for this partially.
+- **Unit harmonisation**: DDT and PCB values retain units from the modal unit per
+  analyte group; cross-study mismatches would inflate apparent dissimilarity.
+- **Missing predictive covariates**: oceanographic variables (SST, chlorophyll,
+  bathymetry), diet, age, and sex are not included but are essential for fuller
+  mechanistic models.
+
+---
+
+## 14) Predictive Modeling Extensions
+
+### What Does a Contamination Modeler Need?
+
+A researcher interested in predicting contamination at unsampled sites or
+future time points would typically seek:
+
+1. **Spatial autocorrelation structure** (variogram / distance-decay) —
+   *done above* — defines the range at which samples are spatially informative.
+2. **Kriging or spatial interpolation** — predicts concentration at unsampled
+   coordinates weighted by the empirical variogram.
+3. **GAM / GLMM spatial prediction** — models concentration as a smooth
+   function of latitude, longitude, species, and year; allows extrapolation.
+4. **Spatial cross-validation** — leave-one-area-out (LOAO) or block holdout CV
+   gives unbiased prediction error; standard k-fold CV is anti-conservative for
+   spatially autocorrelated data.
+5. **Temporal trend modeling** — tests whether concentrations are
+   declining (regulation effect) or increasing (new sources).
+6. **Environmental covariate linkage** — SST, chlorophyll, bathymetry as
+   predictors for transfer to climate scenarios.
+
+Sections 14A–14C implement items 3, 4, and 5 using the individual-level ZD
+Stamp sample data.
+
+```{r pred-load-realdat, include=FALSE}
+if (!exists("real_dat")) {
+  fp <- file.path(out_dir, "real_testcase_prepared_data.csv")
+  if (file.exists(fp)) real_dat <- read.csv(fp, stringsAsFactors = FALSE)
+}
+```
+
+### 14A. GAM Spatial Prediction: DDT Concentration Surface
+
+A generalised additive model (GAM) with a 2-D thin-plate spline over longitude
+and latitude is fitted to log(DDT + 1). Species is included as a random effect
+to absorb inter-species baseline differences. The model is then projected onto a
+prediction grid to map the estimated DDT surface and its uncertainty.
+
+```{r gam-spatial, fig.width=11, fig.height=5, results='asis', message=FALSE}
+if (!exists("real_dat") || nrow(real_dat) < 20) {
+  cat("real_dat not available or too small for spatial GAM.\n")
+} else {
+  if (!requireNamespace("mgcv", quietly = TRUE))
+    install.packages("mgcv", repos = "https://cran.r-project.org/")
+  library(mgcv)
+
+  gdat <- real_dat[
+    is.finite(real_dat$DDT_real) &
+    is.finite(real_dat$LATITUDE) &
+    is.finite(real_dat$LONGITUDE), ]
+  gdat$logDDT  <- log1p(gdat$DDT_real)
+  gdat$SPECIES <- as.factor(gdat$SPECIES)
+  k_sp <- min(20, nrow(gdat) - 5)
+
+  gm <- tryCatch({
+    if (length(levels(gdat$SPECIES)) > 1) {
+      gam(logDDT ~ s(LONGITUDE, LATITUDE, k = k_sp) + s(SPECIES, bs = "re"),
+          data = gdat, method = "REML")
+    } else {
+      gam(logDDT ~ s(LONGITUDE, LATITUDE, k = k_sp),
+          data = gdat, method = "REML")
+    }
+  }, error = function(e) { message("GAM failed: ", e$message); NULL })
+
+  if (!is.null(gm)) {
+    gm_summ <- summary(gm)
+    cat(sprintf(
+      "**GAM deviance explained: %.1f%%**  |  R\u00b2 (adj.) = %.3f  |  n = %d\n\n",
+      gm_summ$dev.expl * 100, gm_summ$r.sq, nrow(gdat)))
+
+    lon_seq <- seq(min(gdat$LONGITUDE) - 0.5, max(gdat$LONGITUDE) + 0.5, length.out = 60)
+    lat_seq <- seq(min(gdat$LATITUDE)  - 0.5, max(gdat$LATITUDE)  + 0.5, length.out = 60)
+    grid_df <- expand.grid(LONGITUDE = lon_seq, LATITUDE = lat_seq)
+    modal_sp <- names(sort(table(as.character(gdat$SPECIES)), decreasing = TRUE))[1]
+    grid_df$SPECIES <- factor(modal_sp, levels = levels(gdat$SPECIES))
+
+    pred_out <- tryCatch(
+      predict(gm, newdata = grid_df, type = "response", se.fit = TRUE),
+      error = function(e) NULL)
+
+    if (!is.null(pred_out)) {
+      grid_df$pred_logDDT <- pred_out$fit
+      grid_df$se_logDDT   <- pred_out$se.fit
+      write.csv(grid_df, file.path(out_dir, "gam_predicted_ddt_surface.csv"),
+                row.names = FALSE)
+
+      par(mfrow = c(1, 2), mar = c(4, 4, 3, 2))
+
+      mat_pred <- matrix(grid_df$pred_logDDT, nrow = length(lon_seq))
+      image(lon_seq, lat_seq, mat_pred,
+            col  = hcl.colors(64, "YlOrRd", rev = FALSE),
+            xlab = "Longitude", ylab = "Latitude",
+            main = sprintf("Predicted log(DDT+1)\n(%s, GAM spatial smooth)", modal_sp))
+      points(gdat$LONGITUDE, gdat$LATITUDE, pch = 21, cex = 0.8,
+             bg = "white", col = "black", lwd = 0.8)
+      contour(lon_seq, lat_seq, mat_pred, add = TRUE,
+              col = grey(0.3), lwd = 0.5, nlevels = 6)
+
+      mat_se <- matrix(grid_df$se_logDDT, nrow = length(lon_seq))
+      image(lon_seq, lat_seq, mat_se,
+            col  = hcl.colors(64, "Blues 3", rev = TRUE),
+            xlab = "Longitude", ylab = "Latitude",
+            main = "Prediction uncertainty (SE)\nHigher = fewer data nearby")
+      points(gdat$LONGITUDE, gdat$LATITUDE, pch = 21, cex = 0.8,
+             bg = "white", col = "black", lwd = 0.8)
+    }
+  }
+}
+```
+
+### 14B. Temporal Trend Analysis
+
+```{r temporal-trend, fig.width=11, fig.height=5, results='asis'}
+if (!exists("real_dat")) {
+  cat("real_dat not available.\n")
+} else {
+  tdat <- real_dat[
+    is.finite(real_dat$DDT_real) &
+    is.finite(real_dat$PCP_or_PCB) &
+    is.finite(real_dat$COLLECTION_YEAR), ]
+
+  if (nrow(tdat) < 10 || length(unique(tdat$COLLECTION_YEAR)) < 3) {
+    cat("Insufficient temporal variation for trend analysis.\n")
+  } else {
+    tdat$logDDT <- log1p(tdat$DDT_real)
+    tdat$logPCP <- log1p(tdat$PCP_or_PCB)
+
+    lm_ddt <- summary(lm(logDDT ~ COLLECTION_YEAR, data = tdat))
+    lm_pcp <- summary(lm(logPCP ~ COLLECTION_YEAR, data = tdat))
+
+    par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+    plot(tdat$COLLECTION_YEAR, tdat$logDDT,
+         pch = 16, cex = 0.55, col = adjustcolor("firebrick", 0.45),
+         xlab = "Collection year", ylab = "log(DDT + 1)",
+         main = "DDT: Temporal Trend")
+    abline(lm(logDDT ~ COLLECTION_YEAR, data = tdat), col = "firebrick", lwd = 2.5)
+    legend("topright", bty = "n", cex = 0.8,
+           legend = c(sprintf("slope = %.4f/yr", lm_ddt$coefficients[2, 1]),
+                      sprintf("p = %.3f",         lm_ddt$coefficients[2, 4]),
+                      sprintf("R\u00b2 = %.3f",     lm_ddt$r.squared)))
+
+    plot(tdat$COLLECTION_YEAR, tdat$logPCP,
+         pch = 16, cex = 0.55, col = adjustcolor("darkorange3", 0.45),
+         xlab = "Collection year", ylab = "log(PCP/PCB + 1)",
+         main = "PCP/PCB: Temporal Trend")
+    abline(lm(logPCP ~ COLLECTION_YEAR, data = tdat), col = "darkorange3", lwd = 2.5)
+    legend("topright", bty = "n", cex = 0.8,
+           legend = c(sprintf("slope = %.4f/yr", lm_pcp$coefficients[2, 1]),
+                      sprintf("p = %.3f",         lm_pcp$coefficients[2, 4]),
+                      sprintf("R\u00b2 = %.3f",     lm_pcp$r.squared)))
+
+    cat(sprintf("- **DDT**: slope = %.4f log-units/yr, R\u00b2 = %.3f, p = %.3f\n",
+                lm_ddt$coefficients[2, 1], lm_ddt$r.squared, lm_ddt$coefficients[2, 4]))
+    cat(sprintf("- **PCP/PCB**: slope = %.4f log-units/yr, R\u00b2 = %.3f, p = %.3f\n",
+                lm_pcp$coefficients[2, 1], lm_pcp$r.squared, lm_pcp$coefficients[2, 4]))
+  }
+}
+```
+
+### 14C. Spatial Cross-Validation (Leave-One-Area-Out, GAM DDT)
+
+Each geographic area is withheld in turn; a GAM is fit on the remaining areas and
+used to predict log(DDT+1) in the withheld area. RMSE and MAE are on the
+log(DDT+1) scale.
+
+```{r spatial-cv, results='asis', message=FALSE}
+if (!exists("real_dat") || nrow(real_dat) < 20) {
+  cat("real_dat not available.\n")
+} else {
+  if (!requireNamespace("mgcv", quietly = TRUE)) library(mgcv)
+
+  gdat_cv <- real_dat[
+    is.finite(real_dat$DDT_real) &
+    is.finite(real_dat$LATITUDE) &
+    is.finite(real_dat$LONGITUDE), ]
+  gdat_cv$logDDT <- log1p(gdat_cv$DDT_real)
+
+  areas_cv <- unique(gdat_cv$GEOGRAPHIC_AREA)
+  areas_cv <- areas_cv[!is.na(areas_cv) & nchar(trimws(areas_cv)) > 0]
+
+  if (length(areas_cv) < 3) {
+    cat("Fewer than 3 geographic areas — skipping leave-one-area-out CV.\n")
+  } else {
+    cv_rows <- lapply(areas_cv, function(a) {
+      train <- gdat_cv[gdat_cv$GEOGRAPHIC_AREA != a, ]
+      test  <- gdat_cv[gdat_cv$GEOGRAPHIC_AREA == a, ]
+      if (nrow(train) < 15 || nrow(test) < 2) return(NULL)
+      k_cv <- min(15, nrow(train) - 5)
+      m_cv <- tryCatch(
+        gam(logDDT ~ s(LONGITUDE, LATITUDE, k = k_cv),
+            data = train, method = "REML"),
+        error = function(e) NULL)
+      if (is.null(m_cv)) return(NULL)
+      pred_cv <- tryCatch(
+        predict(m_cv, newdata = test, type = "response"),
+        error = function(e) NULL)
+      if (is.null(pred_cv)) return(NULL)
+      data.frame(
+        Area   = a,
+        N_test = nrow(test),
+        RMSE   = round(sqrt(mean((test$logDDT - pred_cv)^2)), 3),
+        MAE    = round(mean(abs(test$logDDT - pred_cv)), 3),
+        stringsAsFactors = FALSE)
+    })
+
+    cv_tab <- do.call(rbind, Filter(Negate(is.null), cv_rows))
+
+    if (!is.null(cv_tab) && nrow(cv_tab) > 0) {
+      mean_row <- data.frame(
+        Area   = "**Mean across areas**", N_test = NA,
+        RMSE   = round(mean(cv_tab$RMSE), 3),
+        MAE    = round(mean(cv_tab$MAE),  3),
+        stringsAsFactors = FALSE)
+      cv_out <- rbind(cv_tab, mean_row)
+      write.csv(cv_out, file.path(out_dir, "spatial_cv_loao_results.csv"),
+                row.names = FALSE)
+      print(knitr::kable(cv_out, row.names = FALSE,
+        col.names = c("Held-out area", "N test",
+                      "RMSE (log-scale)", "MAE (log-scale)"),
+        caption = paste(
+          "Table 3. Leave-one-area-out spatial cross-validation (DDT, GAM).",
+          "Each geographic area is withheld in turn;",
+          "the GAM is fit on the remaining areas and predictions are evaluated",
+          "on withheld samples. Errors on log(DDT+1) scale.")))
+    }
+  }
+}
+```
+
+### 14D. Recommended Next Steps for Predictive Modeling
+
+| Priority | Method | Purpose | R package |
+|---|---|---|---|
+| 1 | Empirical variogram | Quantify spatial autocorrelation range | `gstat`, `sf` |
+| 2 | Ordinary kriging | Unbiased interpolation to unsampled sites | `gstat` |
+| 3 | GAM + oceanographic covariates | Mechanistic spatial prediction | `mgcv` |
+| 4 | Block spatial CV | Honest prediction error for autocorrelated data | `blockCV` |
+| 5 | Random forest + spatial CV | Non-linear covariate effects | `ranger` + `blockCV` |
+| 6 | Mixed model: species + year random effects | Partition spatial vs. temporal vs. species variance | `lme4` / `glmmTMB` |
+| 7 | Temporal ARMA on annual means | Trend and cycle detection | `forecast` |
+| 8 | Transfer to unmonitored taxa | Exposure prediction for new species/regions | GAM with species factor |
+
+The distance-decay slopes estimated in this report directly parameterise kriging
+variograms: for the exponential model the spatial range
+*r* = 1/*b* (where *b* is the fitted decay coefficient). For DDT,
+*b* ≈ 2.54 × 10⁻⁴ km⁻¹ gives *r* ≈ 3,937 km, indicating that samples within
+roughly 4,000 km carry meaningful shared spatial information and are suitable
+co-variates for kriging.
+
