@@ -748,3 +748,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Assess whether the new datasource/observation-type balancing logic in `BIEN Shiny App/app.R` and the README explanation are logically sound, identify bugs or biodiversity-interpretation concerns, and recommend whether to keep as-is or make one quick follow-up adjustment.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Confirm whether BIEN was actually down versus an app bug, then add a user-facing retry workflow after connection-capacity failures.
+- Requested outcomes: Reproduce the BIEN connection-slot error independently of the UI, add a `Retry BIEN connection (with backoff)` control, implement short exponential backoff retries in the occurrence query path, and document the behavior in the standalone BIEN README.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/README.md; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
