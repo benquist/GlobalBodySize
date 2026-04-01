@@ -385,6 +385,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md; BIEN-SpeciesShinyApp/*
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-01
+- Prompt summary: Perform one final cleanup step and remove the mirrored `BIEN Shiny App/` folder from the monorepo so BIEN work lives only in the standalone repository.
+- Requested outcomes: Delete the mirrored BIEN folder from `biodiversity-agents-lab`, keep the standalone checkout as the source of truth, and update monorepo docs/logging accordingly.
+- Files changed: BIEN Shiny App/* (removed from monorepo); README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-30
 - Prompt summary: User asked whether the deep-search code was actually run and whether results exist.
 - Requested outcomes: Confirm execution status and point to the generated result files.
