@@ -14,5 +14,6 @@ Agent-orchestrated biodiversity analysis workspace with species distribution mod
 
 - Agent and prompt provenance are logged under `agents/` and project-level `chat_provenance_log.md` files.
 - The BIEN Shiny app is currently organized for fast occurrence-first loading, with traits, range layers, and optional BIEN total counts loaded on demand.
+- The canonical standalone repository for the BIEN app is `https://github.com/benquist/BIEN-SpeciesShinyApp`; the copy in this monorepo is now a workspace mirror rather than the primary publication target.
 - This monorepo contains multiple related biodiversity projects rather than a single standalone application.
 

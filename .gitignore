@@ -12,3 +12,6 @@ worldclim_data/
 # OS
 .DS_Store
 .flickrExclusion
+
+# Local standalone repo checkouts
+BIEN-SpeciesShinyApp/

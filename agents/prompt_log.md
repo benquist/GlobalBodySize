@@ -379,6 +379,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-01
+- Prompt summary: Clarify whether the BIEN app work was being pushed to the wrong repository, then separate the mixed repo setup so the standalone `BIEN-SpeciesShinyApp` repository is used correctly.
+- Requested outcomes: Verify the current remotes, confirm whether the BIEN app is nested inside the monorepo, create or sync a dedicated checkout of `BIEN-SpeciesShinyApp`, and reduce future repo confusion.
+- Files changed: README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md; BIEN-SpeciesShinyApp/*
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-30
 - Prompt summary: User asked whether the deep-search code was actually run and whether results exist.
 - Requested outcomes: Confirm execution status and point to the generated result files.
