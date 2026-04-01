@@ -424,6 +424,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify the clone URL, reproduce the install/run steps from a fresh checkout, confirm whether the app launches successfully, and provide corrected launch guidance.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Run mandatory pre-return checks after BIEN app clone/run troubleshooting verification.
+- Requested outcomes: Verify prompt-log coverage, changed-Rmd/package-build applicability, and git push synchronization before returning the troubleshooting summary.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
