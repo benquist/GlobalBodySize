@@ -274,3 +274,14 @@ Action taken:
 - Added a dedicated code and workflow documentation file for the BIEN Shiny App and linked it from the README.
 - Fixed the trait-graphics runtime issue and re-verified the Shiny workflow.
 Outcome: The project now includes explicit documentation and review agents plus a scientist-readable workflow guide aligned with biodiversity-science norms.
+
+[11] Date: 2026-04-01
+Source: active chat request
+Request summary: Coordinate a focused review of contaminent data/contaminent_distance_decay_analysis.Rmd for code quality, statistical soundness, reproducibility, and biodiversity spatial-scaling relevance.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added the current review request to agents/prompt_log.md for final-gate prompt tracking.
+- Appended this provenance entry because an agents-folder file was updated in this turn.
+Outcome: Agent logging remains append-only and current for this review task.
