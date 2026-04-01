@@ -264,6 +264,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Update the app README with collaborator-friendly clone, install, launch, and troubleshooting steps for both the dedicated repo and the monorepo context.
 - Files changed: BIEN Shiny App/README.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Review the BIEN Shiny app workflow, add more commenting, fix/check trait graphics, have biodiversity agents review the code and README, and report BIEN count-only occurrence totals in the overview.
+- Requested outcomes: Improve commenting in `app.R`, tighten trait graphics so table ranges and plotted ranges stay aligned, add a BIEN count-only total for matching occurrence records without downloading all rows, incorporate biodiversity-user guidance into the README, and push the changes to GitHub.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Add fractions of total BIEN occurrence records by source class (Specimens, iNaturalist, plots, traits, other) after the count-only total in the BIEN app overview.
+- Requested outcomes: Extend the Overview to show count-only source fractions derived from BIEN provenance fields without downloading all records, update the README to mention the new summary, and publish the changes.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Requested outcomes: Continue the plant body-mass scaling workflow after the first deep-search results.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
@@ -406,6 +418,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-03-30
 - Prompt summary: Audit statistical validity of quantitative synthesis in the integrated literature workflow.
 - Requested outcomes: Assess exponent extraction, comparability, heterogeneity handling, and recommend a robust cross-study modeling framework with prioritized practical implementation steps.
+
+- Date: 2026-03-31
+- Prompt summary: User reported that the BIEN Shiny app was not working after following the GitHub clone steps and asked for help.
+- Requested outcomes: Verify the clone URL, reproduce the install/run steps from a fresh checkout, confirm whether the app launches successfully, and provide corrected launch guidance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
