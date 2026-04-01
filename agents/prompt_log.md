@@ -760,3 +760,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Implement and activate the BIEN connection retry feature in the standalone app.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: I am getting this error - BIEN connection note: The public BIEN database is temporarily at capacity or refusing new connections, so this query could not retrieve occurrence records right now. Please try `Query BIEN` again shortly. Can we double check this? Are we sure it is down and not just an issue with the app?
+- Requested outcomes: Verify whether BIEN was down versus an app bug and provide an implementation path after confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
