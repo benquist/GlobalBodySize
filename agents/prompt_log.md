@@ -468,3 +468,75 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Upgrade BIEN app README for standalone repo use and publish it to BIEN-SpeciesShinyApp.
 - Files changed: BIEN Shiny App/README.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User reports BIEN Shiny App shows default poppy results but Pinus ponderosa returns no results.
+- Requested outcomes: Investigate likely causes in BIEN Shiny App/app.R with focus on query logic, event triggering, and BIEN API variability; provide concise actionable patch guidance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User reported Pinus ponderosa returned no results after poppy and requested @m investigation.
+- Requested outcomes: Reproduce issue, harden BIEN query behavior for non-default species, and verify multi-species response including Pinus.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User reported Carnegiea gigantea shows no distribution points on the map despite query results.
+- Requested outcomes: Diagnose map rendering gap and improve behavior when occurrence rows lack usable coordinates.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Run final mandatory gate now.
+- Requested outcomes: Verify prompt is recorded in agents/prompt_log.md, updated Rmd compile status, updated R package build status, and git push status confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User observed some species show only geographic range on the Overview tab instead of occurrence points.
+- Requested outcomes: Confirm whether BIEN returned rows without usable coordinates and clarify this case in the app UI.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User approved adding a clearer Overview banner for species that show range polygons instead of occurrence points.
+- Requested outcomes: Add a prominent UI notice explaining when BIEN returned rows without usable coordinates and the map is showing range instead.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Run final mandatory gate now.
+- Requested outcomes: Verify prompt is recorded in agents/prompt_log.md, updated Rmd compile status, updated R package build status, and git push status confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User requested coloring BIEN occurrence points by observation_type and adding cultivated/introduced filter toggles.
+- Requested outcomes: Color map points by BIEN observation_type with a legend and add explicit is_cultivated/is_introduced filter controls in the Shiny app UI and query logic.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Run final mandatory gate now.
+- Requested outcomes: Verify prompt is recorded in agents/prompt_log.md, updated Rmd compile status, updated R package build status, and git push status confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User reported Quercus petraea froze in the app.
+- Requested outcomes: Reproduce the slow species behavior, reduce map rendering load, and keep the UI responsive for high-volume species.
+- Files changed: BIEN Shiny App/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: Run final mandatory gate now.
+- Requested outcomes: Verify prompt is recorded in agents/prompt_log.md, updated Rmd compile status, updated R package build status, and git push status confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-03-31
+- Prompt summary: User requested a more detailed GitHub repo description and README for BIEN-SpeciesShinyApp.
+- Requested outcomes: Expand the BIEN app README overview and update the repo description to better explain scope, features, and use cases.
+- Files changed: BIEN Shiny App/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
