@@ -40,6 +40,49 @@ safe_bien_retry <- function(call_fn, timeout_sec = 90, attempts = 1) {
   )
 }
 
+# Query BIEN occurrences with the same biological filters used by the BIEN helper,
+# but (1) exclude trait-linked rows that belong in the Traits tab rather than the
+# occurrence map and (2) randomize the returned row order on the BIEN side so
+# widespread species are less likely to be dominated by whichever datasource
+# happens to come first in the backend table (for example FIA plot rows).
+query_occurrence_randomized <- function(species_name, cultivated = FALSE, natives_only = TRUE, only_geovalid = TRUE, limit = 1000, record_limit = 500) {
+  cultivated_ <- BIEN:::.cultivated_check(cultivated)
+  newworld_ <- BIEN:::.newworld_check(NULL)
+  taxonomy_ <- BIEN:::.taxonomy_check(TRUE)
+  native_ <- BIEN:::.native_check(TRUE)
+  observation_ <- BIEN:::.observation_check(TRUE)
+  political_ <- BIEN:::.political_check(FALSE)
+  natives_ <- BIEN:::.natives_check(natives_only)
+  collection_ <- BIEN:::.collection_check(FALSE)
+  geovalid_ <- BIEN:::.geovalid_check(only_geovalid)
+
+  query <- paste(
+    "SELECT scrubbed_species_binomial", taxonomy_$select,
+    native_$select, political_$select,
+    ",latitude, longitude,date_collected,",
+    "datasource,dataset,dataowner,custodial_institution_codes,collection_code,view_full_occurrence_individual.datasource_id",
+    collection_$select, cultivated_$select, newworld_$select,
+    observation_$select, geovalid_$select,
+    "FROM view_full_occurrence_individual",
+    "WHERE scrubbed_species_binomial in (", paste(shQuote(species_name, type = "sh"), collapse = ", "), ")",
+    cultivated_$query, newworld_$query, natives_$query,
+    observation_$query, geovalid_$query,
+    "AND higher_plant_group NOT IN ('Algae','Bacteria','Fungi')",
+    "AND (georef_protocol is NULL OR georef_protocol<>'county centroid')",
+    "AND (is_centroid IS NULL OR is_centroid=0)",
+    "AND scrubbed_species_binomial IS NOT NULL",
+    "AND lower(coalesce(observation_type, '')) NOT LIKE '%trait%'",
+    "AND lower(coalesce(observation_type, '')) NOT LIKE '%measurement%'",
+    "ORDER BY random() LIMIT", as.integer(limit), ";"
+  )
+
+  BIEN:::.BIEN_sql(
+    query,
+    fetch.query = FALSE,
+    record_limit = record_limit
+  )
+}
+
 query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_page_size, timeout_sec) {
   use_cultivated_filter <- if (is.null(input$use_cultivated_filter)) TRUE else isTRUE(input$use_cultivated_filter)
   use_introduced_filter <- if (is.null(input$use_introduced_filter)) TRUE else isTRUE(input$use_introduced_filter)
@@ -68,19 +111,13 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
   for (plan in plans) {
     res <- safe_bien_retry(
       function() {
-        BIEN_occurrence_species(
-          species = species_name,
+        query_occurrence_randomized(
+          species_name = species_name,
           cultivated = include_cultivated,
-          all.taxonomy = TRUE,
-          native.status = TRUE,
-          natives.only = plan$natives.only,
-          observation.type = TRUE,
-          political.boundaries = FALSE,
-          collection.info = FALSE,
-          only.geovalid = plan$only.geovalid,
+          natives_only = plan$natives.only,
+          only_geovalid = plan$only.geovalid,
           limit = plan$limit,
-          record_limit = plan$record_limit,
-          fetch.query = FALSE
+          record_limit = plan$record_limit
         )
       },
       timeout_sec = min(timeout_sec, 25),
@@ -1161,7 +1198,7 @@ server <- function(input, output, session) {
       "<br><strong>Fraction of total matching BIEN records by source class (derived from BIEN provenance):</strong> ", source_mix_line,
       "<br><strong>Observation records returned by BIEN:</strong> ", occ_returned_n,
       "<br><strong>Observation records kept in app sample:</strong> ", occ_n,
-      "<br><strong>Observation sample mode:</strong> ", ifelse(res$occurrence_sample_mode == "random", "random sample of returned BIEN rows", "first returned BIEN rows"),
+      "<br><strong>Observation sample mode:</strong> ", ifelse(res$occurrence_sample_mode == "random", "randomized BIEN sample of matching occurrence rows (to reduce source-order bias)", "first returned BIEN rows"),
       "<br><strong>Query source:</strong> ", query_source_txt,
       "<br><strong>Query elapsed time:</strong> ", query_elapsed_txt,
       "<br><strong>Observation categories:</strong> ", category_line,

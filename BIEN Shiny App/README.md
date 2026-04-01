@@ -104,6 +104,8 @@ To keep the first query responsive, the app now loads content in stages:
 - **Traits** load when a Traits tab is opened
 - **Range** loads only when the Range tab is opened and the optional range toggle is enabled
 
+To reduce over-representation of large datasource blocks (for example FIA plot rows appearing first in the backend table), the occurrence sample is now drawn from a **randomized BIEN occurrence query** rather than simply taking the first matching rows returned by BIEN.
+
 ## Requirements
 
 R packages used by the app:

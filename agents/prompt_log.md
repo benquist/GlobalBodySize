@@ -367,6 +367,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-01
+- Prompt summary: Diagnose and fix the BIEN app’s occurrence-source bias for species like `Juniperus communis` and `Pinus ponderosa`, where the sample appeared overly dominated by plot/FIA rows.
+- Requested outcomes: Investigate the live BIEN query behavior, reduce backend row-order bias in the occurrence sample, keep the app responsive, and clarify the updated sampling behavior in the app/README.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-30
 - Prompt summary: User asked whether the deep-search code was actually run and whether results exist.
 - Requested outcomes: Confirm execution status and point to the generated result files.

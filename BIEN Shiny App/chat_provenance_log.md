@@ -44,5 +44,10 @@ Prompt: Make sure the code is commented, README files are updated and useful, cl
 Source session: current workspace session
 Outcome: Added clearer inline comments to the Shiny app code, expanded the BIEN app README and workspace README, added an explicit re-query notice for filter changes, and prepared the latest app polish updates for publication.
 
+9. Date: 2026-04-01
+Prompt: Investigate why some species such as `Juniperus communis` and `Pinus ponderosa` appear overly dominated by plot/FIA records in the returned occurrence sample, and fix the sampling bias if possible.
+Source session: current workspace session
+Outcome: Verified that the old BIEN occurrence fetch was pulling the first backend rows without randomized ordering, then updated the app to use a randomized occurrence query and exclude trait-linked rows from the main occurrence map/table so the sample better reflects the full BIEN matching pool.
+
 ## Update Rule
 Append a new entry whenever prompts lead to created/modified app code, BIEN query logic, or documentation under BIEN Shiny App/.
