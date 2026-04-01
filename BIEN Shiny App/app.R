@@ -132,11 +132,17 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
     }
 
     if (inherits(res$result, "error")) {
-      notes <- c(notes, paste("occ_error:", conditionMessage(res$result)))
+      err_msg <- conditionMessage(res$result)
+      notes <- c(notes, paste("occ_error:", err_msg))
+
+      if (is_bien_connection_error(err_msg)) {
+        break
+      }
     }
   }
 
-  list(data = last_result, strategy = "none", notes = notes, limit_used = fast_limit)
+  final_strategy <- if (is_bien_connection_error(notes)) "backend_connection_error" else "none"
+  list(data = last_result, strategy = final_strategy, notes = notes, limit_used = fast_limit)
 }
 
 find_first_col <- function(df, candidates) {
@@ -512,9 +518,105 @@ prepare_trait_visual_data <- function(traits) {
   list(data = plot_df, summary = summary_tbl)
 }
 
+describe_sampling_mode <- function(sample_method) {
+  switch(
+    sample_method,
+    datasource = "balanced sample stratified by datasource",
+    observation_type = "balanced sample stratified by BIEN observation type",
+    observation_category = "balanced sample stratified by broader observation category",
+    head = "first returned BIEN rows",
+    "randomized BIEN sample of matching occurrence rows (to reduce source-order bias)"
+  )
+}
+
+is_bien_connection_error <- function(messages) {
+  if (length(messages) == 0 || all(is.na(messages))) {
+    return(FALSE)
+  }
+
+  any(grepl(
+    "could not connect|remaining connection slots|error connecting to the BIEN database",
+    messages,
+    ignore.case = TRUE
+  ))
+}
+
+sample_occurrence_rows <- function(df, target_n, sample_method = "random") {
+  valid_methods <- c("random", "head", "datasource", "observation_type", "observation_category")
+  sample_method <- if (!is.null(sample_method) && sample_method %in% valid_methods) sample_method else "random"
+
+  if (!is.data.frame(df) || nrow(df) == 0 || nrow(df) <= target_n) {
+    return(df)
+  }
+
+  if (sample_method == "head") {
+    return(df %>% slice_head(n = target_n))
+  }
+
+  if (sample_method == "random") {
+    return(df %>% slice_sample(n = target_n))
+  }
+
+  if (!"observation_category" %in% names(df)) {
+    df <- categorize_observation_records(df)
+  }
+
+  stratify_col <- switch(
+    sample_method,
+    datasource = find_first_col(df, c("datasource", "data_source", "collection", "source")),
+    observation_type = find_first_col(df, c("observation_type", "observation.type")),
+    observation_category = find_first_col(df, c("observation_category")),
+    NULL
+  )
+
+  if (is.null(stratify_col) || !stratify_col %in% names(df)) {
+    return(df %>% slice_sample(n = target_n))
+  }
+
+  group_values <- trimws(as.character(df[[stratify_col]]))
+  group_values[is.na(group_values) | group_values == ""] <- "unknown"
+  group_index <- split(seq_len(nrow(df)), group_values)
+
+  if (length(group_index) <= 1) {
+    return(df %>% slice_sample(n = target_n))
+  }
+
+  group_index <- group_index[order(vapply(group_index, length, integer(1)), decreasing = TRUE)]
+  base_quota <- max(1L, floor(target_n / length(group_index)))
+
+  selected <- unlist(lapply(group_index, function(idx) {
+    draw_n <- min(length(idx), base_quota)
+    idx[sample.int(length(idx), size = draw_n, replace = FALSE)]
+  }), use.names = FALSE)
+  selected <- unique(selected)
+
+  if (length(selected) < target_n) {
+    leftovers <- lapply(group_index, function(idx) setdiff(idx, selected))
+
+    while (length(selected) < target_n && any(lengths(leftovers) > 0)) {
+      for (i in seq_along(leftovers)) {
+        if (length(selected) >= target_n) {
+          break
+        }
+        if (length(leftovers[[i]]) == 0) {
+          next
+        }
+        add_pos <- sample.int(length(leftovers[[i]]), size = 1)
+        add_idx <- leftovers[[i]][add_pos]
+        selected <- c(selected, add_idx)
+        leftovers[[i]] <- setdiff(leftovers[[i]], add_idx)
+      }
+    }
+  }
+
+  selected <- selected[seq_len(min(length(selected), target_n))]
+  df[selected, , drop = FALSE]
+}
+
 # Standardize, QA, de-duplicate, and optionally thin occurrence records before mapping.
 prepare_occurrences <- function(occ, map_point_cap = 800, sample_method = "random") {
-  sample_method <- if (identical(sample_method, "head")) "head" else "random"
+  valid_methods <- c("random", "head", "datasource", "observation_type", "observation_category")
+  sample_method <- if (!is.null(sample_method) && sample_method %in% valid_methods) sample_method else "random"
 
   if (!is.data.frame(occ) || nrow(occ) == 0) {
     return(list(data = NULL, lat_col = NULL, lon_col = NULL, qa = list(total = 0, coord_valid = 0, kept = 0, removed = 0, removed_invalid = 0, duplicates_removed = 0), map_cap_applied = FALSE, map_cap = map_point_cap, original_kept = 0, sample_method = sample_method))
@@ -556,11 +658,7 @@ prepare_occurrences <- function(occ, map_point_cap = 800, sample_method = "rando
   duplicates_removed_n <- coord_valid_n - original_kept_n
 
   if (kept_n > map_point_cap) {
-    occ <- if (sample_method == "random") {
-      occ %>% slice_sample(n = map_point_cap)
-    } else {
-      occ %>% slice_head(n = map_point_cap)
-    }
+    occ <- sample_occurrence_rows(occ, target_n = map_point_cap, sample_method = sample_method)
     kept_n <- nrow(occ)
     map_cap_applied <- TRUE
   } else {
@@ -727,8 +825,8 @@ ui <- fluidPage(
       checkboxInput("only_geovalid", "Keep only BIEN geovalid coordinates (hide flagged / non-geovalid points)", value = TRUE),
       uiOutput("filter_selection_summary"),
       numericInput("occurrence_limit", "Occurrence records to keep in app sample", value = 1000, min = 200, max = 50000, step = 200),
-      checkboxInput("randomize_occurrence_sample", "Randomize occurrence sample before display", value = TRUE),
-      selectInput("map_sampling_method", "If too many points for the map", choices = c("Random sample" = "random", "First returned" = "head"), selected = "random"),
+      checkboxInput("randomize_occurrence_sample", "Allow randomized or balanced subsampling for the displayed app sample (turn off to keep the returned BIEN sample as-is)", value = TRUE),
+      selectInput("map_sampling_method", "If too many occurrence records are available, balance the display using", choices = c("Balanced by datasource" = "datasource", "Balanced by observation type" = "observation_type", "Balanced by broader observation category" = "observation_category", "Random sample" = "random", "First returned" = "head"), selected = "datasource"),
       selectInput("map_color_by", "Color map points by", choices = c("Observation category" = "category", "Raw BIEN observation_type" = "type"), selected = "category"),
       numericInput("trait_limit", "Max trait records (sample)", value = 1000, min = 100, max = 50000, step = 100),
       checkboxInput("include_range_query", "Load BIEN range layers when the Range tab is opened (slower)", value = FALSE),
@@ -818,10 +916,11 @@ server <- function(input, output, session) {
     occ_limit <- max(200, as.numeric(input$occurrence_limit))
     trait_limit <- max(100, as.numeric(input$trait_limit))
     sample_random <- if (is.null(input$randomize_occurrence_sample)) TRUE else isTRUE(input$randomize_occurrence_sample)
-    map_sampling_method <- if (is.null(input$map_sampling_method)) "random" else input$map_sampling_method
+    map_sampling_method <- if (is.null(input$map_sampling_method)) "datasource" else input$map_sampling_method
+    display_sampling_method <- if (sample_random) map_sampling_method else "head"
     occ_page_size <- min(1000, max(occ_limit, 500))
     trait_page_size <- min(500, trait_limit)
-    occ_fetch_limit <- min(if (sample_random) max(occ_limit * 2, 1000) else occ_limit, 2000)
+    occ_fetch_limit <- min(if (identical(display_sampling_method, "head")) occ_limit else max(occ_limit * 2, 1000), 2000)
     trait_fetch_limit <- min(trait_limit, 1000)
     range_dir <- file.path(tempdir(), "bien_ranges_cache", gsub("\\s+", "_", species_name))
     dir.create(range_dir, recursive = TRUE, showWarnings = FALSE)
@@ -865,16 +964,12 @@ server <- function(input, output, session) {
       if (is.data.frame(occ)) {
         occ <- categorize_observation_records(occ)
         if (nrow(occ) > occ_limit) {
-          occ <- if (sample_random) {
-            occ %>% slice_sample(n = occ_limit)
-          } else {
-            occ %>% slice_head(n = occ_limit)
-          }
+          occ <- sample_occurrence_rows(occ, target_n = occ_limit, sample_method = display_sampling_method)
         }
       }
 
       incProgress(0.85, detail = "Preparing map and QA summary")
-      occ_prepared <- if (is.data.frame(occ)) prepare_occurrences(occ, map_point_cap = 800, sample_method = map_sampling_method) else list(data = NULL, lat_col = NULL, lon_col = NULL, qa = list(total = 0, coord_valid = 0, kept = 0, removed = 0, removed_invalid = 0, duplicates_removed = 0), map_cap_applied = FALSE, map_cap = 800, original_kept = 0, sample_method = map_sampling_method)
+      occ_prepared <- if (is.data.frame(occ)) prepare_occurrences(occ, map_point_cap = 800, sample_method = display_sampling_method) else list(data = NULL, lat_col = NULL, lon_col = NULL, qa = list(total = 0, coord_valid = 0, kept = 0, removed = 0, removed_invalid = 0, duplicates_removed = 0), map_cap_applied = FALSE, map_cap = 800, original_kept = 0, sample_method = display_sampling_method)
       family_name <- extract_primary_value(occ, c("scrubbed_family", "family", "verbatim_family"))
 
       query_errors <- c(occ_bundle$notes, occ_error)
@@ -892,7 +987,7 @@ server <- function(input, output, session) {
         occ_total_available = NA_real_,
         occ_total_note = "Click 'Load BIEN total counts and source mix (slower)' to fetch optional BIEN totals for this species.", 
         occ_source_mix = NULL,
-        occurrence_sample_mode = if (sample_random) "random" else "head",
+        occurrence_sample_mode = display_sampling_method,
         traits = NULL,
         ranges = NULL,
         range_sf = NULL,
@@ -1176,8 +1271,11 @@ server <- function(input, output, session) {
     } else {
       "fresh BIEN query"
     }
+    connection_issue <- is_bien_connection_error(res$query_errors)
 
-    map_status <- if (mappable_n > 0 && isTRUE(res$occurrences_prepared$map_cap_applied)) {
+    map_status <- if (connection_issue) {
+      "BIEN connection failed during this query, so no occurrence records could be retrieved"
+    } else if (mappable_n > 0 && isTRUE(res$occurrences_prepared$map_cap_applied)) {
       paste("Showing", mappable_n, "sampled occurrence point(s) out of", res$occurrences_prepared$original_kept, "mappable records")
     } else if (mappable_n > 0) {
       paste("Showing", mappable_n, "occurrence point(s)")
@@ -1198,8 +1296,13 @@ server <- function(input, output, session) {
       "<br><strong>Fraction of total matching BIEN records by source class (derived from BIEN provenance):</strong> ", source_mix_line,
       "<br><strong>Observation records returned by BIEN:</strong> ", occ_returned_n,
       "<br><strong>Observation records kept in app sample:</strong> ", occ_n,
-      "<br><strong>Observation sample mode:</strong> ", ifelse(res$occurrence_sample_mode == "random", "randomized BIEN sample of matching occurrence rows (to reduce source-order bias)", "first returned BIEN rows"),
+      "<br><strong>Observation sample mode:</strong> ", describe_sampling_mode(res$occurrence_sample_mode),
       "<br><strong>Query source:</strong> ", query_source_txt,
+      if (connection_issue) {
+        "<br><strong>BIEN server status:</strong> The public BIEN database is temporarily at capacity or refusing new connections. Please rerun the query in a minute or two."
+      } else {
+        ""
+      },
       "<br><strong>Query elapsed time:</strong> ", query_elapsed_txt,
       "<br><strong>Observation categories:</strong> ", category_line,
       "<br><strong>Mappable occurrence points:</strong> ", mappable_n,
@@ -1239,6 +1342,14 @@ server <- function(input, output, session) {
     mappable_n <- if (is.data.frame(res$occurrences_prepared$data)) nrow(res$occurrences_prepared$data) else 0
     cached_range <- get_cached_result(range_cache, res$query_cache_key)
     has_range <- !is.null(cached_range) && inherits(cached_range$range_sf, "sf") && nrow(cached_range$range_sf) > 0
+
+    if (is_bien_connection_error(res$query_errors)) {
+      return(tags$div(
+        style = "background:#f8d7da;border:1px solid #f1aeb5;color:#842029;padding:10px 12px;border-radius:6px;margin:8px 0;",
+        tags$strong("BIEN connection note: "),
+        "The public BIEN database is temporarily at capacity or refusing new connections, so this query could not retrieve occurrence records right now. Please try `Query BIEN` again shortly."
+      ))
+    }
 
     if (occ_n > 0 && mappable_n == 0 && has_range) {
       return(tags$div(

@@ -49,5 +49,10 @@ Prompt: Investigate why some species such as `Juniperus communis` and `Pinus pon
 Source session: current workspace session
 Outcome: Verified that the old BIEN occurrence fetch was pulling the first backend rows without randomized ordering, then updated the app to use a randomized occurrence query and exclude trait-linked rows from the main occurrence map/table so the sample better reflects the full BIEN matching pool.
 
+10. Date: 2026-04-01
+Prompt: Add balanced occurrence-display sampling by datasource or observation type, then investigate why `Juniperus communis` returned no observations during live app testing.
+Source session: current workspace session
+Outcome: Added stratified display-sampling controls for occurrence maps/tables, confirmed that the live failure was caused by BIEN public database connection-slot exhaustion rather than a true species-level absence, and updated the app to show a clear backend-capacity warning with retry guidance.
+
 ## Update Rule
 Append a new entry whenever prompts lead to created/modified app code, BIEN query logic, or documentation under BIEN Shiny App/.

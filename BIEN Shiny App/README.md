@@ -33,6 +33,7 @@ The app organizes BIEN output into several linked views:
 - Colors points by BIEN `observation_type` or broader observation category so users can visually distinguish record source classes such as plot, specimen, literature, or checklist.
 - Falls back to the BIEN range polygon when occurrence rows exist but BIEN does not provide usable coordinates in the current response.
 - Reports whether the map is showing all points or a sampled subset for responsiveness.
+- If one source class dominates a widespread species, the display can now be balanced by `datasource`, raw BIEN `observation_type`, or a broader observation category to make the map/table view more representative.
 
 ### 2. Summary Statistics
 - Shows the main returned-record summary immediately after a species query.
@@ -105,6 +106,10 @@ To keep the first query responsive, the app now loads content in stages:
 - **Range** loads only when the Range tab is opened and the optional range toggle is enabled
 
 To reduce over-representation of large datasource blocks (for example FIA plot rows appearing first in the backend table), the occurrence sample is now drawn from a **randomized BIEN occurrence query** rather than simply taking the first matching rows returned by BIEN.
+
+If a widespread species is still visually dominated by one record stream, the sidebar now lets you balance the displayed subset by **datasource**, **BIEN observation type**, or a broader **observation category** instead of using only simple random thinning.
+
+If BIEN is temporarily overloaded and refuses new public connections, the app now shows a clear warning that the backend is at capacity and suggests rerunning the query shortly, rather than implying the species truly has no observations.
 
 ## Requirements
 

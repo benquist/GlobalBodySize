@@ -373,6 +373,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-01
+- Prompt summary: Add stratified occurrence-display sampling for the BIEN app, then investigate why `Juniperus communis` was returning no observations during live testing.
+- Requested outcomes: Balance the displayed subset by datasource or observation type, diagnose the live query failure, surface BIEN backend-capacity errors clearly in the UI, and update the README guidance.
+- Files changed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; BIEN Shiny App/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-30
 - Prompt summary: User asked whether the deep-search code was actually run and whether results exist.
 - Requested outcomes: Confirm execution status and point to the generated result files.
@@ -717,4 +723,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Advise on a short scientist-friendly interpretation statement for the BIEN Shiny app occurrence filters and assess whether the default filter settings are appropriate for biodiversity exploration.
 - Requested outcomes: Recommend a concise sentence explaining that the default view shows native-only, non-cultivated, geovalid BIEN records and indicate whether that conservative default is suitable for exploratory biodiversity use.
 - Files reviewed: BIEN Shiny App/app.R; BIEN Shiny App/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Review the newly implemented balanced occurrence-display sampling changes in the BIEN Shiny App.
+- Requested outcomes: Assess whether the new datasource/observation-type balancing logic in `BIEN Shiny App/app.R` and the README explanation are logically sound, identify bugs or biodiversity-interpretation concerns, and recommend whether to keep as-is or make one quick follow-up adjustment.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
