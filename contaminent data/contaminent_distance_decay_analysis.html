@@ -485,7 +485,7 @@ plot_decay(pairwise_df$distance_km, pairwise_df$sim_DDT, &quot;DDT decay&quot;)
 plot_decay(pairwise_df$distance_km, pairwise_df$sim_PCP, &quot;PCP decay&quot;)
 plot_decay(pairwise_df$distance_km, pairwise_df$sim_isotope, &quot;Isotope decay&quot;)
 plot_decay(pairwise_df$distance_km, pairwise_df$sim_overall, &quot;Overall decay&quot;)</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/plotting-1.png" width="1056" /></p>
+<p><img src="outputs/figures/plotting-1.png" width="1056" /></p>
 <pre class="r"><code># Generality panel: all responses in one view.
 plot(pairwise_df$distance_km, pairwise_df$sim_DDT,
      pch = 16, cex = 0.25, col = rgb(178, 34, 34, 110, maxColorValue = 255),
@@ -500,7 +500,7 @@ legend(&quot;topright&quot;, bty = &quot;n&quot;,
        legend = c(&quot;DDT&quot;, &quot;PCP&quot;, &quot;Isotope&quot;, &quot;Overall&quot;),
        col = c(&quot;firebrick&quot;, &quot;darkorange3&quot;, &quot;royalblue&quot;, &quot;darkgreen&quot;),
        pch = 16)</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/generality-1.png" width="768" /></p>
+<p><img src="outputs/figures/generality-1.png" width="768" /></p>
 <pre class="r"><code># Pooled model to evaluate broad generality.
 long_df &lt;- rbind(
   data.frame(response = &quot;DDT&quot;, distance_km = pairwise_df$distance_km, sim = pairwise_df$sim_DDT),
@@ -549,17 +549,18 @@ summary(pooled_fit)</code></pre>
 [6] “outputs/dyadic_trophic_model_blocked_cv.csv”<br />
 [7] “outputs/dyadic_trophic_model_fixed_effects.csv”<br />
 [8] “outputs/dyadic_trophic_transfer_comparison.csv”<br />
-[9] “outputs/gam_predicted_ddt_surface.csv”<br />
-[10] “outputs/null_model_slope_comparison.csv”<br />
-[11] “outputs/pairwise_distance_similarity.csv”<br />
-[12] “outputs/real_testcase_distance_decay_model_summary.csv” [13]
+[9] “outputs/figures”<br />
+[10] “outputs/gam_predicted_ddt_surface.csv”<br />
+[11] “outputs/null_model_slope_comparison.csv”<br />
+[12] “outputs/pairwise_distance_similarity.csv”<br />
+[13] “outputs/real_testcase_distance_decay_model_summary.csv” [14]
 “outputs/real_testcase_distance_decay_plots.png”<br />
-[14] “outputs/real_testcase_null_model_summary.csv”<br />
-[15] “outputs/real_testcase_pairwise_distance_similarity.csv” [16]
+[15] “outputs/real_testcase_null_model_summary.csv”<br />
+[16] “outputs/real_testcase_pairwise_distance_similarity.csv” [17]
 “outputs/real_testcase_prepared_data.csv”<br />
-[17] “outputs/real_testcase_reported_fields_dictionary.csv”<br />
-[18] “outputs/spatial_cv_loao_results.csv”<br />
-[19] “outputs/spatiotemporal_scaling_model_summary.csv”</p>
+[18] “outputs/real_testcase_reported_fields_dictionary.csv”<br />
+[19] “outputs/spatial_cv_loao_results.csv”<br />
+[20] “outputs/spatiotemporal_scaling_model_summary.csv”</p>
 </div>
 <div id="interpretation-notes" class="section level2">
 <h2>Interpretation Notes</h2>
@@ -900,7 +901,7 @@ class="section level3">
   draw_all_fits(pair_real$distance_km, pair_real$sim_overall,    &quot;Similarity (overall)&quot;,    &quot;Overall – Distance Decay (all species)&quot;)
   dev.off()
 }</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/real-scatter-fits-1.png" width="1152" /></p>
+<p><img src="outputs/figures/real-scatter-fits-1.png" width="1152" /></p>
 <pre><code>## quartz_off_screen 
 ##                 2</code></pre>
 </div>
@@ -947,7 +948,7 @@ class="section level3">
   plot_binned(bin_sim(pair_real, &quot;sim_isotope&quot;),    &quot;Mean Similarity (isotope)&quot;, &quot;Isotope – Binned Mean ± 95% CI (all species)&quot;, &quot;steelblue4&quot;)
   plot_binned(bin_sim(pair_real, &quot;sim_overall&quot;),    &quot;Mean Similarity (overall)&quot;, &quot;Overall – Binned Mean ± 95% CI (all species)&quot;, &quot;darkorchid4&quot;)
 }</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/real-binned-ci-1.png" width="1152" /></p>
+<p><img src="outputs/figures/real-binned-ci-1.png" width="1152" /></p>
 </div>
 <div id="c.-observed-vs.-null-slope-distributions"
 class="section level3">
@@ -979,7 +980,7 @@ class="section level3">
 } else {
   cat(&quot;null_real_summary not available.\n&quot;)
 }</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/real-null-slopes-1.png" width="1152" /></p>
+<p><img src="outputs/figures/real-null-slopes-1.png" width="1152" /></p>
 </div>
 <div id="d.-observed-vs.-null-decay-curve-comparison"
 class="section level3">
@@ -1021,7 +1022,7 @@ class="section level3">
            lwd = c(2.5, 2, 8), lty = c(1, 2, 1))
   }
 }</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/real-null-decay-bands-1.png" width="1152" /></p>
+<p><img src="outputs/figures/real-null-decay-bands-1.png" width="1152" /></p>
 </div>
 </div>
 <div id="species-level-distance-decay-analysis" class="section level2">
@@ -1074,7 +1075,7 @@ class="section level3">
 <div id="species-larus-glaucescens-66-within-species-pairs"
 class="section level3">
 <h3>Species: Larus glaucescens ( 66 within-species pairs)</h3>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-1.png" width="1152" /><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-2.png" width="1152" />
+<p><img src="outputs/figures/species-breakdown-1.png" width="1152" /><img src="outputs/figures/species-breakdown-2.png" width="1152" />
 <strong>Best-fit models (lowest AIC per response):</strong></p>
 <table>
 <thead>
@@ -1121,7 +1122,7 @@ class="section level3">
 <div id="species-larus-hyperboreus-36-within-species-pairs"
 class="section level3">
 <h3>Species: Larus hyperboreus ( 36 within-species pairs)</h3>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-3.png" width="1152" /><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-4.png" width="1152" />
+<p><img src="outputs/figures/species-breakdown-3.png" width="1152" /><img src="outputs/figures/species-breakdown-4.png" width="1152" />
 <strong>Best-fit models (lowest AIC per response):</strong></p>
 <table>
 <thead>
@@ -1168,7 +1169,7 @@ class="section level3">
 <div id="species-uria-aalge-8515-within-species-pairs"
 class="section level3">
 <h3>Species: Uria aalge ( 8515 within-species pairs)</h3>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-5.png" width="1152" /><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-6.png" width="1152" />
+<p><img src="outputs/figures/species-breakdown-5.png" width="1152" /><img src="outputs/figures/species-breakdown-6.png" width="1152" />
 <strong>Best-fit models (lowest AIC per response):</strong></p>
 <table>
 <thead>
@@ -1215,7 +1216,7 @@ class="section level3">
 <div id="species-uria-lomvia-1326-within-species-pairs"
 class="section level3">
 <h3>Species: Uria lomvia ( 1326 within-species pairs)</h3>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-7.png" width="1152" /><img src="contaminent_distance_decay_analysis_files/figure-html/species-breakdown-8.png" width="1152" />
+<p><img src="outputs/figures/species-breakdown-7.png" width="1152" /><img src="outputs/figures/species-breakdown-8.png" width="1152" />
 <strong>Best-fit models (lowest AIC per response):</strong></p>
 <table>
 <thead>
@@ -1815,7 +1816,7 @@ functional form.</caption>
   }
 }</code></pre>
 <div class="figure">
-<img src="contaminent_distance_decay_analysis_files/figure-html/fitted-curves-plot-1.png" alt="Fitted distance-decay curves: exponential (red, solid), power-law (orange, dashed), log-linear (blue, dotted). Legend shows fitted equation and AIC for each form." width="1344" />
+<img src="outputs/figures/fitted-curves-plot-1.png" alt="Fitted distance-decay curves: exponential (red, solid), power-law (orange, dashed), log-linear (blue, dotted). Legend shows fitted equation and AIC for each form." width="1344" />
 <p class="caption">
 Fitted distance-decay curves: exponential (red, solid), power-law
 (orange, dashed), log-linear (blue, dotted). Legend shows fitted
@@ -2057,7 +2058,7 @@ surface and its uncertainty.</p>
 }</code></pre>
 <p><strong>GAM deviance explained: 70.7%</strong> | R² (adj.) = 0.686 |
 n = 216</p>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/gam-spatial-1.png" width="1056" /></p>
+<p><img src="outputs/figures/gam-spatial-1.png" width="1056" /></p>
 </div>
 <div id="b.-temporal-trend-analysis" class="section level3">
 <h3>14B. Temporal Trend Analysis</h3>
@@ -2106,7 +2107,7 @@ n = 216</p>
                 lm_pcp$coefficients[2, 1], lm_pcp$r.squared, lm_pcp$coefficients[2, 4]))
   }
 }</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/temporal-trend-1.png" width="1056" />-
+<p><img src="outputs/figures/temporal-trend-1.png" width="1056" />-
 <strong>DDT</strong>: slope = -0.1014 log-units/yr, R² = 0.152, p =
 0.000 - <strong>PCP/PCB</strong>: slope = -0.0753 log-units/yr, R² =
 0.086, p = 0.000</p>
@@ -2534,7 +2535,7 @@ indicates interaction model support over additive model.</caption>
            legend = levels(g), col = cols[seq_along(levels(g))], lwd = 2.5)
   }
 }</code></pre>
-<p><img src="contaminent_distance_decay_analysis_files/figure-html/spatiotemporal-visualization-1.png" width="1248" /></p>
+<p><img src="outputs/figures/spatiotemporal-visualization-1.png" width="1248" /></p>
 </div>
 <div id="b-dyadic-mixed-effects-spatiotemporal-model-blocked-cv"
 class="section level2">
@@ -2946,6 +2947,73 @@ reducing spatial leakage.</caption>
 </tr>
 </tbody>
 </table>
+<pre class="r"><code>if (exists(&quot;fit_objs&quot;) &amp;&amp; length(fit_objs) &gt; 0) {
+  par(mfrow = c(2, 2), mar = c(7, 4, 3, 1))
+
+  for (nm in names(fit_objs)) {
+    fit_obj &lt;- fit_objs[[nm]]
+    cf &lt;- as.data.frame(summary(fit_obj$model)$coefficients)
+    cf$term &lt;- rownames(cf)
+    keep &lt;- cf$term %in% c(&quot;log_dist&quot;, &quot;log_time&quot;, &quot;log_dist:log_time&quot;)
+    cf &lt;- cf[keep, , drop = FALSE]
+    labs &lt;- c(log_dist = &quot;Distance&quot;, log_time = &quot;Time lag&quot;, `log_dist:log_time` = &quot;Distance x Time&quot;)
+    xpos &lt;- seq_len(nrow(cf))
+    ylim_r &lt;- range(c(cf$Estimate - 1.96 * cf$`Std. Error`, cf$Estimate + 1.96 * cf$`Std. Error`, 0))
+
+    plot(xpos, cf$Estimate,
+         ylim = ylim_r,
+         xlim = c(0.5, nrow(cf) + 0.5),
+         xaxt = &quot;n&quot;,
+         xlab = &quot;&quot;,
+         ylab = &quot;Coefficient estimate&quot;,
+         main = paste(c(sim_overall = &quot;Overall&quot;, sim_DDT = &quot;DDT&quot;)[nm], &quot;mixed model&quot;),
+         pch = 19,
+         col = if (nm == &quot;sim_overall&quot;) &quot;darkorchid4&quot; else &quot;firebrick&quot;)
+    axis(1, at = xpos, labels = labs[cf$term], las = 2)
+    abline(h = 0, lty = 2, col = &quot;grey50&quot;)
+    segments(xpos, cf$Estimate - 1.96 * cf$`Std. Error`,
+             xpos, cf$Estimate + 1.96 * cf$`Std. Error`,
+             lwd = 2,
+             col = if (nm == &quot;sim_overall&quot;) &quot;darkorchid4&quot; else &quot;firebrick&quot;)
+  }
+
+  if (exists(&quot;cv_tabs&quot;) &amp;&amp; !is.null(cv_tabs) &amp;&amp; nrow(cv_tabs) &gt; 0) {
+    cv_plot &lt;- cv_tabs[cv_tabs$held_out_area != &quot;Mean across held-out areas&quot;, ]
+    areas &lt;- unique(cv_plot$held_out_area)
+    responses &lt;- unique(cv_plot$response)
+    rmse_mat &lt;- sapply(responses, function(resp) cv_plot$RMSE[match(areas, cv_plot$held_out_area[cv_plot$response == resp])])
+    r2_mat &lt;- sapply(responses, function(resp) cv_plot$R2_pred[match(areas, cv_plot$held_out_area[cv_plot$response == resp])])
+    if (is.null(dim(rmse_mat))) rmse_mat &lt;- matrix(rmse_mat, ncol = 1, dimnames = list(areas, responses))
+    if (is.null(dim(r2_mat))) r2_mat &lt;- matrix(r2_mat, ncol = 1, dimnames = list(areas, responses))
+
+    barplot(t(rmse_mat), beside = TRUE,
+            col = c(&quot;darkorchid4&quot;, &quot;firebrick&quot;)[seq_len(ncol(rmse_mat))],
+            names.arg = areas,
+            las = 2,
+            ylab = &quot;Blocked CV RMSE&quot;,
+            main = &quot;Dyadic mixed model blocked CV&quot;)
+    legend(&quot;topright&quot;, bty = &quot;n&quot;,
+           legend = c(sim_overall = &quot;Overall&quot;, sim_DDT = &quot;DDT&quot;)[colnames(rmse_mat)],
+           fill = c(&quot;darkorchid4&quot;, &quot;firebrick&quot;)[seq_len(ncol(rmse_mat))])
+
+    matplot(seq_along(areas), r2_mat,
+            type = &quot;b&quot;, pch = 19, lty = 1,
+            col = c(&quot;darkorchid4&quot;, &quot;firebrick&quot;)[seq_len(ncol(r2_mat))],
+            xaxt = &quot;n&quot;,
+            xlab = &quot;Held-out area&quot;,
+            ylab = expression(R^2),
+            main = &quot;Dyadic mixed model predictive fit&quot;)
+    axis(1, at = seq_along(areas), labels = areas, las = 2)
+    legend(&quot;topright&quot;, bty = &quot;n&quot;,
+           legend = c(sim_overall = &quot;Overall&quot;, sim_DDT = &quot;DDT&quot;)[colnames(r2_mat)],
+           col = c(&quot;darkorchid4&quot;, &quot;firebrick&quot;)[seq_len(ncol(r2_mat))],
+           lty = 1, pch = 19)
+  } else {
+    plot.new(); title(&quot;Blocked CV RMSE&quot;)
+    plot.new(); title(&quot;Blocked CV predictive fit&quot;)
+  }
+}</code></pre>
+<p><img src="outputs/figures/dyadic-mixed-graphics-1.png" width="1152" /></p>
 </div>
 <div id="c-trophic-covariate-extension-for-transferability"
 class="section level2">
@@ -3339,6 +3407,66 @@ extension should be interpreted as a first biodiversity-aware stress
 test, not a full ecological solution; meaningful further gains will
 likely require explicit movement/connectivity covariates or
 oceanographic predictors.</p>
+<pre class="r"><code>if (exists(&quot;trophic_objs&quot;) &amp;&amp; length(trophic_objs) &gt; 0) {
+  par(mfrow = c(2, 2), mar = c(8, 4, 3, 1))
+
+  for (nm in names(trophic_objs)) {
+    fit_obj &lt;- trophic_objs[[nm]]
+    cf &lt;- fixef(fit_obj$model)
+    keep_terms &lt;- c(&quot;log_dist&quot;, &quot;log_time&quot;, &quot;log_dist:log_time&quot;, &quot;trophic_diff_n15&quot;, &quot;habitat_diff_c13&quot;)
+    cf &lt;- cf[names(cf) %in% keep_terms]
+    labs &lt;- c(
+      log_dist = &quot;Distance&quot;,
+      log_time = &quot;Time lag&quot;,
+      `log_dist:log_time` = &quot;Distance x Time&quot;,
+      trophic_diff_n15 = expression(Delta*delta^{15}*N),
+      habitat_diff_c13 = expression(Delta*delta^{13}*C)
+    )
+    cols &lt;- ifelse(cf &gt;= 0, &quot;steelblue4&quot;, &quot;firebrick&quot;)
+    bp &lt;- barplot(cf,
+                  col = cols,
+                  las = 2,
+                  ylab = &quot;Coefficient estimate&quot;,
+                  main = paste(c(sim_overall = &quot;Overall&quot;, sim_DDT = &quot;DDT&quot;)[nm], &quot;trophic model&quot;),
+                  names.arg = rep(&quot;&quot;, length(cf)))
+    axis(1, at = bp, labels = names(cf), las = 2)
+    abline(h = 0, lty = 2, col = &quot;grey50&quot;)
+  }
+
+  if (exists(&quot;compare_cv&quot;) &amp;&amp; !is.null(compare_cv) &amp;&amp; nrow(compare_cv) &gt; 0) {
+    gulf &lt;- compare_cv[compare_cv$`Held-out area` == &quot;Gulf of Alaska&quot;, ]
+    mean_rows &lt;- compare_cv[compare_cv$`Held-out area` == &quot;Mean across held-out areas&quot;, ]
+
+    plot_df &lt;- rbind(gulf, mean_rows)
+    plot_df$group &lt;- paste(plot_df$Response, plot_df$`Held-out area`, sep = &quot;\n&quot;)
+    groups &lt;- unique(plot_df$group)
+    models &lt;- unique(plot_df$Model)
+    rmse_mat &lt;- sapply(models, function(model) plot_df$RMSE[match(groups, plot_df$group[plot_df$Model == model])])
+    r2_mat &lt;- sapply(models, function(model) plot_df$Predictive_R2[match(groups, plot_df$group[plot_df$Model == model])])
+    if (is.null(dim(rmse_mat))) rmse_mat &lt;- matrix(rmse_mat, ncol = 1, dimnames = list(groups, models))
+    if (is.null(dim(r2_mat))) r2_mat &lt;- matrix(r2_mat, ncol = 1, dimnames = list(groups, models))
+
+    barplot(t(rmse_mat), beside = TRUE,
+            col = c(&quot;grey55&quot;, &quot;darkgreen&quot;)[seq_len(ncol(rmse_mat))],
+            names.arg = groups,
+            las = 2,
+            ylab = &quot;RMSE&quot;,
+            main = &quot;Baseline vs trophic model transfer RMSE&quot;)
+    legend(&quot;topright&quot;, bty = &quot;n&quot;, fill = c(&quot;grey55&quot;, &quot;darkgreen&quot;)[seq_len(ncol(rmse_mat))], legend = colnames(rmse_mat))
+
+    barplot(t(r2_mat), beside = TRUE,
+            col = c(&quot;grey55&quot;, &quot;darkgreen&quot;)[seq_len(ncol(r2_mat))],
+            names.arg = groups,
+            las = 2,
+            ylab = expression(R^2),
+            main = &quot;Baseline vs trophic model transfer predictive fit&quot;)
+    legend(&quot;topleft&quot;, bty = &quot;n&quot;, fill = c(&quot;grey55&quot;, &quot;darkgreen&quot;)[seq_len(ncol(r2_mat))], legend = colnames(r2_mat))
+  } else {
+    plot.new(); title(&quot;Transfer RMSE comparison&quot;)
+    plot.new(); title(&quot;Transfer predictive fit comparison&quot;)
+  }
+}</code></pre>
+<p><img src="outputs/figures/dyadic-trophic-graphics-1.png" width="1152" /></p>
 </div>
 <div id="conclusion-main-drivers-of-contamination-variation"
 class="section level2">
@@ -3394,6 +3522,134 @@ behavior)</li>
 <li>Time (collection year / pairwise lag)</li>
 <li>Species ecological differences</li>
 </ol>
+</div>
+</div>
+<div id="graphics-gallery" class="section level2">
+<h2>17) Graphics Gallery</h2>
+<p>This appendix pulls together all graphics generated by the workflow
+so they can be reviewed in one place, including the original
+distance-decay plots and the new spatiotemporal and
+biodiversity-augmented mixed-model figures.</p>
+<div id="dummy-distance-decay-panels" class="section level3">
+<h3>Dummy distance decay panels</h3>
+<p>
+<img src="outputs/figures/plotting-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="generality-across-response-types" class="section level3">
+<h3>Generality across response types</h3>
+<p>
+<img src="outputs/figures/generality-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="real-data-distance-decay-fits" class="section level3">
+<h3>Real data distance decay fits</h3>
+<p>
+<img src="outputs/real_testcase_distance_decay_plots.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="binned-mean-similarity-with-95-ci" class="section level3">
+<h3>Binned mean similarity with 95% CI</h3>
+<p>
+<img src="outputs/figures/real-binned-ci-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="observed-versus-null-slope-distributions"
+class="section level3">
+<h3>Observed versus null slope distributions</h3>
+<p>
+<img src="outputs/figures/real-null-slopes-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="observed-versus-null-decay-bands" class="section level3">
+<h3>Observed versus null decay bands</h3>
+<p>
+<img src="outputs/figures/real-null-decay-bands-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="functional-form-comparison" class="section level3">
+<h3>Functional form comparison</h3>
+<p>
+<img src="outputs/figures/fitted-curves-plot-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="gam-spatial-prediction" class="section level3">
+<h3>GAM spatial prediction</h3>
+<p>
+<img src="outputs/figures/gam-spatial-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="temporal-trends" class="section level3">
+<h3>Temporal trends</h3>
+<p>
+<img src="outputs/figures/temporal-trend-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="distance-decay-by-time-lag-tercile" class="section level3">
+<h3>Distance decay by time lag tercile</h3>
+<p>
+<img src="outputs/figures/spatiotemporal-visualization-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="dyadic-mixed-model-diagnostics" class="section level3">
+<h3>Dyadic mixed model diagnostics</h3>
+<p>
+<img src="outputs/figures/dyadic-mixed-graphics-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="trophic-mixed-model-diagnostics" class="section level3">
+<h3>Trophic mixed model diagnostics</h3>
+<p>
+<img src="outputs/figures/dyadic-trophic-graphics-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown" class="section level3">
+<h3>species breakdown</h3>
+<p>
+<img src="outputs/figures/species-breakdown-1.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown-2" class="section level3">
+<h3>Species breakdown 2</h3>
+<p>
+<img src="outputs/figures/species-breakdown-2.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown-3" class="section level3">
+<h3>Species breakdown 3</h3>
+<p>
+<img src="outputs/figures/species-breakdown-3.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown-4" class="section level3">
+<h3>Species breakdown 4</h3>
+<p>
+<img src="outputs/figures/species-breakdown-4.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown-5" class="section level3">
+<h3>Species breakdown 5</h3>
+<p>
+<img src="outputs/figures/species-breakdown-5.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown-6" class="section level3">
+<h3>Species breakdown 6</h3>
+<p>
+<img src="outputs/figures/species-breakdown-6.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown-7" class="section level3">
+<h3>Species breakdown 7</h3>
+<p>
+<img src="outputs/figures/species-breakdown-7.png" style="max-width: 100%; height: auto;" />
+</p>
+</div>
+<div id="species-breakdown-8" class="section level3">
+<h3>Species breakdown 8</h3>
+<p>
+<img src="outputs/figures/species-breakdown-8.png" style="max-width: 100%; height: auto;" />
+</p>
 </div>
 </div>
 

@@ -2,7 +2,9 @@
 title: "Dummy Spatial Scaling Analysis: Contaminants and Isotopes"
 author: "GitHub Copilot"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    self_contained: false
 ---
 
 ## Overview
@@ -17,11 +19,21 @@ This report creates a dummy tissue dataset for sampled individuals across latitu
 In the spirit of broad spatial-scaling analyses, we compare multiple distance-decay functions (exponential, power-law, and log-linear), evaluate isolated curves per variable, and assess generality with a pooled model and null randomization.
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-set.seed(42)
-
 out_dir <- "outputs"
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+fig_dir <- file.path(out_dir, "figures")
+if (!dir.exists(fig_dir)) dir.create(fig_dir, recursive = TRUE)
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  dev = "png",
+  fig.path = paste0(fig_dir, "/")
+)
+
+set.seed(42)
 ```
 
 ## 1) Create Dummy Data
@@ -1730,6 +1742,75 @@ if (!exists("pair_real")) {
 }
 ```
 
+```{r dyadic-mixed-graphics, fig.width=12, fig.height=9, message=FALSE, warning=FALSE}
+if (exists("fit_objs") && length(fit_objs) > 0) {
+  par(mfrow = c(2, 2), mar = c(7, 4, 3, 1))
+
+  for (nm in names(fit_objs)) {
+    fit_obj <- fit_objs[[nm]]
+    cf <- as.data.frame(summary(fit_obj$model)$coefficients)
+    cf$term <- rownames(cf)
+    keep <- cf$term %in% c("log_dist", "log_time", "log_dist:log_time")
+    cf <- cf[keep, , drop = FALSE]
+    labs <- c(log_dist = "Distance", log_time = "Time lag", `log_dist:log_time` = "Distance x Time")
+    xpos <- seq_len(nrow(cf))
+    ylim_r <- range(c(cf$Estimate - 1.96 * cf$`Std. Error`, cf$Estimate + 1.96 * cf$`Std. Error`, 0))
+
+    plot(xpos, cf$Estimate,
+         ylim = ylim_r,
+         xlim = c(0.5, nrow(cf) + 0.5),
+         xaxt = "n",
+         xlab = "",
+         ylab = "Coefficient estimate",
+         main = paste(c(sim_overall = "Overall", sim_DDT = "DDT")[nm], "mixed model"),
+         pch = 19,
+         col = if (nm == "sim_overall") "darkorchid4" else "firebrick")
+    axis(1, at = xpos, labels = labs[cf$term], las = 2)
+    abline(h = 0, lty = 2, col = "grey50")
+    segments(xpos, cf$Estimate - 1.96 * cf$`Std. Error`,
+             xpos, cf$Estimate + 1.96 * cf$`Std. Error`,
+             lwd = 2,
+             col = if (nm == "sim_overall") "darkorchid4" else "firebrick")
+  }
+
+  if (exists("cv_tabs") && !is.null(cv_tabs) && nrow(cv_tabs) > 0) {
+    cv_plot <- cv_tabs[cv_tabs$held_out_area != "Mean across held-out areas", ]
+    areas <- unique(cv_plot$held_out_area)
+    responses <- unique(cv_plot$response)
+    rmse_mat <- sapply(responses, function(resp) cv_plot$RMSE[match(areas, cv_plot$held_out_area[cv_plot$response == resp])])
+    r2_mat <- sapply(responses, function(resp) cv_plot$R2_pred[match(areas, cv_plot$held_out_area[cv_plot$response == resp])])
+    if (is.null(dim(rmse_mat))) rmse_mat <- matrix(rmse_mat, ncol = 1, dimnames = list(areas, responses))
+    if (is.null(dim(r2_mat))) r2_mat <- matrix(r2_mat, ncol = 1, dimnames = list(areas, responses))
+
+    barplot(t(rmse_mat), beside = TRUE,
+            col = c("darkorchid4", "firebrick")[seq_len(ncol(rmse_mat))],
+            names.arg = areas,
+            las = 2,
+            ylab = "Blocked CV RMSE",
+            main = "Dyadic mixed model blocked CV")
+    legend("topright", bty = "n",
+           legend = c(sim_overall = "Overall", sim_DDT = "DDT")[colnames(rmse_mat)],
+           fill = c("darkorchid4", "firebrick")[seq_len(ncol(rmse_mat))])
+
+    matplot(seq_along(areas), r2_mat,
+            type = "b", pch = 19, lty = 1,
+            col = c("darkorchid4", "firebrick")[seq_len(ncol(r2_mat))],
+            xaxt = "n",
+            xlab = "Held-out area",
+            ylab = expression(R^2),
+            main = "Dyadic mixed model predictive fit")
+    axis(1, at = seq_along(areas), labels = areas, las = 2)
+    legend("topright", bty = "n",
+           legend = c(sim_overall = "Overall", sim_DDT = "DDT")[colnames(r2_mat)],
+           col = c("darkorchid4", "firebrick")[seq_len(ncol(r2_mat))],
+           lty = 1, pch = 19)
+  } else {
+    plot.new(); title("Blocked CV RMSE")
+    plot.new(); title("Blocked CV predictive fit")
+  }
+}
+```
+
 ## 15C) Trophic Covariate Extension for Transferability
 
 We do not yet have tracking-derived movement covariates in this dataset, so the
@@ -1968,6 +2049,68 @@ if (!exists("pair_real")) {
 }
 ```
 
+```{r dyadic-trophic-graphics, fig.width=12, fig.height=9, message=FALSE, warning=FALSE}
+if (exists("trophic_objs") && length(trophic_objs) > 0) {
+  par(mfrow = c(2, 2), mar = c(8, 4, 3, 1))
+
+  for (nm in names(trophic_objs)) {
+    fit_obj <- trophic_objs[[nm]]
+    cf <- fixef(fit_obj$model)
+    keep_terms <- c("log_dist", "log_time", "log_dist:log_time", "trophic_diff_n15", "habitat_diff_c13")
+    cf <- cf[names(cf) %in% keep_terms]
+    labs <- c(
+      log_dist = "Distance",
+      log_time = "Time lag",
+      `log_dist:log_time` = "Distance x Time",
+      trophic_diff_n15 = expression(Delta*delta^{15}*N),
+      habitat_diff_c13 = expression(Delta*delta^{13}*C)
+    )
+    cols <- ifelse(cf >= 0, "steelblue4", "firebrick")
+    bp <- barplot(cf,
+                  col = cols,
+                  las = 2,
+                  ylab = "Coefficient estimate",
+                  main = paste(c(sim_overall = "Overall", sim_DDT = "DDT")[nm], "trophic model"),
+                  names.arg = rep("", length(cf)))
+    axis(1, at = bp, labels = names(cf), las = 2)
+    abline(h = 0, lty = 2, col = "grey50")
+  }
+
+  if (exists("compare_cv") && !is.null(compare_cv) && nrow(compare_cv) > 0) {
+    gulf <- compare_cv[compare_cv$`Held-out area` == "Gulf of Alaska", ]
+    mean_rows <- compare_cv[compare_cv$`Held-out area` == "Mean across held-out areas", ]
+
+    plot_df <- rbind(gulf, mean_rows)
+    plot_df$group <- paste(plot_df$Response, plot_df$`Held-out area`, sep = "\n")
+    groups <- unique(plot_df$group)
+    models <- unique(plot_df$Model)
+    rmse_mat <- sapply(models, function(model) plot_df$RMSE[match(groups, plot_df$group[plot_df$Model == model])])
+    r2_mat <- sapply(models, function(model) plot_df$Predictive_R2[match(groups, plot_df$group[plot_df$Model == model])])
+    if (is.null(dim(rmse_mat))) rmse_mat <- matrix(rmse_mat, ncol = 1, dimnames = list(groups, models))
+    if (is.null(dim(r2_mat))) r2_mat <- matrix(r2_mat, ncol = 1, dimnames = list(groups, models))
+
+    barplot(t(rmse_mat), beside = TRUE,
+            col = c("grey55", "darkgreen")[seq_len(ncol(rmse_mat))],
+            names.arg = groups,
+            las = 2,
+            ylab = "RMSE",
+            main = "Baseline vs trophic model transfer RMSE")
+    legend("topright", bty = "n", fill = c("grey55", "darkgreen")[seq_len(ncol(rmse_mat))], legend = colnames(rmse_mat))
+
+    barplot(t(r2_mat), beside = TRUE,
+            col = c("grey55", "darkgreen")[seq_len(ncol(r2_mat))],
+            names.arg = groups,
+            las = 2,
+            ylab = expression(R^2),
+            main = "Baseline vs trophic model transfer predictive fit")
+    legend("topleft", bty = "n", fill = c("grey55", "darkgreen")[seq_len(ncol(r2_mat))], legend = colnames(r2_mat))
+  } else {
+    plot.new(); title("Transfer RMSE comparison")
+    plot.new(); title("Transfer predictive fit comparison")
+  }
+}
+```
+
 ## 16) Conclusion: Main Drivers of Contamination Variation
 
 ```{r conclusion-driver-values, include=FALSE}
@@ -2026,4 +2169,57 @@ If a single concise ranking is needed for this report, it is:
 2. Contaminant chemistry class (DDT vs PCB/PCP vs isotope behavior)
 3. Time (collection year / pairwise lag)
 4. Species ecological differences
+
+## 17) Graphics Gallery
+
+This appendix pulls together all graphics generated by the workflow so they can
+be reviewed in one place, including the original distance-decay plots and the
+new spatiotemporal and biodiversity-augmented mixed-model figures.
+
+```{r graphics-gallery, results='asis', echo=FALSE}
+gallery_files <- c(
+  file.path(fig_dir, "plotting-1.png"),
+  file.path(fig_dir, "generality-1.png"),
+  file.path(out_dir, "real_testcase_distance_decay_plots.png"),
+  file.path(fig_dir, "real-binned-ci-1.png"),
+  file.path(fig_dir, "real-null-slopes-1.png"),
+  file.path(fig_dir, "real-null-decay-bands-1.png"),
+  file.path(fig_dir, "fitted-curves-plot-1.png"),
+  file.path(fig_dir, "gam-spatial-1.png"),
+  file.path(fig_dir, "temporal-trend-1.png"),
+  file.path(fig_dir, "spatiotemporal-visualization-1.png"),
+  file.path(fig_dir, "dyadic-mixed-graphics-1.png"),
+  file.path(fig_dir, "dyadic-trophic-graphics-1.png")
+)
+
+species_gallery <- list.files(fig_dir, pattern = "^species-breakdown-[0-9]+\\.png$", full.names = TRUE)
+species_gallery <- species_gallery[order(species_gallery)]
+gallery_files <- c(gallery_files, species_gallery)
+gallery_files <- gallery_files[file.exists(gallery_files)]
+
+pretty_title <- function(fp) {
+  nm <- tools::file_path_sans_ext(basename(fp))
+  nm <- gsub("-1$", "", nm)
+  nm <- gsub("^plotting$", "Dummy distance-decay panels", nm)
+  nm <- gsub("^generality$", "Generality across response types", nm)
+  nm <- gsub("^real_testcase_distance_decay_plots$", "Real-data distance-decay fits", nm)
+  nm <- gsub("^real-binned-ci$", "Binned mean similarity with 95% CI", nm)
+  nm <- gsub("^real-null-slopes$", "Observed versus null slope distributions", nm)
+  nm <- gsub("^real-null-decay-bands$", "Observed versus null decay bands", nm)
+  nm <- gsub("^fitted-curves-plot$", "Functional-form comparison", nm)
+  nm <- gsub("^gam-spatial$", "GAM spatial prediction", nm)
+  nm <- gsub("^temporal-trend$", "Temporal trends", nm)
+  nm <- gsub("^spatiotemporal-visualization$", "Distance-decay by time-lag tercile", nm)
+  nm <- gsub("^dyadic-mixed-graphics$", "Dyadic mixed-model diagnostics", nm)
+  nm <- gsub("^dyadic-trophic-graphics$", "Trophic mixed-model diagnostics", nm)
+  nm <- gsub("^species-breakdown-", "Species breakdown ", nm)
+  gsub("-", " ", nm)
+}
+
+for (fp in gallery_files) {
+  cat("\n\n### ", pretty_title(fp), "\n\n", sep = "")
+  print(knitr::include_graphics(fp))
+  cat("\n")
+}
+```
 
