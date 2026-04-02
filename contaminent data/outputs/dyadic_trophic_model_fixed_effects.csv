@@ -1,0 +1,3 @@
+"response","model_type","n_pairs","beta_dist","beta_time","beta_dist_time","beta_trophic_diff","beta_habitat_diff","beta_mean_trophic","beta_mean_habitat","AIC"
+"Overall","trophic_full_dyadic",23220,-0.0228,-0.0081,6e-04,-0.0208,-0.0417,0.0093,-0.0389,-32573.7467
+"DDT","trophic_full_dyadic",23220,-0.0389,0.005,-7e-04,3e-04,5e-04,0.017,-0.0479,-9815.9458

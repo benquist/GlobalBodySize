@@ -204,6 +204,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Perform biodiversity-oriented code review and provide actionable changes for taxonomy/data QA/provenance/spatial-scaling robustness.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Inspect /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp and check GitHub update status.
+- Requested outcomes: Determine local uncommitted changes, branch upstream ahead/behind status, summarize the latest 8 commits, check for dedicated improvement-history files, and recommend concrete next steps for README biodiversity QA/features plus persistent improvement history.
+- Files reviewed: BIEN-SpeciesShinyApp/.git history; BIEN-SpeciesShinyApp/README.md; BIEN-SpeciesShinyApp/CODE_WORKFLOW_DOCUMENTATION.md; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Requested outcomes: Execute final gate checks and report blockers before returning status update.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
@@ -890,5 +896,95 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-04-01
 - Prompt summary: Run the BIEN Shiny app and get the URL.
 - Requested outcomes: Start the local Shiny app via `Rscript -e "shiny::runApp('app.R', port=3838, launch.browser=FALSE)"` and provide the access URL (http://127.0.0.1:3838). No files were created or modified.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Add new sections 11–14 to contaminent_distance_decay_analysis.Rmd: cross-species summary table, functional form comparison with fitted equations + plots, interpretation/discussion, predictive modeling with GAM, temporal trend, spatial CV, and a road-map table; then re-render the HTML.
+- Requested outcomes: Append sections 11–14 to the Rmd and regenerate contaminent_distance_decay_analysis.html via rmarkdown::render().
+- Files changed: contaminent data/contaminent_distance_decay_analysis.Rmd; contaminent data/contaminent_distance_decay_analysis.html
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Review the current contamination distance-decay and spatiotemporal workflow in contaminent_distance_decay_analysis.Rmd and provide a biodiversity-informed critique using specialist perspectives.
+- Requested outcomes: Deliver a concise executive summary, ranked top-8 implementation-ready recommendations with rationale/data/model/validation/gain fields, and a next-week action checklist with key risks and mitigations.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: While the report was running, request @m workflow review and ask what biodiversity-informed analyses could better explain contamination variation; then ask for a conclusion on main drivers of contamination variation in species.
+- Requested outcomes: Add a conclusion section to contaminent_distance_decay_analysis.Rmd, regenerate contaminent_distance_decay_analysis.html, and provide biodiversity-agent recommendations for next analyses leveraging traits, movement, trophic ecology, phylogeny, and robust validation.
+- Files changed: contaminent data/contaminent_distance_decay_analysis.Rmd; contaminent data/contaminent_distance_decay_analysis.html; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Re-run final pre-return checks for /Users/brianjenquist/VSCode after adding prompt log entry.
+- Requested outcomes: Verify prompt log coverage, successful Rmd compile status, package-build applicability, and git push status; return PASS/FAIL.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Run final pre-return checks now for /Users/brianjenquist/VSCode (verify prompt log, updated Rmd compile status, R package build applicability, and git push status).
+- Requested outcomes: Return PASS/FAIL with concise evidence for the four required checks.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: User asked where to run the new BIEN Shiny app after port 3838 was serving EvoPowerEff; launch BIEN app on a dedicated port and provide the correct URL.
+- Requested outcomes: Start BIEN app from BIEN-SpeciesShinyApp and return the working local link.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-01
+- Prompt summary: Enhance contaminent distance-decay analysis plots to show functional fits, observed vs null comparisons, mean similarity ±95% CI by distance, and species-level within-species analyses.
+- Requested outcomes: Update contaminent data/contaminent_distance_decay_analysis.Rmd with new plotting and species-breakdown sections, re-render HTML, and preserve outputs for real-data interpretation.
+- Files changed: contaminent data/contaminent_distance_decay_analysis.Rmd; contaminent data/contaminent_distance_decay_analysis.html; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Implement the requested dyadic mixed-effects spatiotemporal contamination model with blocked cross-validation in the contaminant report.
+- Requested outcomes: Add a dyadic mixed-effects section with distance-time interaction and crossed random effects for pair members/species/area, add leave-one-area-out blocked CV metrics table, regenerate contaminent_distance_decay_analysis.html, and provide biodiversity-focused interpretation of main drivers.
+- Files changed: contaminent data/contaminent_distance_decay_analysis.Rmd; contaminent data/contaminent_distance_decay_analysis.html; contaminent data/outputs/dyadic_mixed_model_fixed_effects.csv; contaminent data/outputs/dyadic_mixed_model_blocked_cv.csv; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Run the mandatory final pre-return checks for the dyadic mixed-effects contamination-model update task.
+- Requested outcomes: Verify prompt log entry presence, updated Rmd compile status, package build applicability, and git push synchronization; return PASS/FAIL.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Add one more high-impact biodiversity extension by incorporating movement or trophic covariates into the dyadic mixed model to improve Gulf-of-Alaska transfer performance, and make sure the HTML is updated.
+- Requested outcomes: Add a trophic-augmented dyadic mixed-model section using isotope-derived biodiversity proxies, compare blocked transfer performance against the baseline mixed model, regenerate contaminent_distance_decay_analysis.html with working figure assets, and save the new output tables.
+- Files changed: contaminent data/contaminent_distance_decay_analysis.Rmd; contaminent data/contaminent_distance_decay_analysis.html; contaminent data/contaminent_distance_decay_analysis_files/; contaminent data/outputs/dyadic_trophic_model_fixed_effects.csv; contaminent data/outputs/dyadic_trophic_model_blocked_cv.csv; contaminent data/outputs/dyadic_trophic_transfer_comparison.csv; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: User asked for an update after the contaminent analysis plotting enhancements (functional fits, observed-vs-null views, binned mean ±95% CI, and species-level breakdowns) were implemented and rendered.
+- Requested outcomes: Provide current status of implementation and verification, including render status and where the updated report can be viewed.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: User asked whether the contamination plotting enhancement work is done.
+- Requested outcomes: Confirm completion status after required final-gate checks, including whether the updated report rendered successfully and whether any remaining blocker is only git/push hygiene.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Run the mandatory final pre-return checks for the current contamination plotting enhancement task in /Users/brianjenquist/VSCode and return the exact required format.
+- Requested outcomes: Verify the latest prompt is logged, confirm successful render of changed Rmd files, confirm whether any updated R packages require build, and verify git push status under the strict always-agent policy for the contamination plotting enhancement task.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: User requested running the mandatory final pre-return gate and specified BIEN app (not EvoPower app), noting BIEN-SpeciesShinyApp was launched on port 3891 with listening confirmation and no source edits.
+- Requested outcomes: Verify prompt log coverage, determine Rmd compile/build applicability, verify git push status, perform minimal remediation if needed, and return concise PASS/FAIL.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Run mandatory final pre-return gate for this task after BIEN app connectivity diagnosis and restart on port 3892.
+- Requested outcomes: Verify prompt log requirement, check Rmd compile/build applicability, verify git push status, and perform minimal remediation if needed with concise PASS/FAIL.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot

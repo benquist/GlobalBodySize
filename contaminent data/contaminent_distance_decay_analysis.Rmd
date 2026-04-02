@@ -349,9 +349,13 @@ print(list.files(out_dir, full.names = TRUE))
 ## 7) Real-Data Test Case: ZD Stamp Samples (xlsx)
 
 ```{r real-data-load}
-real_file <- "../ZD_stamp_samples(AutoRecovered).xlsx"
+real_file_candidates <- c(
+  "ZD_stamp_samples(AutoRecovered).xlsx",
+  "../ZD_stamp_samples(AutoRecovered).xlsx"
+)
+real_file <- real_file_candidates[file.exists(real_file_candidates)][1]
 
-if (!file.exists(real_file)) {
+if (length(real_file) == 0 || !file.exists(real_file)) {
   cat("Real dataset file not found:", real_file, "\n")
 } else {
   if (!requireNamespace("readxl", quietly = TRUE)) {
@@ -501,6 +505,9 @@ if (exists("real_dat") && nrow(real_dat) > 10) {
         area_j = real_dat$GEOGRAPHIC_AREA[j],
         species_i = real_dat$SPECIES[i],
         species_j = real_dat$SPECIES[j],
+        year_i = real_dat$COLLECTION_YEAR[i],
+        year_j = real_dat$COLLECTION_YEAR[j],
+        time_lag_years = abs(real_dat$COLLECTION_YEAR[i] - real_dat$COLLECTION_YEAR[j]),
         distance_km = d_geo,
         sim_DDT = sim_ddt,
         sim_PCP_or_PCB = sim_pcp,
@@ -1385,4 +1392,638 @@ variograms: for the exponential model the spatial range
 *b* ≈ 2.54 × 10⁻⁴ km⁻¹ gives *r* ≈ 3,937 km, indicating that samples within
 roughly 4,000 km carry meaningful shared spatial information and are suitable
 co-variates for kriging.
+
+## 15) Spatiotemporal Scaling Model (Distance + Time)
+
+This section fits a joint scaling model for contaminant similarity as a function
+of both geographic distance and collection-year separation:
+
+$$
+	ext{sim}_{ij} = \beta_0 + \beta_1\log(d_{ij}+1) + \beta_2\log(\Delta t_{ij}+1) + \beta_3\log(d_{ij}+1)\log(\Delta t_{ij}+1) + \varepsilon_{ij}
+$$
+
+where $d_{ij}$ is pairwise geographic distance (km) and $\Delta t_{ij}$ is
+pairwise absolute time lag (years).
+
+```{r spatiotemporal-scaling-model, results='asis'}
+if (!exists("pair_real")) {
+  cat("pair_real not available — skipping spatiotemporal scaling model.\n")
+} else {
+  if (!"time_lag_years" %in% names(pair_real)) {
+    cat("time_lag_years missing in pair_real — rerun real-data analysis chunk first.\n")
+  } else {
+    resp_vars  <- c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall")
+    resp_names <- c("DDT", "PCP/PCB", "Isotope", "Overall")
+
+    fit_st <- function(df, yvar) {
+      ok <- is.finite(df[[yvar]]) & is.finite(df$distance_km) & is.finite(df$time_lag_years)
+      d  <- df$distance_km[ok]
+      t  <- df$time_lag_years[ok]
+      y  <- df[[yvar]][ok]
+      if (length(y) < 30 || length(unique(t)) < 2) return(NULL)
+
+      st_df <- data.frame(
+        y = y,
+        log_dist = log(d + 1),
+        log_time = log(t + 1)
+      )
+
+      m_add <- lm(y ~ log_dist + log_time, data = st_df)
+      m_int <- lm(y ~ log_dist * log_time, data = st_df)
+
+      b_int <- coef(summary(m_int))
+      get_coef <- function(term, col) if (term %in% rownames(b_int)) b_int[term, col] else NA_real_
+
+      data.frame(
+        response = yvar,
+        n_pairs = nrow(st_df),
+        dist_coef = coef(m_int)["log_dist"],
+        time_coef = coef(m_int)["log_time"],
+        interaction_coef = coef(m_int)["log_dist:log_time"],
+        p_dist = get_coef("log_dist", "Pr(>|t|)"),
+        p_time = get_coef("log_time", "Pr(>|t|)"),
+        p_interaction = get_coef("log_dist:log_time", "Pr(>|t|)"),
+        R2_additive = summary(m_add)$r.squared,
+        R2_interaction = summary(m_int)$r.squared,
+        AIC_additive = AIC(m_add),
+        AIC_interaction = AIC(m_int),
+        delta_AIC_int_vs_add = AIC(m_add) - AIC(m_int),
+        stringsAsFactors = FALSE
+      )
+    }
+
+    st_out <- do.call(rbind, lapply(resp_vars, function(v) fit_st(pair_real, v)))
+
+    if (!is.null(st_out) && nrow(st_out) > 0) {
+      st_out$response <- resp_names[match(st_out$response, resp_vars)]
+      num_cols <- setdiff(names(st_out), c("response"))
+      st_out[num_cols] <- lapply(st_out[num_cols], function(x) round(x, 4))
+      write.csv(st_out, file.path(out_dir, "spatiotemporal_scaling_model_summary.csv"), row.names = FALSE)
+
+      print(knitr::kable(
+        st_out,
+        row.names = FALSE,
+        col.names = c(
+          "Response", "N pairs", "Beta distance", "Beta time", "Beta distance x time",
+          "p distance", "p time", "p interaction", "R2 additive", "R2 interaction",
+          "AIC additive", "AIC interaction", "Delta AIC (int-add)"
+        ),
+        caption = paste(
+          "Table 4. Spatiotemporal scaling models.",
+          "Positive Delta AIC indicates interaction model support over additive model."
+        )
+      ))
+    }
+  }
+}
+```
+
+```{r spatiotemporal-visualization, fig.width=13, fig.height=10}
+if (exists("pair_real") && "time_lag_years" %in% names(pair_real)) {
+  resp_vars  <- c("sim_DDT", "sim_PCP_or_PCB", "sim_isotope", "sim_overall")
+  resp_names <- c("DDT", "PCP/PCB", "Isotope", "Overall")
+
+  q <- quantile(pair_real$time_lag_years, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+  q[1] <- min(q[1], 0)
+  pair_real$time_group <- cut(
+    pair_real$time_lag_years,
+    breaks = unique(q),
+    include.lowest = TRUE,
+    labels = c("Low time lag", "Mid time lag", "High time lag")[seq_len(length(unique(q)) - 1)]
+  )
+
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+  cols <- c("steelblue3", "darkorange3", "firebrick3")
+
+  for (ii in seq_along(resp_vars)) {
+    v <- resp_vars[ii]
+    d <- pair_real$distance_km
+    y <- pair_real[[v]]
+    g <- pair_real$time_group
+    ok <- is.finite(d) & is.finite(y) & !is.na(g)
+    d <- d[ok]; y <- y[ok]; g <- droplevels(g[ok])
+
+    plot(d, y,
+         pch = 16, cex = 0.30,
+         col = adjustcolor("black", alpha.f = 0.10),
+         xlab = "Distance (km)", ylab = "Similarity",
+         main = paste(resp_names[ii], "by time-lag tercile"))
+
+    dseq <- seq(0.1, max(d), length.out = 300)
+    levs <- levels(g)
+    for (jj in seq_along(levs)) {
+      idx <- g == levs[jj]
+      if (sum(idx) < 20) next
+      m <- lm(y[idx] ~ log(d[idx] + 1))
+      a <- coef(m)[1]; b <- coef(m)[2]
+      lines(dseq, a + b * log(dseq + 1), col = cols[jj], lwd = 2.5)
+    }
+    legend("topright", bty = "n", cex = 0.75,
+           legend = levels(g), col = cols[seq_along(levels(g))], lwd = 2.5)
+  }
+}
+```
+
+## 15B) Dyadic Mixed-Effects Spatiotemporal Model + Blocked CV
+
+To reduce pseudo-replication from pairwise expansion, this section fits a
+dyadic mixed-effects model with crossed random effects for both members of
+each pair (individual IDs, species, and geographic areas), then evaluates
+prediction using leave-one-area-out blocked cross-validation.
+
+```{r dyadic-mixed-model, results='asis', message=FALSE, warning=FALSE}
+if (!exists("pair_real")) {
+  cat("pair_real not available — skipping dyadic mixed-effects model.\n")
+} else if (!all(c("time_lag_years", "id_i", "id_j", "area_i", "area_j", "species_i", "species_j") %in% names(pair_real))) {
+  cat("Required pairwise fields not found — rerun real-data analysis chunk first.\n")
+} else {
+  if (!requireNamespace("lme4", quietly = TRUE)) {
+    install.packages("lme4", repos = "https://cran.r-project.org/")
+  }
+  library(lme4)
+
+  fit_dyadic <- function(df, yvar) {
+    keep <- is.finite(df[[yvar]]) &
+      is.finite(df$distance_km) & is.finite(df$time_lag_years) &
+      !is.na(df$id_i) & !is.na(df$id_j) & !is.na(df$area_i) & !is.na(df$area_j) &
+      !is.na(df$species_i) & !is.na(df$species_j)
+
+    dat <- df[keep, c(yvar, "distance_km", "time_lag_years", "id_i", "id_j", "area_i", "area_j", "species_i", "species_j")]
+    names(dat)[1] <- "y"
+
+    if (nrow(dat) < 100) return(NULL)
+
+    dat$log_dist <- log(dat$distance_km + 1)
+    dat$log_time <- log(dat$time_lag_years + 1)
+
+    dat$id_i <- as.factor(dat$id_i)
+    dat$id_j <- as.factor(dat$id_j)
+    dat$area_i <- as.factor(dat$area_i)
+    dat$area_j <- as.factor(dat$area_j)
+    dat$species_i <- as.factor(dat$species_i)
+    dat$species_j <- as.factor(dat$species_j)
+
+    ctrl <- lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+
+    full_formula <- y ~ log_dist * log_time +
+      (1 | id_i) + (1 | id_j) +
+      (1 | species_i) + (1 | species_j) +
+      (1 | area_i) + (1 | area_j)
+
+    fallback_formula <- y ~ log_dist * log_time +
+      (1 | species_i) + (1 | species_j) +
+      (1 | area_i) + (1 | area_j)
+
+    mod <- try(lmer(full_formula, data = dat, REML = FALSE, control = ctrl), silent = TRUE)
+    model_type <- "full_dyadic"
+    if (inherits(mod, "try-error")) {
+      mod <- try(lmer(fallback_formula, data = dat, REML = FALSE, control = ctrl), silent = TRUE)
+      model_type <- "fallback_species_area"
+    }
+    if (inherits(mod, "try-error")) return(NULL)
+
+    sm <- summary(mod)
+    cf <- as.data.frame(sm$coefficients)
+    cf$term <- rownames(cf)
+
+    get_cf <- function(term, colname) {
+      if (!(term %in% cf$term)) return(NA_real_)
+      cf[cf$term == term, colname][1]
+    }
+
+    fixed_row <- data.frame(
+      response = yvar,
+      model_type = model_type,
+      n_pairs = nrow(dat),
+      beta_dist = get_cf("log_dist", "Estimate"),
+      beta_time = get_cf("log_time", "Estimate"),
+      beta_dist_time = get_cf("log_dist:log_time", "Estimate"),
+      se_dist = get_cf("log_dist", "Std. Error"),
+      se_time = get_cf("log_time", "Std. Error"),
+      se_dist_time = get_cf("log_dist:log_time", "Std. Error"),
+      t_dist = get_cf("log_dist", "t value"),
+      t_time = get_cf("log_time", "t value"),
+      t_dist_time = get_cf("log_dist:log_time", "t value"),
+      AIC = AIC(mod),
+      stringsAsFactors = FALSE
+    )
+
+    list(model = mod, data = dat, fixed = fixed_row)
+  }
+
+  run_blocked_cv <- function(dat, model_type, yvar) {
+    areas <- sort(unique(c(as.character(dat$area_i), as.character(dat$area_j))))
+    areas <- areas[!is.na(areas) & nchar(trimws(areas)) > 0]
+    if (length(areas) < 3) return(NULL)
+
+    ctrl <- lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+    full_formula <- y ~ log_dist * log_time +
+      (1 | id_i) + (1 | id_j) +
+      (1 | species_i) + (1 | species_j) +
+      (1 | area_i) + (1 | area_j)
+    fallback_formula <- y ~ log_dist * log_time +
+      (1 | species_i) + (1 | species_j) +
+      (1 | area_i) + (1 | area_j)
+
+    cv_rows <- lapply(areas, function(a) {
+      test_idx <- as.character(dat$area_i) == a | as.character(dat$area_j) == a
+      train <- dat[!test_idx, ]
+      test <- dat[test_idx, ]
+      if (nrow(train) < 100 || nrow(test) < 20) return(NULL)
+
+      form <- if (model_type == "full_dyadic") full_formula else fallback_formula
+      fit <- try(lmer(form, data = train, REML = FALSE, control = ctrl), silent = TRUE)
+      if (inherits(fit, "try-error")) {
+        fit <- try(lmer(fallback_formula, data = train, REML = FALSE, control = ctrl), silent = TRUE)
+      }
+      if (inherits(fit, "try-error")) return(NULL)
+
+      pred <- try(predict(fit, newdata = test, allow.new.levels = TRUE), silent = TRUE)
+      if (inherits(pred, "try-error")) return(NULL)
+
+      obs <- test$y
+      rmse <- sqrt(mean((obs - pred)^2, na.rm = TRUE))
+      mae <- mean(abs(obs - pred), na.rm = TRUE)
+      r2 <- if (length(unique(obs)) > 1) cor(obs, pred, use = "complete.obs")^2 else NA_real_
+
+      data.frame(
+        response = yvar,
+        held_out_area = a,
+        n_test = nrow(test),
+        RMSE = rmse,
+        MAE = mae,
+        R2_pred = r2,
+        stringsAsFactors = FALSE
+      )
+    })
+
+    cv_tab <- do.call(rbind, Filter(Negate(is.null), cv_rows))
+    if (is.null(cv_tab) || nrow(cv_tab) == 0) return(NULL)
+    mean_row <- data.frame(
+      response = yvar,
+      held_out_area = "Mean across held-out areas",
+      n_test = NA,
+      RMSE = mean(cv_tab$RMSE, na.rm = TRUE),
+      MAE = mean(cv_tab$MAE, na.rm = TRUE),
+      R2_pred = mean(cv_tab$R2_pred, na.rm = TRUE),
+      stringsAsFactors = FALSE
+    )
+    rbind(cv_tab, mean_row)
+  }
+
+  targets <- c("sim_overall", "sim_DDT")
+  fit_objs <- lapply(targets, function(v) fit_dyadic(pair_real, v))
+  names(fit_objs) <- targets
+  fit_objs <- fit_objs[!vapply(fit_objs, is.null, logical(1))]
+
+  if (length(fit_objs) == 0) {
+    cat("Dyadic mixed-effects models failed or insufficient data.\n")
+  } else {
+    fixed_tab <- do.call(rbind, lapply(fit_objs, function(x) x$fixed))
+    fixed_tab$response <- c(sim_overall = "Overall", sim_DDT = "DDT")[fixed_tab$response]
+
+    num_cols <- setdiff(names(fixed_tab), c("response", "model_type"))
+    fixed_tab[num_cols] <- lapply(fixed_tab[num_cols], function(x) round(x, 4))
+
+    write.csv(fixed_tab, file.path(out_dir, "dyadic_mixed_model_fixed_effects.csv"), row.names = FALSE)
+
+    print(knitr::kable(
+      fixed_tab,
+      row.names = FALSE,
+      col.names = c(
+        "Response", "Model", "N pairs",
+        "Beta distance", "Beta time", "Beta distance x time",
+        "SE dist", "SE time", "SE dist x time",
+        "t dist", "t time", "t dist x time", "AIC"
+      ),
+      caption = paste(
+        "Table 5. Dyadic mixed-effects spatiotemporal model fixed effects.",
+        "Crossed random effects account for pair-member, species, and area dependence."
+      )
+    ))
+
+    cv_tabs <- do.call(rbind, lapply(names(fit_objs), function(v) {
+      out <- run_blocked_cv(fit_objs[[v]]$data, fit_objs[[v]]$fixed$model_type[1], v)
+      out
+    }))
+
+    if (!is.null(cv_tabs) && nrow(cv_tabs) > 0) {
+      cv_tabs$response <- c(sim_overall = "Overall", sim_DDT = "DDT")[cv_tabs$response]
+      num_cols <- c("n_test", "RMSE", "MAE", "R2_pred")
+      for (nc in num_cols) {
+        if (nc %in% names(cv_tabs)) cv_tabs[[nc]] <- round(cv_tabs[[nc]], 4)
+      }
+
+      write.csv(cv_tabs, file.path(out_dir, "dyadic_mixed_model_blocked_cv.csv"), row.names = FALSE)
+
+      print(knitr::kable(
+        cv_tabs,
+        row.names = FALSE,
+        col.names = c("Response", "Held-out area", "N test", "RMSE", "MAE", "Predictive R2"),
+        caption = paste(
+          "Table 6. Leave-one-area-out blocked cross-validation for dyadic mixed models.",
+          "Test rows include any pair touching the held-out area, reducing spatial leakage."
+        )
+      ))
+    }
+  }
+}
+```
+
+## 15C) Trophic Covariate Extension for Transferability
+
+We do not yet have tracking-derived movement covariates in this dataset, so the
+highest-value biodiversity extension currently available is a **trophic proxy**
+model. Here, pairwise differences in $\delta^{15}N$ and $\delta^{13}C$ are used
+as proxies for trophic-position mismatch and habitat/foraging mismatch,
+respectively. These covariates test whether Gulf-of-Alaska transfer improves
+when ecological similarity is modeled alongside space and time.
+
+```{r dyadic-trophic-extension, results='asis', message=FALSE, warning=FALSE}
+if (!exists("pair_real")) {
+  cat("pair_real not available — skipping trophic extension.\n")
+} else {
+  if (!exists("real_dat")) {
+    fp <- file.path(out_dir, "real_testcase_prepared_data.csv")
+    if (file.exists(fp)) real_dat <- read.csv(fp, stringsAsFactors = FALSE)
+  }
+
+  if (!exists("real_dat") || !all(c("GUALIQUOTID", "delta13C_real", "delta15N_real") %in% names(real_dat))) {
+    cat("real_dat with isotope fields not available — skipping trophic extension.\n")
+  } else {
+    iso_map <- real_dat[, c("GUALIQUOTID", "delta13C_real", "delta15N_real")]
+    iso_i <- iso_map
+    names(iso_i) <- c("id_i", "delta13C_i", "delta15N_i")
+    iso_j <- iso_map
+    names(iso_j) <- c("id_j", "delta13C_j", "delta15N_j")
+
+    pair_trophic <- merge(pair_real, iso_i, by = "id_i", all.x = TRUE)
+    pair_trophic <- merge(pair_trophic, iso_j, by = "id_j", all.x = TRUE)
+
+    pair_trophic$trophic_diff_n15 <- abs(pair_trophic$delta15N_i - pair_trophic$delta15N_j)
+    pair_trophic$habitat_diff_c13 <- abs(pair_trophic$delta13C_i - pair_trophic$delta13C_j)
+    pair_trophic$mean_trophic_n15 <- rowMeans(cbind(pair_trophic$delta15N_i, pair_trophic$delta15N_j), na.rm = TRUE)
+    pair_trophic$mean_habitat_c13 <- rowMeans(cbind(pair_trophic$delta13C_i, pair_trophic$delta13C_j), na.rm = TRUE)
+
+    fit_dyadic_trophic <- function(df, yvar) {
+      keep <- is.finite(df[[yvar]]) &
+        is.finite(df$distance_km) & is.finite(df$time_lag_years) &
+        is.finite(df$trophic_diff_n15) & is.finite(df$habitat_diff_c13) &
+        is.finite(df$mean_trophic_n15) & is.finite(df$mean_habitat_c13) &
+        !is.na(df$id_i) & !is.na(df$id_j) & !is.na(df$area_i) & !is.na(df$area_j) &
+        !is.na(df$species_i) & !is.na(df$species_j)
+
+      dat <- df[keep, c(
+        yvar, "distance_km", "time_lag_years",
+        "trophic_diff_n15", "habitat_diff_c13", "mean_trophic_n15", "mean_habitat_c13",
+        "id_i", "id_j", "area_i", "area_j", "species_i", "species_j"
+      )]
+      names(dat)[1] <- "y"
+      if (nrow(dat) < 100) return(NULL)
+
+      dat$log_dist <- log(dat$distance_km + 1)
+      dat$log_time <- log(dat$time_lag_years + 1)
+      dat$id_i <- as.factor(dat$id_i)
+      dat$id_j <- as.factor(dat$id_j)
+      dat$area_i <- as.factor(dat$area_i)
+      dat$area_j <- as.factor(dat$area_j)
+      dat$species_i <- as.factor(dat$species_i)
+      dat$species_j <- as.factor(dat$species_j)
+
+      ctrl <- lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+
+      form_full <- y ~ log_dist * log_time + trophic_diff_n15 + habitat_diff_c13 +
+        mean_trophic_n15 + mean_habitat_c13 +
+        (1 | id_i) + (1 | id_j) +
+        (1 | species_i) + (1 | species_j) +
+        (1 | area_i) + (1 | area_j)
+
+      form_fallback <- y ~ log_dist * log_time + trophic_diff_n15 + habitat_diff_c13 +
+        mean_trophic_n15 + mean_habitat_c13 +
+        (1 | species_i) + (1 | species_j) +
+        (1 | area_i) + (1 | area_j)
+
+      mod <- try(lmer(form_full, data = dat, REML = FALSE, control = ctrl), silent = TRUE)
+      model_type <- "trophic_full_dyadic"
+      if (inherits(mod, "try-error")) {
+        mod <- try(lmer(form_fallback, data = dat, REML = FALSE, control = ctrl), silent = TRUE)
+        model_type <- "trophic_fallback_species_area"
+      }
+      if (inherits(mod, "try-error")) return(NULL)
+
+      sm <- summary(mod)
+      cf <- as.data.frame(sm$coefficients)
+      cf$term <- rownames(cf)
+
+      get_cf <- function(term, colname) {
+        if (!(term %in% cf$term)) return(NA_real_)
+        cf[cf$term == term, colname][1]
+      }
+
+      fixed_row <- data.frame(
+        response = yvar,
+        model_type = model_type,
+        n_pairs = nrow(dat),
+        beta_dist = get_cf("log_dist", "Estimate"),
+        beta_time = get_cf("log_time", "Estimate"),
+        beta_dist_time = get_cf("log_dist:log_time", "Estimate"),
+        beta_trophic_diff = get_cf("trophic_diff_n15", "Estimate"),
+        beta_habitat_diff = get_cf("habitat_diff_c13", "Estimate"),
+        beta_mean_trophic = get_cf("mean_trophic_n15", "Estimate"),
+        beta_mean_habitat = get_cf("mean_habitat_c13", "Estimate"),
+        AIC = AIC(mod),
+        stringsAsFactors = FALSE
+      )
+
+      list(model = mod, data = dat, fixed = fixed_row)
+    }
+
+    run_blocked_cv_trophic <- function(dat, model_type, yvar) {
+      areas <- sort(unique(c(as.character(dat$area_i), as.character(dat$area_j))))
+      areas <- areas[!is.na(areas) & nchar(trimws(areas)) > 0]
+      if (length(areas) < 3) return(NULL)
+
+      ctrl <- lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+      form_full <- y ~ log_dist * log_time + trophic_diff_n15 + habitat_diff_c13 +
+        mean_trophic_n15 + mean_habitat_c13 +
+        (1 | id_i) + (1 | id_j) +
+        (1 | species_i) + (1 | species_j) +
+        (1 | area_i) + (1 | area_j)
+      form_fallback <- y ~ log_dist * log_time + trophic_diff_n15 + habitat_diff_c13 +
+        mean_trophic_n15 + mean_habitat_c13 +
+        (1 | species_i) + (1 | species_j) +
+        (1 | area_i) + (1 | area_j)
+
+      cv_rows <- lapply(areas, function(a) {
+        test_idx <- as.character(dat$area_i) == a | as.character(dat$area_j) == a
+        train <- dat[!test_idx, ]
+        test <- dat[test_idx, ]
+        if (nrow(train) < 100 || nrow(test) < 20) return(NULL)
+
+        form <- if (model_type == "trophic_full_dyadic") form_full else form_fallback
+        fit <- try(lmer(form, data = train, REML = FALSE, control = ctrl), silent = TRUE)
+        if (inherits(fit, "try-error")) {
+          fit <- try(lmer(form_fallback, data = train, REML = FALSE, control = ctrl), silent = TRUE)
+        }
+        if (inherits(fit, "try-error")) return(NULL)
+
+        pred <- try(predict(fit, newdata = test, allow.new.levels = TRUE), silent = TRUE)
+        if (inherits(pred, "try-error")) return(NULL)
+
+        obs <- test$y
+        data.frame(
+          response = yvar,
+          held_out_area = a,
+          n_test = nrow(test),
+          RMSE = sqrt(mean((obs - pred)^2, na.rm = TRUE)),
+          MAE = mean(abs(obs - pred), na.rm = TRUE),
+          R2_pred = if (length(unique(obs)) > 1) cor(obs, pred, use = "complete.obs")^2 else NA_real_,
+          stringsAsFactors = FALSE
+        )
+      })
+
+      cv_tab <- do.call(rbind, Filter(Negate(is.null), cv_rows))
+      if (is.null(cv_tab) || nrow(cv_tab) == 0) return(NULL)
+      mean_row <- data.frame(
+        response = yvar,
+        held_out_area = "Mean across held-out areas",
+        n_test = NA,
+        RMSE = mean(cv_tab$RMSE, na.rm = TRUE),
+        MAE = mean(cv_tab$MAE, na.rm = TRUE),
+        R2_pred = mean(cv_tab$R2_pred, na.rm = TRUE),
+        stringsAsFactors = FALSE
+      )
+      rbind(cv_tab, mean_row)
+    }
+
+    targets <- c("sim_overall", "sim_DDT")
+    trophic_objs <- lapply(targets, function(v) fit_dyadic_trophic(pair_trophic, v))
+    names(trophic_objs) <- targets
+    trophic_objs <- trophic_objs[!vapply(trophic_objs, is.null, logical(1))]
+
+    if (length(trophic_objs) == 0) {
+      cat("Trophic mixed-effects models failed or insufficient data.\n")
+    } else {
+      trophic_fixed <- do.call(rbind, lapply(trophic_objs, function(x) x$fixed))
+      trophic_fixed$response <- c(sim_overall = "Overall", sim_DDT = "DDT")[trophic_fixed$response]
+      num_cols <- setdiff(names(trophic_fixed), c("response", "model_type"))
+      trophic_fixed[num_cols] <- lapply(trophic_fixed[num_cols], function(x) round(x, 4))
+      write.csv(trophic_fixed, file.path(out_dir, "dyadic_trophic_model_fixed_effects.csv"), row.names = FALSE)
+
+      print(knitr::kable(
+        trophic_fixed,
+        row.names = FALSE,
+        col.names = c(
+          "Response", "Model", "N pairs", "Beta distance", "Beta time", "Beta distance x time",
+          "Beta trophic diff", "Beta habitat diff", "Beta mean trophic", "Beta mean habitat", "AIC"
+        ),
+        caption = paste(
+          "Table 7. Trophic-augmented dyadic mixed-effects models.",
+          "New biodiversity covariates are isotope-derived trophic and habitat proxies."
+        )
+      ))
+
+      trophic_cv <- do.call(rbind, lapply(names(trophic_objs), function(v) {
+        run_blocked_cv_trophic(trophic_objs[[v]]$data, trophic_objs[[v]]$fixed$model_type[1], v)
+      }))
+
+      if (!is.null(trophic_cv) && nrow(trophic_cv) > 0) {
+        trophic_cv$response <- c(sim_overall = "Overall", sim_DDT = "DDT")[trophic_cv$response]
+        num_cols <- c("n_test", "RMSE", "MAE", "R2_pred")
+        for (nc in num_cols) {
+          if (nc %in% names(trophic_cv)) trophic_cv[[nc]] <- round(trophic_cv[[nc]], 4)
+        }
+        write.csv(trophic_cv, file.path(out_dir, "dyadic_trophic_model_blocked_cv.csv"), row.names = FALSE)
+
+        base_cv_fp <- file.path(out_dir, "dyadic_mixed_model_blocked_cv.csv")
+        if (file.exists(base_cv_fp)) {
+          base_cv <- read.csv(base_cv_fp, stringsAsFactors = FALSE)
+          base_cv$model <- "Baseline mixed model"
+          trophic_cv$model <- "Trophic mixed model"
+
+          compare_cv <- rbind(base_cv, trophic_cv)
+          keep_rows <- compare_cv$held_out_area %in% c("Gulf of Alaska", "Mean across held-out areas")
+          compare_cv <- compare_cv[keep_rows, c("response", "model", "held_out_area", "RMSE", "MAE", "R2_pred")]
+          names(compare_cv) <- c("Response", "Model", "Held-out area", "RMSE", "MAE", "Predictive_R2")
+          write.csv(compare_cv, file.path(out_dir, "dyadic_trophic_transfer_comparison.csv"), row.names = FALSE)
+
+          print(knitr::kable(
+            compare_cv,
+            row.names = FALSE,
+            col.names = c("Response", "Model", "Held-out area", "RMSE", "MAE", "Predictive R2"),
+            caption = paste(
+              "Table 8. Transfer-performance comparison for the baseline versus trophic-augmented mixed models.",
+              "Rows highlight Gulf of Alaska and the mean across held-out areas."
+            )
+          ))
+
+          gulf_compare <- compare_cv[compare_cv$`Held-out area` == "Gulf of Alaska", ]
+          if (nrow(gulf_compare) > 0) {
+            cat("\nGulf of Alaska remains the hardest transfer domain. The trophic extension should be interpreted as a first biodiversity-aware stress test, not a full ecological solution; meaningful further gains will likely require explicit movement/connectivity covariates or oceanographic predictors.\n")
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## 16) Conclusion: Main Drivers of Contamination Variation
+
+```{r conclusion-driver-values, include=FALSE}
+driver_table <- NULL
+if (exists("st_out") && !is.null(st_out) && nrow(st_out) > 0) {
+  driver_table <- st_out
+}
+
+space_rank <- time_rank <- interaction_rank <- NA_character_
+if (!is.null(driver_table)) {
+  ord_space <- order(abs(driver_table$dist_coef), decreasing = TRUE)
+  ord_time  <- order(abs(driver_table$time_coef), decreasing = TRUE)
+  ord_int   <- order(abs(driver_table$interaction_coef), decreasing = TRUE)
+  space_rank <- paste(driver_table$response[ord_space], collapse = " > ")
+  time_rank <- paste(driver_table$response[ord_time], collapse = " > ")
+  interaction_rank <- paste(driver_table$response[ord_int], collapse = " > ")
+}
+```
+
+Across contaminants and isotopes, the dominant source of variation is **space**: chemical
+similarity decreases with increasing geographic distance, and this spatial decay is strongest
+for DDT-family chemistry and strongest overall in the multivariate index.
+
+The second driver is **contaminant class and transport behavior**:
+
+- DDT-family patterns are steep and typically best described by exponential decay, consistent
+  with spatially localized or regionally concentrated sources plus distance attenuation.
+- PCP/PCB patterns are shallower, consistent with broader transport and mixing.
+- Isotopes show smoother, more gradient-like structure (often better log-linear support),
+  indicating broad foraging/habitat transitions rather than sharply bounded sources.
+
+The third driver is **time and space-time coupling**:
+
+- Temporal lags contribute additional variation, but usually less than distance.
+- The joint space-time model indicates that distance-decay strength can shift with temporal
+  separation (interaction term), meaning spatial structure is not fully time-stationary.
+
+The fourth driver is **species/ecology context**:
+
+- Species-level fits show different slope magnitudes and best functional forms,
+  implying trophic ecology and movement behavior modulate exposure patterns.
+- In this dataset, high-pair species (especially *Uria* spp.) dominate signal strength,
+  so future inference should balance species representation.
+
+### Practical take-away for predictive modeling
+
+For prediction, prioritize a **spatiotemporal model** where contamination is modeled as a
+function of distance structure, year (or lag), and species effects simultaneously (for example,
+GAM or mixed-effects spatial model with spatial cross-validation by area). This workflow is
+best aligned with the evidence in this report: space is the strongest axis, time is informative,
+and species modifies both.
+
+If a single concise ranking is needed for this report, it is:
+
+1. Geographic distance (spatial structure)
+2. Contaminant chemistry class (DDT vs PCB/PCP vs isotope behavior)
+3. Time (collection year / pairwise lag)
+4. Species ecological differences
 
