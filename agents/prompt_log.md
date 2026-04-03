@@ -190,6 +190,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-02
+- Prompt summary: Review methods framework in contaminent_distance_decay_analysis.Rmd with focus on Sections 15B, 15C, and 16; provide biodiversity-agent style critique and concrete method edits.
+- Requested outcomes: Severity-ordered findings; specific text additions/edits; cautions on isotope proxy interpretation for trophic effects; citation improvements; quick wins without full pipeline changes.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-30
 - Prompt summary: User confirms completion ("Done") and expects body-mass repository creation/push to proceed.
 - Requested outcomes: Verify GitHub auth and nested project state, then create and push the plant body-mass scaling GitHub repository if possible.
@@ -242,6 +248,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: User asked whether dummy data and dummy data results are available in an R Markdown report for the contaminent data project.
 - Requested outcomes: Create/render an R Markdown analysis with generated dummy data, pairwise distance-similarity results, distance-decay model fits, null-model comparison, and shareable output files.
 - Files changed: agents/prompt_log.md; contaminent data/contaminent_distance_decay_analysis.Rmd; contaminent data/contaminent_distance_decay_analysis.html; contaminent data/outputs/dummy_tissue_data.csv; contaminent data/outputs/pairwise_distance_similarity.csv; contaminent data/outputs/distance_decay_model_summary.csv; contaminent data/outputs/null_model_slope_comparison.csv
+
+- Date: 2026-04-02
+- Prompt summary: User asks how to host a new BIEN Shiny app subproject on a website, including whether GitHub or WordPress can host it.
+- Requested outcomes: Explain viable hosting options for a Shiny app, clarify GitHub vs WordPress limitations, and recommend a practical deployment path for the BIEN app.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-01
@@ -311,6 +323,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-01
+- Prompt summary: "Run the mandatory final pre-return check for the latest user prompt."
+- Requested outcomes: Verify PASS/FAIL for prompt log, Rmd compile, package build, and git push.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: "what is the status?"
+- Requested outcomes: Provide current project status for the contamination distance-decay workflow.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
 - Prompt summary: "Run the mandatory final pre-return check for the latest user prompt."
 - Requested outcomes: Verify PASS/FAIL for prompt log, Rmd compile, package build, and git push.
 - Files changed: agents/prompt_log.md
@@ -998,5 +1022,23 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-04-02
 - Prompt summary: Run mandatory final pre-return gate for this task after BIEN app connectivity diagnosis and restart on port 3892.
 - Requested outcomes: Verify prompt log requirement, check Rmd compile/build applicability, verify git push status, and perform minimal remediation if needed with concise PASS/FAIL.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2025-05-30
+- Prompt summary: User confirmed GitHub repo for contamination work is https://github.com/benquist/ScalingContamination.git; push contamination analyses there.
+- Requested outcomes: Add 'contamination' git remote pointing to ScalingContamination.git and push master branch.
+- Files changed: N/A (git remote + push only)
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Expand scientific writeup with conclusion plus detailed methods tied to explicit hypothesis tests, emphasizing null models and scale; add trophic-entry statements, undergraduate dyadic-model explanation, citations, and biodiversity-agent review suggestions.
+- Requested outcomes: Update contaminant Rmd narrative and visuals to explain method entry of distance/time/species/trophic effects; include method references and @m biodiversity review recommendations.
+- Files changed: contaminent data/contaminent_distance_decay_analysis.Rmd
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Run final mandatory pre-return checks for workspace /Users/brianjenquist/VSCode for contamination report updates completed in this turn.
+- Requested outcomes: Verify prompt-log entry presence, confirm updated contamination Rmd compile success, confirm R package build status (or N/A if none changed), and confirm git push status with concise PASS/FAIL and missing items.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot

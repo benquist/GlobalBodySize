@@ -3025,7 +3025,9 @@ is a <strong>trophic proxy</strong> model. Here, pairwise differences in
 class="math inline">\(\delta^{13}C\)</span> are used as proxies for
 trophic-position mismatch and habitat/foraging mismatch, respectively.
 These covariates test whether Gulf-of-Alaska transfer improves when
-ecological similarity is modeled alongside space and time.</p>
+ecological similarity is modeled alongside space and time. All
+trophic/habitat isotope covariates are interpreted as transfer-oriented
+ecological similarity indices under a baseline-stability assumption.</p>
 <pre class="r"><code>if (!exists(&quot;pair_real&quot;)) {
   cat(&quot;pair_real not available — skipping trophic extension.\n&quot;)
 } else {
@@ -3468,9 +3470,316 @@ oceanographic predictors.</p>
 }</code></pre>
 <p><img src="outputs/figures/dyadic-trophic-graphics-1.png" width="1152" /></p>
 </div>
+<div id="detailed-methods-and-hypothesis-testing-framework"
+class="section level2">
+<h2>16) Detailed Methods and Hypothesis-Testing Framework</h2>
+<p>This section formalizes the analytical strategy as a scale-aware
+hypothesis-testing workflow. The goal is not only to estimate
+distance-decay, but to test whether observed patterns exceed what would
+be expected under ecologically informed null structure.</p>
+<div id="a.-core-inferential-setup" class="section level3">
+<h3>16A. Core inferential setup</h3>
+<p>The analysis is built around pairwise comparisons among samples. For
+each pair, we quantify:</p>
+<ul>
+<li>geographic separation (km),</li>
+<li>contaminant similarity (DDT family; PCP/PCB family),</li>
+<li>isotope similarity (delta13C and delta15N structure), and</li>
+<li>multivariate overall similarity.</li>
+</ul>
+<p>This pairwise framing makes scale explicit because each observation
+is a contrast across space (and later time), not a single-site
+value.</p>
+</div>
+<div id="b.-hypotheses-and-matched-tests" class="section level3">
+<h3>16B. Hypotheses and matched tests</h3>
+<p>The workflow tests the following hypotheses.</p>
+<ol style="list-style-type: decimal">
+<li><p><strong>H1: Spatial decay exists for each response</strong>.
+Test: fit exponential, power-law, and log-linear distance-decay
+functions to each response and evaluate slope direction, fit quality,
+and AIC support.</p></li>
+<li><p><strong>H2: Observed decay is stronger than expected under
+structured randomness</strong>. Test: permutation null models comparing
+observed log-distance slopes to null slope distributions (p_lower and
+p_upper). This is the principal significance test for distance
+structure.</p></li>
+<li><p><strong>H3: Decay form differs by contaminant class</strong>.
+Test: compare functional-form rankings and parameter values among
+DDT-family, PCP/PCB-family, isotope, and overall similarity
+responses.</p></li>
+<li><p><strong>H4: Distance-decay is not species-invariant</strong>.
+Test: species-level model fits and slope summaries, followed by
+cross-species synthesis table of best models and decay
+strength.</p></li>
+<li><p><strong>H5: Time contributes independent structure beyond
+distance</strong>. Test: spatiotemporal scaling models including
+distance, temporal lag, and distance-by-time interaction terms.</p></li>
+<li><p><strong>H6: Hierarchical dependence matters for inference and
+prediction</strong>. Test: dyadic mixed-effects models with crossed
+random effects for individuals, species, and areas, preventing
+pseudoreplication from pairwise data reuse.</p></li>
+<li><p><strong>H7: Biodiversity-relevant trophic structure improves
+transferability</strong>. Test: extension of dyadic mixed models with
+trophic and habitat isotope covariates, compared against baseline models
+under blocked transfer tests.</p></li>
+</ol>
+</div>
+<div id="c.-null-models-as-a-central-inferential-engine"
+class="section level3">
+<h3>16C. Null models as a central inferential engine</h3>
+<p>Null models are not a side diagnostic in this workflow; they are the
+backbone of hypothesis testing for spatial structure.</p>
+<ul>
+<li>In the synthetic demonstration, randomization establishes the
+baseline slope distribution expected when spatial signal is absent.</li>
+<li>In real data, spatially constrained permutations preserve broad area
+and species composition while breaking fine-scale pairwise alignment,
+producing a conservative counterfactual for H2.</li>
+</ul>
+<p>This design answers the key inferential question directly: is the
+observed decay stronger than expected given the sampling structure and
+broad ecological grouping?</p>
+</div>
+<div id="d.-scale-as-the-design-principle" class="section level3">
+<h3>16D. Scale as the design principle</h3>
+<p>Scale is explicitly embedded in each stage:</p>
+<ul>
+<li><strong>Fine-to-broad spatial scale</strong>: pairwise distances
+from local to basin-wide extents, with flexible functional forms to
+detect curvature and attenuation behavior.</li>
+<li><strong>Temporal scale</strong>: year and pairwise lag terms test
+whether spatial decay is stable or shifts with time separation.</li>
+<li><strong>Biological scale</strong>: species-level and trophic
+structure test whether ecological organization changes decay strength or
+model transfer performance.</li>
+<li><strong>Prediction scale</strong>: leave-one-area-out blocking
+evaluates extrapolation to truly new spatial domains rather than
+interpolative fit alone.</li>
+</ul>
+<p>Together, these choices convert scale from a descriptive backdrop
+into an explicit driver of model architecture and hypothesis tests.</p>
+</div>
+<div id="e.-why-this-multi-method-sequence-is-necessary"
+class="section level3">
+<h3>16E. Why this multi-method sequence is necessary</h3>
+<p>No single model can answer all questions in contamination
+biogeography. The sequence used here is deliberate:</p>
+<ol style="list-style-type: decimal">
+<li>identify form and strength of decay,</li>
+<li>validate against null expectations,</li>
+<li>evaluate heterogeneity among species and chemistry classes,</li>
+<li>incorporate temporal coupling,</li>
+<li>model hierarchical dependence, and</li>
+<li>test ecological covariates for spatial transfer.</li>
+</ol>
+<p>This sequence balances mechanistic interpretation and predictive
+robustness, while keeping inference anchored to explicit null
+expectations and scale-aware validation.</p>
+</div>
+<div id="f.-how-trophic-level-enters-the-models" class="section level3">
+<h3>16F. How trophic level enters the models</h3>
+<p>Trophic structure is entered through isotope-derived covariates in
+the dyadic trophic model:</p>
+<ul>
+<li><code>trophic_diff_n15 = |delta15N_i - delta15N_j|</code>, a proxy
+for trophic-level mismatch,</li>
+<li><code>habitat_diff_c13 = |delta13C_i - delta13C_j|</code>, a proxy
+for habitat/foraging mismatch,</li>
+<li><code>mean_trophic_n15</code>, the pair-average trophic position
+proxy,</li>
+<li><code>mean_habitat_c13</code>, the pair-average habitat baseline
+proxy.</li>
+</ul>
+<p>Interpretation on the similarity scale is direct: negative
+coefficients for mismatch terms indicate that isotopically dissimilar
+pairs are less similar in contaminants after accounting for distance,
+time lag, and hierarchical random effects.</p>
+<p>Important caution: these are ecological proxies, not direct causal
+measurements of trophic level or habitat identity. delta15N and delta13C
+each include baseline spatial variation, source mixing, and
+tissue-integration effects; therefore, coefficients should be
+interpreted as associational signals unless baseline correction and
+discrimination-factor uncertainty are modeled explicitly.</p>
+</div>
+<div
+id="g.-integrative-graphics-how-distance-time-species-and-trophic-effects-enter"
+class="section level3">
+<h3>16G. Integrative graphics: how distance, time, species, and trophic
+effects enter</h3>
+<pre class="r"><code>if (!exists(&quot;fit_objs&quot;) || length(fit_objs) == 0) {
+  plot.new(); title(&quot;Integrative model-entry graphics unavailable (baseline model objects missing)&quot;)
+} else {
+  par(mfrow = c(2, 2), mar = c(8, 4, 3, 1))
+
+  # Panel A: baseline fixed effects (distance, time, interaction)
+  base_terms &lt;- c(&quot;log_dist&quot;, &quot;log_time&quot;, &quot;log_dist:log_time&quot;)
+  lab_map &lt;- c(log_dist = &quot;Distance&quot;, log_time = &quot;Time lag&quot;, `log_dist:log_time` = &quot;Distance x Time&quot;)
+
+  for (nm in names(fit_objs)) {
+    cf &lt;- as.data.frame(summary(fit_objs[[nm]]$model)$coefficients)
+    cf$term &lt;- rownames(cf)
+    cf &lt;- cf[cf$term %in% base_terms, , drop = FALSE]
+    if (nrow(cf) == 0) { plot.new(); title(paste(nm, &quot;baseline fixed effects unavailable&quot;)); next }
+
+    xpos &lt;- seq_len(nrow(cf))
+    ylim_r &lt;- range(c(cf$Estimate - 1.96 * cf$`Std. Error`, cf$Estimate + 1.96 * cf$`Std. Error`, 0), na.rm = TRUE)
+    plot(xpos, cf$Estimate,
+         ylim = ylim_r,
+         xlim = c(0.5, nrow(cf) + 0.5),
+         xaxt = &quot;n&quot;,
+         xlab = &quot;&quot;,
+         ylab = &quot;Coefficient estimate&quot;,
+         main = paste(c(sim_overall = &quot;Overall&quot;, sim_DDT = &quot;DDT&quot;)[nm], &quot;baseline fixed effects&quot;),
+         pch = 19,
+         col = if (nm == &quot;sim_overall&quot;) &quot;darkorchid4&quot; else &quot;firebrick&quot;)
+    axis(1, at = xpos, labels = lab_map[cf$term], las = 2)
+    abline(h = 0, lty = 2, col = &quot;grey50&quot;)
+    segments(xpos, cf$Estimate - 1.96 * cf$`Std. Error`,
+             xpos, cf$Estimate + 1.96 * cf$`Std. Error`,
+             lwd = 2,
+             col = if (nm == &quot;sim_overall&quot;) &quot;darkorchid4&quot; else &quot;firebrick&quot;)
+  }
+
+  # Panel C: species and area random-effect SDs (shows hierarchical entry)
+  first_nm &lt;- names(fit_objs)[1]
+  vc &lt;- as.data.frame(VarCorr(fit_objs[[first_nm]]$model))
+  vc &lt;- vc[vc$grp %in% c(&quot;species_i&quot;, &quot;species_j&quot;, &quot;area_i&quot;, &quot;area_j&quot;, &quot;id_i&quot;, &quot;id_j&quot;), c(&quot;grp&quot;, &quot;sdcor&quot;)]
+  if (nrow(vc) &gt; 0) {
+    ord &lt;- order(vc$sdcor, decreasing = TRUE)
+    barplot(vc$sdcor[ord],
+            names.arg = vc$grp[ord],
+            las = 2,
+            col = &quot;grey45&quot;,
+            ylab = &quot;Random-effect SD&quot;,
+            main = &quot;Hierarchical variance entry (example response)&quot;)
+  } else {
+    plot.new(); title(&quot;Random-effect SDs unavailable&quot;)
+  }
+
+  # Panel D: trophic covariate fixed effects if trophic models exist
+  if (exists(&quot;trophic_objs&quot;) &amp;&amp; length(trophic_objs) &gt; 0) {
+    tnm &lt;- names(trophic_objs)[1]
+    tcf &lt;- as.data.frame(summary(trophic_objs[[tnm]]$model)$coefficients)
+    tcf$term &lt;- rownames(tcf)
+    keep &lt;- c(&quot;trophic_diff_n15&quot;, &quot;habitat_diff_c13&quot;, &quot;mean_trophic_n15&quot;, &quot;mean_habitat_c13&quot;)
+    tcf &lt;- tcf[tcf$term %in% keep, , drop = FALSE]
+    tlab &lt;- c(
+      trophic_diff_n15 = &quot;Trophic mismatch (delta15N)&quot;,
+      habitat_diff_c13 = &quot;Habitat mismatch (delta13C)&quot;,
+      mean_trophic_n15 = &quot;Pair mean trophic proxy&quot;,
+      mean_habitat_c13 = &quot;Pair mean habitat proxy&quot;
+    )
+    if (nrow(tcf) &gt; 0) {
+      xpos &lt;- seq_len(nrow(tcf))
+      ylim_r &lt;- range(c(tcf$Estimate - 1.96 * tcf$`Std. Error`, tcf$Estimate + 1.96 * tcf$`Std. Error`, 0), na.rm = TRUE)
+      plot(xpos, tcf$Estimate,
+           ylim = ylim_r,
+           xlim = c(0.5, nrow(tcf) + 0.5),
+           xaxt = &quot;n&quot;,
+           xlab = &quot;&quot;,
+           ylab = &quot;Coefficient estimate&quot;,
+           main = &quot;Ecology entry via trophic proxies&quot;,
+           pch = 19,
+           col = &quot;darkgreen&quot;)
+      axis(1, at = xpos, labels = tlab[tcf$term], las = 2)
+      abline(h = 0, lty = 2, col = &quot;grey50&quot;)
+      segments(xpos, tcf$Estimate - 1.96 * tcf$`Std. Error`,
+               xpos, tcf$Estimate + 1.96 * tcf$`Std. Error`,
+               lwd = 2,
+               col = &quot;darkgreen&quot;)
+    } else {
+      plot.new(); title(&quot;Trophic fixed effects unavailable&quot;)
+    }
+  } else {
+    plot.new(); title(&quot;Trophic model objects unavailable&quot;)
+  }
+}</code></pre>
+<p><img src="outputs/figures/method-entry-graphics-1.png" width="1152" /></p>
+<p>The figure above is designed to answer exactly how each driver
+enters:</p>
+<ul>
+<li>distance and time enter as fixed effects (<code>log_dist</code>,
+<code>log_time</code>) plus interaction,</li>
+<li>species/area/individual repeated structure enters as random
+effects,</li>
+<li>ecology enters via trophic/habitat isotope proxy covariates.</li>
+</ul>
+<p>These panels are best interpreted as an entry map of model terms and
+uncertainty, complemented by the dedicated performance plots in Sections
+15B and 15C.</p>
+</div>
+<div id="h.-dyadic-mixed-models-explained-for-undergraduates"
+class="section level3">
+<h3>16H. Dyadic mixed models explained for undergraduates</h3>
+<p>A dyadic mixed model is a model for data where each row describes a
+<strong>pair</strong> (a dyad), not a single sample. Here, each row
+compares sample <code>i</code> and sample <code>j</code>.</p>
+<p>Why this matters: the same sample appears in many different pairs, so
+pairwise rows are not independent. If we ignore that, we can get
+overconfident p-values and unstable effects.</p>
+<p>The model solves this by combining:</p>
+<ul>
+<li><strong>fixed effects</strong> (distance, time, trophic covariates):
+average relationships we want to estimate, and</li>
+<li><strong>random effects</strong> (id_i/id_j, species_i/species_j,
+area_i/area_j): adjustments that absorb repeated-measure structure and
+group-level dependence.</li>
+</ul>
+<p>In plain language: fixed effects tell us the average rule; random
+effects acknowledge that each bird/species/area has its own baseline
+around that rule. Because each pair has two members, modeling both
+<code>i</code> and <code>j</code> keeps the analysis symmetric; if this
+is ignored, repeated use of the same samples can make effects look more
+certain than they really are.</p>
+</div>
+<div id="i.-method-citations" class="section level3">
+<h3>16I. Method citations</h3>
+<p>Methods used here follow established references for mixed models,
+smooth spatial models, information-theoretic model comparison, and
+null/permutation logic. For mixed models, interpretation here
+prioritizes effect sizes, uncertainty, and blocked cross-validation
+performance; where p-values are used, denominator-df approximations
+depend on method choices.</p>
+</div>
+<div id="j.-references-for-methods" class="section level3">
+<h3>16J. References for methods</h3>
+<ul>
+<li>Bates D, Machler M, Bolker B, Walker S. 2015. Fitting linear
+mixed-effects models using lme4. Journal of Statistical Software
+67(1):1-48.</li>
+<li>Wood SN. 2017. Generalized Additive Models: An Introduction with R
+(2nd ed.). Chapman and Hall/CRC.</li>
+<li>Burnham KP, Anderson DR. 2002. Model Selection and Multimodel
+Inference: A Practical Information-Theoretic Approach (2nd ed.).
+Springer.</li>
+<li>Manly BFJ. 2006. Randomization, Bootstrap and Monte Carlo Methods in
+Biology (3rd ed.). Chapman and Hall/CRC.</li>
+<li>Gotelli NJ, Graves GR. 1996. Null Models in Ecology. Smithsonian
+Institution Press.</li>
+<li>Legendre P, Fortin MJ, Borcard D. 2015. Should the Mantel test be
+used in spatial analysis? Methods in Ecology and Evolution 6:1239-1247.
+(Context for spatial dependence cautions and alternatives.)</li>
+<li>Roberts DR, Bahn V, Ciuti S, et al. 2017. Cross-validation
+strategies for data with temporal, spatial, hierarchical, or
+phylogenetic structure. Ecography 40:913-929.</li>
+<li>Post DM. 2002. Using stable isotopes to estimate trophic position:
+models, methods, and assumptions. Ecology 83:703-718.</li>
+<li>Fry B. 2006. Stable Isotope Ecology. Springer.</li>
+<li>McMahon KW, McCarthy MD. 2016. Embracing variability in trophic
+discrimination factors facilitates calculation of ecologically
+meaningful trophic positions. Oecologia 181:991-1003.</li>
+<li>Newsome SD, del Rio CM, Bearhop S, Phillips DL. 2007. A niche for
+isotopic ecology. Frontiers in Ecology and the Environment
+5:429-436.</li>
+<li>Kenny DA, Kashy DA, Cook WL. 2006. Dyadic Data Analysis. Guilford
+Press.</li>
+</ul>
+</div>
+</div>
 <div id="conclusion-main-drivers-of-contamination-variation"
 class="section level2">
-<h2>16) Conclusion: Main Drivers of Contamination Variation</h2>
+<h2>17) Conclusion: Main Drivers of Contamination Variation</h2>
 <p>Across contaminants and isotopes, the dominant source of variation is
 <strong>space</strong>: chemical similarity decreases with increasing
 geographic distance, and this spatial decay is strongest for DDT-family
@@ -3505,6 +3814,20 @@ modulate exposure patterns.</li>
 dominate signal strength, so future inference should balance species
 representation.</li>
 </ul>
+<div id="synthesis-of-hypothesis-support" class="section level3">
+<h3>Synthesis of hypothesis support</h3>
+<p>The strongest empirical support is for H1 and H2: spatial decay is
+consistently negative, and null-model comparisons indicate that observed
+decay exceeds structured random expectation. H3 is also supported:
+DDT-family responses show steeper and often more exponential behavior
+than PCP/PCB-family and isotope structure. H4 and H6 are supported by
+species-level heterogeneity and dyadic mixed-model performance under
+blocked transfer. H5 and H7 are supported but context-dependent:
+temporal terms and trophic covariates add information, especially in
+difficult transfer settings, but gains vary by response and held-out
+region. These trophic gains should be interpreted as improved ecological
+transfer signals, not stand-alone proof of trophic causation.</p>
+</div>
 <div id="practical-take-away-for-predictive-modeling"
 class="section level3">
 <h3>Practical take-away for predictive modeling</h3>
@@ -3525,131 +3848,111 @@ behavior)</li>
 </div>
 </div>
 <div id="graphics-gallery" class="section level2">
-<h2>17) Graphics Gallery</h2>
+<h2>18) Graphics Gallery</h2>
 <p>This appendix pulls together all graphics generated by the workflow
 so they can be reviewed in one place, including the original
 distance-decay plots and the new spatiotemporal and
 biodiversity-augmented mixed-model figures.</p>
 <div id="dummy-distance-decay-panels" class="section level3">
 <h3>Dummy distance decay panels</h3>
-<p>
-<img src="outputs/figures/plotting-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/plotting-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="generality-across-response-types" class="section level3">
 <h3>Generality across response types</h3>
-<p>
-<img src="outputs/figures/generality-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/generality-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="real-data-distance-decay-fits" class="section level3">
 <h3>Real data distance decay fits</h3>
-<p>
-<img src="outputs/real_testcase_distance_decay_plots.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/real_testcase_distance_decay_plots.png” attr(,“class”)
+[1] “knit_image_paths” “knit_asis”</p>
 </div>
 <div id="binned-mean-similarity-with-95-ci" class="section level3">
 <h3>Binned mean similarity with 95% CI</h3>
-<p>
-<img src="outputs/figures/real-binned-ci-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/real-binned-ci-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="observed-versus-null-slope-distributions"
 class="section level3">
 <h3>Observed versus null slope distributions</h3>
-<p>
-<img src="outputs/figures/real-null-slopes-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/real-null-slopes-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="observed-versus-null-decay-bands" class="section level3">
 <h3>Observed versus null decay bands</h3>
-<p>
-<img src="outputs/figures/real-null-decay-bands-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/real-null-decay-bands-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="functional-form-comparison" class="section level3">
 <h3>Functional form comparison</h3>
-<p>
-<img src="outputs/figures/fitted-curves-plot-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/fitted-curves-plot-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="gam-spatial-prediction" class="section level3">
 <h3>GAM spatial prediction</h3>
-<p>
-<img src="outputs/figures/gam-spatial-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/gam-spatial-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="temporal-trends" class="section level3">
 <h3>Temporal trends</h3>
-<p>
-<img src="outputs/figures/temporal-trend-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/temporal-trend-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="distance-decay-by-time-lag-tercile" class="section level3">
 <h3>Distance decay by time lag tercile</h3>
-<p>
-<img src="outputs/figures/spatiotemporal-visualization-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/spatiotemporal-visualization-1.png”
+attr(,“class”) [1] “knit_image_paths” “knit_asis”</p>
 </div>
 <div id="dyadic-mixed-model-diagnostics" class="section level3">
 <h3>Dyadic mixed model diagnostics</h3>
-<p>
-<img src="outputs/figures/dyadic-mixed-graphics-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/dyadic-mixed-graphics-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="trophic-mixed-model-diagnostics" class="section level3">
 <h3>Trophic mixed model diagnostics</h3>
-<p>
-<img src="outputs/figures/dyadic-trophic-graphics-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/dyadic-trophic-graphics-1.png” attr(,“class”)
+[1] “knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown" class="section level3">
 <h3>species breakdown</h3>
-<p>
-<img src="outputs/figures/species-breakdown-1.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-1.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown-2" class="section level3">
 <h3>Species breakdown 2</h3>
-<p>
-<img src="outputs/figures/species-breakdown-2.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-2.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown-3" class="section level3">
 <h3>Species breakdown 3</h3>
-<p>
-<img src="outputs/figures/species-breakdown-3.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-3.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown-4" class="section level3">
 <h3>Species breakdown 4</h3>
-<p>
-<img src="outputs/figures/species-breakdown-4.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-4.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown-5" class="section level3">
 <h3>Species breakdown 5</h3>
-<p>
-<img src="outputs/figures/species-breakdown-5.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-5.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown-6" class="section level3">
 <h3>Species breakdown 6</h3>
-<p>
-<img src="outputs/figures/species-breakdown-6.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-6.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown-7" class="section level3">
 <h3>Species breakdown 7</h3>
-<p>
-<img src="outputs/figures/species-breakdown-7.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-7.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 <div id="species-breakdown-8" class="section level3">
 <h3>Species breakdown 8</h3>
-<p>
-<img src="outputs/figures/species-breakdown-8.png" style="max-width: 100%; height: auto;" />
-</p>
+<p>[1] “outputs/figures/species-breakdown-8.png” attr(,“class”) [1]
+“knit_image_paths” “knit_asis”</p>
 </div>
 </div>
 

@@ -15,3 +15,8 @@ worldclim_data/
 
 # Local standalone repo checkouts
 BIEN-SpeciesShinyApp/
+contaminent data/
+
+# Local data workbooks and gate artifacts
+ZD_stamp_samples(AutoRecovered).xlsx
+agents/.final_gate_check.txt

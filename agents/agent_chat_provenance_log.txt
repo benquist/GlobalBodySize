@@ -285,3 +285,37 @@ Action taken:
 - Added the current review request to agents/prompt_log.md for final-gate prompt tracking.
 - Appended this provenance entry because an agents-folder file was updated in this turn.
 Outcome: Agent logging remains append-only and current for this review task.
+
+[12] Date: 2026-04-02
+Source: active chat request
+Request summary: Inspect BIEN-SpeciesShinyApp GitHub update status, summarize recent commits, and recommend next documentation/history steps without editing project code files.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added the current request summary to agents/prompt_log.md to satisfy the mandatory always-gate prompt-log requirement.
+- Appended this provenance record because an agents-folder file was updated during compliance checks.
+Outcome: Append-only agent logging remains current, enabling final-gate completion for this status-audit turn.
+
+[13] Date: 2026-04-02
+Source: active chat request
+Request summary: Confirm whether the contamination plotting enhancement task is fully done after rendering and required final-gate checks.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added the latest completion-status prompt to agents/prompt_log.md so the always-gate can verify the latest prompt is recorded.
+- Appended this provenance note because an agents-folder log file was updated during final-gate compliance work.
+Outcome: Final-gate logging is current for the latest contamination-analysis status request.
+
+[14] Date: 2026-04-02
+Source: active chat request
+Request summary: Run the mandatory final pre-return checks for the current contamination plotting enhancement task and determine whether the work is fully complete.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added the exact final-gate prompt entry required by the always agent to agents/prompt_log.md.
+- Appended this provenance note because agent logging files were updated during final-gate compliance.
+Outcome: The prompt-log requirement is now aligned with the latest always-gate request; only git commit/push remains before PASS can be achieved.
+2026-04-02 | always gate run | Appended current prompt entry in agents/prompt_log.md during mandatory final pre-return verification.
