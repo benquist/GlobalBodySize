@@ -211,6 +211,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-03
+- Prompt summary: Add Overview & About tab to BIEN Shiny app with Pinus ponderosa worked example (occurrence map, trait distributions, source-mix bar chart, feature table), BIEN links (biendata.org, GitHub repo, NCEAS BIEN group), and latest BIEN publication link. Also add live shinyapps.io link near top of README. Push to GitHub.
+- Requested outcomes: New Overview & About tab in app.R; live app URL in README; all BIEN resource links present; changes committed and pushed to origin/main.
+- Files changed: BIEN-SpeciesShinyApp/app.R, BIEN-SpeciesShinyApp/README.md, agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-02
 - Prompt summary: Inspect /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp and check GitHub update status.
 - Requested outcomes: Determine local uncommitted changes, branch upstream ahead/behind status, summarize the latest 8 commits, check for dedicated improvement-history files, and recommend concrete next steps for README biodiversity QA/features plus persistent improvement history.
@@ -332,6 +338,24 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: "what is the status?"
 - Requested outcomes: Provide current project status for the contamination distance-decay workflow.
 - Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: "Run the mandatory final pre-return check for the latest user prompt."
+- Requested outcomes: Verify PASS/FAIL for prompt log, Rmd compile, package build, and git push.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: "Run the mandatory final pre-return check for the latest user prompt."
+- Requested outcomes: Verify prompt is logged; verify changed Rmd compile status; verify updated R package build status; verify git push status; return PASS/BLOCKED with concise evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: "THERE ARE NO PLOTS NO GRAPHICS using the real world Stamp data!!! ... do we have graphical results? ... within species vs between species ... different years ... where are we with the analyses?"
+- Requested outcomes: Confirm and fix real-data graphics visibility, assess confounders, and report analysis status.
+- Files changed: contaminent data/contaminent_distance_decay_analysis.Rmd (rendered), contaminent data/contaminent_distance_decay_analysis.html, contaminent data/outputs/*
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-02
@@ -1040,5 +1064,17 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-04-02
 - Prompt summary: Run final mandatory pre-return checks for workspace /Users/brianjenquist/VSCode for contamination report updates completed in this turn.
 - Requested outcomes: Verify prompt-log entry presence, confirm updated contamination Rmd compile success, confirm R package build status (or N/A if none changed), and confirm git push status with concise PASS/FAIL and missing items.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: User asked for a concise, implementation-oriented inspection of contaminant distance-decay outputs and Rmd structure, focused on real-data plots, confounder handling, and plot-cleanup priorities.
+- Requested outcomes: Confirm whether explicit real-data graphics now exist, evaluate treatment of within-vs-between species and temporal/spatiotemporal confounders, list top practical causes of messy pairwise distance-decay plots, and provide concrete refinements.
+- Files changed: None (analysis-only request)
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-02
+- Prompt summary: Run the mandatory final pre-return check for the latest user prompt. Verify all required checks and return PASS/BLOCKED with concise evidence for prompt log, Rmd compile, R package build, and git push status.
+- Requested outcomes: Verify all 4 mandatory checks and report PASS/BLOCKED with concise evidence.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
