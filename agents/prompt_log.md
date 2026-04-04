@@ -1132,3 +1132,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Make Occurrence Map the first tab users see when the app loads in BIEN-SpeciesShinyApp/app.R, push to GitHub (origin/main), and deploy to shinyapps.io.
 - Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Add BIEN Query Code content to also map occurrence data, compute app-like summary statistics, and plot trait summaries similar to the Shiny app.
+- Requested outcomes: Expand the generated BIEN script in BIEN-SpeciesShinyApp/app.R to include occurrence map plotting, summary statistics blocks aligned with app logic, and trait summary/plot code.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot

@@ -319,3 +319,49 @@ Action taken:
 - Appended this provenance note because agent logging files were updated during final-gate compliance.
 Outcome: The prompt-log requirement is now aligned with the latest always-gate request; only git commit/push remains before PASS can be achieved.
 2026-04-02 | always gate run | Appended current prompt entry in agents/prompt_log.md during mandatory final pre-return verification.
+2026-04-03 | always gate run | Appended prompt-log entry for mandatory final pre-return gate request covering BIEN-SpeciesShinyApp improvements; no agent-behavior changes.
+
+[8] Date: 2026-04-03
+Source: active chat request
+Request summary: User requested mandatory final pre-return gate verification after BIEN-SpeciesShinyApp commit/push/deploy workflow.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.- agents/agent_chat_provenancehe- agents/agent_chat_provenance_logent- agents/agent_chor strict latest-prompt compliance.
+- Appended this provenance entry because an agents folder file was updated.
+Outcome: Mandatory gate logging requirements are up to date for this chat.
+
+
+[9] Date: 2026-04-03
+Source: active chat request
+Request summary: User requested mandatory final pre-return gate run after read-only BIEN logo file discovery checks, with concise PASS/FAIL evidence and minimal remediation.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the latest prompt entry to agents/prompt_log.md for strict prompt-log compliance.
+- Appended this provenance entry because an agents-folder file was updated during gate remediation.
+Outcome: Agent logging requirements are current for this gate run.
+
+[10] Date: 2026-04-03
+Source: active chat request
+Request summary: User requested mandatory final pre-return gate run after BIEN-SpeciesShinyApp README logo/link commit a0eefd2 was pushed.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the latest prompt entry to agents/prompt_log.md to satisfy mandatory gate prompt logging.
+- Appended this provenance entry because an agents-folder file was updated during gate remediation.
+Outcome: Agent logging requirements are current for this gate run.
+
+[11] Date: 2026-04-04
+Source: active chat request
+Request summary: User requested expanding BIEN Query Code output to include occurrence mapping, app-like summary statistics, and trait summary plotting.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Expanded BIEN Query Code renderText output with helper functions and code blocks for map plotting, occurrence summaries, and trait summary visualizations.
+- Logged the prompt in agents/prompt_log.md for mandatory final-gate compliance.
+- Appended this provenance entry because agents-folder files were updated.
+Outcome: Query-code tab now outputs a fuller reproducible workflow aligned with the app's map and summary logic.
