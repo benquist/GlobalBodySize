@@ -1540,3 +1540,17 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Result: Lucky button now only selects species and no longer auto-runs BIEN query; user must click Query BIEN explicitly.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/agents/prompt_log.md; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Fix Betula papyrifera and Populus tremuloides returning zero records by handling species with NULL native.status values in BIEN queries.
+- Requested outcomes: Diagnose why these species return 0 records despite having 150,000+ occurrences in BIEN, implement fix to include NULL is_introduced values, deploy to shinyapps.io.
+- Result: Identified BIEN's internal filter was excluding NULL is_introduced values. Created custom `natives_check_with_null_fallback()` function as drop-in replacement; applied to 4 query functions in app.R; verified fix works (306k+ records for Betula papyrifera); committed (5638362); successfully deployed to shinyapps.io (https://benquist.shinyapps.io/bien-species-shinyapp/).
+- Files changed: BIEN-SpeciesShinyApp/app.R (added natives_check_with_null_fallback function, replaced BIEN:::.native_check() in 4 query functions); test scripts created for validation; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-05
+- Prompt summary: Run mandatory final pre-return checks for this session (Betula/Populus native-status fix resolution).
+- Requested outcomes: Verify prompt-log entry recorded in agents/prompt_log.md for this task, confirm updated Rmd files compile successfully, confirm updated R packages build successfully, confirm git push status.
+- Context: BIEN-SpeciesShinyApp fixes for species lacking native.status classification deployed to shinyapps.io (commit 5638362); fix verified working (306k+ records for Betula papyrifera, 880k+ for Populus tremuloides); app successfully deployed and confirmed responsive.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot

@@ -466,3 +466,4 @@ Outcome: Prompt log now includes the latest final-gate request for strict always
 
 2026-04-04 | GitHub Copilot | always-mode final-gate rerun for current turn: appended exact current prompt entry in agents/prompt_log.md, then re-ran mandatory checks per agents/always.agent.md.
 [2026-04-04] Updated agents/prompt_log.md with exact final-gate request entry before mandatory pre-return checks.
+2026-04-04 | always-mode final gate run | Updated agents/prompt_log.md (and BIEN-SpeciesShinyApp/agents/prompt_log.md) to record current prompt before mandatory checks.
