@@ -1438,3 +1438,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Confirm code changes, push repos, and run mandatory always-agent gate.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User requested rerunning mandatory final pre-return checks now.
+- Requested outcomes: Verify PASS/BLOCKED with concise evidence for prompt log recording, applicable Rmd compile, applicable R package build, and git push confirmation using commit context (BIEN d85b54b pushed; workspace 40ebf83 pushed).
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User requested immediate deployment now.
+- Requested outcomes: Deploy BIEN Species Shiny app immediately and confirm status.
+- Files changed: BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
