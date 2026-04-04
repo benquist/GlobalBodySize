@@ -365,3 +365,14 @@ Action taken:
 - Logged the prompt in agents/prompt_log.md for mandatory final-gate compliance.
 - Appended this provenance entry because agents-folder files were updated.
 Outcome: Query-code tab now outputs a fuller reproducible workflow aligned with the app's map and summary logic.
+
+[12] Date: 2026-04-04
+Source: active chat request
+Request summary: Mandatory always-agent final gate was run after BIEN query-code expansion, requiring exact prompt-log capture for PASS.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the exact final-gate prompt entry to agents/prompt_log.md.
+- Appended this provenance entry because agents-folder files were updated during gate remediation.
+Outcome: Agent logging state is aligned with strict always-agent prompt matching.
