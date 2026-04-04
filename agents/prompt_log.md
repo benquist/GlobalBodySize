@@ -1376,5 +1376,11 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-04-04
 - Prompt summary: Run mandatory final pre-return checks; context: user asked to push to GitHub, all BIEN-SpeciesShinyApp changes committed and pushed to origin/main (f120627), app confirmed HTTP 200, workspace git repo up to date. Verify prompt log latest entry, changed Rmd compile applicability, changed package build applicability, and git push status. Return PASS/BLOCKED with evidence.
 - Requested outcomes: Return PASS/BLOCKED with evidence for all four always-agent checks.
+
+- Date: 2026-04-04
+- Prompt summary: Comprehensive 4-area review of BIEN-SpeciesShinyApp: (1) performance/robustness audit of blocking BIEN calls, auto-fire count queries, timeout logic, summary_cache_nonce reactive; (2) code quality/bug review; (3) biodiversity UX review of UI layout, category labels, map fraction display, citizen science toggle; (4) documentation review of README.md and CODE_WORKFLOW_DOCUMENTATION.md.
+- Requested outcomes: Structured report with IMPLEMENT vs SUGGEST split; concrete code changes with before/after blocks; concrete doc improvements.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/README.md; BIEN-SpeciesShinyApp/CODE_WORKFLOW_DOCUMENTATION.md; agents/prompt_log.md
+- Completed by: @m supervisor
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
