@@ -1567,3 +1567,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
  Result: Identified that `ORDER BY random()` on 880k+ records in the SQL query was causing multi-minute delays. Optimized by disabling randomization for fetches > 10k records. Natural table order is already well-distributed across datasources. Reduced per_plan_timeout from 25s to 20s for faster fallback. Updated progress message to clearly indicate "fast-loading mode" for large species. Deployed to shinyapps.io (commit 852abd9). App now responds quickly for Populus tremuloides and other large species.
  Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
  Completed by: GitHub Copilot
+
+- Date: 2026-04-05
+- Prompt summary: Run mandatory final pre-return checks for this turn after exact final-check prompt logging. Context: Populus tremuloides hang fix deployed in BIEN-SpeciesShinyApp commit a0735b8; root prompt-log commits 0279e18 and a4b0380 pushed. Verify PASS/BLOCKED for prompt log entry (exact final-check request), changed Rmd compile applicability/results, changed R package build applicability/results, and git push status for root and BIEN repos.
+- Requested outcomes: Log this exact final-check request, then verify mandatory gate status with evidence for prompt log, change-gated Rmd compile, change-gated R package build, and git push for both repositories.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
