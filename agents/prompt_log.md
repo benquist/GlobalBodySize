@@ -1520,3 +1520,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Result: Disabled SQL ORDER BY random() for lucky fast mode, reduced per-plan timeout to 8s, deployed and pushed.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reported lucky-generated species still hangs during query and requested deep dive fix.
+- Requested outcomes: Diagnose root cause and make Lucky->Query path reliably responsive.
+- Result: Removed automatic post-query BIEN summary count prefetch observer; counts remain manual via explicit slower button; deployed and pushed.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
