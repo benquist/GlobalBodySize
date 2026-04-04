@@ -389,3 +389,17 @@ Action taken:
 - Deployed the updated app to shinyapps.io.
 - Appended prompt/provenance log entries to keep mandatory gate records current.
 Outcome: Fix is now published in GitHub and live deployment.
+
+[14] Date: 2026-04-04
+Source: active chat request
+Request summary: User requested adding dual-mode BIEN Query Code output (liberal + conservative occurrence query/map) and a final species-specific outbound-links tab.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added a final tab that renders species-specific outbound links for Wikipedia, Kew POWO, Missouri Botanical Garden, and The Plant List.
+- Updated BIEN Query Code tab output text to include both liberal and conservative occurrence query/map workflows.
+- Committed, pushed, and deployed BIEN app changes.
+- Appended prompt/provenance entries for mandatory final-gate compliance.
+Outcome: New links tab and dual-mode query-code guidance are live in the public app.

@@ -1150,3 +1150,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Commit and push BIEN-SpeciesShinyApp summary-statistics fix to GitHub, deploy updated app to shinyapps.io, and confirm status.
 - Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Add dual-mode BIEN Query Code output (liberal and conservative occurrence query/map) and add a final species-specific outbound-links tab.
+- Requested outcomes: Update BIEN-SpeciesShinyApp/app.R so BIEN Query Code includes both liberal and conservative occurrence search/map code, and add a new final tab with species-linked Wikipedia, Kew POWO, Missouri Botanical Garden, and The Plant List links based on current species input.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
