@@ -1384,3 +1384,33 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: @m supervisor
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reported Juniperus communis map count mismatch (expected 15,000) and requested default BIEN query toggle plus custom filter toggles.
+- Requested outcomes: Explain mapped-count behavior, remove restrictive occurrence fetch cap, add default-vs-custom BIEN filter-profile toggle flow, and deploy app.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks for this turn after BIEN-SpeciesShinyApp fetch-cap removal and default-vs-custom filter profile toggle deployment.
+- Requested outcomes: Verify prompt log entry, Rmd compile applicability, package build applicability, and git push status; return PASS/BLOCKED with InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks now. Require PASS only if this exact final-gate prompt has a latest prompt-log entry, changed Rmd compile applicability is handled, changed package build applicability is handled, and git push status is confirmed.
+- Requested outcomes: Return PASS only when this exact final-gate prompt is the latest prompt-log entry and all three operational checks are verified.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User requested an "I'm Feeling Lucky" style random BIEN species button that ensures at least 30 mappable occurrence points.
+- Requested outcomes: Add lucky-species UI button, implement random species precheck with minimum mappable-point threshold, deploy app, and push to GitHub.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reported long wait times for large species queries (e.g., Acer negundo) and asked how to avoid delays.
+- Requested outcomes: Implement app-side mitigation for large-species query latency, deploy live update, and explain how to use it.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
