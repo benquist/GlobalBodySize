@@ -1126,3 +1126,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Fix quoting in BIEN Query Code tab in BIEN-SpeciesShinyApp/app.R, push to GitHub (origin/main), and deploy to shinyapps.io.
 - Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Set Occurrence Map as default landing tab — added selected='Occurrence Map' to tabsetPanel; committed 1523a2a and deployed to shinyapps.io.
+- Requested outcomes: Make Occurrence Map the first tab users see when the app loads in BIEN-SpeciesShinyApp/app.R, push to GitHub (origin/main), and deploy to shinyapps.io.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
