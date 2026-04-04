@@ -376,3 +376,16 @@ Action taken:
 - Appended the exact final-gate prompt entry to agents/prompt_log.md.
 - Appended this provenance entry because agents-folder files were updated during gate remediation.
 Outcome: Agent logging state is aligned with strict always-agent prompt matching.
+
+[13] Date: 2026-04-04
+Source: active chat request
+Request summary: User asked to push/deploy the summary-statistics reconciliation fix.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Committed and pushed BIEN-SpeciesShinyApp/app.R fix for source-mix/category reconciliation.
+- Deployed the updated app to shinyapps.io.
+- Appended prompt/provenance log entries to keep mandatory gate records current.
+Outcome: Fix is now published in GitHub and live deployment.
