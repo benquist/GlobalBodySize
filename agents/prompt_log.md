@@ -1432,3 +1432,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Add a plot-only observation toggle in BIEN app filters, wire into record filtering and summaries, and publish updates.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Finalize and verify plot-only observation filter rollout status after deploy lock.
+- Requested outcomes: Confirm code changes, push repos, and run mandatory always-agent gate.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
