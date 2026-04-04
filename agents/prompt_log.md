@@ -10,6 +10,13 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by:
 
 ## Entries
+- Date: 2026-04-05
+- Prompt summary: User reported Populus tremuloides query still appears hung with no fast-loading progress message and requested immediate fix.
+- Requested outcomes: Ensure fast mode actually prevents large-species query hangs and make progress messaging visible during the query.
+- Result: Fixed eventReactive query path so fast mode always disables DB-side randomization (no ORDER BY random()) and always shows fast-loading progress detail when fast mode is active; deployed to shinyapps.io.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-28
 - Prompt summary: Create an always agent that runs last and checks prompt logging, Rmd compile status, R package build status, and git push status.
 - Requested outcomes: Add new always agent and make it final gate before return.
