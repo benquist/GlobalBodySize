@@ -414,3 +414,14 @@ Action taken:
 - Appended exact final-gate prompt entry in agents/prompt_log.md.
 - Appended this provenance entry for append-only agent-log compliance.
 Outcome: Prompt-log state is aligned for strict always-agent final-gate matching.
+
+[16] Date: 2026-04-04
+Source: active chat request
+Request summary: Mandatory final-gate rerun required exact prompt text "after latest prompt-log remediation".
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the exact latest final-gate prompt text in agents/prompt_log.md.
+- Appended this provenance entry for append-only compliance.
+Outcome: Prompt log now includes the exact latest final-gate request text.
