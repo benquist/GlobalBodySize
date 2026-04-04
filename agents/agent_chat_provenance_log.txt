@@ -439,3 +439,14 @@ Action taken:
 - Committed, pushed, and deployed app update.
 - Appended prompt/provenance logs for final-gate compliance.
 Outcome: Dynamic Missouri Botanical Garden link now follows species input into searchable results.
+
+[18] Date: 2026-04-04
+Source: active chat request
+Request summary: Mandatory final-gate check requested after MBG link-fix push/deploy.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended exact latest final-gate prompt entry in agents/prompt_log.md.
+- Appended this provenance entry for append-only compliance.
+Outcome: Prompt log now includes the latest final-gate request for strict always-agent matching.
