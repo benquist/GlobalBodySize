@@ -425,3 +425,17 @@ Action taken:
 - Appended the exact latest final-gate prompt text in agents/prompt_log.md.
 - Appended this provenance entry for append-only compliance.
 Outcome: Prompt log now includes the exact latest final-gate request text.
+
+[17] Date: 2026-04-04
+Source: active chat request
+Request summary: User reported MBG Plant Finder search URL did not carry species input through; requested fix.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Updated species-links tab MBG dynamic link to use Tropicos name search (MBG) for reliable species-term carry-through.
+- Kept direct Pinus ponderosa Plant Finder details link.
+- Committed, pushed, and deployed app update.
+- Appended prompt/provenance logs for final-gate compliance.
+Outcome: Dynamic Missouri Botanical Garden link now follows species input into searchable results.
