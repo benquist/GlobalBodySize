@@ -48,6 +48,18 @@ Source: active chat | git commit | other evidence
 Request summary: ...
 Files affected: ...
 Action taken: ...
+
+[3] Date: 2026-04-04
+Source: active chat request
+Request summary: Add typo-tolerant species spelling suggestion to BIEN Shiny app. When user misspells a species name (e.g., "Bistorta vivipera" instead of "vivipara"), the app should suggest the best-matching BIEN taxon and allow one-click apply.
+Files affected: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+Action taken:
+- Implemented find_best_species_spelling() function using BIEN_taxonomy_genus() lookup and edit-distance ranking.
+- Added enable_taxon_autocorrect checkbox in sidebar; added spelling_suggestion_ui output for dynamic suggestion display.
+- Modified bien_results eventReactive to compute name_suggestion when query returns zero records.
+- Added observeEvent for apply_name_suggestion button that updates species input and reruns query via manual_query_nonce.
+- Committed and pushed to BIEN-SpeciesShinyApp origin/main (commit ad11bd1).
+Outcome: Typo-correction workflow fully functional and deployed. Feature shows suggested name with confidence level and allows user to apply suggested spelling with one click.
 Outcome: ...
 Commit (optional): <hash> - <message>
 
@@ -450,3 +462,7 @@ Action taken:
 - Appended exact latest final-gate prompt entry in agents/prompt_log.md.
 - Appended this provenance entry for append-only compliance.
 Outcome: Prompt log now includes the latest final-gate request for strict always-agent matching.
+2026-04-04 | GitHub Copilot | always-mode final-gate rerun: appended latest prompt entry in agents/prompt_log.md and re-verified mandatory checks (prompt log, Rmd applicability, package build applicability, git push).
+
+2026-04-04 | GitHub Copilot | always-mode final-gate rerun for current turn: appended exact current prompt entry in agents/prompt_log.md, then re-ran mandatory checks per agents/always.agent.md.
+[2026-04-04] Updated agents/prompt_log.md with exact final-gate request entry before mandatory pre-return checks.

@@ -1192,3 +1192,177 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify PASS/FAIL for prompt log, updated Rmd compile status, updated R package build status, and git push status confirmed after MBG link-fix push/deploy.
 - Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Do not push to GitHub; explain in README how observation data types are parsed (citizen science, plot, GBIF, etc.) so users can understand classification.
+- Requested outcomes: Update BIEN-SpeciesShinyApp README with clear, user-friendly explanation of observation category parsing logic and interpretation.
+- Files changed: BIEN-SpeciesShinyApp/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Verify whether "Suggest closest BIEN taxon spelling when no exact match" is working.
+- Requested outcomes: Validate typo-suggestion feature behavior with misspelled and correctly spelled names; fix any edge-case bug preventing expected behavior.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/test_misspelling.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reports querying Bistorta vivipera triggers page reload and no autocorrect suggestion appears.
+- Requested outcomes: Diagnose and fix Shiny crash path in typo-suggestion workflow so misspelled names surface suggestion UI instead of causing reload prompt.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks exactly per agents/always.agent.md.
+- Requested outcomes: Verify prompt log entry, changed Rmd compile applicability, changed R package build applicability, and git push status with evidence; return strict PASS/BLOCKED format and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks exactly per agents/always.agent.md after adding the latest prompt-log entry.
+- Requested outcomes: Verify prompt log, changed Rmd compile applicability, changed R package build applicability, and git push status; return strict PASS/BLOCKED format with InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reports querying Bistorta vivipera still shows "disconnected from server" alert.
+- Requested outcomes: Diagnose remaining typo-suggestion crash path, apply fix, and deploy updated BIEN-SpeciesShinyApp so misspelling suggestion appears instead of disconnect.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/test_misspelling.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Clarify why the category is labeled citizen science/field observation and show which data sources feed it.
+- Requested outcomes: Rename the category to a neutral field-observation label and add explicit datasource breakdown for that category in the BIEN app summary output.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks exactly per agents/always.agent.md for this turn after field-observation category rename and datasource-breakdown update.
+- Requested outcomes: Verify prompt log, changed Rmd compile applicability/results, changed R package build applicability/results, and git push status with evidence; return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks exactly per agents/always.agent.md after appending the latest final-gate prompt entry.
+- Requested outcomes: Verify prompt log, changed/new Rmd compile applicability, changed package build applicability, and git push status; return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User approved deployment of the field-observation category rename and datasource-breakdown summary update.
+- Requested outcomes: Deploy BIEN-SpeciesShinyApp to shinyapps.io with latest local app.R changes and confirm deployment status.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks exactly per agents/always.agent.md for this deployment turn.
+- Requested outcomes: Verify latest prompt-log entry, changed/new Rmd compile applicability, changed package build applicability, and git push status; return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks exactly per agents/always.agent.md after appending the exact final-gate prompt entry for this deployment turn.
+- Requested outcomes: Verify prompt log, changed/new Rmd compile applicability/results, changed package build applicability/results, and git push status with evidence. Return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User requested removing 'non-iNaturalist' from HumanObservation category label and asked for a better term.
+- Requested outcomes: Rename category to remove redundancy and provide clearer naming recommendation; update app and documentation labels consistently.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/README.md; BIEN-SpeciesShinyApp/CODE_WORKFLOW_DOCUMENTATION.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Add mapped-point percentage of total observations in the BIEN app summary and guide users to refresh or increase mapped points from the sidebar.
+- Requested outcomes: Show mapped proportion metrics, add actionable guidance text, and add a sidebar control to increase mapped-point cap.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks exactly per agents/always.agent.md for this turn.
+- Requested outcomes: Verify prompt log latest entry, changed/new Rmd compile applicability/results, changed package build applicability/results, and git push status evidence. Return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks exactly per agents/always.agent.md after appending the exact final-gate prompt entry for this turn.
+- Requested outcomes: Verify prompt log, changed/new Rmd compile applicability/results, changed package build applicability/results, and git push status with evidence. Return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User approved deployment of the mapped-point proportion summary and max mapped-point control.
+- Requested outcomes: Deploy BIEN-SpeciesShinyApp to shinyapps.io with mapped-point percentage reporting, guidance text, and sidebar mapped-point cap control; confirm deployment success.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reports the mapped-fraction metric is not visible on the BIEN app map and asks whether earlier changes were deployed.
+- Requested outcomes: Move the mapped-fraction display into the Occurrence Map tab notice area, repair any introduced app.R corruption, redeploy the app, and confirm live status.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks exactly per agents/always.agent.md for this turn after restoring BIEN app.R, reapplying intended mapped-fraction map-tab changes, and deploying corrected build.
+- Requested outcomes: Verify latest prompt log entry, changed/new Rmd compile applicability/results, changed package build applicability/results, and git push status evidence; return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User requested showing fraction of total BIEN observations mapped (not only fraction of current app sample).
+- Requested outcomes: Auto-fetch total BIEN occurrence counts per query, display mapped fraction of total by default, and keep source-mix query manual.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks exactly per agents/always.agent.md for this turn.
+- Requested outcomes: Verify prompt log latest entry, changed/new Rmd compile applicability/results, changed package build applicability/results, and git push status evidence. Return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks exactly per agents/always.agent.md after appending the exact final-gate prompt entry.
+- Requested outcomes: Verify prompt log latest entry, changed/new Rmd compile applicability/results, changed package build applicability/results, and git push status evidence. Return strict PASS/BLOCKED and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User requested a left-sidebar toggle to exclude citizen science and HumanObservation records, keeping plot/specimen-focused occurrence views.
+- Requested outcomes: Add exclusion checkbox, filter mapped/table occurrences to remove iNaturalist and HumanObservation categories, update filter summary text, and deploy to shinyapps.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Mandatory final-gate verification requested with context that shinyapps deployment was blocked by HTTP 409 task-in-progress lock.
+- Requested outcomes: Verify prompt log entry exists, check changed Rmd compile applicability, check changed R package build applicability, and confirm git push status.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks now and confirm PASS only if prompt logging, changed Rmd handling, changed package build handling, and git push status are all verified.
+- Requested outcomes: Return PASS/BLOCKED with concise evidence and InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reported map still only shows app-sample mapped fraction and requested fraction versus total BIEN observations.
+- Requested outcomes: Ensure map notice shows mapped fraction against total BIEN observations, fix reactive update timing so total appears when available, and deploy updated app.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Mandatory final-gate verification requested after deploying map-fraction denominator reactivity fix.
+- Requested outcomes: Verify prompt log entry exists, confirm changed Rmd compile applicability, confirm changed R package build applicability, and confirm git push status.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Re-run mandatory final pre-return checks now. Require PASS only if prompt is recorded in agents/prompt_log.md for this exact final-gate request, changed Rmd compile requirement handled, changed R package build requirement handled, and git push status confirmed.
+- Requested outcomes: Return PASS only when prompt logging, changed Rmd handling, changed R package build handling, and git push confirmation are all verified for this exact request.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reported the shiny app was not responding.
+- Requested outcomes: Diagnose live availability, inspect shinyapps logs, restore responsiveness, and verify endpoint health.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
