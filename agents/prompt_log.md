@@ -1527,3 +1527,16 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Result: Removed automatic post-query BIEN summary count prefetch observer; counts remain manual via explicit slower button; deployed and pushed.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Run mandatory final pre-return checks for this turn after deep-dive lucky query hang fix.
+- Requested outcomes: Verify prompt log, Rmd compile applicability, package build applicability, and git push status; return PASS/BLOCKED with concise evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reported app still hangs after Lucky generates species (e.g., Ambrosia artemisiifolia).
+- Requested outcomes: Deep-dive and prevent Lucky flow from hanging the app.
+- Result: Lucky button now only selects species and no longer auto-runs BIEN query; user must click Query BIEN explicitly.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/agents/prompt_log.md; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
