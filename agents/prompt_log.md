@@ -1078,3 +1078,51 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify all 4 mandatory checks and report PASS/BLOCKED with concise evidence.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-03
+- Prompt summary: Run mandatory final pre-return gate for this task after successful deployment of BIEN-SpeciesShinyApp to shinyapps.io.
+- Requested outcomes: Verify prompt log requirement, determine Rmd compile applicability, determine R package build applicability, verify git push status, and perform minimal remediation if required with concise PASS/FAIL.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-03
+- Prompt summary: Run mandatory final pre-return gate for BIEN species-input casing normalization fix so lowercase queries (e.g., 'pinus ponderosa') resolve consistently.
+- Requested outcomes: Verify prompt-log condition, confirm Rmd compile applicability, confirm R package build applicability, and verify git push status for BIEN-SpeciesShinyApp commit 6bd168f pushed to origin/main after shinyapps deployment.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-03
+- Prompt summary: Audit BIEN-SpeciesShinyApp for biodiversity-science correctness and interpretation risks, focused on taxonomy/name handling, native-introduced-cultivated semantics, geovalid caveats, source-mix interpretation, and user-facing warnings.
+- Requested outcomes: Provide prioritized biodiversity-science recommendations with implementation detail and explicit risk framing.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-03
+- Prompt summary: Run mandatory final pre-return gate for this task after BIEN-SpeciesShinyApp improvements (species normalization robustness, SQL quoting helper, popup escaping, verbatim species input preservation, fallback warning banner) and README path fix, with commit/push/deploy context.
+- Requested outcomes: Verify prompt-log recording, determine updated Rmd compile applicability, determine updated R package build applicability, verify git push status, perform minimal remediation if needed, and return concise PASS/FAIL with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-03
+- Prompt summary: Run mandatory final pre-return gate for this task. Context: user requested push of all changes to GitHub and update of public BIEN shiny app website; completed actions include commit 8f9e586 on main, push to origin/main for BIEN-SpeciesShinyApp, and successful deployment to shinyapps.io.
+- Requested outcomes: Verify prompt logging, determine updated Rmd compile applicability, determine updated R package build applicability, verify git push status, perform minimal remediation if needed, and return concise PASS/FAIL with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-03
+- Prompt summary: Run mandatory final pre-return gate for this task after read-only BIEN logo asset checks (no file edits), and return concise PASS/FAIL evidence with minimal remediation if needed.
+- Requested outcomes: Verify prompt-log recording, determine updated Rmd compile applicability, determine updated R package build applicability, verify git push status, and report gate result.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-03
+- Prompt summary: Run mandatory final pre-return gate for this task after BIEN-SpeciesShinyApp README logo/link update (commit a0eefd2 pushed to origin/main), with no Rmd or R package file changes.
+- Requested outcomes: Verify prompt-log recording, determine updated Rmd compile applicability, determine updated R package build applicability, verify git push status, perform minimal remediation if needed, and return concise PASS/FAIL with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: Fix quoting bug in BIEN Query Code tab output — backslash-escaped double quotes in paste0() replaced with single-quoted outer string; committed 701dd3c and deployed to shinyapps.io.
+- Requested outcomes: Fix quoting in BIEN Query Code tab in BIEN-SpeciesShinyApp/app.R, push to GitHub (origin/main), and deploy to shinyapps.io.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
