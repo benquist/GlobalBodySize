@@ -1513,3 +1513,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Result: Added forced_query_species server-side override to eliminate updateTextInput race; deployed successfully.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; BIEN-SpeciesShinyApp/agents/prompt_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-04
+- Prompt summary: User reported lucky-selected species query (e.g., Betula papyrifera) still hangs/takes too long.
+- Requested outcomes: Fix lucky query performance so it does not appear stuck after selecting random species.
+- Result: Disabled SQL ORDER BY random() for lucky fast mode, reduced per-plan timeout to 8s, deployed and pushed.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
