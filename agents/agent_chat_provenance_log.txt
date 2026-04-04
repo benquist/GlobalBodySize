@@ -403,3 +403,14 @@ Action taken:
 - Committed, pushed, and deployed BIEN app changes.
 - Appended prompt/provenance entries for mandatory final-gate compliance.
 Outcome: New links tab and dual-mode query-code guidance are live in the public app.
+
+[15] Date: 2026-04-04
+Source: active chat request
+Request summary: Mandatory final-gate check requested after links-tab and dual-mode query-code deployment.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended exact final-gate prompt entry in agents/prompt_log.md.
+- Appended this provenance entry for append-only agent-log compliance.
+Outcome: Prompt-log state is aligned for strict always-agent final-gate matching.
