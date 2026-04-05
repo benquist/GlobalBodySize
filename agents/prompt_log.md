@@ -11,6 +11,13 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 - Date: 2026-04-05
+- Prompt summary: User reported Helianthus annuus query hangs with no map update and summary statistics also hanging.
+- Requested outcomes: Remove blocking query behavior so occurrence map and summary can load without long hangs.
+- Result: Identified DB randomization as the blocking path for large species; enforced non-random SQL in live query path and moved randomization to lightweight in-memory shuffle for head sampling mode; updated progress detail to explicitly state DB randomization is disabled for speed; deployed to shinyapps.io.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-05
 - Prompt summary: Run mandatory final pre-return checks for this turn after Populus tremuloides hang fix (commit a0735b8) and root prompt-log commit (0279e18).
 - Requested outcomes: Verify prompt recorded in agents/prompt_log.md for this exact final-check request, confirm changed Rmd compile applicability/results, confirm changed R package build applicability/results, and confirm git push status for relevant repos.
 - Files changed: agents/prompt_log.md
