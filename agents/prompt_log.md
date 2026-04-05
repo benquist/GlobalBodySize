@@ -1617,3 +1617,10 @@ Verify and report PASS/BLOCKED for:
 3) updated R package build applicability/results,
 4) git push status confirmed.
 Return concise evidence and decision.
+
+- Date: 2026-04-05
+- Prompt summary: "No, not the range map but the map with occurrence points"
+- Requested outcomes: Adjust BIEN Species Shiny App behavior/visualization to use the occurrence-points map instead of the range map.
+- Context/result note: This prompt drove the BIEN timeout diagnosis and fixes in BIEN-SpeciesShinyApp/app.R (`per_plan_timeout` 20->60 and default `query_timeout` slider 30->90), with deployment on commit 58ca515.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/agents/prompt_log.md; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
