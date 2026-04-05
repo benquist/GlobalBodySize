@@ -11,6 +11,14 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 - Date: 2026-04-05
+- Prompt summary: User reported that querying Sequoia sempervirens returned no data points on the map despite expecting many observations.
+- Prompt text (exact): then I ran Sequoia sempervirens and it returned no data points to the map when we have 26,810 observation points
+- Requested outcomes: Diagnose whether the zero-point map result is an app bug versus BIEN coordinate availability/filter behavior, and restore mapping when possible.
+- Result: Reproduced query path and confirmed occurrence rows are returned, but mappable coordinate availability is zero in BIEN for this species under both strict and liberal filters (`count_mappable_occurrences_for_species` returned 0 in both modes). No map-render bug was found; the issue is absence of usable latitude/longitude in current BIEN response for this taxon. Recommended fallback is range-layer interpretation plus explicit coordinate-availability messaging.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-05
 - Prompt summary: User reported Helianthus annuus query hangs with no map update and summary statistics also hanging.
 - Requested outcomes: Remove blocking query behavior so occurrence map and summary can load without long hangs.
 - Result: Identified DB randomization as the blocking path for large species; enforced non-random SQL in live query path and moved randomization to lightweight in-memory shuffle for head sampling mode; updated progress detail to explicitly state DB randomization is disabled for speed; deployed to shinyapps.io.
@@ -22,6 +30,13 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify prompt recorded in agents/prompt_log.md for this exact final-check request, confirm changed Rmd compile applicability/results, confirm changed R package build applicability/results, and confirm git push status for relevant repos.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-05
+- Prompt summary: Full audit and fix cycle — comprehensive BIEN Shiny App performance review targeting all blocking paths, dead code, zero-coordinate UX, and large-species hang issues.
+- Requested outcomes: (1) Identify all remaining blocking/synchronous DB paths including count_mappable_occurrences_for_species and get_random_bien_species_candidate; (2) fix count_occurrence_source_mix GROUP BY over unlimited rows; (3) remove dead code; (4) fix misleading 'Auto-fetching' text; (5) improve zero-coordinate UX with actionable guidance; (6) commit and push to GitHub.
+- Result: Removed two dead-code functions (get_random_bien_species_candidate with ORDER BY random(), count_mappable_occurrences_for_species). Fixed count_occurrence_source_mix to cap GROUP BY computation at 50 000 rows via LIMIT-subquery pattern — prevents multi-minute scans for Solidago canadensis (880k+ rows). Fixed misleading 'Auto-fetching' placeholder text to correctly say counts are not loaded until the manual button is clicked. Improved zero-coordinate map notice to include actionable guidance (uncheck geovalid, enable range layers, inspect Observation Table tab). Confirmed count_occurrence_records and count_occurrence_source_mix are strictly manual-only (gated behind load_summary_counts button). App parses cleanly and deployed to shinyapps.io.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot (@m supervisor)
 
 - Date: 2026-04-05
 - Prompt summary: User reported Populus tremuloides query still appears hung with no fast-loading progress message and requested immediate fix.
@@ -1580,3 +1595,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Log this exact final-check request, then verify mandatory gate status with evidence for prompt log, change-gated Rmd compile, change-gated R package build, and git push for both repositories.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+[2026-04-05] Re-run the mandatory final pre-return gate for this turn in /Users/brianjenquist/VSCode after adding exact prompt text to agents/prompt_log.md.
+Verify and report PASS/BLOCKED for:
+1) prompt log recorded,
+2) updated Rmd compile applicability/results,
+3) updated R package build applicability/results,
+4) git push status confirmed.
+Return concise evidence and decision.
