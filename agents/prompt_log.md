@@ -1654,3 +1654,12 @@ Return concise evidence and decision.
 - Requested outcomes: Verify agents/prompt_log.md was updated with large-species timeout fix entry; check Rmd compile applicability/results (change-gated); check R package build applicability/results (change-gated); confirm git push status for both BIEN-SpeciesShinyApp (commit 0d68d67 to origin/main) and VSCode monorepo.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-06
+- Prompt summary: User reported 'I'm Feeling Lucky' button is not working correctly.
+- Prompt text (exact): "the i am feeling lucky button is now working right now"
+- Requested outcomes: Fix the Lucky button so it works with current timeout settings.
+- Root cause: Lucky button was setting query_timeout to 10-15 seconds (old hardcoded values), but the recent large-species timeout fix updated defaults to 150s min 45s. This mismatch broke Lucky mode button logic.
+- Fix implemented: Updated Lucky button to set query_timeout = 75 seconds (respecting new min 45s threshold and providing reasonable per_plan timeout of 75s). This keeps Lucky queries fast while working with the new responsive timeout scaling logic. Parse check PASS. Deployed to shinyapps.io commit 74c0d08. App HTTP 200 response confirmed.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
