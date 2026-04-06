@@ -1624,3 +1624,18 @@ Return concise evidence and decision.
 - Context/result note: This prompt drove the BIEN timeout diagnosis and fixes in BIEN-SpeciesShinyApp/app.R (`per_plan_timeout` 20->60 and default `query_timeout` slider 30->90), with deployment on commit 58ca515.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/agents/prompt_log.md; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-06
+- Prompt summary: User requested emailing all agent overviews to brianjenquist@gmail.com.
+- Prompt text (exact): "For all of my agents can you email me each of the agent overviews? brianjenquist@gmail.com"
+- Requested outcomes: Compile all agent overviews in one email-ready message for delivery to the user.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-06
+- Prompt summary: Add new 'Temporal Distribution' tab to BIEN Shiny App with year-range filter and 10-year interval histogram.
+- Prompt text (exact): "I would like to add a new tab to the app - a Temporal year-range filter + date distribution in summary stats — client-side post-download, zero BIEN query cost. For each species we can generate a frequency distribution of counts per 10 year intervals from the earliest to the latest observation. Color code the histogram by collection type (plot, iNaturalist, specimen etc.)"
+- Requested outcomes: (1) Create new 'Temporal Distribution' tab; (2) Add year-range slider for client-side filtering; (3) Plot 10-year interval histogram colored by observation_category; (4) Display temporal summary statistics (total records, records with dates, earliest/latest year, median year, span); (5) Ensure zero BIEN query cost (client-side only); (6) Deploy to shinyapps.io.
+- Result: Added ggplot2 to required packages. Created three helper functions: parse_collection_year() to extract years from date_collected, bin_temporal_data() to aggregate observations into 10-year bins by observation_category, and summarize_temporal_stats() to generate temporal summary statistics. Implemented new UI tab with year-range slider and histogram plot. Added server-side reactives: output$temporal_stats (text summary) and output$temporal_histogram (ggplot2 stacked bar chart). Color scheme: Specimen/herbarium (brown), Plot/survey (green), Citizen science/iNaturalist (orange), Field observation/HumanObservation (blue), GBIF/other aggregator (purple), Other/unknown (gray). All operations run client-side post-download with zero BIEN query cost. Parse check PASS. Deployed to shinyapps.io commit 1e4794d. App HTTP 200 response confirmed.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
