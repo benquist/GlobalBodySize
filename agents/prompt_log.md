@@ -1648,3 +1648,9 @@ Return concise evidence and decision.
 - Fix implemented: Made per_plan_timeout responsive to user's query_timeout setting. New calculation: per_plan_timeout = max(75, round(timeout_sec * 0.85)). Allocates 85% of user's timeout to longest-running plan (COUNT/FETCH), leaving 15% for overhead and fallback execution. Updated query_timeout slider defaults: value 90→150 seconds (default), min 30→45 seconds, max 300→500 seconds. Examples: (i) user sets 150s → per_plan gets 128s (was 60s, fixes Vacc. corymb.); (ii) user sets 300s → per_plan gets 255s (was 60s); (iii) user sets 500s → per_plan gets 425s (was 60s). Lucky mode remains hardcoded to 8s per-plan (stays fast). Parse check PASS. Deployed to shinyapps.io commit 0d68d67. App HTTP 200 response confirmed.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-06
+- Prompt summary: Run final pre-return checks for large-species timeout fix (Vaccinium corymbosum).
+- Requested outcomes: Verify agents/prompt_log.md was updated with large-species timeout fix entry; check Rmd compile applicability/results (change-gated); check R package build applicability/results (change-gated); confirm git push status for both BIEN-SpeciesShinyApp (commit 0d68d67 to origin/main) and VSCode monorepo.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
