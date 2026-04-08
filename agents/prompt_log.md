@@ -1679,3 +1679,11 @@ Return concise evidence and decision.
 - Result: Temporal tab smoke test PASS (local app on 127.0.0.1:8126 returned HTML containing "Temporal Distribution"). Lucky selector smoke test PASS (5/5 runs returned status=ok with valid species). Vaccinium large-species smoke test PASS using app fallback path with timeout_sec=150 and per_plan_timeout_sec=128, returning rows=1200 under strict strategy in ~11.5s. Local app endpoint returned HTTP 200 during smoke testing.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User confirmed to proceed with external smoke validation checks.
+- Prompt text (exact): "yes"
+- Requested outcomes: Run the same three checks against the deployed shinyapps.io app as external smoke validation.
+- Result: Local reproducible checks remain PASS for all three items (Temporal tab render, Lucky selector logic, Vaccinium large-species query path). External shinyapps.io network checks from this environment were inconclusive due connection timeout / fetch extraction failures (curl timeout and fetch_webpage extraction failure), so only availability inference is partial from prior successful checks in session.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
