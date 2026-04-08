@@ -1671,3 +1671,11 @@ Return concise evidence and decision.
 - Result: Audited BIEN repo state, fetched remote, identified one collaborator commit ahead (43c6f17), created safety backups before pull (tag backup-temporal-build-2026-04-08, branch backup/temporal-build-2026-04-08), stashed local untracked diagnostics, fast-forwarded to collaborator update, verified temporal tab removal, restored temporal feature in updated app (ggplot2 dependency, year parsing/binning helpers, temporal tab UI, temporal stats and histogram outputs), synced app.R and inst/app/app.R, rebuilt package with R CMD INSTALL, launched package app via BIENSpeciesShinyApp::runApp() and confirmed HTTP 200 locally, restored stashed local diagnostics, and pushed preservation commit bcd1eed to origin/main.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; BIEN-SpeciesShinyApp/agents/prompt_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User approved running all three smoke checks (Temporal tab render, Lucky button logic, Vaccinium large-species path).
+- Prompt text (exact): "Yes to all three"
+- Requested outcomes: Run smoke checks for (1) Temporal Distribution tab render, (2) Lucky selection behavior, and (3) large-species query behavior for Vaccinium corymbosum.
+- Result: Temporal tab smoke test PASS (local app on 127.0.0.1:8126 returned HTML containing "Temporal Distribution"). Lucky selector smoke test PASS (5/5 runs returned status=ok with valid species). Vaccinium large-species smoke test PASS using app fallback path with timeout_sec=150 and per_plan_timeout_sec=128, returning rows=1200 under strict strategy in ~11.5s. Local app endpoint returned HTTP 200 during smoke testing.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
