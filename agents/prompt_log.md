@@ -11,6 +11,22 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 
+- Date: 2026-04-08
+- Prompt summary: Mandatory final pre-return gate invocation for this turn.
+- Prompt text (exact): "Run the mandatory final pre-return gate for this turn."
+- Requested outcomes: Verify prompt logging, Rmd compile applicability, R package build applicability, and git push status before returning to user.
+- Result: Final gate executed; checks confirmed after prompt log update.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (always gate invocation)
+
+- Date: 2026-04-08
+- Prompt summary: User reported Margaritaria nobilis runs slowly and asked for a user alert plus improvements.
+- Prompt text (exact): "Margaritaria nobilis is running slow...can we give the user an alert?"
+- Requested outcomes: Add in-app slow-query alerting and practical performance guidance for long BIEN species queries.
+- Result: Added a runtime-based slow-query warning panel in the Occurrence tab and a post-query warning notification when non-cached queries exceed 25 seconds, including likely-cause diagnostics and actionable speed-up guidance (fast mode, lower limits, relaxed strict filters).
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-05
 - Prompt summary: User asked @M to review the BIEN Shiny App overall and requested prompt log update.
 - Prompt text (exact): "update please. @M what do you think of the BIEN shiny app?"
@@ -1694,4 +1710,20 @@ Return concise evidence and decision.
 - Requested outcomes: Deploy BIEN Shiny app to shinyapps.io development endpoint and push corresponding repository updates to GitHub.
 - Result: Deployed BIEN app successfully via deploy_safe.R to https://benquist.shinyapps.io/bien-species-shinyapp/ (bundle id 11819845, task id 1675353737), verified live endpoint HTTP 200, committed deployment metadata + BIEN prompt log, and pushed BIEN repo main to commit f2b9369.
 - Files changed: BIEN-SpeciesShinyApp/rsconnect/shinyapps.io/benquist/bien-species-shinyapp.dcf; BIEN-SpeciesShinyApp/agents/prompt_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User reported Margaritaria nobilis is slow and requested user-facing alerting and speed guidance.
+- Prompt text (exact): "Margaritaria nobilis is running slow...can we give the user an alert? how to improve?"
+- Requested outcomes: Add a clear in-app slow-query alert and actionable mitigation guidance for heavy BIEN species queries.
+- Result: Added slow-query runtime alerting in the Occurrence tab and post-query warning notifications for non-cached runs exceeding 25 seconds, with likely-cause diagnostics and practical speed-up options.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: Mandatory final pre-return gate rerun request after updating prompt log.
+- Prompt text (exact): "Re-run the mandatory final pre-return gate now that agents/prompt_log.md was updated."
+- Requested outcomes: Confirm prompt logging, Rmd compile applicability, R package build status, and git push status before return.
+- Result: Gate rerun requested and tracked.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
