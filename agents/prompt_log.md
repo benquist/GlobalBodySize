@@ -1727,3 +1727,33 @@ Return concise evidence and decision.
 - Result: Gate rerun requested and tracked.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User requested mandatory final pre-return gate execution after commits/pushes.
+- Prompt text (exact): "Run the mandatory final pre-return gate now after commits/pushes.
+
+Verify and report PASS/BLOCKED for:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd compile successfully (if applicable)
+3) Updated R package build successfully (if applicable)
+4) Git push status confirmed
+
+Recent commits:
+- Root: 7a6e975 on master
+- BIEN repo: 8ad6ca1 on main"
+- Requested outcomes: Execute the required final gate checks and return PASS/BLOCKED with evidence for prompt log, Rmd compile applicability/results, R package build applicability/results, and git push status.
+- Result: Final gate executed with evidence collected for both root and BIEN repositories.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User reported Species External Links still showing stale Pinus-specific text after searching a new species (example: Ficus pallida).
+- Prompt text (exact): "I do see a bug. After I load the page, when I enter a new name and search ( I tried Ficus pallida ) and I click on the species external link I get the followingWikipedia
+Species page generated from: Ficus pallida;  Plants of the World Online (Kew)
+Direct taxon link for Pinus ponderosa; otherwise species search results.; Missouri Botanical Garden
+Direct Plant Finder detail for Pinus ponderosa; otherwise Tropicos (Missouri Botanical Garden) name search.; The Plant List
+Direct record link for Pinus ponderosa; otherwise species search.  It is like the search species is not being populated throughout htere.  Again, we should be looking for Ficus pallida;"
+- Requested outcomes: Fix external-links panel so all descriptions/targets reflect the current queried species rather than stale startup text.
+- Result: Updated external-links rendering to source species from current query result and replaced hardcoded Pinus-only explanatory text with dynamic species-aware messaging while preserving direct-link behavior for the startup example species.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
