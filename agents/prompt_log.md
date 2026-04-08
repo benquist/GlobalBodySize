@@ -1757,3 +1757,57 @@ Direct record link for Pinus ponderosa; otherwise species search.  It is like th
 - Result: Updated external-links rendering to source species from current query result and replaced hardcoded Pinus-only explanatory text with dynamic species-aware messaging while preserving direct-link behavior for the startup example species.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User requested improved random-species behavior to prioritize a specified starter set, then use true BIEN-random species constrained to at least 10 observations.
+- Prompt text (exact): "Also, for the random species we seem to only pick large sampled species that take a long time to load. Can we start the random selection of species with these species \"* Chimarrhis hookeri
+* Cedrela angustifolia
+* Hevea brasiliensis
+* Clusia alata
+* Annona montana
+* Bunchosia armeniaca
+* Guatteria excelsa (endemic)
+* Miconia calophylla
+* Ficus pallida\"  then truely select a random subset of species from BIEN (but the species shoudl have at least 10 observations)"
+- Requested outcomes: Make the Lucky selector try the provided starter species first and then fall back to a truly random BIEN subset where species meet a >=10 observation threshold.
+- Result: Updated lucky-species selection to first randomize across the nine requested starter species (with range verification and count threshold checks), then query a BIEN-random species pool via SQL with HAVING COUNT(*) >= 10 and attempt verified-range candidates from that random pool.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User asked whether the Shiny app has been updated.
+- Prompt text (exact): "did you update the shiny app?"
+- Requested outcomes: Confirm current update status for code/deployment.
+- Result: Verified deployment endpoint availability (HTTP 200) and checked repository state to confirm latest random-species updates are present locally in BIEN app files.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: Mandatory final pre-return gate check for this turn.
+- Prompt text (exact): "Run the mandatory pre-return gate for this turn."
+- Requested outcomes: Verify prompt log recording, Rmd compile status, R package build status, and git push status.
+- Result: Gate executed and initially BLOCKED until prompt log was updated.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: Exact mandatory gate rerun prompt logging.
+- Prompt text (exact): "Re-run the mandatory pre-return gate now that agents/prompt_log.md has been updated.
+
+Verify and report PASS/BLOCKED for:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd compile status
+3) Updated R package build status
+4) Git push status confirmed"
+- Requested outcomes: Re-run mandatory final gate with exact criteria listed in prompt.
+- Result: Exact prompt text recorded for compliance matching.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User requested immediate deployment of the latest local Shiny app changes.
+- Prompt text (exact): "yes, deploy it now"
+- Requested outcomes: Deploy current BIEN app changes to shinyapps.io immediately.
+- Result: Deployed via BIEN-SpeciesShinyApp/deploy_safe.R (bundle id 11822966, task id 1675658179) and verified endpoint returned HTTP 200.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
