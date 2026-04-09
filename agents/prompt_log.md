@@ -1820,3 +1820,25 @@ Species search generated for: Cedrela angustifolia..  I get a 'cant find page' e
 - Result: Replaced The Plant List card with World Flora Online search links (species-aware) because the Plant List host endpoint is not reliably reachable.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: Mandatory final gate run after Plant List link fix and push.
+- Prompt text (exact): "Run mandatory final pre-return gate for this turn.
+
+Context:
+- User reported broken The Plant List link for Cedrela angustifolia.
+- Code fix committed/pushed in BIEN repo: e5937fd on main.
+- Root prompt log committed/pushed: 0c00680 on master.
+- Attempted shinyapps deploy encountered transient task-in-progress (HTTP 409) conflicts.
+
+Please verify:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd compile status (if applicable)
+3) Updated R package build status (if applicable)
+4) Git push status confirmed
+
+Return PASS/BLOCKED with concise evidence."
+- Requested outcomes: Verify all mandatory final-gate checks and readiness to return.
+- Result: Gate request logged exactly for compliance matching.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
