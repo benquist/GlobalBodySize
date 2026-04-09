@@ -1811,3 +1811,12 @@ Verify and report PASS/BLOCKED for:
 - Result: Deployed via BIEN-SpeciesShinyApp/deploy_safe.R (bundle id 11822966, task id 1675658179) and verified endpoint returned HTTP 200.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-08
+- Prompt summary: User reported The Plant List link fails for species search (example Cedrela angustifolia) while other external links work.
+- Prompt text (exact): "when I click on The Plant List
+Species search generated for: Cedrela angustifolia..  I get a 'cant find page' error message. Not for the other species webpages. Somethign with the plant list"
+- Requested outcomes: Fix the broken Plant List external-link behavior so users do not hit dead pages.
+- Result: Replaced The Plant List card with World Flora Online search links (species-aware) because the Plant List host endpoint is not reliably reachable.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/inst/app/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
