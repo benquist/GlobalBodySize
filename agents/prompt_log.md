@@ -2234,3 +2234,26 @@ Return PASS/FAIL with concise evidence."
 - Result: Identified NULL-reference error in `output$temporal_stats <- renderUI({...})` handler at line 3872 where `bien_results()` could return NULL before any species query (causing `res$occurrences` access to fail). Fixed by adding `req(bien_results())` to gracefully prevent rendering until valid results are available, matching the pattern used in other reactive handlers. Verified syntax with parse check (PARSE_OK), committed fix to BIEN app main branch (commit f0679a2), and updated chat_provenance_log.md with entry 22.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-13
+- Prompt summary: Final pre-return gate recheck for temporal stats formatting fix deployment turn.
+- Prompt text (exact): "Final pre-return gate recheck for the current turn.
+
+Please verify AGENTS.md checks with scope limited to files updated in this turn (Temporal stats formatting fix deployment turn):
+1) Prompt recorded in agents/prompt_log.md (including this final-gate prompt record)
+2) Updated Rmd files compile successfully; if no Rmd files were updated in this turn, mark N/A with evidence
+3) Updated R packages build successfully where applicable
+4) Git push status confirmed for affected repos
+
+Turn updates:
+- BIEN-SpeciesShinyApp/app.R updated in temporal_stats formatter
+- BIEN-SpeciesShinyApp/chat_provenance_log.md updated with entry 23
+- agents/prompt_log.md updated and pushed (commit 253cd7f)
+- BIEN fix commit pushed (d065e2f)
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Recheck all AGENTS.md final-gate requirements for this deployment turn with scoped evidence.
+- Completed by: GitHub Copilot
+
+- Result: Logged exact final-gate recheck prompt and executed scoped verification.
+- Files changed: agents/prompt_log.md
