@@ -11,6 +11,94 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 
+- Date: 2026-04-09
+- Prompt summary: User reported duplicate tooltip popups and sticky black tooltip on hover leave in BIEN app settings.
+- Prompt text (exact): "For the hover over information for the  tooltip wording pop ups. There are now two popups occuring - one box with white background and one box with black backgroudn. The black background box does not disapear when the hover over cursor leaves"
+- Requested outcomes: Ensure a single tooltip popup appears and dismisses correctly when cursor leaves.
+- Result: Removed Bootstrap/native tooltip attributes plus Bootstrap tooltip initialization and kept only the custom tooltip implementation, then redeployed the app.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-13
+- Prompt summary: Temporal Distribution error persisted after prior fix; diagnose and deploy corrected fix.
+- Prompt text (exact): "I dont think the error is fixed. We are still seeing it"
+- Requested outcomes: Identify why Temporal stats still errors in production and fix it.
+- Result: Pulled shinyapps logs and identified current runtime failure in `output$temporal_stats` as an unsupported `sprintf("%,d")` format string. Updated `app.R` to build the total-record count label with `format(stats$total_records, big.mark = ",", scientific = FALSE, trim = TRUE)` and rendered it with `%s`. Verified syntax (`PARSE_OK`), redeployed via `Rscript deploy_now.R`, and updated BIEN chat provenance.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: User requested a final response message for the RBIEN reporter plus a recommended fix.
+- Prompt text (exact): "Give me a response to the user who posted the issue and a recommended fix"
+- Requested outcomes: Provide ready-to-post issue response text and a concrete recommended fix path.
+- Result: Prepared maintainer-style issue reply with immediate workaround for affected users and a package-level fix recommendation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: User asked for a ready-to-post response on the RBIEN issue thread.
+- Prompt text (exact): "can you post a response then on the RBIEN issue?"
+- Requested outcomes: Provide concise issue-comment text they can post directly to GitHub.
+- Result: Prepared maintainer-style response text with reproducibility note, likely 1.2.8 regression interpretation, workaround, and requested diagnostics.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: User asked for diagnosis of external RBIEN issue where BIEN_trait_species fails while other functions work.
+- Prompt text (exact): "a user of rbien r package has this issue External Email ... For a few days now, I get an error message (almost immediately) when using the function BIEN_trait_species() ... Do you have any clue on what could cause such an issue and how to solve it?"
+- Requested outcomes: Provide likely root cause and actionable troubleshooting/mitigation guidance for the reported BIEN_trait_species failure.
+- Result: Reproduced BIEN_trait_species("Poa annua") successfully on BIEN 1.2.7 against BIEN DB 4.2.8, inspected BIEN_trait_species/.BIEN_sql internals, and prepared guidance indicating likely version-specific regression or environment-specific send-query issue with recommended downgrade and diagnostics.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: User reported app freeze and requested immediate check.
+- Prompt text (exact): "Looks like the shiny app is frozen"
+- Requested outcomes: Diagnose freeze source in deployed BIEN app and restore responsiveness.
+- Result: Reviewed shinyapps logs, found repeated BIEN COUNT timeout errors tied to the random-species precheck path, removed blocking precheck queries from Lucky selection by switching to immediate curated-pool pick, and redeployed successfully.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: User reported tooltip fix still not working in deployed app and asked for verification.
+- Prompt text (exact): "just checked the shiny app and it didnt work. ...check"
+- Requested outcomes: Diagnose and fix non-working Settings tooltip icons in the running app.
+- Result: Implemented Bootstrap-version-compatible tooltip attributes and added a framework-independent JavaScript fallback tooltip system bound to `.bien-inline-tip` so hover/focus/click help works even without bootstrap tooltip plugin availability, then redeployed to shinyapps.io and verified app status is running with updated timestamp.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: User approved applying clearer ecological wording to Settings/Filters tooltip text.
+- Prompt text (exact): "yes"
+- Requested outcomes: Proceed with previously offered tooltip wording refinements for filter controls in the BIEN app.
+- Result: Updated Settings/Filters tooltip language to more explicitly describe ecological implications of native/introduced, cultivated, plot-only, geovalid, and human-observation filters.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Re-run mandatory final pre-return gate after latest prompt-log update.
+- Prompt text (exact): "Re-run the mandatory final pre-return gate for this turn after the latest prompt-log update."
+- Requested outcomes: Re-verify prompt logging, Rmd compile applicability/results, R package build applicability/results, and git push confirmation.
+- Result: Gate rerun initiated after logging updates to satisfy exact-match prompt traceability.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (always gate invocation)
+
+- Date: 2026-04-09
+- Prompt summary: Run mandatory final pre-return gate for the Settings Filters tooltip fix turn.
+- Prompt text (exact): "Run the mandatory final pre-return gate for this turn and return PASS/FAIL with concise evidence for all required checks from AGENTS.md."
+- Requested outcomes: Verify prompt logging, Rmd compile applicability/results, R package build applicability/results, and git push status before returning to user.
+- Result: Gate executed after app tooltip fix. Prompt log now includes the gate request. Rmd compile was N/A (no changed Rmd files). Package build check succeeded for BIEN package context. Git push tracking status confirmed.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (always gate invocation)
+
+- Date: 2026-04-09
+- Prompt summary: Fix non-working Settings Filters info icons in BIEN Shiny App and add pertinent per-toggle help text behavior.
+- Prompt text (exact): "On the shiny app, for the 'Settings Filters' toggle. On the right of each item to toggle such as 'Conservative default profile' and 'Filter by native vs introduced' etc. there is an information symbol. HOwever, it is currently not working on the hover over or click. Can we add pertantent information for each toggle?"
+- Requested outcomes: Make info symbols interactive on hover/click and ensure users can view explanatory help for each settings toggle.
+- Result: Replaced title-only info marker rendering with Bootstrap tooltip attributes and added robust tooltip initialization hooks so help text appears on hover, focus, and click across filter controls.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-08
 - Prompt summary: Mandatory final pre-return gate invocation for this turn.
 - Prompt text (exact): "Run the mandatory final pre-return gate for this turn."
@@ -1841,4 +1929,300 @@ Return PASS/BLOCKED with concise evidence."
 - Requested outcomes: Verify all mandatory final-gate checks and readiness to return.
 - Result: Gate request logged exactly for compliance matching.
 - Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Create student tutorial Rmd for spatial null model of contamination distance decay — tutorial_spatial_null_model.Rmd
+- Prompt text (exact): "Create student tutorial Rmd for spatial null model of contamination distance decay — tutorial_spatial_null_model.Rmd"
+- Requested outcomes: New R Markdown tutorial teaching students how to upload spatial contamination data and generate a null model for spatial scaling analysis using distance-decay methods.
+- Result: Created /Users/brianjenquist/VSCode/contaminent data/tutorial_spatial_null_model.Rmd with eval=FALSE for user-data upload sections and a self-contained runnable example chunk using simulated data.
+- Files changed: contaminent data/tutorial_spatial_null_model.Rmd; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Final-gate check request for tutorial location/access reply
+- Prompt text (exact): "Run mandatory final pre-return checks for this reply-only request: user asks where tutorial is and how to access it."
+- Requested outcomes: Verify prompt log, Rmd compile applicability, R package build applicability, and git push status for contaminent data repo.
+- Result: Logged prompt and executed mandatory gate checks.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: User asked where the tutorial is and how to access it.
+- Prompt text (exact): "where is the tutorial? how do I access it?"
+- Requested outcomes: Identify tutorial location and provide access instructions.
+- Result: Logged prompt for final-gate traceability on this informational turn.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Review tutorial_spatial_null_model.Rmd for correctness bugs and student-confusion risks
+- Prompt text (exact): "Review the student tutorial at /Users/brianjenquist/VSCode/contaminent data/tutorial_spatial_null_model.Rmd.
+
+Tasks:
+1) Check for correctness issues in the tutorial code and workflow.
+2) Identify any bugs that would cause wrong results or student confusion.
+3) Provide concise recommended fixes with exact section/chunk references.
+4) Classify each finding by severity (high/medium/low).
+
+Return findings-first (most severe first), then brief summary."
+- Requested outcomes: Severity-ranked review findings with exact section/chunk references and concise fixes.
+- Result: Performed code/workflow review and documented prioritized issues.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Split ScalingContamination into separate project repositories and clean monorepo to contamination-only.
+- Prompt text (exact): "THe ScalingContamination repo has many separate projects in it. It needs to be cleaned up and the different projects put in their own repo"
+- Requested outcomes: Perform split from a fresh temporary clone, push separate project repos, and clean ScalingContamination contents.
+- Result: Created/pushed dedicated repos for Cacti, EvoPowerEfficiencyExplorer, PlantBodyMassScaling, updated CaliPoppySDM, and cleaned/pushed ScalingContamination to contamination-focused contents.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Run mandatory final gate in split execution context and report PASS/FAIL evidence.
+- Prompt text (exact): "Run mandatory final gate for this turn using the split-execution repository context at /tmp/scaling_split_work/ScalingContamination (clean temp clone used for operations), not the user workspace's unrelated dirty files.
+
+Checks required:
+1) Prompt recorded in /Users/brianjenquist/VSCode/agents/prompt_log.md for this exact split request.
+2) Updated Rmd files compile successfully for files changed in the split execution context.
+3) Updated R packages build successfully where applicable.
+4) Git push status confirmed for split targets and /tmp/scaling_split_work/ScalingContamination.
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Verify prompt logging, changed Rmd compile status, changed package build status, and git push status for split targets.
+- Result: Logged prompt before report- Result: Logged prompt before report- Result: Logged prompt before rompleted by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Add iNaturalist to BIEN species external links.
+- Prompt text (exact): "For the BIEN shiny app, for the species external links can you add a link to that species iNaturalist page?"
+- Requested outcomes: Add an iNaturalist species link in addition to existing external reference links.
+- Result: Updated BIEN app Species External Links UI to include iNaturalist taxon search generated from the current species name.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Run mandatory final gate for BIEN iNaturalist external-link update.
+- Prompt text (exact): "Run mandatory final gate for this turn.
+
+Turn changes:
+- /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/app.R (added iNaturalist species external link)
+- /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/chat_provenance_log.md (new entry)
+- /Users/brianjenquist/VSCode/agents/prompt_log.md (new prompt entry)
+
+Please verify:
+1) Prompt is recorded in agents/prompt_log.md
+2) Updated Rmd files compile successfully where applicable
+3) Updated R packages build successfully where applicable
+4) Git push status is confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Confirm mandatory gate checks for this turn.
+- Result: Logged final-gate prompt for traceability prior to re-running checks.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Scoped BIEN final gate check.
+- Prompt text (exact): "Run mandatory final gate for this turn, scoped to BIEN repo changes only."
+- Requested outcomes: Validate required final checks for BIEN repo-scope turn.
+- Result: Logged scoped final-gate prompt prior to pass check.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Add conditional AsianPlant species external link in BIEN app.
+- Prompt text (exact): "Also, for the Species External LInks tab, also use https://www.asianplant.net/ as a site to link with. But only link a species to this site if it occurs in the site"
+- Requested outcomes: Add AsianPlant to Species External Links and display it only when the species is present on asianplant.net.
+- Result: Added a cached species-index lookup against asianplant.net Species.htm and conditionally render the AsianPlant link card only for matched species.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Final gate check for AsianPlant external-link turn.
+- Prompt text (exact): "Run mandatory final gate for this turn.
+
+Turn changes:
+- /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/app.R
+- /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/chat_provenance_log.md
+- /Users/brianjenquist/VSCode/agents/prompt_log.md
+
+Please verify:
+1) Prompt is recorded in agents/prompt_log.md
+2) Updated Rmd files compile where applicable
+3) Updated R packages build where applicable
+4) Git push status confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Validate mandatory final checks for this turn.
+- Result: Logged final-gate request before rerunning gate.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Deploy BIEN Shiny app to shinyapps.io.
+- Prompt text (exact): "Yes, deploy to shiny app for BIEN"
+- Requested outcomes: Deploy current BIEN app version to shinyapps.io and confirm live status.
+- Result: Ran deploy_now.R successfully and verified app is running at shinyapps.io with updated timestamp.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Mandatory final gate for BIEN deploy turn.
+- Prompt text (exact): "Run mandatory final gate for this turn.
+
+Turn actions:
+- Deployed BIEN app via /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/deploy_now.R
+- Verified shinyapps status for bien-species-shinyapp is running
+- Logged prompt in /Users/brianjenquist/VSCode/agents/prompt_log.md
+
+Please verify:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd files compile where applicable
+3) Updated R packages build where applicable
+4) Git push status confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Execute mandatory final gate checks and report PASS/FAIL evidence.
+- Result: Final gate executed with prompt log verification, Rmd applicability check, package build, and push-status confirmation.
+- Files changed: agents/prompt_log.md, BIEN-SpeciesShinyApp/BIENSpeciesShinyApp_0.1.0.tar.gz
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Expand BIEN random species starter list.
+- Prompt text (exact): "Now, lets add more species to the random select list. Append these species to the random species select list 'Capparis micracantha
+Clappertonia ficifolia
+Dacryodes costata 
+Ilex cymosa
+Lasianthus attenuatus
+Ochrosia elliptica
+Popowia pisocarpa
+
+Quassia indica
+
+Aquilegia coerulea
+'"
+- Requested outcomes: Append the specified species to the BIEN app random species starter pool.
+- Result: Added all requested species to the curated random species starter_pool used by the random species button.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Deploy BIEN app after random species updates.
+- Prompt text (exact): "yes deploy"
+- Requested outcomes: Deploy latest BIEN app to shinyapps.io.
+- Result: Deployed successfully and confirmed app status running with updated timestamp.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-09
+- Prompt summary: Mandatory final gate for BIEN deploy verification turn.
+- Prompt text (exact): "Run mandatory final gate for this turn.
+
+Turn actions:
+- Deployed BIEN app via /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/deploy_now.R
+- Verified app row from rsconnect applications() shows status running
+- Logged user prompt in /Users/brianjenquist/VSCode/agents/prompt_log.md
+
+Please verify:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd compile where applicable
+3) Updated R package build where applicable
+4) Git push status confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Execute mandatory final gate checks for this deploy turn.
+- Result: Logged exact final-gate prompt before rerun.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-10
+- Prompt summary: Mandatory final gate invocation for current turn.
+- Prompt text (exact): "Run mandatory final gate for this turn."
+- Requested outcomes: Execute mandatory final gate checks and return PASS/BLOCKED with evidence.
+- Result: Gate run executed with prompt-log verification, Rmd applicability check, R package build verification, and git push confirmation.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt; BIEN-SpeciesShinyApp/BIENSpeciesShinyApp_0.1.0.tar.gz
+- Completed by: GitHub Copilot (always gate invocation)
+
+- Date: 2026-04-12
+- Prompt summary: Resume work after communication gap.
+- Prompt text (exact): "Sorry for the gap in communication. Lets resume the work"
+- Requested outcomes: Re-establish context and continue pending tasks.
+- Result: Session resumed; awaiting user direction on next concrete task.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-12
+- Prompt summary: Update BIEN Occurrence Map overview/about tab wording.
+- Prompt text (exact): "For the overview and about tab on the BIEN app. Currently we have the text \" Occurrence Map
+Thousands of geo-validated occurrence records spanning California, Oregon, Idaho, Colorado, and northern Mexico. Records are colored by source class (plot surveys, herbarium specimens, iNaturalist citizen-science observations). The app balances the display so no single data source visually drowns out the others.\"   Lets change that to read \" Occurrence Map
+View species-level occurence records - toggle to view geo-validated occurrence records, native and non-native records. Records are colored by source class (plot surveys, herbarium specimens, iNaturalist citizen-science observations).\"  Would you suggest any changes here?"
+- Requested outcomes: Replace overview/about Occurrence Map text and suggest wording improvements.
+- Result: Updated the Overview/About Occurrence Map description with the requested wording and prepared concise wording suggestions.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-12
+- Prompt summary: Final gate for BIEN overview/about wording update turn.
+- Prompt text (exact): "Run mandatory final gate for this turn.
+
+Turn changes:
+- /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/app.R (updated Overview/About Occurrence Map text)
+- /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/chat_provenance_log.md (new entry)
+- /Users/brianjenquist/VSCode/agents/prompt_log.md (new/repair entries)
+
+Please verify:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd compile where applicable
+3) Updated R package build where applicable
+4) Git push status confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Execute mandatory final checks for this turn.
+- Result: Logged exact final-gate prompt prior to rerun.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-12
+- Prompt summary: Mandatory final gate invocation for current turn.
+- Prompt text (exact): "Run mandatory final gate for this turn."
+- Requested outcomes: Execute mandatory final gate checks and return PASS/BLOCKED with evidence.
+- Result: Prompt recorded; final gate checks executed for prompt log, Rmd compile applicability, R package build, and git push status.
+- Files changed: agents/prompt_log.md; BIEN-SpeciesShinyApp/BIENSpeciesShinyApp_0.1.0.tar.gz
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-13
+- Prompt summary: Push latest BIEN changes.
+- Prompt text (exact): "push"
+- Requested outcomes: Push current committed changes to remote.
+- Result: Committed and pushed BIEN app Overview text update to origin/main.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-13
+- Prompt summary: Final gate for push turn.
+- Prompt text (exact): "Run mandatory final gate for this turn.
+
+Turn actions:
+- Pushed BIEN repo commit f18d8ca to origin/main
+- Updated prompt log with user request \"push\"
+
+Please verify:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd compile where applicable
+3) Updated R package build where applicable
+4) Git push status confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Execute mandatory final gate checks for push turn.
+- Result: Logged exact final-gate prompt prior to rerun.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-13
+- Prompt summary: Fix Temporal Distribution tab NULL-reference error in BIEN Shiny App.
+- Prompt text (exact): "We have an error message in the Temporal Distribution tab. We have this error \"Temporal stats - An error has occurred. Check your logs or contact the app author for clarification.\" Why is this? Can you fix it?"
+- Requested outcomes: Diagnose and fix the error in the Temporal stats display in the Temporal Distribution tab.
+- Result: Identified NULL-reference error in `output$temporal_stats <- renderUI({...})` handler at line 3872 where `bien_results()` could return NULL before any species query (causing `res$occurrences` access to fail). Fixed by adding `req(bien_results())` to gracefully prevent rendering until valid results are available, matching the pattern used in other reactive handlers. Verified syntax with parse check (PARSE_OK), committed fix to BIEN app main branch (commit f0679a2), and updated chat_provenance_log.md with entry 22.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
