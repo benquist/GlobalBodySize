@@ -2289,3 +2289,28 @@ Return PASS/FAIL with concise evidence."
 - Result: Implemented strict-zero-mappable trigger to force a single relaxed-geo fallback attempt, retained existing strict-timeout relaxation behavior, and added warning notifications in the server observer to explicitly state conservative toggle remained selected while effective native/geovalid constraints were auto-relaxed.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Final pre-return gate check after auto-relaxed fallback deployment.
+- Prompt text (exact): "Final pre-return gate check for current turn.
+
+Turn scope:
+- Implemented auto-relaxed fallback behavior in BIEN app when strict query times out or returns zero mappable points.
+- Added user-facing warning notifications clarifying conservative toggle stayed selected while effective query auto-relaxed.
+- Updated BIEN chat provenance and root prompt log.
+- Deployed app to shinyapps successfully.
+- Pushed commits:
+	- BIEN repo main: 0877d34
+	- Root repo master: 4138168
+
+Please verify AGENTS.md requirements:
+1) Prompt recorded in agents/prompt_log.md
+2) Updated Rmd compile status (N/A if no updated Rmd in this turn)
+3) Updated R package build status where applicable
+4) Git push status confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Run mandatory AGENTS.md final checks and confirm PASS.
+- Result: Logged this exact final-gate request and reran final compliance verification.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
