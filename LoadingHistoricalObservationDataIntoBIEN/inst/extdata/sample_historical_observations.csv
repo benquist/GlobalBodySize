@@ -1,0 +1,4 @@
+species_name,collector_name,obs_date,place_description,country_name,state_name,county_name,lat,long,coord_uncertainty_m
+Annona montana,A. Smith,1901-06-15,Near old mission road,Costa Rica,San Jose,,9.93,-84.08,500
+Ochrosia elliptica,J. Doe,1898-11-03,Coastal ridge above village,Fiji,Central,Suva,-18.14,178.42,1200
+Capparis micracantha,R. Green,1912-03-01,Forest margin near river crossing,Indonesia,Maluku,,,-,
