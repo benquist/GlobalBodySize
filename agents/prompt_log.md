@@ -2352,3 +2352,11 @@ Return PASS/FAIL with concise evidence."
 - Result: Added deterministic final-gate marker and prepared matching gate run.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Deploy new Historical Observation Data to BIEN Shiny app to the same shinyapps account as BIEN app.
+- Prompt text (exact): "Can you push this shiny app to my shiny.com account? where we put the BIEN shiny app?"
+- Requested outcomes: Publish the new LoadingHistoricalObservationDataIntoBIEN Shiny app to benquist shinyapps.io account.
+- Result: Deployed app from `LoadingHistoricalObservationDataIntoBIEN` with app name `historical-obs-to-bien`; deployment completed successfully at https://benquist.shinyapps.io/historical-obs-to-bien/.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
