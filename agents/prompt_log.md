@@ -2273,3 +2273,19 @@ Return PASS/FAIL with concise evidence."
 - Result: Added persistent query-summary lines that explicitly show "Requested vs effective BIEN profile" and a direct conservative-profile preservation flag when fallback auto-relaxes native/geovalid settings.
 - Files changed: BIEN-SpeciesShinyApp/app.R
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Diagnose Annona montana blank map after long load and explain why prior fixes were insufficient.
+- Prompt text (exact): "I just tried Annona montana and it sat trying to load data and it finally returned a blank map. What is the issue? Why didnt the past fixes you deploy fix this?"
+- Requested outcomes: Identify remaining failure mode after earlier timeout fixes.
+- Result: Verified in shinyapps logs that strict conservative query for Annona montana still hits BIEN elapsed-time failures (`reached elapsed time limit` / `Could not create execute`). Determined previous fixes improved timeout fallback behavior and transparency but did not yet add an explicit zero-mappable strict-result trigger for a forced relaxed pass.
+- Files changed: BIEN-SpeciesShinyApp/app.R
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Implement auto-relaxed pass and explicit user notification when effective settings differ.
+- Prompt text (exact): "Yes, If it times out or yields zero mappable points, auto-run one relaxed fallback pass.But I would like the user to be notified if the toggle has been changed"
+- Requested outcomes: Auto-run one relaxed fallback pass on strict timeout/zero-mappable and notify users when effective settings are auto-relaxed.
+- Result: Implemented strict-zero-mappable trigger to force a single relaxed-geo fallback attempt, retained existing strict-timeout relaxation behavior, and added warning notifications in the server observer to explicitly state conservative toggle remained selected while effective native/geovalid constraints were auto-relaxed.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
