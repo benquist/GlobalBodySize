@@ -2322,3 +2322,25 @@ Return PASS/FAIL with concise evidence."
 - Result: Created new project folder `LoadingHistoricalObservationDataIntoBIEN` with R package metadata, core ingest/mapping/handoff functions, synonym dictionary, sample historical dataset, and runnable Shiny MVP app for upload, mapping suggestion, optional mapping override, BIEN loading-table build, and TNRS/GNRS/GVS/NSR handoff downloads. Validated via function smoke test and app parse check.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/DESCRIPTION; LoadingHistoricalObservationDataIntoBIEN/NAMESPACE; LoadingHistoricalObservationDataIntoBIEN/LICENSE; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/io_ingest.R; LoadingHistoricalObservationDataIntoBIEN/R/dwc_mapping.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_handoff.R; LoadingHistoricalObservationDataIntoBIEN/R/app_launch.R; LoadingHistoricalObservationDataIntoBIEN/inst/dictionaries/header_synonyms.csv; LoadingHistoricalObservationDataIntoBIEN/inst/extdata/sample_historical_observations.csv; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Final pre-return gate check for new project scaffold turn.
+- Prompt text (exact): "Final pre-return gate check for this turn (new project scaffold).
+
+Turn scope:
+- New project created: LoadingHistoricalObservationDataIntoBIEN
+- Added R package skeleton + Shiny MVP + dictionary + sample data
+- Prompt log updated and pushed
+- Commit pushed: root master 25d86ff
+
+Please verify AGENTS.md requirements:
+1) Prompt recorded in agents/prompt_log.md for this turn
+2) Updated Rmd compile status (N/A if none updated this turn)
+3) Updated R package build status where applicable
+4) Git push status confirmed
+
+Return PASS/FAIL with concise evidence."
+- Requested outcomes: Verify mandatory AGENTS final checks for this scaffold turn.
+- Result: Logged this exact final-gate request and reran compliance checks.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
