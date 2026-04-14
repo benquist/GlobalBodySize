@@ -2257,3 +2257,19 @@ Return PASS/FAIL with concise evidence."
 
 - Result: Logged exact final-gate recheck prompt and executed scoped verification.
 - Files changed: agents/prompt_log.md
+
+- Date: 2026-04-14
+- Prompt summary: Explain and fix conservative-profile timeout/blank-map behavior and make effective fallback profile explicit.
+- Prompt text (exact): "For the BIEN shiny app. Sometimes when I query Capparis micracantha I get what seems like a time out. It sits and spins then returns a blank map. But when I unclick the 'Conservative default profile' and hit query data button again then I get a map. Is this an error? Why is this happening? Is there a fix?"
+- Requested outcomes: Diagnose why strict profile can blank-map and implement a fix.
+- Result: Identified strict-profile BIEN timeout behavior as primary cause for intermittent blank maps on some species. Updated occurrence fallback planner to continue to relaxed fallback plans after strict timeout and to reserve strict-plan timeout budget; additionally updated Lucky-mode query invocation so fallback plans remain enabled (`max_plans = 3`, `per_plan_timeout = 4`) to avoid one-shot strict failures on species picked via random starter pool.
+- Files changed: BIEN-SpeciesShinyApp/app.R
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Add explicit requested-vs-effective profile indicator for users.
+- Prompt text (exact): "Will the user know then if the returned observation records then have a changed Conservative default profile"
+- Requested outcomes: Make profile changes obvious when fallback relaxes conservative defaults.
+- Result: Added persistent query-summary lines that explicitly show "Requested vs effective BIEN profile" and a direct conservative-profile preservation flag when fallback auto-relaxes native/geovalid settings.
+- Files changed: BIEN-SpeciesShinyApp/app.R
+- Completed by: GitHub Copilot
