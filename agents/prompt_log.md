@@ -12,6 +12,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-15
+- Prompt summary: User approved immediate deployment of the Shiny app.
+- Prompt text (exact): "yes deploy"
+yes deploy
+- Requested outcomes: Deploy latest BIEN historical app to shinyapps.io and confirm live update.
+- Result: Successfully redeployed historical-obs-to-bien, verified live page now serves updated UI markers, and pushed rsconnect deployment metadata update to app repo.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/rsconnect/shinyapps.io/benquist/historical-obs-to-bien.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User asked whether shinyapps deployment is updated.
 - Prompt text (exact): "is https://benquist.shinyapps.io/historical-obs-to-bien/ updated?"
 is https://benquist.shinyapps.io/historical-obs-to-bien/ updated?
