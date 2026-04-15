@@ -12,6 +12,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-15
+- Prompt summary: User clarified desired two-file merge to Darwin Core workflow before TNRS/GNRS and BIEN upload.
+- Prompt text (exact): "Ok but in the two .csv files. THe Survey data can be linked with lat and long data in the Plot_test1.csv file. So these two files can be merged  to make one larger file. Then these columns should then be matched to Darwin Core. Remember we want to upload to the BIEN database ultimately.  But before we want to upload we want to pass these data through the TNRS, GNRS, etc. "
+Ok but in the two .csv files. THe Survey data can be linked with lat and long data in the Plot_test1.csv file. So these two files can be merged  to make one larger file. Then these columns should then be matched to Darwin Core. Remember we want to upload to the BIEN database ultimately.  But before we want to upload we want to pass these data through the TNRS, GNRS, etc. 
+- Requested outcomes: Confirm intended merge-to-Darwin-Core workflow and explain TNRS/GNRS pre-BIEN process for provided files.
+- Result: Confirmed workflow and provided practical step-by-step instructions and caveats for missing fields needed by downstream handoff tables.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User reported confusion at Step 3 or 4 taxonomy and TNRS handoff usage, with expected merge behavior for provided CSV examples.
 - Prompt text (exact): "I dont understand what to do on Step 4 taxonomy. It is unclear what to do at this step. I have uploaded two example files and once I got to step 3 I was unclear what to do.  Also I was unclear what to do with the Downloads - TNRS Handoff (how does this work? What does this mean? how do I use the TNRS handoff?).. With the two example .csv files I thought that in these two file examples. the example here would then merge these files together and add Lat and Long values and then map this merge to Darwin Core"
 I dont understand what to do on Step 4 taxonomy. It is unclear what to do at this step. I have uploaded two example files and once I got to step 3 I was unclear what to do.  Also I was unclear what to do with the Downloads - TNRS Handoff (how does this work? What does this mean? how do I use the TNRS handoff?).. With the two example .csv files I thought that in these two file examples. the example here would then merge these files together and add Lat and Long values and then map this merge to Darwin Core
