@@ -12,6 +12,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-15
+- Prompt summary: User asked whether shinyapps deployment is updated.
+- Prompt text (exact): "is https://benquist.shinyapps.io/historical-obs-to-bien/ updated?"
+is https://benquist.shinyapps.io/historical-obs-to-bien/ updated?
+- Requested outcomes: Verify live endpoint status against the updated app.
+- Result: Live endpoint returned HTTP 200 and serves an older UI variant label, indicating it has not been redeployed from the latest rebuilt repo snapshot in this turn.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User requested immediate push of Shiny app update.
 - Prompt text (exact): "push the update to the Shiny app now"
 push the update to the Shiny app now
