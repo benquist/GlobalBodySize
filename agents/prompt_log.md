@@ -12,6 +12,14 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-15
+- Prompt summary: User requested rebuild of BIEN historical Shiny app into new GitHub repo with detailed beginner tutorial README and push.
+- Prompt text (exact): "I have added a Github repo for the project 'BIEN_Historical_Data_ShinyApp' After you rebuild the shiny app please push to Github in the new repo. Add a detailed readme file with a tutorial. Give examples so that a basic ecology user would be able to understand and follow"
+- Requested outcomes: Rebuild app in new repo, push to GitHub, and provide a detailed tutorial README with examples for basic ecology users.
+- Result: Cloned BIEN_Historical_Data_ShinyApp, synced rebuilt app source, expanded README into a full step-by-step tutorial with CSV examples and troubleshooting, validated app and smoke test, committed and pushed to origin/main.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/*; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User requested full implementation build of historical BIEN ingestion app and then approved commit.
 - Prompt text (exact): "Good. Build it" followed by "yes commit"
 - Requested outcomes: Rebuild LoadingHistoricalObservationDataIntoBIEN app into an end-to-end guided workflow and commit the changes.
