@@ -12,6 +12,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-15
+- Prompt summary: User reported confusion at Step 3 or 4 taxonomy and TNRS handoff usage, with expected merge behavior for provided CSV examples.
+- Prompt text (exact): "I dont understand what to do on Step 4 taxonomy. It is unclear what to do at this step. I have uploaded two example files and once I got to step 3 I was unclear what to do.  Also I was unclear what to do with the Downloads - TNRS Handoff (how does this work? What does this mean? how do I use the TNRS handoff?).. With the two example .csv files I thought that in these two file examples. the example here would then merge these files together and add Lat and Long values and then map this merge to Darwin Core"
+I dont understand what to do on Step 4 taxonomy. It is unclear what to do at this step. I have uploaded two example files and once I got to step 3 I was unclear what to do.  Also I was unclear what to do with the Downloads - TNRS Handoff (how does this work? What does this mean? how do I use the TNRS handoff?).. With the two example .csv files I thought that in these two file examples. the example here would then merge these files together and add Lat and Long values and then map this merge to Darwin Core
+- Requested outcomes: Clarify Step 3 mapping actions, Step 4 taxonomy purpose, and TNRS handoff usage; confirm expected merge behavior for provided files.
+- Result: Added explicit action instructions in app Step 3 and Step 4 panels and Downloads section, updated README with practical two-file mapping expectations and TNRS usage notes, validated with provided sample CSVs, pushed changes, and redeployed live app.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/README.md; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/rsconnect/shinyapps.io/benquist/historical-obs-to-bien.dcf; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User approved immediate deployment of the Shiny app.
 - Prompt text (exact): "yes deploy"
 yes deploy
