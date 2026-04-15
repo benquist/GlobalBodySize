@@ -153,6 +153,24 @@ ui <- fluidPage(
       downloadButton("download_gnrs", "GNRS Handoff"),
       downloadButton("download_gvs", "GVS Handoff"),
       downloadButton("download_nsr", "NSR Handoff"),
+      tags$div(
+        style = "margin: 6px 0 4px 0; padding: 8px 10px; background: #f0f4ff; border-left: 3px solid #2f6fab; font-size: 0.85em;",
+        strong("Submission Packet includes:"),
+        tags$ul(
+          style = "margin: 4px 0 0 0; padding-left: 16px;",
+          tags$li("combined_observation_stream.csv"),
+          tags$li("join_audit_report.csv"),
+          tags$li("active_mapping.csv"),
+          tags$li("dwc_qc_report.csv"),
+          tags$li("bien_loading_table.csv"),
+          tags$li("tnrs_handoff.csv"),
+          tags$li("gnrs_handoff.csv"),
+          tags$li("gvs_handoff.csv"),
+          tags$li("nsr_handoff.csv"),
+          tags$li("submission_packet_manifest.csv"),
+          tags$li("README_submission_packet.txt")
+        )
+      ),
       downloadButton("download_submission_packet", "Submission Packet Zip"),
       tags$hr(),
       tags$div(
@@ -259,6 +277,18 @@ ui <- fluidPage(
             tags$li("Review taxonomy triage and unresolved names."),
             tags$li("Click 'Step 5: Build BIEN Draft Tables' and resolve any BLOCK QC issues."),
             tags$li("Export the BIEN loading draft plus TNRS, GNRS, GVS, and NSR handoff tables for downstream review.")
+          ),
+          tags$hr(),
+          tags$div(
+            style = "font-size: 0.9em; color: #555;",
+            tags$strong("Live app: "),
+            tags$a(
+              href = "https://benquist.shinyapps.io/historical-obs-to-bien/",
+              target = "_blank",
+              "https://benquist.shinyapps.io/historical-obs-to-bien/"
+            ),
+            tags$br(),
+            tags$span(paste0("Last deployed: ", format(Sys.Date(), "%Y-%m-%d")))
           )
         )
       )

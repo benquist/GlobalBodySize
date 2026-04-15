@@ -28,6 +28,14 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-15
+- Prompt summary: User requested update to the BIEN historical data upload Shiny app — packet contents checklist + Help tab provenance line.
+- Prompt text (exact): BIEN historical data upload shiny app
+- Requested outcomes: Add a sidebar packet-contents checklist above the Submission Packet Zip button; add a provenance/URL line to the Help tab; redeploy.
+- Result: Added 11-file checklist above Submission Packet Zip button in both app copies; added live-app URL and last-deployed date to Help tab in both copies; deployed; confirmed "Submission Packet includes" and "Last deployed" present in live HTML.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User approved both adding GNRS preview and deploying the updated historical BIEN app.
 - Prompt text (exact): yes to both
 - Requested outcomes: Add an in-app GNRS preview table and deploy the updated historical BIEN Shiny app.
