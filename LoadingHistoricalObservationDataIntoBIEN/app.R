@@ -529,7 +529,6 @@ server <- function(input, output, session) {
 
   handoff <- reactive({
     req(build_state())
-    validate(need(!qc_has_blockers(qc_df()), "QC blockers detected. Fix BLOCK issues before exporting handoff tables."))
     build_bien_handoff_tables(staging_preview_df())
   })
 

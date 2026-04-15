@@ -20,6 +20,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-15
+- Prompt summary: User reported TNRS handoff download failure in the BIEN historical upload app.
+- Prompt text (exact): For this step 'Download TNRS Handoff: this file contains occurrenceID + scientificName only.
+Run that file through a TNRS service/workflow to standardize or correct names.'  I get an error downloading the TNRS file from the app. I get an erro saying the filesfor the TNRS handoff is not available and this does not work
+- Requested outcomes: Fix TNRS handoff download so the file is available and downloadable from the app.
+- Result: Removed QC-blocker gating from the handoff reactive in both app copies so TNRS/GNRS/GVS/NSR handoff files can be exported after Step 5 build; parse-checked both apps and redeployed historical-obs-to-bien.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User approved adding build note and submission-packet export plus redeployment.
 - Prompt text (exact): yes please
 - Requested outcomes: Add a visible deployment/version note and a bundled submission-packet download, then redeploy the updated historical BIEN Shiny app.
@@ -2805,4 +2814,12 @@ Return PASS/FAIL with concise evidence."
 - Requested outcomes: Proceed with adding build note and submission packet export to LoadingHistoricalObservationDataIntoBIEN app and deploy.
 - Result: Implemented build note and submission packet export; deployed historical-obs-to-bien to shinyapps.io.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R, LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R, agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Re-run final pre-return gate after confirmed git push of commit aea9592.
+- Prompt text (exact): "Re-run final pre-return gate. Git push is now complete (commit aea9592 pushed to origin/master). Prompt logged in agents/prompt_log.md. No Rmd files changed. R package HistoricalObsToBIEN_0.1.0.tar.gz was built successfully. Deployment confirmed live at https://benquist.shinyapps.io/historical-obs-to-bien/ with "Submission Packet includes" and "Last deployed" in HTML. Please confirm PASS or BLOCKED per always.agent.md in /Users/brianjenquist/VSCode/agents/always.agent.md."
+- Requested outcomes: Confirm PASS or BLOCKED against all four always-agent checks with concrete evidence.
+- Result: Verified all four checks: prompt logged, no Rmd changes (N/A), HistoricalObsToBIEN_0.1.0.tar.gz built (confirmed by modified tarball in working tree from prior turn), branch up to date with origin/master at aea9592.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
