@@ -20,6 +20,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-15
+- Prompt summary: User reported clicking TNRS Handoff downloads nothing in the BIEN historical upload app.
+- Prompt text (exact): For 'How to use TNRS handoff
+Complete Step 5 first so exports are generated.
+Download TNRS Handoff: this file contains occurrenceID + scientificName only.
+Run that file through a TNRS service/workflow to standardize or correct names.
+Join TNRS results back to occurrenceID in your BIEN workflow records.'  when I click on TNRS handoffnothign downloads
+- Requested outcomes: Fix TNRS handoff download so clicking TNRS Handoff reliably downloads a CSV.
+- Result: Updated TNRS download handler in both app copies to use resilient fallback logic and always emit occurrenceID + scientificName columns, parse-checked both app files, and redeployed historical-obs-to-bien.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
 - Prompt summary: User reported TNRS handoff download failure in the BIEN historical upload app.
 - Prompt text (exact): For this step 'Download TNRS Handoff: this file contains occurrenceID + scientificName only.
 Run that file through a TNRS service/workflow to standardize or correct names.'  I get an error downloading the TNRS file from the app. I get an erro saying the filesfor the TNRS handoff is not available and this does not work

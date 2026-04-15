@@ -715,7 +715,28 @@ server <- function(input, output, session) {
 
   output$download_tnrs <- downloadHandler(
     filename = function() "tnrs_handoff.csv",
-    content = function(file) utils::write.csv(handoff()$tnrs, file, row.names = FALSE)
+    content = function(file) {
+      tnrs_tbl <- tryCatch({
+        req(build_state())
+        build_bien_handoff_tables(staging_preview_df())$tnrs
+      }, error = function(e) {
+        src <- if (!is.null(combined_state())) combined_df() else data.frame(stringsAsFactors = FALSE)
+        data.frame(
+          occurrenceID = if ("occurrenceID" %in% names(src)) src$occurrenceID else seq_len(nrow(src)),
+          scientificName = if ("scientificName" %in% names(src)) src$scientificName else NA_character_,
+          stringsAsFactors = FALSE
+        )
+      })
+
+      if (!"occurrenceID" %in% names(tnrs_tbl)) {
+        tnrs_tbl$occurrenceID <- seq_len(nrow(tnrs_tbl))
+      }
+      if (!"scientificName" %in% names(tnrs_tbl)) {
+        tnrs_tbl$scientificName <- NA_character_
+      }
+
+      utils::write.csv(tnrs_tbl[, c("occurrenceID", "scientificName"), drop = FALSE], file, row.names = FALSE)
+    }
   )
 
   output$download_gnrs <- downloadHandler(
