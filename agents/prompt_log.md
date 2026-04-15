@@ -11,6 +11,174 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 
+- Date: 2026-04-14
+- Prompt summary: Mandatory final gate invocation after warning and deployment polish.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after implementing the prompt: \"Yes\". Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build checks, and git push status."
+- Requested outcomes: Verify final-gate compliance after the latest warning, README, and deployment updates.
+- Result: Final gate invocation recorded for strict compliance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Comprehensive redesign of BIEN historical data ingestion app (from data browser to data submission pipeline)
+- Prompt text (summary): "Use available specialists to rethink the BIEN Shiny app for ecologist workflows. The real use case is data submission/validation, not browsing. Create an ecologist-friendly data ingestion tool supporting multi-file upload, join/link, schema mapping, taxonomic resolution, quality validation, and Darwin Core export. Return comprehensive redesign proposal with new UX flow, file structure, validation checklist, and prototype code. Be specific about pain points and implementation priorities."
+- Requested outcomes:
+  * New app workflow (step-by-step user journey)
+  * File structure assumptions and join logic
+  * Proposed UI layout and user flows
+  * BIEN schema mapping strategy
+  * Data validation checklist
+  * Prototype code for upload and preview modules
+  * Implementation priorities (MVP vs. nice-to-have)
+- Result:
+  * REDESIGN_PROPOSAL.md (14 sections, 500+ lines)
+  * app_redesign_prototype.R (complete Shiny app skeleton with 6 modules)
+  * TAXONOMY_INTEGRATION_STRATEGY.md (13 sections, 600+ lines)
+  * Updated: agents/agent_chat_provenance_log.txt
+- Files changed:
+  * /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/REDESIGN_PROPOSAL.md (created)
+  * /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/app_redesign_prototype.R (created)
+  * /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/TAXONOMY_INTEGRATION_STRATEGY.md (created)
+  * /Users/brianjenquist/VSCode/agents/agent_chat_provenance_log.txt (updated)
+  * /Users/brianjenquist/VSCode/agents/prompt_log.md (this file, updated)
+- Completed by: GitHub Copilot (@m supervisor mode with delegated specialist reasoning)
+
+- Date: 2026-04-14
+- Prompt summary: User approved finishing the remaining warning and deployment polish.
+- Prompt text (exact): "Yes"
+- Requested outcomes: Implement the remaining suggested steps: surface duplicate metadata collapse in the UI, add export-time limitations messaging, and deploy the updated Historical BIEN app.
+- Result: Added duplicate metadata collapse warnings to join audit UI and summary, added a persistent export limitations box, updated README guidance, validated syntax and tutorial smoke test, and redeployed the app to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Mandatory final gate invocation after applying wording and tutorial-data fixes.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after implementing the prompt: \"yes\". Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build checks, and git push status."
+- Requested outcomes: Verify final-gate compliance after the latest app wording and tutorial-data updates.
+- Result: Final gate invocation recorded for strict compliance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: User approved applying the recommended wording and tutorial-data fixes.
+- Prompt text (exact): "yes"
+- Requested outcomes: Implement the previously proposed fixes to soften BIEN-readiness framing, add clearer tutorial caveats, and improve tutorial data safety.
+- Result: Updated the app and README wording to frame outputs as draft handoff tables, added explicit mapping and scientific caveats, replaced tutorial data with plausible synthetic examples, and corrected basisOfRecord vocabulary guidance.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/inst/extdata/sample_plot_metadata.csv; LoadingHistoricalObservationDataIntoBIEN/inst/extdata/tutorial_observations.csv; LoadingHistoricalObservationDataIntoBIEN/R/qc_checks.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Mandatory final gate invocation after agent review of new app additions.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after reviewing the prompt: \"@M please check these new additions. Make sure the biodiversity agents agree with these and check with them if they have any reocmmendations\". Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build checks, and git push status."
+- Requested outcomes: Verify final-gate compliance after the agent review turn.
+- Result: Final gate invocation recorded for strict compliance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: User asked @M and biodiversity agents to review the new Help/About/Tutorial additions and provide recommendations.
+- Prompt text (exact): "@M please check these new additions. Make sure the biodiversity agents agree with these and check with them if they have any reocmmendations"
+- Requested outcomes: Review the new app additions with @m plus biodiversity-focused agents, confirm agreement or disagreement, and summarize recommendations.
+- Result: Queried @m, biodiversity-informatics-checker, and biodiversity-science-guard; all agreed the additions are useful but recommended softer BIEN-readiness framing, stronger tutorial caveats, and safer tutorial data and messaging.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: User requested help button, README updates, About tab steps, worked example, and tutorial tab using fake data.
+- Prompt text (exact): "Build a help button and read me. An about tab about the steps. Have a worked example. Have a tutorial tab of fake data to walk the user through the process."
+- Requested outcomes: Implement in-app Help/About/Tutorial UX and provide a worked example flow with fake data; update README accordingly.
+- Result: Added Help modal button, About and Tutorial tabs, built-in tutorial fake data mode, tutorial file previews, worked-example instructions, and README documentation updates.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/inst/extdata/tutorial_observations.csv; LoadingHistoricalObservationDataIntoBIEN/inst/dictionaries/header_synonyms.csv; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Final gate rerun with explicit AM-only Rmd scope.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn. For Rmd compile check, evaluate only added or modified Rmd files (diff-filter=AM) and exclude deleted files from render requirements. Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, Rmd compile, R package build, and git push status."
+- Requested outcomes: Obtain final-gate PASS using the always-agent-required changed/new Rmd interpretation.
+- Result: Gate rerun requested with explicit AM-only Rmd scope to avoid deleted-file false block.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Review recent onboarding additions in LoadingHistoricalObservationDataIntoBIEN for biodiversity informatics appropriateness.
+- Prompt text (exact): "Review the recent additions in /Users/brianjenquist/VSCode/LoadingHistoricalObservationDataIntoBIEN: Help button, About tab, Tutorial tab, worked example, tutorial fake data files, dictionary updates, and README updates. Evaluate whether they are appropriate for a biodiversity informatics workflow that maps historical observations to Darwin Core and BIEN handoff tables. Return findings first, especially any risks of misleading users, poor Darwin Core guidance, or provenance/QC issues in the tutorial. Then state whether you agree with the additions overall and list recommended improvements."
+- Requested outcomes: Evidence-based review of the new UI, tutorial, fake data, dictionary, and README, with findings first and recommendations.
+- Result: Reviewed the additions against implemented mapping, QC, and BIEN handoff logic; validated the tutorial workflow and prepared findings.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: User asked if the new Historical BIEN Shiny app is ready to launch.
+- Prompt text (exact): "can we launch the new Historical BIEN shiny app yet?"
+- Requested outcomes: Confirm whether the app can be launched now and whether the deployed endpoint is live.
+- Result: Validated syntax parse and deployment endpoint status for launch readiness confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Mandatory final gate invocation after implementing Shiny app updates.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after implementing the Shiny app updates requested by: \"yes. Update Shiny app\". Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build checks, and git push status."
+- Requested outcomes: Verify final-gate compliance after implementing join-audit and QC dashboard app updates.
+- Result: Final gate invocation recorded for strict compliance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: User requested implementing the approved Shiny app updates.
+- Prompt text (exact): "yes. Update Shiny app"
+- Requested outcomes: Implement app updates for join auditing and QC dashboard in the historical ingestion Shiny workflow.
+- Result: Added join-audit reporting, QC dashboard with BLOCK or WARN checks, blocker-aware BIEN export gating, and new downloadable audit and QC reports.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/R/qc_checks.R; LoadingHistoricalObservationDataIntoBIEN/NAMESPACE; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/tests/smoke_join_qc.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Re-run mandatory always-agent gate after prompt-log update.
+- Prompt text (exact): "Re-run the mandatory final pre-return gate now after the latest agents/prompt_log.md update. Return strict format from always.agent.md with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build, and git push checks."
+- Requested outcomes: Re-verify all final-gate checks after prompt-log update.
+- Result: Gate rerun requested with strict PASS/BLOCKED output.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Mandatory always-agent final pre-return gate invocation for this turn.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn and return strict output exactly per always.agent.md format. Context: user asked, \"what does @M and the biodiversity agents suggest?\" Check: (1) latest prompt recorded in agents/prompt_log.md, (2) changed/new Rmd compile status in current worktree, (3) updated R package build status for package dirs with DESCRIPTION and changed files, (4) git push status against upstream. Use concrete command evidence. If package build runs, include InstallCode lines; otherwise set InstallCode accordingly."
+- Requested outcomes: Execute strict final gate and verify all required checks with concrete evidence.
+- Result: Gate invoked; pending PASS verification after this prompt-log update.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: User asked for synthesized recommendations from @M and biodiversity agents.
+- Prompt text (exact): "what does @M and the biodiversity agents suggest?"
+- Requested outcomes: Summarize actionable guidance from @m plus biodiversity-focused agents for the multi-file historical data ingestion and BIEN/DwC workflow.
+- Result: Collected and synthesized recommendations from @m, biodiversity-informatics-checker, and biodiversity-science-guard.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: @m supervisor recommendations for multi-file CSV ingestion in LoadingHistoricalObservationDataIntoBIEN with robust joining and Darwin Core mapping for BIEN handoff.
+- Prompt text (exact): "You are @m supervising specialists. Context: project LoadingHistoricalObservationDataIntoBIEN is being extended to support multiple uploaded CSV files (species observations + plot/location metadata) that are joined into unified records and then mapped to Darwin Core for BIEN handoff (TNRS/GNRS/GVS/NSR tables). Provide concise recommendations in 3 sections: 1) critical design requirements for robustness and UX, 2) biodiversity-science safeguards that must be enforced, 3) immediate implementation checklist (top 8 items). Be specific to R/Shiny and DwC/BIEN workflows."
+
+- Date: 2026-04-14
+- Prompt summary: User requested an @m review of new help, about, tutorial, worked example, fake tutorial data, and README additions in the Historical BIEN Shiny app.
+- Prompt text (exact): "Review the new additions in the Historical BIEN Shiny app project at /Users/brianjenquist/VSCode/LoadingHistoricalObservationDataIntoBIEN. Focus on the recent Help button, About tab, Tutorial tab, worked example, built-in fake tutorial data, and README additions. Check whether these additions are sound for the intended biodiversity/Darwin Core/BIEN workflow. Coordinate the review as @m and return: 1) top findings ordered by severity, 2) whether the additions are acceptable as-is, 3) concrete recommendations for next changes. Keep it concise and implementation-focused."
+- Requested outcomes: Review the new user-facing additions for biodiversity, Darwin Core, and BIEN workflow soundness; return severity-ordered findings, acceptability, and next actions.
+- Result: Review completed with workflow validation, tutorial-path validation, and biodiversity-focused assessment of the new guidance and fake example data.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+- Requested outcomes: Deliver concise, implementation-specific recommendations across architecture/UX robustness, biodiversity-science safeguards, and a top-8 immediate implementation checklist for R/Shiny and DwC/BIEN integration.
+- Result: Prepared structured recommendations with R/Shiny workflow specifics and DwC/BIEN handoff safeguards.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (@m supervisor)
+
+- Date: 2026-04-14
+- Prompt summary: Request science-guard recommendations for Shiny QC checks to prevent ecological misinterpretation in historical biodiversity CSV ingestion and BIEN workflow mapping.
+- Prompt text (exact): "For a Shiny app that ingests historical biodiversity CSVs and joins observation/species and plot/location metadata before Darwin Core mapping and BIEN workflow, provide science-guard recommendations: what checks prevent ecological misinterpretation? Include guidance for native/introduced/cultivated status, temporal ambiguity, coordinate uncertainty, duplicate records, and downstream model caveats. Return practical rules suitable for implementation in app QC summaries."
+- Requested outcomes: Provide implementation-ready QC rules and caveats covering status interpretation, temporal uncertainty, spatial uncertainty, deduplication, and downstream modeling risks.
+- Result: Prepared biodiversity science-guard recommendations structured as practical QC rules suitable for app summaries.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-09
 - Prompt summary: User reported duplicate tooltip popups and sticky black tooltip on hover leave in BIEN app settings.
 - Prompt text (exact): "For the hover over information for the  tooltip wording pop ups. There are now two popups occuring - one box with white background and one box with black backgroudn. The black background box does not disapear when the hover over cursor leaves"
@@ -33,6 +201,14 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Identify why Temporal stats still errors in production and fix it.
 - Result: Pulled shinyapps logs and identified current runtime failure in `output$temporal_stats` as an unsupported `sprintf("%,d")` format string. Updated `app.R` to build the total-record count label with `format(stats$total_records, big.mark = ",", scientific = FALSE, trim = TRUE)` and rendered it with `%s`. Verified syntax (`PARSE_OK`), redeployed via `Rscript deploy_now.R`, and updated BIEN chat provenance.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Review the new user-facing Help/About/Tutorial additions in LoadingHistoricalObservationDataIntoBIEN for biodiversity-science safety.
+- Prompt text (exact): "Review the new user-facing additions in /Users/brianjenquist/VSCode/LoadingHistoricalObservationDataIntoBIEN: Help button, About tab, Tutorial tab, worked example, and fake-data walkthrough. Check whether the tutorial framing and steps are scientifically safe for biodiversity workflows. Focus on whether the UI/tutorial could encourage overconfidence, obscure uncertainty, or miss caveats about joins, QC, taxonomy, coordinates, and downstream interpretation. Return severity-ordered findings, agreement/disagreement, and recommended wording or workflow changes."
+- Requested outcomes: Assess whether the tutorial and UI framing are scientifically safe for biodiversity workflows and identify wording or workflow changes needed to reduce overconfidence and preserve uncertainty.
+- Result: Reviewed the user-facing tutorial/help framing against join logic, QC coverage, taxonomy handling, coordinate checks, and downstream BIEN handoff behavior; produced severity-ordered findings and recommended wording/workflow changes.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-09
@@ -247,6 +423,14 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-03-28
 - Prompt summary: Run final pre-return checks now after adding the latest prompt-log entry.
 - Requested outcomes: Verify prompt logging, change-gated Rmd/package checks, and git push status; return strict PASS/BLOCKED output.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Review planned multi-file historical observation ingestion workflow for Darwin Core handling, QA, uncertainty propagation, provenance, and join-risk mitigation.
+- Prompt text (exact): "Review the planned multi-file historical observation ingestion workflow (species table + plot metadata table joined by key, then Darwin Core mapping, then BIEN handoff tables). Provide your recommendations: required Darwin Core field handling, taxonomic/coordinate QA, uncertainty propagation, provenance fields, and join-risk mitigation. Return prioritized bullets with must-have vs should-have."
+- Requested outcomes: Provide prioritized must-have and should-have recommendations for Darwin Core required fields, taxonomic and coordinate quality controls, uncertainty propagation strategy, provenance fields, and join-risk mitigation in the ingestion pipeline.
+- Result: Completed evidence-based review recommendations anchored to current LoadingHistoricalObservationDataIntoBIEN workflow implementation.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
@@ -2358,5 +2542,13 @@ Return PASS/FAIL with concise evidence."
 - Prompt text (exact): "Can you push this shiny app to my shiny.com account? where we put the BIEN shiny app?"
 - Requested outcomes: Publish the new LoadingHistoricalObservationDataIntoBIEN Shiny app to benquist shinyapps.io account.
 - Result: Deployed app from `LoadingHistoricalObservationDataIntoBIEN` with app name `historical-obs-to-bien`; deployment completed successfully at https://benquist.shinyapps.io/historical-obs-to-bien/.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-14
+- Prompt summary: Review recent onboarding additions in LoadingHistoricalObservationDataIntoBIEN for biodiversity informatics appropriateness.
+- Prompt text (exact): "Review the recent additions in /Users/brianjenquist/VSCode/LoadingHistoricalObservationDataIntoBIEN: Help button, About tab, Tutorial tab, worked example, tutorial fake data files, dictionary updates, and README updates. Evaluate whether they are appropriate for a biodiversity informatics workflow that maps historical observations to Darwin Core and BIEN handoff tables. Return findings first, especially any risks of misleading users, poor Darwin Core guidance, or provenance/QC issues in the tutorial. Then state whether you agree with the additions overall and list recommended improvements."
+- Requested outcomes: Evidence-based review of the new UI, tutorial, fake data, dictionary, and README, with findings first and recommendations.
+- Result: Reviewed the additions against implemented mapping, QC, and BIEN handoff logic; validated the tutorial workflow and prepared findings.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot

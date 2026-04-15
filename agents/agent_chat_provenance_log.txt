@@ -41,6 +41,33 @@ For every future chat that causes creation/alteration/direction of agent files o
 2) Record: date, source chat summary, files affected, and actions taken.
 3) If git commit metadata exists, include commit hash and message.
 
+[3] Date: 2026-04-15
+Source: active chat (supervisor @m mode)
+Request summary: Comprehensive redesign of BIEN historical data ingestion Shiny app from data-browser to data-submission-pipeline
+Details: User asked specialists (biodiversity-science-guard, coder, taxonomy-reconciliation) to:
+  • Review Darwin Core + BIEN submission standards
+  • Design new 6-step user workflow (upload → link → schema → taxonomy → validate → export)
+  • Create prototype code for multi-file ingestion app
+  • Develop taxonomy reconciliation strategy
+Request outcomes:
+  • REDESIGN_PROPOSAL.md — 14-section proposal with UX flow, file structure, validation rules, implementation priorities
+  • app_redesign_prototype.R — Full R Shiny prototype with 6 modules (upload, link, schema, taxonomy, validation, export)
+  • TAXONOMY_INTEGRATION_STRATEGY.md — 13-section spec for species name reconciliation with GBIF backbone integration
+Files affected:
+  /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/REDESIGN_PROPOSAL.md (created)
+  /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/app_redesign_prototype.R (created)
+  /Users/brianjenquist/VSCode/BIEN-SpeciesShinyApp/TAXONOMY_INTEGRATION_STRATEGY.md (created)
+  /Users/brianjenquist/VSCode/agents/agent_chat_provenance_log.txt (this file, updated)
+  /Users/brianjenquist/VSCode/agents/prompt_log.md (updated)
+Action taken:
+  - Coordinated specialist agents to analyze, design, and prototype
+  - Produced specification documents with enough detail for developer handoff
+  - Included user pain points, implementation priorities, and test criteria
+Guides future work:
+  - Coder can implement MVP from REDESIGN_PROPOSAL.md steps
+  - Taxonomy specialist recommendations built into taxonomy module prototype
+  - Validation checklist provides test acceptance criteria
+
 Entry Template
 --------------
 [N] Date: YYYY-MM-DD [time optional]
@@ -117,6 +144,17 @@ Prompt: can you add those to just thius directory too
 
 2) Session: 4104f6cb-26c6-4bbb-80ac-3a87addd07e3 | Created: 2026-03-28 14:56:58 -0700
 Prompt: make an R shiny app that allows someone to explore the EvoPowerEfficiency.R code and
+
+[6] Date: 2026-04-14
+Source: active chat request
+Request summary: Review the Help/About/Tutorial additions in LoadingHistoricalObservationDataIntoBIEN for biodiversity-science safety and return severity-ordered findings.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the exact review prompt to agents/prompt_log.md so the mandatory final gate can verify the latest prompt.
+- Appended this provenance entry because the chat altered files under agents/ during final-gate compliance.
+Outcome: Agent-folder provenance remains append-only and current for this review turn.
 
 3) Session: 4104f6cb-26c6-4bbb-80ac-3a87addd07e3 | Created: 2026-03-28 14:56:58 -0700
 Prompt: hey i
@@ -468,3 +506,14 @@ Outcome: Prompt log now includes the latest final-gate request for strict always
 [2026-04-04] Updated agents/prompt_log.md with exact final-gate request entry before mandatory pre-return checks.
 2026-04-04 | always-mode final gate run | Updated agents/prompt_log.md (and BIEN-SpeciesShinyApp/agents/prompt_log.md) to record current prompt before mandatory checks.
 2026-04-08 | Added mandatory-final-gate prompt entry to agents/prompt_log.md for post-commit/push gate run request.
+
+[N] Date: 2026-04-10
+Source: active chat request
+Request summary: Run mandatory final gate for this turn.
+Files affected: agents/prompt_log.md; agents/agent_chat_provenance_log.txt; BIEN-SpeciesShinyApp/BIENSpeciesShinyApp_0.1.0.tar.gz
+Action taken:
+- Executed final-gate checks for prompt logging, changed-Rmd compile applicability, changed-package build, and git push sync.
+- Appended the exact current prompt text to agents/prompt_log.md.
+- Ran R CMD build in BIEN-SpeciesShinyApp and verified success.
+Outcome: Mandatory final gate evidence updated for this turn.
+2026-04-12 | always final gate | Appended current-turn prompt record to agents/prompt_log.md during mandatory gate run; reran BIEN package build evidence.
