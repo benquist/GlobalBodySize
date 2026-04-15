@@ -6,10 +6,114 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date:
 - Prompt summary:
 - Requested outcomes:
+
+- Date: 2026-04-15
+- Prompt summary: Scientist-friendly Shiny teaching copy request for merge keys and Step 4 taxonomy/TNRS with uncertainty caveats.
+- Prompt text (exact): "Provide scientist-friendly teaching copy for an ecology Shiny app preparing BIEN submissions. Need non-jargon explanations for merge keys and Step 4 taxonomy/TNRS usage without overpromising data validity. Return short recommendations plus 6-10 lines of ready-to-use UI text that are clear for generic ecology users and include caveats about uncertainty/QC."
+- Requested outcomes: Provide concise recommendations and ready-to-use UI lines explaining merge keys and Step 4 taxonomy/TNRS in plain language, with explicit uncertainty and QC caveats.
+- Result: Drafted concise recommendations and 6-10 lines of UI-ready copy emphasizing provisional matching, uncertainty, and quality-control review before BIEN submission.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Files changed:
 - Completed by:
 
 ## Entries
+
+- Date: 2026-04-15
+- Prompt summary: User approved adding build note and submission-packet export plus redeployment.
+- Prompt text (exact): yes please
+- Requested outcomes: Add a visible deployment/version note and a bundled submission-packet download, then redeploy the updated historical BIEN Shiny app.
+- Result: Added a visible build note, implemented Submission Packet Zip with manifest and README, redeployed historical-obs-to-bien to shinyapps.io, and verified the live URL returns HTTP 200 and includes the new UI markers.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: User approved both adding GNRS preview and deploying the updated historical BIEN app.
+- Prompt text (exact): yes to both
+- Requested outcomes: Add an in-app GNRS preview table and deploy the updated historical BIEN Shiny app.
+- Result: Added GNRS Handoff Preview to Step 6 in both app copies, redeployed historical-obs-to-bien to shinyapps.io, and verified the live URL returns HTTP 200 and includes the new UI markers.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Confirmed continuation to apply the next historical BIEN app update.
+- Prompt text (exact): yes
+- Requested outcomes: Continue the next planned update to the historical BIEN Shiny app.
+- Result: Updated both historical BIEN app UIs so Step 3 explains DBH auto-mapping behavior and Step 6 explains staging-status and GNRS-ready export contents; validated both app entrypoints parse successfully.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Continue implementation of shiny app plan with merge, mapping, and staging enhancements.
+- Prompt text (exact): lets return and continue
+- Requested outcomes: Continue coding updates to the historical BIEN Shiny app according to the agreed plan.
+- Result: Implemented stronger merge-key scoring, DBH auto-mapping defaults, richer GNRS handoff fields, and explicit staging status columns; mirrored helper updates into deployable app copy and validated with sample-file smoke tests.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/dwc_mapping.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_handoff.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/dwc_mapping.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/bien_handoff.R; LoadingHistoricalObservationDataIntoBIEN/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Exact current-turn prompt text record for BIEN multi-file ingest request.
+- Prompt text (exact): I would like this app to have the abilty search multiple files, like the ones attached, find the columns that match Darwin Core as well as the ones that match the BIEN database (use RBIEN to check columns to see matching), then suggest a merging of data into one flat file. Then we would need to pass the merged data through BIEN pipelines (TNRS, GRNRS eta.) and then augment the data so that we can load to a staging table for entering into the BIEN db
+- Requested outcomes: Add multi-file ingest + Darwin Core/BIEN matching + merge suggestion + BIEN pipeline augmentation + staging output.
+- Result: Implemented in BIEN-SpeciesShinyApp/app.R with new Ingest to BIEN tab and downloads.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Add app workflow for multi-file ingest, Darwin Core and BIEN matching, merge suggestion, BIEN pipeline augmentation, and staging output.
+- Prompt text (exact): "I would like this app to have the abilty search multiple files, like the ones attached, find the columns that match Darwin Core as well as the ones that match the BIEN database (use RBIEN to check columns to see matching), then suggest a merging of data into one flat file. Then we would need to pass the merged data through BIEN pipelines (TNRS, GRNRS eta.) and then augment the data so that we can load to a staging table for entering into the BIEN db"
+- Requested outcomes: Implement a multi-file upload and analysis feature that maps columns to Darwin Core and BIEN fields, suggests file merges into a flat table, runs BIEN-oriented TNRS/GRNRS-style augmentation, and prepares a staging-table-ready output.
+- Result: Added a new Ingest to BIEN tab in the BIEN Species Shiny app with multi-file CSV ingest, Darwin Core and BIEN field mapping, RBIEN metadata schema check, merge key suggestion, merged flat-file preview, TNRS-like taxon normalization, coordinate QA augmentation, staging preview, and CSV downloads.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Final gate rerun with added or modified Rmd scope only.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after implementing the prompt: \"Please deploy the new update\". For Rmd compile check, evaluate only added or modified Rmd files (diff-filter=AM) and exclude deleted files from render requirements. Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, Rmd compile, R package build, and git push status."
+- Requested outcomes: Complete final-gate verification for deployment turn without deleted-Rmd false blocking.
+- Result: Final gate rerun requested with explicit AM-only Rmd scope.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Mandatory final gate invocation after deployment request.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after implementing the prompt: \"Please deploy the new update\". Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build checks, and git push status."
+- Requested outcomes: Verify final-gate compliance after deployment turn.
+- Result: Final gate invocation recorded for strict compliance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: User requested deployment of the new update.
+- Prompt text (exact): "Please deploy the new update"
+- Requested outcomes: Deploy the latest Historical BIEN app updates to shinyapps.io and confirm availability.
+- Result: Redeployed app to shinyapps.io and verified the live endpoint is serving the updated UI.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Mandatory final gate invocation after implementing duplicate-conflict reporting.
+- Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after implementing the prompt: \"yes\". Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build checks, and git push status."
+- Requested outcomes: Verify final-gate compliance after latest app/code changes and deployment.
+- Result: Final gate invocation recorded for strict compliance.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: User approved continuing improvements to the Historical BIEN app.
+- Prompt text (exact): "yes"
+- Requested outcomes: Continue improving the app following prior recommendations.
+- Result: Added row-level duplicate metadata conflict detection, integrated conflict reporting into app UI and downloads, updated README guidance, validated tests, and redeployed to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/NAMESPACE; LoadingHistoricalObservationDataIntoBIEN/README.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: User requested a fresh restart in thinking for the historical-observations-to-BIEN Shiny app direction.
+- Prompt text (exact): "I would like to restart our thinking about the shiny app https://benquist.shinyapps.io/historical-obs-to-bien/"
+- Requested outcomes: Reframe strategy and workflow direction for the deployed historical-obs-to-bien Shiny app.
+- Result: In progress in this turn.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 
 - Date: 2026-04-15
 - Prompt summary: User clarified desired two-file merge to Darwin Core workflow before TNRS/GNRS and BIEN upload.
@@ -90,6 +194,14 @@ what is status of the shiny app?
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-14
+
+- Date: 2026-04-15
+- Prompt summary: User requested UX review for BIEN ingestion app confusion around Step 3 or 4 and join-key terminology.
+- Prompt text (exact): "Review this UX problem for a BIEN ingestion Shiny app: users confused by Step 3/4 and database terms ('Primary join key'). Provide recommendations focused on biodiversity informatics correctness while being beginner-friendly. Return: 1) top risks from confusing wording, 2) improved step language for merge->Darwin Core->TNRS/GNRS->BIEN sequence, 3) exact beginner-friendly definitions for join key terms with an ecology example."
+- Requested outcomes: Provide beginner-friendly, biodiversity-informatics-correct recommendations covering wording risks, improved step sequence language, and clear join-key definitions with an ecology example.
+- Result: Pending in this turn.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Prompt summary: Mandatory final gate invocation after warning and deployment polish.
 - Prompt text (exact): "Run the mandatory final pre-return gate now for this turn after implementing the prompt: \"Yes\". Return strict always.agent.md format with PASS/BLOCKED and evidence for prompt log, changed/new Rmd compile, updated R package build checks, and git push status."
 - Requested outcomes: Verify final-gate compliance after the latest warning, README, and deployment updates.
@@ -185,6 +297,30 @@ what is status of the shiny app?
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-15
+- Prompt summary: User requested biodiversity-agent-guided UX teaching recommendations for historical BIEN ingestion workflow.
+- Prompt text (exact): "@M check with your biodiversity agents. What are use cases from a typical ecological user want and how best should the text and steps be specified and taught."
+- Requested outcomes: Provide top ecological use cases, confusion points, best-practice step wording patterns, a three-pass teaching sequence, and a sub-2-minute beginner golden-path script for Shiny/README implementation.
+- Result: Prepared implementation-oriented guidance for a historical biodiversity ingestion app that merges observation and plot/location CSVs, maps to Darwin Core, runs QC, and exports TNRS/GNRS/GVS/NSR handoff tables before BIEN upload.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Draft beginner-safe BIEN submission instructions focused on taxonomy/geography handoff caveats and checks.
+- Prompt text (exact): "For beginner ecology users preparing BIEN submissions, propose scientifically safe instructional text and step sequence.
+
+Need:
+1) What novice ecologists most commonly misunderstand about taxonomy/geography validation handoffs
+2) How to phrase caveats without overwhelming users
+3) Recommended in-app checks users should do before proceeding from each step
+4) Example plain-language microcopy (1-2 lines each) for Step 2, Step 3, Step 4, Step 5, and downloads section.
+
+Focus on reducing misinterpretation and preventing false confidence."
+- Requested outcomes: Safe instructional sequence and concise microcopy that reduces misinterpretation and false confidence.
+- Result: Prepared a defensible, beginner-oriented sequence with caveats, step checks, and plain-language microcopy for key steps and downloads.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-14
 - Prompt summary: User asked if the new Historical BIEN Shiny app is ready to launch.
 - Prompt text (exact): "can we launch the new Historical BIEN shiny app yet?"
@@ -248,6 +384,22 @@ what is status of the shiny app?
 - Result: Prepared structured recommendations with R/Shiny workflow specifics and DwC/BIEN handoff safeguards.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot (@m supervisor)
+
+- Date: 2026-04-15
+- Prompt summary: User requested concise assessment of biodiversity-informatics user needs for survey/plot linkage, Darwin Core mapping, validation, and BIEN handoff export guidance.
+- Prompt text (exact): "Assess typical biodiversity-informatics user needs for an app that links survey and plot metadata, maps to Darwin Core, validates, and exports BIEN handoff tables.
+
+Return:
+1) Priority user personas and use cases
+2) Minimum metadata users expect before TNRS/GNRS/GVS/NSR
+3) Exact copy recommendations for Step 3 (mapping), Step 4 (taxonomy), and handoff download explanations
+4) Teaching pitfalls to avoid (overconfidence, ambiguous wording, hidden assumptions)
+
+Be concise but specific."
+- Requested outcomes: Provide concise, specific UX/content recommendations for personas, prerequisites, step copy, and instructional pitfalls in the biodiversity workflow.
+- Result: In progress.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
 
 - Date: 2026-04-14
 - Prompt summary: Request science-guard recommendations for Shiny QC checks to prevent ecological misinterpretation in historical biodiversity CSV ingestion and BIEN workflow mapping.
@@ -2629,4 +2781,20 @@ Return PASS/FAIL with concise evidence."
 - Requested outcomes: Evidence-based review of the new UI, tutorial, fake data, dictionary, and README, with findings first and recommendations.
 - Result: Reviewed the additions against implemented mapping, QC, and BIEN handoff logic; validated the tutorial workflow and prepared findings.
 - Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Re-run mandatory pre-return checks after prompt-log update.
+- Prompt text (exact): "Re-run mandatory pre-return checks for this turn after prompt-log update. Verify: prompt recorded in agents/prompt_log.md, updated Rmd compile status, updated R package build status, and git push status. Return PASS/FAIL with concise evidence and N/A notes where applicable."
+- Requested outcomes: Re-verify mandatory AGENTS gate items with concise PASS/FAIL evidence and N/A notes where applicable.
+- Result: Recorded prompt and executed final-gate verification checks for prompt log, changed Rmd handling, R package build status, and git push status.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-15
+- Prompt summary: Approve and implement build note and submission packet export for historical-obs-to-bien Shiny app.
+- Prompt text (exact): "yes please"
+- Requested outcomes: Proceed with adding build note and submission packet export to LoadingHistoricalObservationDataIntoBIEN app and deploy.
+- Result: Implemented build note and submission packet export; deployed historical-obs-to-bien to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R, LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R, agents/prompt_log.md
 - Completed by: GitHub Copilot

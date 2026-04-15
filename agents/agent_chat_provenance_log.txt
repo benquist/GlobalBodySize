@@ -517,3 +517,4 @@ Action taken:
 - Ran R CMD build in BIEN-SpeciesShinyApp and verified success.
 Outcome: Mandatory final gate evidence updated for this turn.
 2026-04-12 | always final gate | Appended current-turn prompt record to agents/prompt_log.md during mandatory gate run; reran BIEN package build evidence.
+2026-04-15 | active chat (@m biodiversity guidance) | Updated agents/prompt_log.md with current prompt/requested outcomes/results for mandatory gate compliance.

@@ -43,12 +43,92 @@ reconcile_taxonomy_local <- function(scientific_names) {
   )
 }
 
+read_local_app_version <- function(desc_path = "DESCRIPTION") {
+  if (!file.exists(desc_path)) {
+    return("unknown")
+  }
+
+  desc <- tryCatch(read.dcf(desc_path), error = function(e) NULL)
+  if (is.null(desc) || !"Version" %in% colnames(desc)) {
+    return("unknown")
+  }
+
+  as.character(desc[1, "Version"])
+}
+
+build_release_note <- function() {
+  version_txt <- read_local_app_version()
+  app_mtime <- tryCatch(format(file.info("app.R")$mtime, "%Y-%m-%d %H:%M"), error = function(e) "unknown")
+  paste0("Build ", version_txt, " | app.R updated ", app_mtime, " | includes GNRS preview and submission packet export")
+}
+
+write_submission_packet <- function(zipfile, combined_tbl, join_audit_tbl, mapping_tbl, qc_tbl, bien_tbl, handoff_tbls, join_conflicts_tbl = NULL) {
+  packet_dir <- file.path(tempdir(), paste0("historical_obs_packet_", as.integer(Sys.time())))
+  dir.create(packet_dir, recursive = TRUE, showWarnings = FALSE)
+
+  file_specs <- list(
+    list(name = "combined_observation_stream.csv", data = combined_tbl, description = "Linked source table after chosen joins."),
+    list(name = "join_audit_report.csv", data = join_audit_tbl, description = "Join coverage and cardinality audit."),
+    list(name = "active_mapping.csv", data = mapping_tbl, description = "Current source-to-Darwin-Core mapping used in build step."),
+    list(name = "dwc_qc_report.csv", data = qc_tbl, description = "QC results for the Darwin Core draft."),
+    list(name = "bien_loading_table.csv", data = bien_tbl, description = "Draft BIEN loading table with staging and augmentation columns."),
+    list(name = "tnrs_handoff.csv", data = handoff_tbls$tnrs, description = "Draft TNRS handoff for external name reconciliation."),
+    list(name = "gnrs_handoff.csv", data = handoff_tbls$gnrs, description = "Draft GNRS handoff with GNRS-ready geography fields."),
+    list(name = "gvs_handoff.csv", data = handoff_tbls$gvs, description = "Draft GVS handoff for coordinate review."),
+    list(name = "nsr_handoff.csv", data = handoff_tbls$nsr, description = "Draft NSR handoff for native-status review.")
+  )
+
+  if (!is.null(join_conflicts_tbl) && is.data.frame(join_conflicts_tbl) && nrow(join_conflicts_tbl) > 0) {
+    file_specs[[length(file_specs) + 1]] <- list(
+      name = "join_duplicate_conflict_report.csv",
+      data = join_conflicts_tbl,
+      description = "Conflicting duplicate metadata values detected during join review."
+    )
+  }
+
+  manifest_rows <- lapply(file_specs, function(spec) {
+    out_path <- file.path(packet_dir, spec$name)
+    utils::write.csv(spec$data, out_path, row.names = FALSE)
+    data.frame(
+      file_name = spec$name,
+      description = spec$description,
+      n_rows = if (is.data.frame(spec$data)) nrow(spec$data) else NA_integer_,
+      stringsAsFactors = FALSE
+    )
+  })
+  manifest <- do.call(rbind, manifest_rows)
+  utils::write.csv(manifest, file.path(packet_dir, "submission_packet_manifest.csv"), row.names = FALSE)
+
+  readme_lines <- c(
+    "Historical Observation Data to BIEN - Submission Packet",
+    paste0("Build note: ", build_release_note()),
+    "",
+    "Contents:",
+    "- BIEN loading draft",
+    "- TNRS, GNRS, GVS, and NSR handoff tables",
+    "- Join audit, active mapping, QC report",
+    "- Optional duplicate-join conflict report when conflicts were detected",
+    "- submission_packet_manifest.csv describing the included files",
+    "",
+    "These are draft handoff tables and require downstream external review before BIEN submission."
+  )
+  writeLines(readme_lines, file.path(packet_dir, "README_submission_packet.txt"), useBytes = TRUE)
+
+  old_wd <- setwd(packet_dir)
+  on.exit(setwd(old_wd), add = TRUE)
+  utils::zip(zipfile = zipfile, files = list.files(packet_dir, all.files = FALSE))
+}
+
 ui <- fluidPage(
   titlePanel("Historical Observation Data to BIEN"),
   tags$div(
     style = "margin: 10px 0; padding: 10px; background: #eef6ff; border-left: 4px solid #2f6fab;",
     strong("Goal: "),
     "Upload flat files, link tables, map to Darwin Core, run validation, and export BIEN draft handoff tables."
+  ),
+  tags$div(
+    style = "margin: 0 0 10px 0; color: #5a6b7a; font-size: 0.9em;",
+    build_release_note()
   ),
   sidebarLayout(
     sidebarPanel(
@@ -65,6 +145,7 @@ ui <- fluidPage(
       h4("Downloads"),
       downloadButton("download_combined", "Combined Source Table"),
       downloadButton("download_join_audit", "Join Audit Report"),
+      downloadButton("download_join_conflicts", "Join Conflict Report"),
       downloadButton("download_mapping", "Active Mapping"),
       downloadButton("download_qc", "QC Report"),
       downloadButton("download_bien", "BIEN Loading Draft"),
@@ -72,6 +153,7 @@ ui <- fluidPage(
       downloadButton("download_gnrs", "GNRS Handoff"),
       downloadButton("download_gvs", "GVS Handoff"),
       downloadButton("download_nsr", "NSR Handoff"),
+      downloadButton("download_submission_packet", "Submission Packet Zip"),
       tags$hr(),
       tags$div(
         style = "padding: 10px; background: #fff8e1; border-left: 4px solid #c28b00; font-size: 0.92em;",
@@ -89,6 +171,9 @@ ui <- fluidPage(
           "Step 1 Upload",
           h3("Step 1. Upload and Inspect Files"),
           uiOutput("merge_controls"),
+          uiOutput("merge_plan_box"),
+          h4("Suggested Merge Plan"),
+          tableOutput("merge_plan_table"),
           h4("Loaded File Summary"),
           tableOutput("upload_summary_table"),
           h4("Primary File Preview"),
@@ -101,13 +186,25 @@ ui <- fluidPage(
           h4("Join Audit"),
           uiOutput("join_warning_box"),
           tableOutput("join_audit_table"),
+          h4("Duplicate Key Conflict Report"),
+          tableOutput("join_conflicts_table"),
           h4("Linked Table Preview"),
           tableOutput("combined_preview")
         ),
         tabPanel(
           "Step 3 Map",
           h3("Step 3. Darwin Core Mapping"),
-          p("Auto-suggestions come from header synonym matching. You can upload a mapping override CSV with source_column,dwc_term."),
+          p("Auto-suggestions come from header synonym matching plus BIEN-aware field matching. You can upload a mapping override CSV with source_column,dwc_term."),
+          tags$div(
+            style = "margin: 10px 0; padding: 10px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
+            strong("What to review in this step"),
+            tags$ol(
+              tags$li("Click 'Step 3: Suggest Mapping' in the left sidebar."),
+              tags$li("Confirm that the species column maps to scientificName and any latitude/longitude columns map to decimalLatitude and decimalLongitude."),
+              tags$li("If a DBH or diameter column is detected, the app may map it to measurementValue automatically and add measurementType = diameter_at_breast_height with a default unit when possible."),
+              tags$li("If any suggestion is wrong, upload a mapping override CSV before continuing.")
+            )
+          ),
           h4("Suggested Mapping"),
           tableOutput("mapping_table"),
           h4("Active Mapping"),
@@ -134,8 +231,21 @@ ui <- fluidPage(
           "Step 6 Export",
           h3("Step 6. Export BIEN Draft Tables"),
           p("Download the draft loading and handoff tables for external validation and BIEN review."),
+          tags$div(
+            style = "margin: 10px 0; padding: 10px; background: #eef7ee; border-left: 4px solid #3a7d44;",
+            strong("What is in the BIEN Loading Draft now"),
+            tags$ul(
+              tags$li("Mapped Darwin Core fields plus BIEN-backed taxonomy and coordinate augmentation columns."),
+              tags$li("Explicit staging status columns so you can see which rows still need review before BIEN loading."),
+              tags$li("GNRS-ready location fields and query identifiers in the GNRS handoff export."),
+              tags$li("Submission Packet Zip bundles the BIEN draft, handoff tables, QC, mapping, join audit, and a manifest file."),
+              tags$li("These files are still draft handoff tables, not final proof that names or places are validated.")
+            )
+          ),
           h4("BIEN Loading Preview"),
           tableOutput("bien_preview"),
+          h4("GNRS Handoff Preview"),
+          tableOutput("gnrs_preview"),
           h4("Export Readiness"),
           verbatimTextOutput("export_readiness")
         ),
@@ -145,10 +255,10 @@ ui <- fluidPage(
           tags$ol(
             tags$li("Upload one or more observation and metadata CSV files or turn on tutorial mode."),
             tags$li("Choose primary and metadata join keys, then click 'Step 2: Prepare Linked Table'."),
-            tags$li("Click 'Step 3: Suggest Mapping' and review required Darwin Core terms."),
+            tags$li("Click 'Step 3: Suggest Mapping', confirm required Darwin Core terms, and review any automatic DBH measurement mapping."),
             tags$li("Review taxonomy triage and unresolved names."),
             tags$li("Click 'Step 5: Build BIEN Draft Tables' and resolve any BLOCK QC issues."),
-            tags$li("Export draft BIEN, TNRS, GNRS, GVS, and NSR handoff tables.")
+            tags$li("Export the BIEN loading draft plus TNRS, GNRS, GVS, and NSR handoff tables for downstream review.")
           )
         )
       )
@@ -172,17 +282,25 @@ server <- function(input, output, session) {
     read_uploaded_csv_list(input$input_csv)
   })
 
+  merge_plan <- reactive({
+    files <- available_files()
+    req(length(files) > 0)
+    suggest_merge_plan(files)
+  })
+
   output$merge_controls <- renderUI({
     files <- names(available_files())
     req(length(files) > 0)
 
-    primary_default <- files[1]
+    plan <- merge_plan()
+    primary_default <- if (!is.null(plan$primary_file) && nzchar(plan$primary_file)) plan$primary_file else files[1]
     metadata_choices <- setdiff(files, primary_default)
+    metadata_default <- intersect(metadata_choices, plan$metadata_files)
 
     tagList(
       selectInput("primary_file", "Primary observation file", choices = files, selected = primary_default),
       uiOutput("primary_key_ui"),
-      selectizeInput("metadata_files", "Metadata file(s)", choices = metadata_choices, multiple = TRUE),
+      selectizeInput("metadata_files", "Metadata file(s)", choices = metadata_choices, selected = metadata_default, multiple = TRUE),
       uiOutput("metadata_keys_ui")
     )
   })
@@ -190,33 +308,70 @@ server <- function(input, output, session) {
   output$primary_key_ui <- renderUI({
     req(input$primary_file)
     df <- available_files()[[input$primary_file]]
-    selectInput("primary_key", "Primary join key", choices = names(df))
+    plan <- merge_plan()
+    selected_key <- if (!is.null(plan$primary_key) && plan$primary_key %in% names(df)) plan$primary_key else names(df)[[1]]
+    selectInput("primary_key", "Primary join key", choices = names(df), selected = selected_key)
   })
 
   output$metadata_keys_ui <- renderUI({
     req(input$metadata_files)
+    plan <- merge_plan()
 
     controls <- lapply(input$metadata_files, function(f) {
       df <- available_files()[[f]]
+      selected_key <- NULL
+      if (is.data.frame(plan$join_suggestions) && nrow(plan$join_suggestions) > 0) {
+        hit <- plan$join_suggestions[plan$join_suggestions$metadata_file == f, , drop = FALSE]
+        if (nrow(hit) > 0 && hit$metadata_key[[1]] %in% names(df)) {
+          selected_key <- hit$metadata_key[[1]]
+        }
+      }
       selectInput(
         inputId = paste0("meta_key_", make.names(f)),
         label = paste0("Join key in metadata file: ", f),
-        choices = names(df)
+        choices = names(df),
+        selected = if (!is.null(selected_key)) selected_key else names(df)[[1]]
       )
     })
 
     do.call(tagList, controls)
   })
 
-  output$upload_summary_table <- renderTable({
-    files <- available_files()
-    req(length(files) > 0)
-    data.frame(
-      file = names(files),
-      rows = vapply(files, nrow, integer(1)),
-      cols = vapply(files, ncol, integer(1)),
-      stringsAsFactors = FALSE
+  output$merge_plan_box <- renderUI({
+    plan <- merge_plan()
+
+    if (!is.data.frame(plan$join_suggestions) || nrow(plan$join_suggestions) == 0) {
+      return(tags$div(
+        style = "margin: 8px 0 12px 0; padding: 10px; background: #eef6ff; border-left: 4px solid #2f6fab;",
+        strong("Merge suggestion: "),
+        "The app could not infer a high-confidence join pair automatically. Select the primary file and keys manually below."
+      ))
+    }
+
+    best <- plan$join_suggestions[1, , drop = FALSE]
+    tags$div(
+      style = "margin: 8px 0 12px 0; padding: 10px; background: #eef6ff; border-left: 4px solid #2f6fab;",
+      strong("Merge suggestion: "),
+      paste0(
+        "Use ", best$primary_file[[1]], " as the primary observation file, then join ",
+        best$metadata_file[[1]], " by ", best$primary_key[[1]], " = ", best$metadata_key[[1]],
+        " (shared unique values: ", best$shared_unique_values[[1]], ")."
+      )
     )
+  })
+
+  output$merge_plan_table <- renderTable({
+    plan <- merge_plan()
+    if (!is.data.frame(plan$join_suggestions) || nrow(plan$join_suggestions) == 0) {
+      return(data.frame(note = "No automatic merge candidates detected.", stringsAsFactors = FALSE))
+    }
+    plan$join_suggestions
+  }, striped = TRUE, bordered = TRUE)
+
+  output$upload_summary_table <- renderTable({
+    plan <- merge_plan()
+    req(is.data.frame(plan$file_summary))
+    plan$file_summary
   }, striped = TRUE, bordered = TRUE)
 
   output$primary_preview <- renderTable({
@@ -253,7 +408,13 @@ server <- function(input, output, session) {
       metadata_keys = metadata_keys
     )
 
-    list(merged = merged, audit = audit)
+    conflicts <- find_duplicate_metadata_conflicts(
+      data_list = files,
+      metadata_files = metadata_files,
+      metadata_keys = metadata_keys
+    )
+
+    list(merged = merged, audit = audit, conflicts = conflicts)
   })
 
   combined_df <- reactive({
@@ -264,6 +425,11 @@ server <- function(input, output, session) {
   join_audit <- reactive({
     req(combined_state())
     combined_state()$audit
+  })
+
+  join_conflicts <- reactive({
+    req(combined_state())
+    combined_state()$conflicts
   })
 
   suggested_mapping <- eventReactive(input$suggest_btn, {
@@ -304,6 +470,11 @@ server <- function(input, output, session) {
     build_state()$qc
   })
 
+  staging_preview_df <- reactive({
+    req(build_state())
+    build_bien_loading_table(dwc_df())
+  })
+
   taxonomy_df <- reactive({
     if (!is.null(build_state())) {
       df <- dwc_df()
@@ -323,13 +494,13 @@ server <- function(input, output, session) {
   bien_df <- reactive({
     req(build_state())
     validate(need(!qc_has_blockers(qc_df()), "QC blockers detected. Fix BLOCK issues before building BIEN outputs."))
-    build_bien_loading_table(dwc_df())
+    staging_preview_df()
   })
 
   handoff <- reactive({
     req(build_state())
     validate(need(!qc_has_blockers(qc_df()), "QC blockers detected. Fix BLOCK issues before exporting handoff tables."))
-    build_bien_handoff_tables(dwc_df())
+    build_bien_handoff_tables(staging_preview_df())
   })
 
   output$combined_preview <- renderTable({
@@ -342,6 +513,17 @@ server <- function(input, output, session) {
     join_audit()
   }, striped = TRUE, bordered = TRUE)
 
+  output$join_conflicts_table <- renderTable({
+    req(join_conflicts())
+    if (nrow(join_conflicts()) == 0) {
+      return(data.frame(
+        note = "No duplicate-key column conflicts detected in selected metadata files.",
+        stringsAsFactors = FALSE
+      ))
+    }
+    join_conflicts()
+  }, striped = TRUE, bordered = TRUE)
+
   output$join_warning_box <- renderUI({
     req(join_audit())
     audit <- join_audit()
@@ -350,10 +532,16 @@ server <- function(input, output, session) {
       return(NULL)
     }
 
+    conflict_count <- nrow(join_conflicts())
     tags$div(
       style = "margin: 8px 0 12px 0; padding: 12px; background: #fff3cd; border-left: 4px solid #b7791f;",
       strong("Duplicate metadata warning: "),
-      "At least one metadata file has duplicate join keys. The merge uses first non-empty values per key. Review before export."
+      paste0(
+        "At least one metadata file has duplicate join keys. The merge uses first non-empty values per key. ",
+        "Detected conflicting duplicate values: ",
+        conflict_count,
+        ". Review the conflict report before export."
+      )
     )
   })
 
@@ -368,22 +556,45 @@ server <- function(input, output, session) {
   }, striped = TRUE, bordered = TRUE)
 
   output$taxonomy_summary <- renderTable({
-    tx <- taxonomy_df()
-    data.frame(
-      metric = c("Total unique names", "Candidate", "Review", "Unresolved"),
-      value = c(
-        nrow(tx),
-        sum(tx$status == "CANDIDATE"),
-        sum(tx$status == "REVIEW"),
-        sum(tx$status == "UNRESOLVED")
-      ),
-      stringsAsFactors = FALSE
-    )
+    if (!is.null(build_state())) {
+      bien_tbl <- staging_preview_df()
+      data.frame(
+        metric = c("Total records", "Unique submitted names", "BIEN/backbone matched", "Needs review", "Blank scientificName"),
+        value = c(
+          nrow(bien_tbl),
+          length(unique(bien_tbl$scientificName)),
+          sum(!is.na(bien_tbl$bien_matched_name) & trimws(as.character(bien_tbl$bien_matched_name)) != ""),
+          sum(grepl("review|unresolved", bien_tbl$bien_taxonomy_status, ignore.case = TRUE), na.rm = TRUE),
+          sum(is.na(bien_tbl$scientificName) | trimws(as.character(bien_tbl$scientificName)) == "")
+        ),
+        stringsAsFactors = FALSE
+      )
+    } else {
+      tx <- taxonomy_df()
+      data.frame(
+        metric = c("Total unique names", "Candidate", "Review", "Unresolved"),
+        value = c(
+          nrow(tx),
+          sum(tx$status == "CANDIDATE"),
+          sum(tx$status == "REVIEW"),
+          sum(tx$status == "UNRESOLVED")
+        ),
+        stringsAsFactors = FALSE
+      )
+    }
   }, striped = TRUE, bordered = TRUE)
 
   output$taxonomy_review <- renderTable({
-    tx <- taxonomy_df()
-    tx[tx$status %in% c("REVIEW", "UNRESOLVED"), , drop = FALSE]
+    if (!is.null(build_state())) {
+      bien_tbl <- staging_preview_df()
+      review_idx <- grepl("review|unresolved", bien_tbl$bien_taxonomy_status, ignore.case = TRUE) |
+        is.na(bien_tbl$scientificName) |
+        trimws(as.character(bien_tbl$scientificName)) == ""
+      bien_tbl[review_idx, c("occurrenceID", "scientificName", "bien_matched_name", "bien_taxonomy_status", "bien_family"), drop = FALSE]
+    } else {
+      tx <- taxonomy_df()
+      tx[tx$status %in% c("REVIEW", "UNRESOLVED"), , drop = FALSE]
+    }
   }, striped = TRUE, bordered = TRUE)
 
   output$qc_table <- renderTable({
@@ -401,8 +612,11 @@ server <- function(input, output, session) {
     metadata_count <- if (is.null(input$metadata_files)) 0 else length(input$metadata_files)
     join_blockers <- if (nrow(join_audit()) == 0) 0 else sum(join_audit()$severity == "BLOCK")
     join_warnings <- if (nrow(join_audit()) == 0) 0 else sum(join_audit()$severity == "WARN")
+    join_conflict_rows <- nrow(join_conflicts())
     qc_blocks <- qc_severity_count(qc_df(), "BLOCK")
     qc_warns <- qc_severity_count(qc_df(), "WARN")
+    bien_matches <- if ("bien_matched_name" %in% names(staging_preview_df())) sum(!is.na(staging_preview_df()$bien_matched_name) & trimws(as.character(staging_preview_df()$bien_matched_name)) != "") else 0
+    coord_ready <- if ("coordinate_valid_basic" %in% names(staging_preview_df())) sum(isTRUE(staging_preview_df()$coordinate_valid_basic), na.rm = TRUE) else 0
 
     paste(
       paste0("Loaded files: ", length(available_files())),
@@ -410,7 +624,10 @@ server <- function(input, output, session) {
       paste0("Metadata files joined: ", metadata_count),
       paste0("Combined rows (primary records): ", nrow(combined_df())),
       paste0("Join audit blockers: ", join_blockers, " | warnings: ", join_warnings),
+      paste0("Join duplicate-conflict rows: ", join_conflict_rows),
       paste0("Mapped Darwin Core columns: ", ncol(dwc_df())),
+      paste0("BIEN/backbone matched names: ", bien_matches),
+      paste0("Rows with basic-valid coordinates: ", coord_ready),
       if (length(missing) == 0) "Required Darwin Core terms present: yes" else paste0("Missing required terms: ", paste(missing, collapse = ", ")),
       paste0("QC blockers: ", qc_blocks, " | warnings: ", qc_warns),
       if (qc_blocks > 0) "BIEN export blocked until BLOCK issues are fixed." else "Draft handoff tables generated.",
@@ -423,12 +640,17 @@ server <- function(input, output, session) {
     utils::head(bien_df(), 10)
   }, striped = TRUE, bordered = TRUE)
 
+  output$gnrs_preview <- renderTable({
+    req(handoff())
+    utils::head(handoff()$gnrs, 10)
+  }, striped = TRUE, bordered = TRUE)
+
   output$export_readiness <- renderText({
     req(qc_df())
     if (qc_has_blockers(qc_df())) {
       "Export blocked: resolve BLOCK issues in Step 5 Validate before BIEN loading export."
     } else {
-      "Export ready: download BIEN loading draft and TNRS/GNRS/GVS/NSR handoff files."
+      "Export ready: download the BIEN loading draft with BIEN-backed taxonomy, coordinate, staging-status, and GNRS-ready augmentation plus TNRS/GNRS/GVS/NSR handoff files."
     }
   })
 
@@ -445,6 +667,11 @@ server <- function(input, output, session) {
   output$download_mapping <- downloadHandler(
     filename = function() "active_mapping.csv",
     content = function(file) utils::write.csv(active_mapping(), file, row.names = FALSE)
+  )
+
+  output$download_join_conflicts <- downloadHandler(
+    filename = function() "join_duplicate_conflict_report.csv",
+    content = function(file) utils::write.csv(join_conflicts(), file, row.names = FALSE)
   )
 
   output$download_qc <- downloadHandler(
@@ -475,6 +702,22 @@ server <- function(input, output, session) {
   output$download_nsr <- downloadHandler(
     filename = function() "nsr_handoff.csv",
     content = function(file) utils::write.csv(handoff()$nsr, file, row.names = FALSE)
+  )
+
+  output$download_submission_packet <- downloadHandler(
+    filename = function() paste0("historical_obs_submission_packet_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".zip"),
+    content = function(file) {
+      write_submission_packet(
+        zipfile = file,
+        combined_tbl = combined_df(),
+        join_audit_tbl = join_audit(),
+        mapping_tbl = active_mapping(),
+        qc_tbl = qc_df(),
+        bien_tbl = bien_df(),
+        handoff_tbls = handoff(),
+        join_conflicts_tbl = join_conflicts()
+      )
+    }
   )
 }
 

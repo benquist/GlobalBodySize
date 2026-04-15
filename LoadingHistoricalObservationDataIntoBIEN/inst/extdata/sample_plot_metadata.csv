@@ -1,0 +1,4 @@
+plot_id,latitude,longitude,locality,country,stateProvince,county,eventDate
+PLOT-001,34.42,-119.70,Coastal oak woodland training site,United States,California,Santa Barbara,1901-06-15
+PLOT-002,39.32,-120.35,Montane pine training site,United States,California,Nevada,1898-11-03
+PLOT-003,39.55,-105.78,High-elevation meadow training site,United States,Colorado,Park,1912-03-01
