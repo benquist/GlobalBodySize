@@ -262,6 +262,7 @@ ui <- fluidPage(
         ),
 
 
+
         tabPanel(
           "Step 5 Validate",
           h3("Step 5. QC Validation"),
@@ -271,59 +272,6 @@ ui <- fluidPage(
           h4("Build Summary"),
           verbatimTextOutput("summary_text")
         ),
-          # --- Loading spinner state for each step ---
-          link_loading <- reactiveVal(FALSE)
-          map_loading <- reactiveVal(FALSE)
-          validate_loading <- reactiveVal(FALSE)
-
-          # --- Step 2 Link spinner logic ---
-          observeEvent(input$prepare_btn, {
-            link_loading(TRUE)
-            # Simulate delay for demonstration; replace with real triggers as needed
-            invalidateLater(500, session)
-            isolate({ Sys.sleep(0.5) })
-            link_loading(FALSE)
-          })
-          output$link_loading_ui <- renderUI({
-            if (link_loading()) {
-              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-                tags$span("⏳ Preparing linked table... Please wait."),
-                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-              )
-            } else NULL
-          })
-
-          # --- Step 3 Map spinner logic ---
-          observeEvent(input$suggest_btn, {
-            map_loading(TRUE)
-            invalidateLater(500, session)
-            isolate({ Sys.sleep(0.5) })
-            map_loading(FALSE)
-          })
-          output$map_loading_ui <- renderUI({
-            if (map_loading()) {
-              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-                tags$span("⏳ Suggesting mapping... Please wait."),
-                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-              )
-            } else NULL
-          })
-
-          # --- Step 5 Validate spinner logic ---
-          observeEvent(input$build_btn, {
-            validate_loading(TRUE)
-            invalidateLater(500, session)
-            isolate({ Sys.sleep(0.5) })
-            validate_loading(FALSE)
-          })
-          output$validate_loading_ui <- renderUI({
-            if (validate_loading()) {
-              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-                tags$span("⏳ Validating and building BIEN draft tables... Please wait."),
-                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-              )
-            } else NULL
-          })
 
           # --- Spinner CSS (only add once) ---
           tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }')))
@@ -393,24 +341,60 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  # --- Step 4 Taxonomy spinner logic ---
-  taxonomy_loading <- reactiveVal(FALSE)
-  observeEvent(input$workflow_tabs, {
-    if (identical(input$workflow_tabs, "Step 4 Taxonomy")) {
-      taxonomy_loading(TRUE)
-      invalidateLater(500, session)
-      isolate({ Sys.sleep(0.5) })
-      taxonomy_loading(FALSE)
-    }
-  }, ignoreInit = TRUE)
-  output$taxonomy_loading_ui <- renderUI({
-    if (taxonomy_loading()) {
+  # --- Loading spinner state for each step ---
+  link_loading <- reactiveVal(FALSE)
+  map_loading <- reactiveVal(FALSE)
+  validate_loading <- reactiveVal(FALSE)
+
+  # --- Step 2 Link spinner logic ---
+  observeEvent(input$prepare_btn, {
+    link_loading(TRUE)
+    # Simulate delay for demonstration; replace with real triggers as needed
+    invalidateLater(500, session)
+    isolate({ Sys.sleep(0.5) })
+    link_loading(FALSE)
+  })
+  output$link_loading_ui <- renderUI({
+    if (link_loading()) {
       tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-        tags$span("⏳ Calculating taxonomy summary... Please wait."),
+        tags$span("⏳ Preparing linked table... Please wait."),
         tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
       )
     } else NULL
   })
+
+  # --- Step 3 Map spinner logic ---
+  observeEvent(input$suggest_btn, {
+    map_loading(TRUE)
+    invalidateLater(500, session)
+    isolate({ Sys.sleep(0.5) })
+    map_loading(FALSE)
+  })
+  output$map_loading_ui <- renderUI({
+    if (map_loading()) {
+      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
+        tags$span("⏳ Suggesting mapping... Please wait."),
+        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+      )
+    } else NULL
+  })
+
+  # --- Step 5 Validate spinner logic ---
+  observeEvent(input$build_btn, {
+    validate_loading(TRUE)
+    invalidateLater(500, session)
+    isolate({ Sys.sleep(0.5) })
+    validate_loading(FALSE)
+  })
+  output$validate_loading_ui <- renderUI({
+    if (validate_loading()) {
+      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
+        tags$span("⏳ Validating and building BIEN draft tables... Please wait."),
+        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+      )
+    } else NULL
+  })
+
   tutorial_files <- reactive({
     list(
       "tutorial_observations.csv" = read_historical_csv("inst/extdata/tutorial_observations.csv"),
