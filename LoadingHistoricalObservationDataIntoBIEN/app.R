@@ -218,6 +218,7 @@ ui <- fluidPage(
           "Step 2 Link",
           h3("Step 2. Link Observations with Metadata"),
           p("Select a primary observation file and one or more metadata files (location, plot, traits)."),
+          uiOutput("link_loading_ui"),
           h4("Join Audit"),
           uiOutput("join_warning_box"),
           tableOutput("join_audit_table"),
@@ -230,6 +231,7 @@ ui <- fluidPage(
           "Step 3 Map",
           h3("Step 3. Darwin Core Mapping"),
           p("Auto-suggestions come from header synonym matching plus BIEN-aware field matching. You can upload a mapping override CSV with source_column,dwc_term."),
+          uiOutput("map_loading_ui"),
           tags$div(
             style = "margin: 10px 0; padding: 10px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
             strong("What to review in this step"),
@@ -249,19 +251,104 @@ ui <- fluidPage(
           "Step 4 Taxonomy",
           h3("Step 4. Taxonomic Reconciliation Triage"),
           p("This step flags unresolved names locally. Use exported TNRS handoff for authoritative reconciliation."),
+          uiOutput("taxonomy_loading_ui"),
           h4("Taxonomy Summary"),
           tableOutput("taxonomy_summary"),
           h4("Names Requiring Review"),
           tableOutput("taxonomy_review")
         ),
+          taxonomy_loading <- reactiveVal(FALSE)
+
+          observe({
+            # Show spinner when taxonomy is being calculated
+            taxonomy_loading(TRUE)
+            invalidateLater(500, session)
+            isolate({
+              # Simulate calculation delay for demonstration (replace with real triggers as needed)
+              if (!is.null(build_state())) {
+                Sys.sleep(0.5)
+              }
+            })
+            taxonomy_loading(FALSE)
+          })
+
+          output$taxonomy_loading_ui <- renderUI({
+            if (taxonomy_loading()) {
+              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
+                tags$span("⏳ Calculating taxonomy summary... Please wait."),
+                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+              )
+            } else {
+              NULL
+            }
+          })
+
+          tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }')))
         tabPanel(
           "Step 5 Validate",
           h3("Step 5. QC Validation"),
+          uiOutput("validate_loading_ui"),
           h4("QC Dashboard"),
           tableOutput("qc_table"),
           h4("Build Summary"),
           verbatimTextOutput("summary_text")
         ),
+          # --- Loading spinner state for each step ---
+          link_loading <- reactiveVal(FALSE)
+          map_loading <- reactiveVal(FALSE)
+          validate_loading <- reactiveVal(FALSE)
+
+          # --- Step 2 Link spinner logic ---
+          observeEvent(input$prepare_btn, {
+            link_loading(TRUE)
+            # Simulate delay for demonstration; replace with real triggers as needed
+            invalidateLater(500, session)
+            isolate({ Sys.sleep(0.5) })
+            link_loading(FALSE)
+          })
+          output$link_loading_ui <- renderUI({
+            if (link_loading()) {
+              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
+                tags$span("⏳ Preparing linked table... Please wait."),
+                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+              )
+            } else NULL
+          })
+
+          # --- Step 3 Map spinner logic ---
+          observeEvent(input$suggest_btn, {
+            map_loading(TRUE)
+            invalidateLater(500, session)
+            isolate({ Sys.sleep(0.5) })
+            map_loading(FALSE)
+          })
+          output$map_loading_ui <- renderUI({
+            if (map_loading()) {
+              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
+                tags$span("⏳ Suggesting mapping... Please wait."),
+                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+              )
+            } else NULL
+          })
+
+          # --- Step 5 Validate spinner logic ---
+          observeEvent(input$build_btn, {
+            validate_loading(TRUE)
+            invalidateLater(500, session)
+            isolate({ Sys.sleep(0.5) })
+            validate_loading(FALSE)
+          })
+          output$validate_loading_ui <- renderUI({
+            if (validate_loading()) {
+              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
+                tags$span("⏳ Validating and building BIEN draft tables... Please wait."),
+                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+              )
+            } else NULL
+          })
+
+          # --- Spinner CSS (only add once) ---
+          tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }')))
         tabPanel(
           "Step 6 Export",
           h3("Step 6. Export BIEN Draft Tables"),
