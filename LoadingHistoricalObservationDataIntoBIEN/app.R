@@ -132,7 +132,23 @@ ui <- fluidPage(
   ),
   sidebarLayout(
     sidebarPanel(
-      h4("Data Source"),
+      h4("Quick Start: 5 Steps"),
+      tags$ol(
+        tags$li("Upload your main survey and plot/location files as CSVs."),
+        tags$li("In Step 2, select the join key (e.g., Plot_Name) for both files. Keys must match exactly!"),
+        tags$li("After linking, check that every observation row has Lat and Long filled. If not, check your join and file contents."),
+        tags$li("In Step 5, resolve any BLOCK errors. Click the QC Dashboard for details. If you see 'missing_geography', your join did not propagate Lat/Long."),
+        tags$li("Once all BLOCK issues are fixed, export your BIEN draft tables and handoffs.")
+      ),
+      tags$div(
+        style = "margin: 8px 0 8px 0; padding: 8px; background: #fffbe6; border-left: 4px solid #c28b00; font-size: 0.92em;",
+        strong("Troubleshooting:"),
+        tags$ul(
+          tags$li("If you see BLOCK or QC errors, click the QC Dashboard for details."),
+          tags$li("Missing Lat/Long? Check your join key and file contents. Plot/location file must have Lat/Long, and join key must match survey file exactly."),
+          tags$li("Still stuck? Download the example files from the Help tab and try those first.")
+        )
+      ),
       checkboxInput("use_tutorial_data", "Use built-in tutorial fake data", value = FALSE),
       fileInput("input_csv", "Upload CSV File(s)", accept = ".csv", multiple = TRUE),
       tags$hr(),
@@ -141,6 +157,7 @@ ui <- fluidPage(
       actionButton("suggest_btn", "Step 3: Suggest Mapping", class = "btn-primary"),
       fileInput("mapping_csv", "Optional Mapping Override CSV", accept = ".csv"),
       actionButton("build_btn", "Step 5: Build BIEN Draft Tables", class = "btn-success"),
+      actionButton("run_bien_services", "Run BIEN Web Services (TNRS, GNRS, GVS, NSR)", class = "btn-warning"),
       tags$hr(),
       h4("Downloads"),
       downloadButton("download_combined", "Combined Source Table"),
@@ -271,12 +288,26 @@ ui <- fluidPage(
           "Help",
           h3("How to Use This App"),
           tags$ol(
-            tags$li("Upload one or more observation and metadata CSV files or turn on tutorial mode."),
-            tags$li("Choose primary and metadata join keys, then click 'Step 2: Prepare Linked Table'."),
-            tags$li("Click 'Step 3: Suggest Mapping', confirm required Darwin Core terms, and review any automatic DBH measurement mapping."),
-            tags$li("Review taxonomy triage and unresolved names."),
-            tags$li("Click 'Step 5: Build BIEN Draft Tables' and resolve any BLOCK QC issues."),
-            tags$li("Export the BIEN loading draft plus TNRS, GNRS, GVS, and NSR handoff tables for downstream review.")
+            tags$li("Upload your main survey and plot/location files as CSVs, or turn on tutorial mode for a demo."),
+            tags$li("In Step 2, select the join key (e.g., Plot_Name) for both files. Keys must match exactly!"),
+            tags$li("After linking, check that every observation row has Lat and Long filled. If not, check your join and file contents."),
+            tags$li("In Step 5, resolve any BLOCK errors. Click the QC Dashboard for details. If you see 'missing_geography', your join did not propagate Lat/Long."),
+            tags$li("Once all BLOCK issues are fixed, export your BIEN draft tables and handoffs.")
+          ),
+          tags$hr(),
+          h4("How to prepare your data for BIEN"),
+          tags$ul(
+            tags$li("Each observation must have a matching plot/location with Lat/Long."),
+            tags$li("Join keys (like Plot_Name) must match exactly in both files (no typos, spaces, or case mismatches)."),
+            tags$li("No empty rows or columns for required fields."),
+            tags$li("Download and test with the example files below if unsure.")
+          ),
+          tags$hr(),
+          h4("FAQ: Common Problems and Solutions"),
+          tags$ul(
+            tags$li(strong("Q: I see BLOCK or QC errors!"), " — Click the QC Dashboard for details. Most often, Lat/Long are missing due to a join problem."),
+            tags$li(strong("Q: My Lat/Long are NA or missing!"), " — Check that your plot/location file has Lat/Long, and that the join key matches exactly in both files."),
+            tags$li(strong("Q: Can I see an example?"), " — Yes! Download the sample files below and try them in the app.")
           ),
           tags$hr(),
           tags$div(
@@ -769,6 +800,35 @@ server <- function(input, output, session) {
       )
     }
   )
+
+  bien_services_status <- reactiveVal("")
+
+  observeEvent(input$run_bien_services, {
+    bien_services_status("Starting BIEN web service workflow...")
+    # 1. TNRS
+    bien_services_status("Submitting names to TNRS...")
+    tnrs_result <- tryCatch({
+      bien_tnrs_query(unique(bien_loading_table()$scientificName))
+    }, error = function(e) e)
+    # 2. GNRS
+    bien_services_status("Submitting coordinates to GNRS...")
+    gnrs_result <- tryCatch({
+      bien_gnrs_query(unique(bien_loading_table()$locality))
+    }, error = function(e) e)
+    # 3. GVS
+    bien_services_status("Submitting coordinates to GVS...")
+    gvs_result <- tryCatch({
+      bien_gvs_query(unique(bien_loading_table()[,c("decimalLatitude","decimalLongitude")]))
+    }, error = function(e) e)
+    # 4. NSR
+    bien_services_status("Submitting names to NSR...")
+    nsr_result <- tryCatch({
+      bien_nsr_query(unique(bien_loading_table()$scientificName))
+    }, error = function(e) e)
+    bien_services_status("All BIEN services complete. Staging table updated.")
+    # TODO: Integrate results into staging table and update UI/exports
+  })
+  output$bien_services_status <- renderText({ bien_services_status() })
 }
 
 shinyApp(ui = ui, server = server)

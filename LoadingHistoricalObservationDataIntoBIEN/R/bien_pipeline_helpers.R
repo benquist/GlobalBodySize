@@ -381,3 +381,49 @@ augment_bien_pipeline <- function(dwc_df, taxonomy_cap = 50) {
 
   out
 }
+
+# ---- BIEN web service API helpers ----
+library(httr)
+
+bien_tnrs_query <- function(names) {
+  # POST to BIEN TNRS API (example endpoint)
+  # names: character vector
+  if (length(names) == 0) return(data.frame())
+  url <- "https://bien.nceas.ucsb.edu/bien/api/tnrs"
+  resp <- httr::POST(url, body = list(names = names), encode = "json")
+  stop_for_status(resp)
+  content <- httr::content(resp, as = "parsed")
+  # Return as data.frame (adapt to actual API response)
+  as.data.frame(content)
+}
+
+bien_gnrs_query <- function(locations) {
+  # POST to BIEN GNRS API (example endpoint)
+  if (length(locations) == 0) return(data.frame())
+  url <- "https://bien.nceas.ucsb.edu/bien/api/gnrs"
+  resp <- httr::POST(url, body = list(locations = locations), encode = "json")
+  stop_for_status(resp)
+  content <- httr::content(resp, as = "parsed")
+  as.data.frame(content)
+}
+
+bien_gvs_query <- function(coords) {
+  # POST to BIEN GVS API (example endpoint)
+  if (length(coords) == 0) return(data.frame())
+  url <- "https://bien.nceas.ucsb.edu/bien/api/gvs"
+  resp <- httr::POST(url, body = list(coords = coords), encode = "json")
+  stop_for_status(resp)
+  content <- httr::content(resp, as = "parsed")
+  as.data.frame(content)
+}
+
+bien_nsr_query <- function(names) {
+  # POST to BIEN NSR API (example endpoint)
+  if (length(names) == 0) return(data.frame())
+  url <- "https://bien.nceas.ucsb.edu/bien/api/nsr"
+  resp <- httr::POST(url, body = list(names = names), encode = "json")
+  stop_for_status(resp)
+  content <- httr::content(resp, as = "parsed")
+  as.data.frame(content)
+}
+# ---- End BIEN web service API helpers ----
