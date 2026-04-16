@@ -273,8 +273,6 @@ ui <- fluidPage(
           verbatimTextOutput("summary_text")
         ),
 
-          # --- Spinner CSS (only add once) ---
-          tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }')))
         tabPanel(
           "Step 6 Export",
           h3("Step 6. Export BIEN Draft Tables"),
