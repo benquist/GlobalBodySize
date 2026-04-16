@@ -248,6 +248,7 @@ ui <- fluidPage(
           tableOutput("active_mapping_table")
         ),
 
+
         tabPanel(
           "Step 4 Taxonomy",
           h3("Step 4. Taxonomic Reconciliation Triage"),
@@ -258,24 +259,6 @@ ui <- fluidPage(
           h4("Names Requiring Review"),
           tableOutput("taxonomy_review")
         ),
-          # --- Step 4 Taxonomy spinner logic ---
-          taxonomy_loading <- reactiveVal(FALSE)
-          observeEvent(input$workflow_tabs, {
-            if (identical(input$workflow_tabs, "Step 4 Taxonomy")) {
-              taxonomy_loading(TRUE)
-              invalidateLater(500, session)
-              isolate({ Sys.sleep(0.5) })
-              taxonomy_loading(FALSE)
-            }
-          }, ignoreInit = TRUE)
-          output$taxonomy_loading_ui <- renderUI({
-            if (taxonomy_loading()) {
-              tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-                tags$span("⏳ Calculating taxonomy summary... Please wait."),
-                tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-              )
-            } else NULL
-          })
 
           # --- Spinner CSS (only add once) ---
           tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }')))
@@ -410,6 +393,24 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  # --- Step 4 Taxonomy spinner logic ---
+  taxonomy_loading <- reactiveVal(FALSE)
+  observeEvent(input$workflow_tabs, {
+    if (identical(input$workflow_tabs, "Step 4 Taxonomy")) {
+      taxonomy_loading(TRUE)
+      invalidateLater(500, session)
+      isolate({ Sys.sleep(0.5) })
+      taxonomy_loading(FALSE)
+    }
+  }, ignoreInit = TRUE)
+  output$taxonomy_loading_ui <- renderUI({
+    if (taxonomy_loading()) {
+      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
+        tags$span("⏳ Calculating taxonomy summary... Please wait."),
+        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+      )
+    } else NULL
+  })
   tutorial_files <- reactive({
     list(
       "tutorial_observations.csv" = read_historical_csv("inst/extdata/tutorial_observations.csv"),
