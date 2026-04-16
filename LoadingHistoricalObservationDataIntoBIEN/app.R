@@ -334,6 +334,7 @@ ui <- fluidPage(
             tags$br(),
             tags$span(paste0("Last deployed: ", format(Sys.Date(), "%Y-%m-%d")))
           )
+
         )
       )
     )
