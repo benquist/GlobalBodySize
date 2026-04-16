@@ -1,0 +1,5 @@
+record_id,scientificName,plot_id,eventDate,recordedBy,basisOfRecord
+OBS-001,Quercus agrifolia,PLOT-001,1901-06-15,Walker,HumanObservation
+OBS-002,Pinus ponderosa,PLOT-002,1898-11-03,Singh,HumanObservation
+OBS-003,Populus tremuloides,PLOT-003,1912-03-01,Garcia,HumanObservation
+OBS-004,Artemisia tridentata,PLOT-003,1899-04-21,Walker,HumanObservation

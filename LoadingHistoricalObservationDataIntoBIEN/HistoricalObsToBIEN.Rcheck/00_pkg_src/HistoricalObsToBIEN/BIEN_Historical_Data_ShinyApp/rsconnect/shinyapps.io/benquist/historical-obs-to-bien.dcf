@@ -1,0 +1,10 @@
+name: historical-obs-to-bien
+title:
+username: benquist
+account: benquist
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17129981
+bundleId: 11857204
+url: https://benquist.shinyapps.io/historical-obs-to-bien/
+version: 1

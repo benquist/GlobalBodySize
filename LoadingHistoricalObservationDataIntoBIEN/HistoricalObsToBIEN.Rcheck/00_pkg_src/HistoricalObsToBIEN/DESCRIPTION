@@ -8,9 +8,8 @@ Maintainer: BIEN Team <bien@example.org>
 Description: Tools and a Shiny interface to map historical observation CSV files to Darwin Core and generate BIEN-ready handoff tables for TNRS, GNRS, GVS, and NSR workflows.
 License: MIT + file LICENSE
 Encoding: UTF-8
-LazyData: true
-Imports:
-    shiny
-Suggests:
-    testthat
+Imports: shiny
+Suggests: testthat
 RoxygenNote: 7.3.2
+NeedsCompilation: no
+Packaged: 2026-04-16 08:19:14 UTC; brianjenquist

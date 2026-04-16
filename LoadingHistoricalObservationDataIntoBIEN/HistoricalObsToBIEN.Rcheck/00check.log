@@ -1,0 +1,126 @@
+* using log directory ‘/Users/brianjenquist/VSCode/LoadingHistoricalObservationDataIntoBIEN/HistoricalObsToBIEN.Rcheck’
+* using R version 4.3.3 (2024-02-29)
+* using platform: aarch64-apple-darwin20 (64-bit)
+* R was compiled by
+    Apple clang version 14.0.0 (clang-1400.0.29.202)
+    GNU Fortran (GCC) 12.2.0
+* running under: macOS 15.5
+* using session charset: UTF-8
+* using options ‘--no-manual --as-cran’
+* checking for file ‘HistoricalObsToBIEN/DESCRIPTION’ ... OK
+* checking extension type ... Package
+* this is package ‘HistoricalObsToBIEN’ version ‘0.1.0’
+* package encoding: UTF-8
+* checking CRAN incoming feasibility ... [4s/25s] NOTE
+Maintainer: ‘BIEN Team <bien@example.org>’
+
+New submission
+
+License components with restrictions and base license permitting such:
+  MIT + file LICENSE
+File 'LICENSE':
+  MIT License
+  
+  Copyright (c) 2026 BIEN
+  
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+  
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+* checking package namespace information ... OK
+* checking package dependencies ... OK
+* checking if this is a source package ... OK
+* checking if there is a namespace ... OK
+* checking for executable files ... OK
+* checking for hidden files and directories ... OK
+* checking for portable file names ... NOTE
+Found the following non-portable file path:
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/rsconnect/shinyapps.io/benquist/historical-obs-to-bien.dcf
+
+Tarballs are only required to store paths of up to 100 bytes and cannot
+store those of more than 256 bytes, with restrictions including to 100
+bytes for the final component.
+See section ‘Package structure’ in the ‘Writing R Extensions’ manual.
+* checking for sufficient/correct file permissions ... OK
+* checking serialization versions ... OK
+* checking whether package ‘HistoricalObsToBIEN’ can be installed ... OK
+* checking installed package size ... OK
+* checking package directory ... OK
+* checking for future file timestamps ... NOTE
+unable to verify current time
+* checking DESCRIPTION meta-information ... OK
+* checking top-level files ... NOTE
+Non-standard files/directories found at top level:
+  ‘BIEN_Historical_Data_ShinyApp’ ‘app.R’ ‘rsconnect’
+* checking for left-over files ... OK
+* checking index information ... OK
+* checking package subdirectories ... OK
+* checking R files for non-ASCII characters ... OK
+* checking R files for syntax errors ... OK
+* checking whether the package can be loaded ... OK
+* checking whether the package can be loaded with stated dependencies ... OK
+* checking whether the package can be unloaded cleanly ... OK
+* checking whether the namespace can be loaded with stated dependencies ... OK
+* checking whether the namespace can be unloaded cleanly ... OK
+* checking loading without being on the library search path ... OK
+* checking use of S3 registration ... OK
+* checking dependencies in R code ... WARNING
+'::' or ':::' imports not declared from:
+  ‘BIEN’ ‘httr’
+'loadNamespace' or 'requireNamespace' call not declared from: ‘BIEN’
+* checking S3 generic/method consistency ... OK
+* checking replacement functions ... OK
+* checking foreign function calls ... OK
+* checking R code for possible problems ... NOTE
+bien_gnrs_query: no visible global function definition for
+  ‘stop_for_status’
+bien_gvs_query: no visible global function definition for
+  ‘stop_for_status’
+bien_nsr_query: no visible global function definition for
+  ‘stop_for_status’
+bien_tnrs_query: no visible global function definition for
+  ‘stop_for_status’
+Undefined global functions or variables:
+  stop_for_status
+* checking for missing documentation entries ... WARNING
+Undocumented code objects:
+  ‘apply_dwc_mapping’ ‘audit_join_quality’ ‘build_bien_handoff_tables’
+  ‘build_bien_loading_table’ ‘canonicalize_header’
+  ‘find_duplicate_metadata_conflicts’ ‘merge_uploaded_streams’
+  ‘qc_has_blockers’ ‘read_historical_csv’ ‘read_uploaded_csv_list’
+  ‘required_dwc_terms’ ‘run_dwc_qc’ ‘run_histbien_app’
+  ‘suggest_dwc_mapping’
+All user-level objects in a package should have documentation entries.
+See chapter ‘Writing R documentation files’ in the ‘Writing R
+Extensions’ manual.
+* checking examples ... NONE
+* checking for unstated dependencies in ‘tests’ ... OK
+* checking tests ... ERROR
+  Running ‘smoke_join_qc.R’
+Running the tests in ‘tests/smoke_join_qc.R’ failed.
+Complete output:
+  > source("R/multi_file_merge.R")
+  Error in file(filename, "r", encoding = encoding) : 
+    cannot open the connection
+  Calls: source -> file
+  In addition: Warning message:
+  In file(filename, "r", encoding = encoding) :
+    cannot open file 'R/multi_file_merge.R': No such file or directory
+  Execution halted
+* checking for non-standard things in the check directory ... OK
+* checking for detritus in the temp directory ... OK
+* DONE
+Status: 1 ERROR, 2 WARNINGs, 5 NOTEs
