@@ -120,6 +120,7 @@ write_submission_packet <- function(zipfile, combined_tbl, join_audit_tbl, mappi
 }
 
 ui <- fluidPage(
+  tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }'))),
   titlePanel("Historical Observation Data to BIEN"),
   tags$div(
     style = "margin: 10px 0; padding: 10px; background: #eef6ff; border-left: 4px solid #2f6fab;",
@@ -260,8 +261,7 @@ ui <- fluidPage(
           tableOutput("taxonomy_review")
         ),
 
-          # --- Spinner CSS (only add once) ---
-          tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }')))
+
         tabPanel(
           "Step 5 Validate",
           h3("Step 5. QC Validation"),
