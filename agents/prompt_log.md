@@ -138,7 +138,25 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-17
+- Prompt summary: Deploy the trait shiny app.
+- Requested outcomes: Deploy BIEN-TraitsShinyApp to shinyapps.io and verify the public app URL is live.
+- Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Run the mandatory final pre-return gate after deploying BIEN-TraitsShinyApp.
+- Requested outcomes: Verify prompt logging, change-gated Rmd compile status, change-gated R package build status, and git push status; return strict PASS/BLOCKED with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
 - Prompt summary: Create the Enhanced Theory Agent (with Mathematical Depth) — a quantitative theory agent with physicist-style reasoning toolkit.
 - Requested outcomes: Agent with 9-step system prompt, 6 mathematical modes (ODE, variational, scaling/asymptotic, stochastic, network/graph, linear algebra/operator), 6 physicist moves, and full physicist prompt template.
 - Files changed: agents/enhanced-theory.agent.md; agents/agent_chat_provenance_log.txt; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Create EcoInterface.agent — a design-focused developer agent for ecological web apps and R Shiny interfaces.
+- Requested outcomes: Agent with 7-step system prompt, 5 design modes, 5 prompt templates (full app, rapid prototype, visualization, UX critique, color system), and 5 hard design constraints.
+- Files changed: agents/EcoInterface.agent.md; agents/agent_chat_provenance_log.txt; agents/prompt_log.md
 - Completed by: GitHub Copilot
