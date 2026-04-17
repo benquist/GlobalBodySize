@@ -1,0 +1,6 @@
+RMD_RENDER_START
+RENDERING .tmp/final-gate-render/contaminent_distance_decay_analysis.Rmd
+RENDER_OK .tmp/final-gate-render/contaminent_distance_decay_analysis.Rmd
+RENDERING .tmp/final-gate/contaminent_distance_decay_analysis.Rmd
+RENDER_OK .tmp/final-gate/contaminent_distance_decay_analysis.Rmd
+RMD_RENDER_DONE

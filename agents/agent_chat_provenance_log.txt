@@ -238,10 +238,39 @@ Additional Recovered Earlier Prompts (Retry Pass)
 Prompt: Good. Now add all of my earlier prompt
 
 19) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
+[20] Date: 2026-04-17
+Source: active chat request
+Request summary: User requested full implementation of all recommended improvements for LoadingHistoricalObservationDataIntoBIEN after specialist review.
+Files affected:
+- LoadingHistoricalObservationDataIntoBIEN/app.R
+- LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R
+- LoadingHistoricalObservationDataIntoBIEN/R/qc_checks.R
+- LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Fixed BIEN service runtime wiring to staged reactive data and added service status summaries.
+- Added duplicate-resolution strategy controls and strict manual-mode duplicate key blocking.
+- Expanded QC checks (duplicate occurrenceID, date plausibility, coordinate-country envelope checks).
+- Added downloadable starter templates for historical imports and new ecological-source onboarding.
+- Re-ran smoke and targeted validation checks.
+Outcome: App workflow now has stronger ingest safeguards, clearer onboarding templates, and corrected BIEN service execution path.
 Prompt: I would like to create another agent that makes sure that for each project created that we have a chat provenance log for the prompts that created the code and
 
 20) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
 Prompt: I would like to create another agent that makes sure that for each project created that we have a chat provenance log for the prompts that created the code and created the work in that project. For example, 'cacti' should have its own provenance log, calipoppy SDM should have its own chat provenance log
+
+[20] Date: 2026-04-17
+Source: active chat request (supervisor @m mode)
+Request summary: Orchestrate a comprehensive assessment of LoadingHistoricalObservationDataIntoBIEN with biodiversity-informatics, biodiversity-science, and statistics specialist perspectives.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Reviewed app architecture, Darwin Core mapping/QC logic, BIEN handoff and web-service hooks, and smoke-test coverage.
+- Logged current prompt to agents/prompt_log.md for mandatory always-gate compliance.
+- Appended this provenance entry because an agent-folder file was updated during this task.
+Outcome: Specialist-oriented assessment prepared with severity-ranked findings and implementation-focused recommendations.
 
 Recovered entries (updated): 20
 
@@ -531,3 +560,21 @@ Outcome: Mandatory final gate evidence updated for this turn.
 2026-04-17 | active chat (enhanced-theory agent creation) | Created agents/enhanced-theory.agent.md — a new quantitative theory agent with physicist-style reasoning. Embeds 6 mathematical modes (ODE, variational, scaling/asymptotic, stochastic, network/graph, linear algebra/operator), 6 physicist moves, and a full physicist prompt template. Updated agents/prompt_log.md with prompt record.
 2026-04-17 | active chat (BIEN-TraitsShinyApp deployment) | Deployed BIEN-TraitsShinyApp to shinyapps.io at https://benquist.shinyapps.io/bien-traits-shinyapp/ via rsconnect::deployApp, verified the public app responds, and updated agents/prompt_log.md plus BIEN-TraitsShinyApp/chat_provenance_log.md for final-gate compliance.
 2026-04-17 | active chat (EcoInterface agent creation) | Created agents/EcoInterface.agent.md — a design-focused ecological app developer agent. Embeds 5 design modes (use case, layout/workflow, visualization, color/aesthetic, implementation), 5 prompt templates, and 5 hard-constraint design principles. Updated prompt_log.md.
+2026-04-17 | active chat (BIEN-TraitsShinyApp project folder setup) | Created /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp-Project and added starter README.md. Updated agents/prompt_log.md and appended this provenance record for mandatory final-gate compliance.
+2026-04-17 | active chat (BIEN-TraitsShinyApp project scaffolding) | Scaffolded BIEN-TraitsShinyApp-Project into a runnable Shiny project (modular app files, deploy script, project provenance log, and starter folders). Updated agents/prompt_log.md and appended this provenance record for final-gate compliance.
+2026-04-17 | active chat (BIEN-TraitsShinyApp production migration) | Migrated full production BIEN trait app into BIEN-TraitsShinyApp-Project/app.R, repointed BIEN-TraitsShinyApp-Project/deploy.R to deploy from the new project directory, and updated README/provenance with final-gate logging updates.
+2026-04-17 | active chat (LoadingHistoricalObservationDataIntoBIEN review) | Appended current review prompt to agents/prompt_log.md to satisfy mandatory always-gate logging before returning findings.
+
+[21] Date: 2026-04-17
+Source: active chat request
+Request summary: Evaluate statistical and data-quality soundness of new QC and duplicate-resolution logic in LoadingHistoricalObservationDataIntoBIEN (date plausibility, duplicate occurrenceID blocking, coordinate-country checks, duplicate aggregation strategy).
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended latest prompt to prompt log for mandatory always-gate compliance.
+- Appended this provenance entry because an agents-folder file was updated during this review turn.
+Outcome: Append-only agent provenance and prompt logging remain current for this statistical QC review.
+2026-04-17 | active chat (always final-gate strict change-gating rerun) | Appended current request to agents/prompt_log.md and reran mandatory checks using strict non-deleted Rmd gating, package-build gating, and git push verification.
+2026-04-17 | always gate run | Appended latest mandatory gate request to agents/prompt_log.md before executing final operational checks.
+2026-04-17 | active chat (BIEN-TraitsShinyApp-Project deployment) | Successfully deployed BIEN-TraitsShinyApp-Project to shinyapps.io (bien-traits-shinyapp); app verified live. Updated prompt_log.md and agent_chat_provenance_log.txt for deployment completion.

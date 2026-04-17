@@ -155,12 +155,34 @@ ui <- fluidPage(
       tags$hr(),
       h4("Step Actions"),
       actionButton("prepare_btn", "Step 2: Prepare Linked Table", class = "btn-primary"),
+      selectInput(
+        "duplicate_strategy",
+        "Duplicate metadata key resolution",
+        choices = c(
+          "First non-empty value" = "first_non_empty",
+          "Last non-empty value" = "last_non_empty",
+          "Most frequent non-empty value" = "most_frequent_non_empty",
+          "Block and resolve manually" = "require_manual_resolution"
+        ),
+        selected = "require_manual_resolution"
+      ),
       actionButton("suggest_btn", "Step 3: Suggest Mapping", class = "btn-primary"),
       fileInput("mapping_csv", "Optional Mapping Override CSV", accept = ".csv"),
       actionButton("build_btn", "Step 5: Build BIEN Draft Tables", class = "btn-success"),
       actionButton("run_bien_services", "Run BIEN Web Services (TNRS, GNRS, GVS, NSR)", class = "btn-warning"),
       tags$hr(),
       h4("Downloads"),
+      tags$div(
+        style = "margin: 8px 0 10px 0; padding: 8px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
+        strong("Starter templates"),
+        tags$p(
+          style = "margin: 6px 0 0 0; font-size: 0.9em;",
+          "Use these to start common BIEN onboarding workflows."
+        ),
+        downloadButton("download_historical_template", "Template: Historical Observations"),
+        tags$div(style = "height: 6px;"),
+        downloadButton("download_ecological_template", "Template: New Ecological Source")
+      ),
       downloadButton("download_combined", "Combined Source Table"),
       downloadButton("download_join_audit", "Join Audit Report"),
       downloadButton("download_join_conflicts", "Join Conflict Report"),
@@ -277,6 +299,8 @@ ui <- fluidPage(
           "Step 6 Export",
           h3("Step 6. Export BIEN Draft Tables"),
           p("Download the draft loading and handoff tables for external validation and BIEN review."),
+          h4("BIEN Web Services Status"),
+          verbatimTextOutput("bien_services_status"),
           tags$div(
             style = "margin: 10px 0; padding: 10px; background: #eef7ee; border-left: 4px solid #3a7d44;",
             strong("What is in the BIEN Loading Draft now"),
@@ -325,9 +349,9 @@ ui <- fluidPage(
             style = "font-size: 0.9em; color: #555;",
             tags$strong("Live app: "),
             tags$a(
-              href = "https://benquist.shinyapps.io/historical-obs-to-bien/",
+              href = "https://benquist.shinyapps.io/LoadingHistoricalObservationDataIntoBIEN/",
               target = "_blank",
-              "https://benquist.shinyapps.io/historical-obs-to-bien/"
+              "https://benquist.shinyapps.io/LoadingHistoricalObservationDataIntoBIEN/"
             ),
             tags$br(),
             tags$span(paste0("Last deployed: ", format(Sys.Date(), "%Y-%m-%d")))
@@ -343,6 +367,7 @@ server <- function(input, output, session) {
   # --- Loading spinner state for each step ---
   link_loading <- reactiveVal(FALSE)
   map_loading <- reactiveVal(FALSE)
+  taxonomy_loading <- reactiveVal(FALSE)
   validate_loading <- reactiveVal(FALSE)
 
   # --- Step 2 Link spinner logic ---
@@ -373,6 +398,24 @@ server <- function(input, output, session) {
     if (map_loading()) {
       tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
         tags$span("⏳ Suggesting mapping... Please wait."),
+        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+      )
+    } else NULL
+  })
+
+  # --- Step 4 Taxonomy spinner logic ---
+  observeEvent(input$workflow_tabs, {
+    if (identical(input$workflow_tabs, "Step 4 Taxonomy")) {
+      taxonomy_loading(TRUE)
+      invalidateLater(500, session)
+      isolate({ Sys.sleep(0.5) })
+      taxonomy_loading(FALSE)
+    }
+  }, ignoreInit = TRUE)
+  output$taxonomy_loading_ui <- renderUI({
+    if (taxonomy_loading()) {
+      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;",
+        tags$span("⏳ Reconciling taxonomy... Please wait."),
         tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
       )
     } else NULL
@@ -519,21 +562,11 @@ server <- function(input, output, session) {
       metadata_keys[[f]] <- input[[paste0("meta_key_", make.names(f))]]
     }
 
-    merged <- merge_uploaded_streams(
-      data_list = files,
-      primary_file = input$primary_file,
-      primary_key = input$primary_key,
-      metadata_files = metadata_files,
-      metadata_keys = metadata_keys
-    )
-
-    audit <- audit_join_quality(
-      data_list = files,
-      primary_file = input$primary_file,
-      primary_key = input$primary_key,
-      metadata_files = metadata_files,
-      metadata_keys = metadata_keys
-    )
+    selected_strategy <- if (is.null(input$duplicate_strategy) || !nzchar(input$duplicate_strategy)) {
+      "first_non_empty"
+    } else {
+      input$duplicate_strategy
+    }
 
     conflicts <- find_duplicate_metadata_conflicts(
       data_list = files,
@@ -541,7 +574,43 @@ server <- function(input, output, session) {
       metadata_keys = metadata_keys
     )
 
-    list(merged = merged, audit = audit, conflicts = conflicts)
+    duplicate_key_count <- count_duplicate_metadata_keys(
+      data_list = files,
+      metadata_files = metadata_files,
+      metadata_keys = metadata_keys
+    )
+
+    if (identical(selected_strategy, "require_manual_resolution") && duplicate_key_count > 0) {
+      stop(
+        paste0(
+          "Duplicate metadata keys detected (",
+          duplicate_key_count,
+          " keys, ",
+          nrow(conflicts),
+          " conflicting rows). Resolve duplicates in source files or choose a non-blocking duplicate strategy."
+        )
+      )
+    }
+
+    merged <- merge_uploaded_streams(
+      data_list = files,
+      primary_file = input$primary_file,
+      primary_key = input$primary_key,
+      metadata_files = metadata_files,
+      metadata_keys = metadata_keys,
+      duplicate_strategy = if (identical(selected_strategy, "require_manual_resolution")) "first_non_empty" else selected_strategy
+    )
+
+    audit <- audit_join_quality(
+      data_list = files,
+      primary_file = input$primary_file,
+      primary_key = input$primary_key,
+      metadata_files = metadata_files,
+      metadata_keys = metadata_keys,
+      duplicate_strategy = selected_strategy
+    )
+
+    list(merged = merged, audit = audit, conflicts = conflicts, duplicate_strategy = selected_strategy)
   })
 
   combined_df <- reactive({
@@ -659,11 +728,12 @@ server <- function(input, output, session) {
     }
 
     conflict_count <- nrow(join_conflicts())
+    strategy <- if (!is.null(combined_state()$duplicate_strategy)) combined_state()$duplicate_strategy else "first_non_empty"
     tags$div(
       style = "margin: 8px 0 12px 0; padding: 12px; background: #fff3cd; border-left: 4px solid #b7791f;",
       strong("Duplicate metadata warning: "),
       paste0(
-        "At least one metadata file has duplicate join keys. The merge uses first non-empty values per key. ",
+        "At least one metadata file has duplicate join keys. Current strategy: ", strategy, ". ",
         "Detected conflicting duplicate values: ",
         conflict_count,
         ". Review the conflict report before export."
@@ -780,6 +850,104 @@ server <- function(input, output, session) {
     }
   })
 
+  output$download_historical_template <- downloadHandler(
+    filename = function() "historical_observation_import_template.zip",
+    content = function(file) {
+      packet_dir <- file.path(tempdir(), paste0("historical_template_", as.integer(Sys.time())))
+      dir.create(packet_dir, recursive = TRUE, showWarnings = FALSE)
+
+      obs_template <- data.frame(
+        occurrenceID = c("hist-1", "hist-2"),
+        Plot_Name = c("Plot_A", "Plot_B"),
+        scientificName = c("Abies bracteata", "Pinus ponderosa"),
+        eventDate = c("1912-06-10", "1912-06-11"),
+        observer = c("A. Botanist", "A. Botanist"),
+        stringsAsFactors = FALSE
+      )
+
+      plot_template <- data.frame(
+        Plot_Name = c("Plot_A", "Plot_B"),
+        decimalLatitude = c(35.321, 35.456),
+        decimalLongitude = c(-120.123, -120.334),
+        country = c("United States", "United States"),
+        stateProvince = c("California", "California"),
+        locality = c("Santa Lucia Range", "Santa Lucia Range"),
+        stringsAsFactors = FALSE
+      )
+
+      instructions <- c(
+        "Historical Observation Import Template",
+        "",
+        "Use case: Importing legacy field records into BIEN staging.",
+        "",
+        "1) Fill historical_observations.csv with one row per occurrence.",
+        "2) Fill plot_location_metadata.csv with one row per Plot_Name.",
+        "3) In the app, select historical_observations.csv as primary file.",
+        "4) Join by Plot_Name and review Join Audit and conflict report.",
+        "5) Run mapping + QC, then export BIEN and handoff tables."
+      )
+
+      utils::write.csv(obs_template, file.path(packet_dir, "historical_observations.csv"), row.names = FALSE)
+      utils::write.csv(plot_template, file.path(packet_dir, "plot_location_metadata.csv"), row.names = FALSE)
+      writeLines(instructions, file.path(packet_dir, "README_historical_import_template.txt"), useBytes = TRUE)
+
+      old_wd <- setwd(packet_dir)
+      on.exit(setwd(old_wd), add = TRUE)
+      utils::zip(zipfile = file, files = list.files(packet_dir, all.files = FALSE))
+    }
+  )
+
+  output$download_ecological_template <- downloadHandler(
+    filename = function() "new_ecological_source_template.zip",
+    content = function(file) {
+      packet_dir <- file.path(tempdir(), paste0("ecological_template_", as.integer(Sys.time())))
+      dir.create(packet_dir, recursive = TRUE, showWarnings = FALSE)
+
+      source_template <- data.frame(
+        source_record_id = c("src-1", "src-2"),
+        occurrenceID = c("hist-1", "hist-2"),
+        scientificName = c("Abies bracteata", "Pinus ponderosa"),
+        traitName = c("plant_height", "leaf_area"),
+        traitValue = c("14.2", "32.5"),
+        traitUnit = c("m", "cm2"),
+        measurementMethod = c("field_estimate", "digital_image"),
+        sourceCitation = c("Example et al. 1950", "Example et al. 1950"),
+        sourceLicense = c("CC-BY-4.0", "CC-BY-4.0"),
+        stringsAsFactors = FALSE
+      )
+
+      provenance_template <- data.frame(
+        source_name = "Archive field notebook",
+        source_type = "trait_table",
+        extraction_date = format(Sys.Date(), "%Y-%m-%d"),
+        contact_email = "data_owner@example.org",
+        citation = "Replace with full citation",
+        license = "CC-BY-4.0",
+        stringsAsFactors = FALSE
+      )
+
+      instructions <- c(
+        "New Ecological Source Template",
+        "",
+        "Use case: Adding a new ecological dataset into BIEN staging.",
+        "",
+        "1) Fill new_ecological_source.csv with trait/environment records.",
+        "2) Complete source_provenance.csv for citation, license, and contact.",
+        "3) Upload alongside occurrence/location tables and map trait fields.",
+        "4) Harmonize units before export and confirm provenance fields are complete.",
+        "5) Export handoff tables and preserve packet manifest for audit trail."
+      )
+
+      utils::write.csv(source_template, file.path(packet_dir, "new_ecological_source.csv"), row.names = FALSE)
+      utils::write.csv(provenance_template, file.path(packet_dir, "source_provenance.csv"), row.names = FALSE)
+      writeLines(instructions, file.path(packet_dir, "README_new_ecological_source_template.txt"), useBytes = TRUE)
+
+      old_wd <- setwd(packet_dir)
+      on.exit(setwd(old_wd), add = TRUE)
+      utils::zip(zipfile = file, files = list.files(packet_dir, all.files = FALSE))
+    }
+  )
+
   output$download_combined <- downloadHandler(
     filename = function() "combined_observation_stream.csv",
     content = function(file) utils::write.csv(combined_df(), file, row.names = FALSE)
@@ -870,28 +1038,76 @@ server <- function(input, output, session) {
   bien_services_status <- reactiveVal("")
 
   observeEvent(input$run_bien_services, {
+    req(build_state())
+    req(staging_preview_df())
+
+    stage_tbl <- staging_preview_df()
+    if (!is.data.frame(stage_tbl) || nrow(stage_tbl) == 0) {
+      bien_services_status("No staged records are available. Build BIEN draft tables first.")
+      return()
+    }
+
     bien_services_status("Starting BIEN web service workflow...")
+
+    name_vec <- if ("scientificName" %in% names(stage_tbl)) {
+      unique(trimws(as.character(stage_tbl$scientificName)))
+    } else {
+      character(0)
+    }
+    name_vec <- name_vec[!is.na(name_vec) & name_vec != ""]
+
+    locality_vec <- if ("locality" %in% names(stage_tbl)) {
+      unique(trimws(as.character(stage_tbl$locality)))
+    } else {
+      character(0)
+    }
+    locality_vec <- locality_vec[!is.na(locality_vec) & locality_vec != ""]
+
+    coord_tbl <- stage_tbl[, intersect(c("decimalLatitude", "decimalLongitude"), names(stage_tbl)), drop = FALSE]
+
     # 1. TNRS
     bien_services_status("Submitting names to TNRS...")
     tnrs_result <- tryCatch({
-      bien_tnrs_query(unique(bien_loading_table()$scientificName))
+      bien_tnrs_query(name_vec)
     }, error = function(e) e)
+
     # 2. GNRS
-    bien_services_status("Submitting coordinates to GNRS...")
+    bien_services_status("Submitting place names to GNRS...")
     gnrs_result <- tryCatch({
-      bien_gnrs_query(unique(bien_loading_table()$locality))
+      bien_gnrs_query(locality_vec)
     }, error = function(e) e)
+
     # 3. GVS
     bien_services_status("Submitting coordinates to GVS...")
     gvs_result <- tryCatch({
-      bien_gvs_query(unique(bien_loading_table()[,c("decimalLatitude","decimalLongitude")]))
+      bien_gvs_query(coord_tbl)
     }, error = function(e) e)
+
     # 4. NSR
     bien_services_status("Submitting names to NSR...")
     nsr_result <- tryCatch({
-      bien_nsr_query(unique(bien_loading_table()$scientificName))
+      bien_nsr_query(name_vec)
     }, error = function(e) e)
-    bien_services_status("All BIEN services complete. Staging table updated.")
+
+    summarize_service <- function(x) {
+      if (inherits(x, "error")) {
+        return(paste0("ERROR: ", conditionMessage(x)))
+      }
+      if (!is.data.frame(x)) {
+        return("No structured response")
+      }
+      paste0("OK (", nrow(x), " rows)")
+    }
+
+    bien_services_status(paste(
+      "BIEN service run complete.",
+      paste0("TNRS: ", summarize_service(tnrs_result)),
+      paste0("GNRS: ", summarize_service(gnrs_result)),
+      paste0("GVS: ", summarize_service(gvs_result)),
+      paste0("NSR: ", summarize_service(nsr_result)),
+      "Results are a preview; review handoff exports before submission.",
+      sep = "\n"
+    ))
     # TODO: Integrate results into staging table and update UI/exports
   })
   output$bien_services_status <- renderText({ bien_services_status() })

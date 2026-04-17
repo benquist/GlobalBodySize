@@ -26,7 +26,49 @@ first_non_empty <- function(x) {
   non_missing[1]
 }
 
-collapse_by_key <- function(df, key_col) {
+last_non_empty <- function(x) {
+  if (is.factor(x)) {
+    x <- as.character(x)
+  }
+  non_missing <- x[!is.na(x) & trimws(as.character(x)) != ""]
+  if (length(non_missing) == 0) {
+    return(NA)
+  }
+  non_missing[[length(non_missing)]]
+}
+
+most_frequent_non_empty <- function(x) {
+  if (is.factor(x)) {
+    x <- as.character(x)
+  }
+  non_missing <- trimws(as.character(x))
+  non_missing <- non_missing[!is.na(non_missing) & non_missing != ""]
+  if (length(non_missing) == 0) {
+    return(NA)
+  }
+
+  tab <- sort(table(non_missing), decreasing = TRUE)
+  top <- names(tab)[tab == max(tab)]
+  top[[1]]
+}
+
+resolve_duplicate_value <- function(x, strategy = "first_non_empty") {
+  strategy <- if (is.null(strategy) || !nzchar(strategy)) "first_non_empty" else strategy
+
+  if (identical(strategy, "first_non_empty")) {
+    return(first_non_empty(x))
+  }
+  if (identical(strategy, "last_non_empty")) {
+    return(last_non_empty(x))
+  }
+  if (identical(strategy, "most_frequent_non_empty")) {
+    return(most_frequent_non_empty(x))
+  }
+
+  stop("Unknown duplicate resolution strategy: ", strategy)
+}
+
+collapse_by_key <- function(df, key_col, duplicate_strategy = "first_non_empty") {
   if (!is.data.frame(df) || nrow(df) == 0) {
     return(df)
   }
@@ -39,7 +81,7 @@ collapse_by_key <- function(df, key_col) {
 
   rows <- lapply(split_idx, function(idx) {
     chunk <- df[idx, , drop = FALSE]
-    out_row <- lapply(chunk, first_non_empty)
+    out_row <- lapply(chunk, resolve_duplicate_value, strategy = duplicate_strategy)
     as.data.frame(out_row, stringsAsFactors = FALSE)
   })
 
@@ -79,7 +121,7 @@ coalesce_duplicate_suffix_columns <- function(df) {
   df
 }
 
-merge_uploaded_streams <- function(data_list, primary_file, primary_key, metadata_files, metadata_keys) {
+merge_uploaded_streams <- function(data_list, primary_file, primary_key, metadata_files, metadata_keys, duplicate_strategy = "first_non_empty") {
   if (length(data_list) == 0) {
     stop("No uploaded files available.")
   }
@@ -93,6 +135,8 @@ merge_uploaded_streams <- function(data_list, primary_file, primary_key, metadat
   }
 
   merged <- primary_df
+  primary_join_col <- ".join_key_primary"
+  merged[[primary_join_col]] <- normalize_join_key(merged[[primary_key]])
 
   for (f in metadata_files) {
     if (!f %in% names(data_list)) {
@@ -109,18 +153,25 @@ merge_uploaded_streams <- function(data_list, primary_file, primary_key, metadat
       next
     }
 
-    meta_collapsed <- collapse_by_key(meta_df, meta_key)
+    meta_join_col <- ".join_key_meta"
+    meta_df[[meta_join_col]] <- normalize_join_key(meta_df[[meta_key]])
+
+    meta_collapsed <- collapse_by_key(meta_df, meta_join_col, duplicate_strategy = duplicate_strategy)
     merged <- merge(
       merged,
       meta_collapsed,
-      by.x = primary_key,
-      by.y = meta_key,
+      by.x = primary_join_col,
+      by.y = meta_join_col,
       all.x = TRUE,
       sort = FALSE,
       suffixes = c("", ".meta")
     )
 
     merged <- coalesce_duplicate_suffix_columns(merged)
+  }
+
+  if (primary_join_col %in% names(merged)) {
+    merged[[primary_join_col]] <- NULL
   }
 
   merged
@@ -146,7 +197,7 @@ classify_join_cardinality <- function(primary_dup_keys, metadata_dup_keys) {
   "one-to-one"
 }
 
-audit_join_quality <- function(data_list, primary_file, primary_key, metadata_files, metadata_keys) {
+audit_join_quality <- function(data_list, primary_file, primary_key, metadata_files, metadata_keys, duplicate_strategy = "first_non_empty") {
   if (length(data_list) == 0) {
     stop("No uploaded files available.")
   }
@@ -205,7 +256,11 @@ audit_join_quality <- function(data_list, primary_file, primary_key, metadata_fi
     detail <- if (identical(cardinality, "many-to-many")) {
       "Many-to-many join risk detected. Resolve duplicate keys before building handoff tables."
     } else if (duplicate_metadata_collapse) {
-      "Duplicate metadata keys detected. Metadata rows will be collapsed by key using the first non-empty value in each column. Review for conflicts before export."
+      paste0(
+        "Duplicate metadata keys detected. Metadata rows will be collapsed by key using strategy: ",
+        duplicate_strategy,
+        ". Review conflicts before export."
+      )
     } else if (unmatched_primary_rows > 0) {
       "Some primary rows do not match metadata and will retain missing joined values. Review before export."
     } else {
@@ -339,4 +394,33 @@ find_duplicate_metadata_conflicts <- function(data_list, metadata_files, metadat
   out <- do.call(rbind, conflicts)
   rownames(out) <- NULL
   out
+}
+
+count_duplicate_metadata_keys <- function(data_list, metadata_files, metadata_keys) {
+  if (length(data_list) == 0) {
+    return(0L)
+  }
+
+  total_dups <- 0L
+  for (f in metadata_files) {
+    if (!f %in% names(data_list)) {
+      next
+    }
+
+    meta_key <- metadata_keys[[f]]
+    if (is.null(meta_key) || !nzchar(meta_key)) {
+      next
+    }
+
+    meta_df <- data_list[[f]]
+    if (!meta_key %in% names(meta_df) || nrow(meta_df) == 0) {
+      next
+    }
+
+    key_vals <- normalize_join_key(meta_df[[meta_key]])
+    key_tab <- table(key_vals[!is.na(key_vals)], useNA = "no")
+    total_dups <- total_dups + sum(key_tab > 1)
+  }
+
+  as.integer(total_dups)
 }

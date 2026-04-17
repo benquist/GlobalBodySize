@@ -1,0 +1,15 @@
+PKG_BUILD_START
+* checking for file ‘LoadingHistoricalObservationDataIntoBIEN/DESCRIPTION’ ... OK
+* preparing ‘HistoricalObsToBIEN’:
+* checking DESCRIPTION meta-information ... OK
+* checking for LF line-endings in source and make files and shell scripts
+* checking for empty or unneeded directories
+Removed empty directory ‘HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/tests/testthat’
+Removed empty directory ‘HistoricalObsToBIEN/tests/testthat’
+Omitted ‘LazyData’ from DESCRIPTION
+* building ‘HistoricalObsToBIEN_0.1.0.tar.gz’
+Warning in utils::tar(filepath, pkgname, compression = compression, compression_level = 9L,  :
+  storing paths of more than 100 bytes is not portable:
+  ‘HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/rsconnect/shinyapps.io/benquist/historical-obs-to-bien.dcf’
+
+PKG_BUILD_DONE

@@ -160,3 +160,117 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Agent with 7-step system prompt, 5 design modes, 5 prompt templates (full app, rapid prototype, visualization, UX critique, color system), and 5 hard design constraints.
 - Files changed: agents/EcoInterface.agent.md; agents/agent_chat_provenance_log.txt; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Orchestrate a comprehensive specialist assessment of the LoadingHistoricalObservationDataIntoBIEN Shiny app using biodiversity-informatics-checker, biodiversity-science-guard, and stats-specialist perspectives.
+- Requested outcomes: Provide consolidated summary of current state, strengths, critical gaps, top recommendations, use-case workflow improvements, and development next steps.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot (supervision)
+
+- Date: 2026-04-17
+- Prompt summary: Create a new project folder for the BIEN trait shiny app.
+- Requested outcomes: Create a dedicated BIEN-TraitsShinyApp-Project directory in the workspace with a starter README.
+- Files changed: BIEN-TraitsShinyApp-Project/README.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Run the mandatory final pre-return gate after creating BIEN-TraitsShinyApp-Project.
+- Requested outcomes: Verify prompt logging, change-gated Rmd compile status, change-gated R package build status, and git push status; return strict PASS/BLOCKED with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Assess ecological/taxonomy implications of recent updates in LoadingHistoricalObservationDataIntoBIEN.
+- Requested outcomes: Focus on QC envelope checks, taxonomy and handoff implications, and risk of false confidence; return critical issues and concise improvements.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Review implemented changes in LoadingHistoricalObservationDataIntoBIEN for correctness and practical biodiversity data workflow quality.
+- Requested outcomes: Evaluate duplicate key strategy/manual-block behavior, BIEN services wiring in app.R, QC expansion in R/qc_checks.R, and starter workflow templates in app.R; return critical issues, medium risks, and top refinements.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Evaluate whether new QC and duplicate-resolution logic in LoadingHistoricalObservationDataIntoBIEN is statistically/data-quality sound.
+- Requested outcomes: Focus on date plausibility, duplicate occurrenceID blocking, coordinate-country checks, and choice of duplicate aggregation strategy; return critical flaws and practical parameter recommendations.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Scaffold the new BIEN-TraitsShinyApp-Project folder into a full Shiny project structure.
+- Requested outcomes: Create app.R, modular R helpers/UI/server files, deploy script, starter docs/data/www folders, and project README/provenance log.
+- Files changed: BIEN-TraitsShinyApp-Project/app.R; BIEN-TraitsShinyApp-Project/R/helpers.R; BIEN-TraitsShinyApp-Project/R/ui.R; BIEN-TraitsShinyApp-Project/R/server.R; BIEN-TraitsShinyApp-Project/deploy.R; BIEN-TraitsShinyApp-Project/README.md; BIEN-TraitsShinyApp-Project/chat_provenance_log.md; BIEN-TraitsShinyApp-Project/data/.gitkeep; BIEN-TraitsShinyApp-Project/docs/.gitkeep; BIEN-TraitsShinyApp-Project/www/.gitkeep; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Run the mandatory final pre-return gate after scaffolding BIEN-TraitsShinyApp-Project.
+- Requested outcomes: Verify prompt logging, change-gated Rmd compile status, change-gated R package build status, and git push status; return strict PASS/BLOCKED with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Migrate the full BIEN trait production app feature set into BIEN-TraitsShinyApp-Project as the primary app.
+- Requested outcomes: Copy production app implementation into BIEN-TraitsShinyApp-Project/app.R, repoint deploy script to BIEN-TraitsShinyApp-Project while preserving production app name, and update project documentation/provenance.
+- Files changed: BIEN-TraitsShinyApp-Project/app.R; BIEN-TraitsShinyApp-Project/deploy.R; BIEN-TraitsShinyApp-Project/README.md; BIEN-TraitsShinyApp-Project/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Run the mandatory final pre-return gate after migrating production app code into BIEN-TraitsShinyApp-Project.
+- Requested outcomes: Verify prompt logging, change-gated Rmd compile status, change-gated R package build status, and git push status; return strict PASS/BLOCKED with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Check current status of LoadingHistoricalObservationDataIntoBIEN on shinyapps.io with @M, consult biodiversity agents, and implement all recommended app improvements.
+- Requested outcomes: Report development status, improve BIEN services workflow robustness, improve duplicate-conflict handling UX, expand QC checks, and add guided templates for historical imports and new ecological sources.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/README.md; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/io_ingest.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/qc_checks.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/DESCRIPTION; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/NAMESPACE; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Mandatory pre-return gate for current workspace.
+- Requested outcomes: PASS/BLOCKED evidence for prompt log recorded, change-gated Rmd compile status, change-gated R package build status, git push confirmation, and install code when package build runs.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Check with @M what is happening with LoadingHistoricalObservationDataIntoBIEN and consult biodiversity agents for app development status and user-improvement recommendations.
+- Requested outcomes: Provide current development status, assess improvements for importing historical data and onboarding new ecological sources, and include biodiversity specialist perspectives.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot (supervision)
+
+- Date: 2026-04-17
+- Prompt summary: Implement all recommended improvements in LoadingHistoricalObservationDataIntoBIEN (BIEN services fix, conflict-resolution improvements, QC expansion, and workflow templates).
+- Requested outcomes: Patch runtime bug, add duplicate-resolution controls and safeguards, expand QC checks, add onboarding templates, and validate with specialist feedback.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/R/qc_checks.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Run mandatory final pre-return checks for the LoadingHistoricalObservationDataIntoBIEN implementation updates.
+- Requested outcomes: Verify prompt logging, change-gated Rmd compile status, change-gated R package build status, and git push status with strict PASS/BLOCKED output.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Re-run mandatory final pre-return checks with strict change-gating semantics (compile only newly added or modified non-deleted Rmd files).
+- Requested outcomes: Verify this request is logged; evaluate updated non-deleted Rmd compile status; evaluate updated R package build status with InstallCode if built; confirm git push status; return PASS/BLOCKED with evidence.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Deploy BIEN-TraitsShinyApp-Project to shinyapps.io as the updated live app.
+- Requested outcomes: Execute deploy.R with forceUpdate=TRUE, verify deployment succeeded and app is live at https://benquist.shinyapps.io/bien-traits-shinyapp/, update provenance logs, and run final gate.
+- Files changed: BIEN-TraitsShinyApp-Project/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Run mandatory final pre-return gate after deploying BIEN-TraitsShinyApp-Project.
+- Requested outcomes: Verify prompt logging, change-gated Rmd compile status, change-gated R package build status, and git push status; return strict PASS/BLOCKED with evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Mandatory final pre-return gate now after updating agents/prompt_log.md.
+- Requested outcomes: Verify PASS/BLOCKED with evidence for prompt log recorded, change-gated Rmd compile status, change-gated R package build status, git push confirmation, and install code if package builds run.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot

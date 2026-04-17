@@ -1,7 +1,0 @@
-"Area","N_test","RMSE","MAE"
-"Chukchi Sea",14,0.637,0.437
-"Bering Strait",15,0.476,0.384
-"Gulf of Alaska",110,3.838,3.681
-"Aleutian Islands",24,0.362,0.299
-"Bering Sea, Norton Sound",10,0.998,0.952
-"**Mean across areas**",NA,1.262,1.151

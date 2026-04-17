@@ -1,0 +1,10 @@
+name: bien-species-shinyapp
+title:
+username: benquist
+account: benquist
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17051096
+bundleId:
+url: https://benquist.shinyapps.io/bien-species-shinyapp/
+version: 1

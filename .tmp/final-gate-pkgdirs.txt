@@ -1,0 +1,7 @@
+./EvoPowerEfficiencyExplorer
+./BIEN-SpeciesShinyApp
+./calipoppySDM
+./LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp
+./LoadingHistoricalObservationDataIntoBIEN
+./contaminent data/EvoPowerEfficiencyExplorer
+./contaminent data/calipoppySDM
