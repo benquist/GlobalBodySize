@@ -60,6 +60,13 @@ first_value_or <- function(df, col_name, default = NA_character_) {
   as.character(val)
 }
 
+mode_or_first <- function(x) {
+  x <- x[!is.na(x) & nzchar(x)]
+  if (length(x) == 0) return(NA_character_)
+  ux <- unique(x)
+  ux[[which.max(tabulate(match(x, ux)))]]
+}
+
 normalize_species_name <- function(x) {
   x <- str_squish(as.character(x))
   x <- x[nzchar(x)]
@@ -108,9 +115,12 @@ collect_trait_data <- function(
   include_cultivated = FALSE,
   natives_only = TRUE,
   geovalid_only = TRUE,
-  timeout_sec = 120
+  timeout_sec = 120,
+  return_details = FALSE
 ) {
   out <- list()
+  species_log <- vector("list", length(species_vec))
+
   for (i in seq_along(species_vec)) {
     sp <- species_vec[[i]]
     dat <- safe_bien_retry(
@@ -132,14 +142,57 @@ collect_trait_data <- function(
     if (is.data.frame(dat) && nrow(dat) > 0) {
       dat$input_species <- sp
       out[[length(out) + 1]] <- dat
+      species_log[[i]] <- data.frame(
+        input_species = sp,
+        status = "ok",
+        rows = nrow(dat),
+        message = NA_character_,
+        stringsAsFactors = FALSE
+      )
+    } else if (inherits(dat, "error")) {
+      species_log[[i]] <- data.frame(
+        input_species = sp,
+        status = "error",
+        rows = 0,
+        message = conditionMessage(dat),
+        stringsAsFactors = FALSE
+      )
+    } else {
+      species_log[[i]] <- data.frame(
+        input_species = sp,
+        status = "empty",
+        rows = 0,
+        message = NA_character_,
+        stringsAsFactors = FALSE
+      )
     }
   }
 
-  if (length(out) == 0) {
-    return(data.frame())
-  }
+  species_log_tbl <- bind_rows(species_log)
+  raw_traits <- if (length(out) == 0) data.frame() else bind_rows(out)
+  traits <- raw_traits
 
-  traits <- bind_rows(out)
+  diagnostics <- list(
+    requested_species = length(species_vec),
+    ok_species = if (nrow(species_log_tbl) > 0) sum(species_log_tbl$status == "ok") else 0,
+    empty_species = if (nrow(species_log_tbl) > 0) sum(species_log_tbl$status == "empty") else 0,
+    error_species = if (nrow(species_log_tbl) > 0) sum(species_log_tbl$status == "error") else 0,
+    rows_before_filters = nrow(raw_traits),
+    rows_after_cultivated_filter = nrow(raw_traits),
+    rows_after_natives_filter = nrow(raw_traits),
+    rows_after_geovalid_filter = nrow(raw_traits),
+    rows_after_trait_filter = nrow(raw_traits),
+    include_cultivated = include_cultivated,
+    natives_only = natives_only,
+    geovalid_only = geovalid_only
+  )
+
+  if (nrow(traits) == 0) {
+    if (isTRUE(return_details)) {
+      return(list(traits = traits, diagnostics = diagnostics, species_log = species_log_tbl))
+    }
+    return(traits)
+  }
 
   cultivated_col <- first_existing_col(traits, c("cultivated", "is_cultivated"))
   introduced_col <- first_existing_col(traits, c("is_introduced", "introduced"))
@@ -150,24 +203,31 @@ collect_trait_data <- function(
     keep <- is.na(cultivated_vals) | cultivated_vals == 0
     traits <- traits[keep, , drop = FALSE]
   }
+  diagnostics$rows_after_cultivated_filter <- nrow(traits)
 
   if (natives_only && !is.null(introduced_col)) {
     introduced_vals <- suppressWarnings(as.numeric(as.character(traits[[introduced_col]])))
     keep <- is.na(introduced_vals) | introduced_vals == 0
     traits <- traits[keep, , drop = FALSE]
   }
+  diagnostics$rows_after_natives_filter <- nrow(traits)
 
   if (geovalid_only && !is.null(geovalid_col)) {
     geovalid_vals <- suppressWarnings(as.numeric(as.character(traits[[geovalid_col]])))
     keep <- is.na(geovalid_vals) | geovalid_vals == 1
     traits <- traits[keep, , drop = FALSE]
   }
+  diagnostics$rows_after_geovalid_filter <- nrow(traits)
 
   trait_col <- first_existing_col(traits, c("trait_name", "trait", "measurementType"))
   if (!is.null(trait_col) && !is.null(trait_filter) && length(trait_filter) > 0) {
     traits <- traits %>% filter(.data[[trait_col]] %in% trait_filter)
   }
+  diagnostics$rows_after_trait_filter <- nrow(traits)
 
+  if (isTRUE(return_details)) {
+    return(list(traits = traits, diagnostics = diagnostics, species_log = species_log_tbl))
+  }
   traits
 }
 
@@ -258,7 +318,84 @@ build_query_script <- function(species_vec, selected_traits, max_records, includ
 }
 
 app_ui <- fluidPage(
-  titlePanel("BIEN Traits ShinyApp"),
+  tags$head(
+    tags$style(HTML(" 
+      :root {
+        --bien-blue: #2f79b7;
+        --bien-blue-deep: #1e5f98;
+        --bien-green: #74b64a;
+        --bien-green-deep: #4f8f2a;
+      }
+      body {
+        background: linear-gradient(180deg, #f7fbff 0%, #fbfef9 100%);
+      }
+      .bien-app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin: 6px 0 14px 0;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid #a8cbe9;
+        background: linear-gradient(110deg, rgba(47,121,183,0.2), rgba(116,182,74,0.24));
+      }
+      .bien-title {
+        margin: 0;
+        color: var(--bien-blue-deep);
+        font-weight: 700;
+      }
+      .bien-subtitle {
+        margin: 3px 0 0 0;
+        color: #426988;
+        font-size: 0.95em;
+      }
+      .well {
+        border: 1px solid #cfe2c2;
+        background: linear-gradient(180deg, #f5fbf3 0%, #f7fcff 100%);
+      }
+      .btn-primary {
+        background: linear-gradient(90deg, var(--bien-blue), var(--bien-green));
+        border-color: var(--bien-blue-deep);
+      }
+      .nav-tabs > li > a {
+        color: #2f5f86;
+      }
+      .nav-tabs > li.active > a,
+      .nav-tabs > li.active > a:focus,
+      .nav-tabs > li.active > a:hover {
+        color: var(--bien-blue-deep);
+        border-top: 3px solid var(--bien-green);
+        background: linear-gradient(180deg, #ecf6ff 0%, #f4fbef 100%);
+        font-weight: 600;
+      }
+      .bien-info-card {
+        background: linear-gradient(180deg, #f0f7ff 0%, #f5fbef 100%);
+        border: 1px solid #b7d2e8;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      .bien-warning-card {
+        background: #fff7e9;
+        border: 1px solid #e0c08a;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+      }
+      .bien-note {
+        color: #355a75;
+        margin-bottom: 8px;
+      }
+    "))
+  ),
+  tags$div(
+    class = "bien-app-header",
+    tags$div(
+      tags$h2(class = "bien-title", "BIEN Traits Explorer"),
+      tags$p(class = "bien-subtitle", "Trait-based ecology workflow with taxonomy reconciliation, provenance, and export-ready outputs")
+    )
+  ),
   sidebarLayout(
     sidebarPanel(
       tags$p("Query BIEN traits for one or many species, inspect citations, and export reproducible code."),
@@ -289,18 +426,30 @@ app_ui <- fluidPage(
       tabsetPanel(
         id = "main_tabs",
         tabPanel("Query",
+          uiOutput("query_diagnostics_ui"),
+          uiOutput("query_next_steps_ui"),
           h4("Query status"),
           verbatimTextOutput("query_status"),
+          h4("Species-level query outcomes"),
+          DTOutput("species_query_log_table"),
           h4("Taxonomy reconciliation"),
           DTOutput("taxonomy_table")
         ),
         tabPanel("Coverage",
+          tags$div(
+            class = "bien-warning-card",
+            "Coverage reflects BIEN data availability and sampling effort, not the full trait space of a species."
+          ),
           h4("Selected taxa: trait observation counts"),
           DTOutput("coverage_table"),
           h4("Available BIEN traits (global catalog)") ,
           DTOutput("available_traits_table")
         ),
         tabPanel("Trait Data",
+          tags$div(
+            class = "bien-warning-card",
+            "Do not combine incompatible units without explicit conversion rules. Within-species variance can be large."
+          ),
           h4("Trait observations"),
           DTOutput("trait_table"),
           h4("Trait summary by species, trait, and unit"),
@@ -311,6 +460,7 @@ app_ui <- fluidPage(
             column(6, uiOutput("map_trait_ui")),
             column(6, uiOutput("map_unit_ui"))
           ),
+          uiOutput("map_unit_warning_ui"),
           tags$p("Map shows trait observation locations when coordinates are available. Absence of points does not imply no data."),
           leafletOutput("trait_map", height = 520)
         ),
@@ -355,8 +505,23 @@ app_server <- function(input, output, session) {
     traits = data.frame(),
     status = "Enter species and click Query BIEN.",
     available_traits = data.frame(),
-    query_script = ""
+    query_script = "",
+    query_diagnostics = list(),
+    species_query_log = data.frame(),
+    trait_catalog_status = "Trait catalog not loaded yet."
   )
+
+  observeEvent(TRUE, {
+    state$trait_catalog_status <- "Loading BIEN trait catalog..."
+    trait_list <- safe_bien_call(BIEN_trait_list(), timeout_sec = 60)
+    if (is.data.frame(trait_list) && nrow(trait_list) > 0) {
+      state$available_traits <- trait_list
+      state$trait_catalog_status <- paste0("Loaded BIEN trait catalog (", nrow(trait_list), " rows).")
+    } else {
+      state$available_traits <- data.frame()
+      state$trait_catalog_status <- "Trait catalog could not be loaded yet. You can still run species queries."
+    }
+  }, once = TRUE)
 
   observeEvent(input$reset_query, {
     updateTextAreaInput(session, "species_text", value = "")
@@ -364,7 +529,8 @@ app_server <- function(input, output, session) {
     state$species <- character(0)
     state$taxonomy <- data.frame()
     state$traits <- data.frame()
-    state$available_traits <- data.frame()
+    state$query_diagnostics <- list()
+    state$species_query_log <- data.frame()
     state$status <- "Reset complete. Enter species and click Query BIEN."
   })
 
@@ -387,12 +553,16 @@ app_server <- function(input, output, session) {
       tax_tbl <- reconcile_species(species_vec)
       state$taxonomy <- tax_tbl
 
-      incProgress(0.2, detail = "Loading trait catalog")
-      trait_list <- safe_bien_call(BIEN_trait_list(), timeout_sec = 60)
-      if (is.data.frame(trait_list)) {
-        state$available_traits <- trait_list
-      } else {
-        state$available_traits <- data.frame()
+      if (!is.data.frame(state$available_traits) || nrow(state$available_traits) == 0) {
+        incProgress(0.15, detail = "Loading BIEN trait catalog")
+        trait_list <- safe_bien_call(BIEN_trait_list(), timeout_sec = 60)
+        if (is.data.frame(trait_list) && nrow(trait_list) > 0) {
+          state$available_traits <- trait_list
+          state$trait_catalog_status <- paste0("Loaded BIEN trait catalog (", nrow(trait_list), " rows).")
+        } else {
+          state$available_traits <- data.frame()
+          state$trait_catalog_status <- "Trait catalog could not be loaded yet."
+        }
       }
 
       selected_traits <- input$trait_selector
@@ -400,17 +570,37 @@ app_server <- function(input, output, session) {
         selected_traits <- NULL
       }
 
-      incProgress(0.5, detail = "Fetching trait observations")
-      trait_tbl <- collect_trait_data(
+      incProgress(0.55, detail = "Fetching trait observations")
+      trait_details <- collect_trait_data(
         species_vec = species_vec,
         trait_filter = selected_traits,
         max_records = input$max_records,
         include_cultivated = input$use_cultivated,
         natives_only = input$natives_only,
         geovalid_only = input$geovalid_only,
-        timeout_sec = 180
+        timeout_sec = 180,
+        return_details = TRUE
       )
+      trait_tbl <- trait_details$traits
       state$traits <- trait_tbl
+      state$query_diagnostics <- trait_details$diagnostics
+      state$species_query_log <- trait_details$species_log
+
+      unresolved_n <- 0
+      if (is.data.frame(tax_tbl) && nrow(tax_tbl) > 0 && "match_status" %in% names(tax_tbl)) {
+        unresolved_n <- sum(tolower(as.character(tax_tbl$match_status)) == "unresolved", na.rm = TRUE)
+      }
+      state$query_diagnostics$unresolved_taxa <- unresolved_n
+
+      lat_col <- first_existing_col(trait_tbl, c("latitude", "lat", "decimalLatitude"))
+      lon_col <- first_existing_col(trait_tbl, c("longitude", "long", "lon", "decimalLongitude"))
+      mappable_n <- 0
+      if (!is.null(lat_col) && !is.null(lon_col) && is.data.frame(trait_tbl) && nrow(trait_tbl) > 0) {
+        lat_num <- suppressWarnings(as.numeric(trait_tbl[[lat_col]]))
+        lon_num <- suppressWarnings(as.numeric(trait_tbl[[lon_col]]))
+        mappable_n <- sum(!is.na(lat_num) & !is.na(lon_num))
+      }
+      state$query_diagnostics$mappable_rows <- mappable_n
 
       state$query_script <- build_query_script(
         species_vec = species_vec,
@@ -425,8 +615,17 @@ app_server <- function(input, output, session) {
       n_rows <- if (is.data.frame(trait_tbl)) nrow(trait_tbl) else 0
       state$status <- paste0(
         "Completed query for ", length(species_vec), " species. ",
-        "Trait rows returned: ", n_rows, "."
+        "Trait rows returned: ", n_rows, ". ",
+        "Rows before filters: ", state$query_diagnostics$rows_before_filters, "."
       )
+
+      if (n_rows == 0) {
+        showNotification(
+          "BIEN returned zero trait rows under the current filters. Use Query diagnostics for suggested next steps.",
+          type = "warning",
+          duration = 8
+        )
+      }
     })
   })
 
@@ -434,23 +633,89 @@ app_server <- function(input, output, session) {
     state$status
   })
 
+  output$query_diagnostics_ui <- renderUI({
+    d <- state$query_diagnostics
+    if (!is.list(d) || length(d) == 0) {
+      return(tags$div(class = "bien-note", "Run a query to view diagnostics and interpretation cues."))
+    }
+
+    tags$div(
+      class = "bien-info-card",
+      tags$strong("Query diagnostics"),
+      tags$p(
+        paste0(
+          "Requested species: ", d$requested_species,
+          " | Taxonomy unresolved: ", d$unresolved_taxa,
+          " | Species with trait rows: ", d$ok_species,
+          " | Empty species: ", d$empty_species,
+          " | BIEN errors: ", d$error_species
+        )
+      ),
+      tags$p(
+        paste0(
+          "Rows before filters: ", d$rows_before_filters,
+          " | After cultivated filter: ", d$rows_after_cultivated_filter,
+          " | After native filter: ", d$rows_after_natives_filter,
+          " | After geovalid filter: ", d$rows_after_geovalid_filter,
+          " | Final rows: ", d$rows_after_trait_filter,
+          " | Mappable rows: ", d$mappable_rows
+        )
+      ),
+      tags$p(
+        paste0(
+          "Filter-conditioned interpretation: cultivated included = ", ifelse(isTRUE(d$include_cultivated), "yes", "no"),
+          ", native-only = ", ifelse(isTRUE(d$natives_only), "yes", "no"),
+          ", geovalid-only = ", ifelse(isTRUE(d$geovalid_only), "yes", "no"), "."
+        )
+      )
+    )
+  })
+
+  output$query_next_steps_ui <- renderUI({
+    d <- state$query_diagnostics
+    if (!is.list(d) || length(d) == 0 || is.null(d$rows_after_trait_filter) || d$rows_after_trait_filter > 0) {
+      return(NULL)
+    }
+
+    tags$div(
+      class = "bien-warning-card",
+      tags$strong("No trait rows under current filters"),
+      tags$p("This does not imply trait absence. The result is conditioned by filters and BIEN data availability."),
+      tags$ul(
+        tags$li("Uncheck 'Geovalid coordinates only' and rerun."),
+        tags$li("Uncheck 'Native records only' and rerun."),
+        tags$li("Temporarily clear trait filter selections and rerun."),
+        tags$li("Inspect taxonomy reconciliation for unresolved names.")
+      )
+    )
+  })
+
   output$trait_selector_ui <- renderUI({
     tr <- state$available_traits
-    if (!is.data.frame(tr) || nrow(tr) == 0) {
-      return(helpText("Trait selector appears after BIEN trait catalog is loaded."))
+    choices <- character(0)
+    if (is.data.frame(tr) && nrow(tr) > 0) {
+      tr_col <- first_existing_col(tr, c("trait_name", "trait", "measurementType"))
+      if (!is.null(tr_col)) {
+        choices <- sort(unique(as.character(tr[[tr_col]])))
+      }
     }
 
-    tr_col <- first_existing_col(tr, c("trait_name", "trait", "trait"))
-    if (is.null(tr_col)) {
-      return(helpText("Trait list loaded, but trait-name column was not found."))
-    }
-
-    choices <- sort(unique(as.character(tr[[tr_col]])))
-    selectizeInput("trait_selector", "Filter to traits (optional)", choices = choices, multiple = TRUE)
+    tagList(
+      tags$div(class = "bien-note", state$trait_catalog_status),
+      selectizeInput("trait_selector", "Filter to traits (optional)", choices = choices, multiple = TRUE)
+    )
   })
 
   output$taxonomy_table <- renderDT({
     datatable(state$taxonomy, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
+  })
+
+  output$species_query_log_table <- renderDT({
+    lg <- state$species_query_log
+    if (!is.data.frame(lg) || nrow(lg) == 0) {
+      return(datatable(data.frame(message = "No query run yet."), options = list(dom = "t"), rownames = FALSE))
+    }
+    datatable(lg, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
   output$available_traits_table <- renderDT({
@@ -567,10 +832,57 @@ app_server <- function(input, output, session) {
       filter(.data[[trait_col]] == input$map_trait) %>%
       pull(.data[[unit_col]]) %>%
       as.character() %>%
+      (
+        function(z) {
+          z[!is.na(z) & nzchar(z)]
+        }
+      )() %>%
       unique() %>%
       sort()
 
-    selectInput("map_unit", "Unit", choices = c("All", u), selected = "All")
+    if (length(u) == 0) {
+      return(selectInput("map_unit", "Unit", choices = "All", selected = "All"))
+    }
+
+    selected_unit <- mode_or_first(
+      tr %>%
+        filter(.data[[trait_col]] == input$map_trait) %>%
+        pull(.data[[unit_col]]) %>%
+        as.character()
+    )
+
+    if (is.na(selected_unit) || !(selected_unit %in% u)) {
+      selected_unit <- u[1]
+    }
+
+    selectInput("map_unit", "Unit", choices = c(selected_unit, "All", setdiff(u, selected_unit)), selected = selected_unit)
+  })
+
+  output$map_unit_warning_ui <- renderUI({
+    tr <- state$traits
+    if (!is.data.frame(tr) || nrow(tr) == 0 || is.null(input$map_trait)) return(NULL)
+
+    trait_col <- first_existing_col(tr, c("trait_name", "trait", "measurementType"))
+    unit_col <- first_existing_col(tr, c("unit", "measurementUnit"))
+    if (is.null(trait_col) || is.null(unit_col)) return(NULL)
+
+    units <- tr %>%
+      filter(.data[[trait_col]] == input$map_trait) %>%
+      pull(.data[[unit_col]]) %>%
+      as.character() %>%
+      (
+        function(z) {
+          z[!is.na(z) & nzchar(z)]
+        }
+      )() %>%
+      unique()
+
+    if (length(units) <= 1 || !identical(input$map_unit, "All")) return(NULL)
+
+    tags$div(
+      class = "bien-warning-card",
+      "Multiple units are present for this trait. Values are not directly comparable across units. Select one unit for interpretable gradients."
+    )
   })
 
   output$trait_map <- renderLeaflet({
@@ -611,7 +923,14 @@ app_server <- function(input, output, session) {
       )
     }
 
-    if (!is.null(value_col)) {
+    has_mixed_units <- FALSE
+    if (!is.null(unit_col)) {
+      map_units <- unique(as.character(map_df[[unit_col]]))
+      map_units <- map_units[!is.na(map_units) & nzchar(map_units)]
+      has_mixed_units <- length(map_units) > 1 && (is.null(input$map_unit) || identical(input$map_unit, "All"))
+    }
+
+    if (!is.null(value_col) && !has_mixed_units) {
       val_num <- suppressWarnings(as.numeric(map_df[[value_col]]))
       pal <- colorNumeric("YlGnBu", domain = val_num, na.color = "#808080")
       point_col <- pal(val_num)
