@@ -120,7 +120,56 @@ write_submission_packet <- function(zipfile, combined_tbl, join_audit_tbl, mappi
 }
 
 ui <- fluidPage(
-  tags$head(tags$style(HTML('@keyframes spin { 100% { transform: rotate(360deg); } } .spinner-border { animation: spin 0.75s linear infinite; }'))),
+  tags$head(
+    tags$style(HTML('
+      @keyframes spin { 100% { transform: rotate(360deg); } }
+      .spinner-border { animation: spin 0.75s linear infinite; }
+      #global-busy-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.72);
+        z-index: 9999;
+      }
+      #global-busy-overlay .global-busy-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        color: #1f4f7a;
+        font-weight: 700;
+        text-align: center;
+      }
+      #global-busy-overlay .global-busy-wheel {
+        width: 56px;
+        height: 56px;
+        border: 6px solid #2f6fab;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+      }
+    ')),
+    tags$script(HTML('
+      $(document).on("shiny:busy", function() {
+        $("#global-busy-overlay").show();
+      });
+      $(document).on("shiny:idle", function() {
+        $("#global-busy-overlay").hide();
+      });
+    '))
+  ),
+  tags$div(
+    id = "global-busy-overlay",
+    tags$div(
+      class = "global-busy-content",
+      tags$div(class = "global-busy-wheel", role = "status", `aria-live` = "polite"),
+      tags$div("Processing. Please wait...")
+    )
+  ),
   titlePanel("Historical Observation Data to BIEN"),
   tags$div(
     style = "margin: 10px 0; padding: 10px; background: #eef6ff; border-left: 4px solid #2f6fab;",
@@ -280,6 +329,7 @@ ui <- fluidPage(
           uiOutput("taxonomy_loading_ui"),
           h4("Taxonomy Summary"),
           tableOutput("taxonomy_summary"),
+          textOutput("taxonomy_review_note"),
           h4("Names Requiring Review"),
           tableOutput("taxonomy_review")
         ),
@@ -382,6 +432,8 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  taxonomy_review_max_rows <- 500
+
   # --- Loading spinner state for each step ---
   link_loading <- reactiveVal(FALSE)
   map_loading <- reactiveVal(FALSE)
@@ -713,6 +765,74 @@ server <- function(input, output, session) {
     reconcile_taxonomy_local(names_vec)
   })
 
+  taxonomy_view_state <- reactive({
+    if (!is.null(build_state())) {
+      bien_tbl <- staging_preview_df()
+      scientific_name <- as.character(bien_tbl$scientificName)
+      taxonomy_status <- as.character(bien_tbl$bien_taxonomy_status)
+      matched_name <- as.character(bien_tbl$bien_matched_name)
+
+      review_idx <- grepl("review|unresolved", taxonomy_status, ignore.case = TRUE) |
+        is.na(scientific_name) |
+        trimws(scientific_name) == ""
+
+      review_tbl <- bien_tbl[
+        review_idx,
+        c("occurrenceID", "scientificName", "bien_matched_name", "bien_taxonomy_status", "bien_family"),
+        drop = FALSE
+      ]
+
+      total_review_rows <- nrow(review_tbl)
+      if (total_review_rows > taxonomy_review_max_rows) {
+        review_tbl <- utils::head(review_tbl, taxonomy_review_max_rows)
+      }
+
+      metrics <- data.frame(
+        metric = c("Total records", "Unique submitted names", "BIEN/backbone matched", "Needs review", "Blank scientificName"),
+        value = c(
+          nrow(bien_tbl),
+          length(unique(scientific_name)),
+          sum(!is.na(matched_name) & trimws(matched_name) != ""),
+          sum(review_idx, na.rm = TRUE),
+          sum(is.na(scientific_name) | trimws(scientific_name) == "")
+        ),
+        stringsAsFactors = FALSE
+      )
+
+      return(list(
+        metrics = metrics,
+        review_tbl = review_tbl,
+        total_review_rows = total_review_rows,
+        limited = total_review_rows > taxonomy_review_max_rows
+      ))
+    }
+
+    tx <- taxonomy_df()
+    review_tbl <- tx[tx$status %in% c("REVIEW", "UNRESOLVED"), , drop = FALSE]
+    total_review_rows <- nrow(review_tbl)
+    if (total_review_rows > taxonomy_review_max_rows) {
+      review_tbl <- utils::head(review_tbl, taxonomy_review_max_rows)
+    }
+
+    metrics <- data.frame(
+      metric = c("Total unique names", "Candidate", "Review", "Unresolved"),
+      value = c(
+        nrow(tx),
+        sum(tx$status == "CANDIDATE"),
+        sum(tx$status == "REVIEW"),
+        sum(tx$status == "UNRESOLVED")
+      ),
+      stringsAsFactors = FALSE
+    )
+
+    list(
+      metrics = metrics,
+      review_tbl = review_tbl,
+      total_review_rows = total_review_rows,
+      limited = total_review_rows > taxonomy_review_max_rows
+    )
+  })
+
   bien_df <- reactive({
     req(build_state())
     validate(need(!qc_has_blockers(qc_df()), "QC blockers detected. Fix BLOCK issues before building BIEN outputs."))
@@ -778,45 +898,24 @@ server <- function(input, output, session) {
   }, striped = TRUE, bordered = TRUE)
 
   output$taxonomy_summary <- renderTable({
-    if (!is.null(build_state())) {
-      bien_tbl <- staging_preview_df()
-      data.frame(
-        metric = c("Total records", "Unique submitted names", "BIEN/backbone matched", "Needs review", "Blank scientificName"),
-        value = c(
-          nrow(bien_tbl),
-          length(unique(bien_tbl$scientificName)),
-          sum(!is.na(bien_tbl$bien_matched_name) & trimws(as.character(bien_tbl$bien_matched_name)) != ""),
-          sum(grepl("review|unresolved", bien_tbl$bien_taxonomy_status, ignore.case = TRUE), na.rm = TRUE),
-          sum(is.na(bien_tbl$scientificName) | trimws(as.character(bien_tbl$scientificName)) == "")
-        ),
-        stringsAsFactors = FALSE
-      )
-    } else {
-      tx <- taxonomy_df()
-      data.frame(
-        metric = c("Total unique names", "Candidate", "Review", "Unresolved"),
-        value = c(
-          nrow(tx),
-          sum(tx$status == "CANDIDATE"),
-          sum(tx$status == "REVIEW"),
-          sum(tx$status == "UNRESOLVED")
-        ),
-        stringsAsFactors = FALSE
-      )
-    }
+    taxonomy_view_state()$metrics
   }, striped = TRUE, bordered = TRUE)
 
-  output$taxonomy_review <- renderTable({
-    if (!is.null(build_state())) {
-      bien_tbl <- staging_preview_df()
-      review_idx <- grepl("review|unresolved", bien_tbl$bien_taxonomy_status, ignore.case = TRUE) |
-        is.na(bien_tbl$scientificName) |
-        trimws(as.character(bien_tbl$scientificName)) == ""
-      bien_tbl[review_idx, c("occurrenceID", "scientificName", "bien_matched_name", "bien_taxonomy_status", "bien_family"), drop = FALSE]
+  output$taxonomy_review_note <- renderText({
+    state <- taxonomy_view_state()
+    if (state$limited) {
+      paste0(
+        "Showing first ", taxonomy_review_max_rows,
+        " review rows of ", state$total_review_rows,
+        ". Download TNRS handoff for full reconciliation scope."
+      )
     } else {
-      tx <- taxonomy_df()
-      tx[tx$status %in% c("REVIEW", "UNRESOLVED"), , drop = FALSE]
+      paste0("Review rows: ", state$total_review_rows)
     }
+  })
+
+  output$taxonomy_review <- renderTable({
+    taxonomy_view_state()$review_tbl
   }, striped = TRUE, bordered = TRUE)
 
   output$qc_table <- renderTable({

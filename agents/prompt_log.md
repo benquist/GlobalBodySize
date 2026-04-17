@@ -382,3 +382,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Prepare BIEN-TraitsShinyApp-Project as its own git repository, add publication-friendly ignore/deploy settings, create or connect the GitHub repo `BIEN_Trait_Shiny_App`, and push the project there.
 - Files changed: BIEN-TraitsShinyApp-Project/.gitignore; BIEN-TraitsShinyApp-Project/deploy.R; BIEN-TraitsShinyApp-Project/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Diagnose why Step 4 Taxonomy feels hung/slow in LoadingHistoricalObservationDataIntoBIEN and optimize performance.
+- Requested outcomes: Identify bottlenecks, improve Step 4 responsiveness, keep taxonomy outputs usable on large datasets, and deploy the optimized app.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
