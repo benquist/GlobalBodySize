@@ -92,7 +92,8 @@ parse_species_input <- function(text_input, upload_path = NULL) {
   if (is.null(text_input)) {
     text_input <- ""
   }
-  from_text <- unlist(strsplit(text_input, "[\\n,;]+"), use.names = FALSE)
+  # Split only on line breaks, commas, or semicolons (not on letter 'n').
+  from_text <- unlist(strsplit(text_input, "(\\r?\\n|[,;])+", perl = TRUE), use.names = FALSE)
   from_text <- normalize_species_name(from_text)
 
   from_file <- character(0)
