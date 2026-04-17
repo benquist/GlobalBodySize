@@ -34,3 +34,8 @@
 - Prompt summary: Fix lingering Pinus ponderosa empty-table behavior after prior patch.
 - Requested outcomes: Reinstate max_records limit in BIEN_trait_species query to prevent oversized query failures/timeouts and redeploy.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Add a GitHub-ready README with a practical tutorial for BIEN Trait Shiny App users.
+- Requested outcomes: Expand project documentation with setup steps, usage guidance, worked tutorial, troubleshooting, and deployment notes.
+- Completed by: GitHub Copilot

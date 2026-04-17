@@ -358,3 +358,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Commit the current BIEN-TraitsShinyApp-Project parser fix and associated provenance-log updates, then push them to origin/master.
 - Files changed: BIEN-TraitsShinyApp-Project/app.R; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Add a GitHub README with a tutorial for the BIEN Trait Shiny App project.
+- Requested outcomes: Replace the minimal project README with user-facing GitHub documentation covering setup, tutorial workflow, troubleshooting, and deployment notes.
+- Files changed: BIEN-TraitsShinyApp-Project/README.md; BIEN-TraitsShinyApp-Project/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
