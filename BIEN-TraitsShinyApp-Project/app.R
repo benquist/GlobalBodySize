@@ -332,6 +332,53 @@ build_query_script <- function(species_vec, selected_traits, max_records, includ
 }
 
 app_ui <- fluidPage(
+  tags$head(
+    tags$style(HTML(
+      "
+      .query-busy-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.78);
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .query-busy-card {
+        background: #ffffff;
+        border: 1px solid #d8e2ea;
+        border-radius: 12px;
+        padding: 18px 22px;
+        min-width: 280px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+        text-align: center;
+      }
+      .query-busy-spinner {
+        width: 52px;
+        height: 52px;
+        border: 6px solid #d5e6f4;
+        border-top-color: #1b6ca8;
+        border-radius: 50%;
+        margin: 0 auto 10px auto;
+        animation: query-spin 0.9s linear infinite;
+      }
+      .query-busy-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #17486d;
+      }
+      .query-busy-subtitle {
+        margin-top: 4px;
+        font-size: 13px;
+        color: #4c6272;
+      }
+      @keyframes query-spin {
+        to { transform: rotate(360deg); }
+      }
+      "
+    ))
+  ),
+  uiOutput("query_busy_overlay"),
   titlePanel("BIEN Traits ShinyApp"),
   sidebarLayout(
     sidebarPanel(
@@ -438,8 +485,25 @@ app_server <- function(input, output, session) {
     traits = data.frame(),
     status = "Enter species and click Query BIEN.",
     available_traits = data.frame(),
-    query_script = ""
+    query_script = "",
+    query_running = FALSE
   )
+
+  output$query_busy_overlay <- renderUI({
+    if (!isTRUE(state$query_running)) {
+      return(NULL)
+    }
+
+    tags$div(
+      class = "query-busy-overlay",
+      tags$div(
+        class = "query-busy-card",
+        tags$div(class = "query-busy-spinner"),
+        tags$div(class = "query-busy-title", "Fetching BIEN data..."),
+        tags$div(class = "query-busy-subtitle", "Query is running. Please wait for completion.")
+      )
+    )
+  })
 
   observeEvent(input$reset_query, {
     updateTextAreaInput(session, "species_text", value = "")
@@ -464,6 +528,8 @@ app_server <- function(input, output, session) {
     }
 
     state$species <- species_vec
+    state$query_running <- TRUE
+    on.exit({ state$query_running <- FALSE }, add = TRUE)
 
     withProgress(message = "Querying BIEN", value = 0, {
       incProgress(0.2, detail = "Reconciling taxonomy")
