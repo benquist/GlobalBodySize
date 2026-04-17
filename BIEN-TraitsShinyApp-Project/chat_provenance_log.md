@@ -24,3 +24,8 @@
 - Prompt summary: Fix zero-trait-record bug and add error diagnostics.
 - Requested outcomes: Capture and report errors that were previously silent; test Pinus ponderosa query; redeploy with fixes.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Fix Pinus ponderosa zero-results when user enters mixed common+scientific name text.
+- Requested outcomes: Extract scientific binomial from mixed text input and redeploy.
+- Completed by: GitHub Copilot

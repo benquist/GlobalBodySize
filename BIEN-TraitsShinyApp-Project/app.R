@@ -66,6 +66,13 @@ normalize_species_name <- function(x) {
   if (length(x) == 0) return(character(0))
 
   vapply(x, function(one) {
+    # If users paste common + scientific names on one line, extract the first
+    # genus-species binomial-looking pair (for example "Ponderosa Pine Pinus ponderosa").
+    latin_match <- str_match(one, "\\b([A-Z][a-z]+)\\s+([a-z][a-z-]+)\\b")
+    if (!is.na(latin_match[1, 1])) {
+      one <- paste(latin_match[1, 2], latin_match[1, 3])
+    }
+
     parts <- strsplit(one, "\\s+")[[1]]
     if (length(parts) >= 1) {
       genus <- parts[1]
