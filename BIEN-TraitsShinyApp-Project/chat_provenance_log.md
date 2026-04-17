@@ -29,3 +29,8 @@
 - Prompt summary: Fix Pinus ponderosa zero-results when user enters mixed common+scientific name text.
 - Requested outcomes: Extract scientific binomial from mixed text input and redeploy.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Fix lingering Pinus ponderosa empty-table behavior after prior patch.
+- Requested outcomes: Reinstate max_records limit in BIEN_trait_species query to prevent oversized query failures/timeouts and redeploy.
+- Completed by: GitHub Copilot

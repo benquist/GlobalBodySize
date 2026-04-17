@@ -126,7 +126,8 @@ collect_trait_data <- function(
         BIEN_trait_species(
           species = local_sp,
           all.taxonomy = TRUE,
-          source.citation = TRUE
+          source.citation = TRUE,
+          limit = as.integer(max_records)
         )
       },
       attempts = 3,
