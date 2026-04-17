@@ -39,3 +39,8 @@
 - Prompt summary: Add a GitHub-ready README with a practical tutorial for BIEN Trait Shiny App users.
 - Requested outcomes: Expand project documentation with setup steps, usage guidance, worked tutorial, troubleshooting, and deployment notes.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Publish BIEN Trait Shiny App as a standalone GitHub repository named BIEN_Trait_Shiny_App.
+- Requested outcomes: Prepare the project for standalone publication, ensure README is at repo root, and push the project to its own GitHub repository.
+- Completed by: GitHub Copilot

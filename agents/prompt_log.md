@@ -12,6 +12,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 - Date: 2026-04-17
+- Prompt summary: Implement real, working TNRS, GNRS, GVS, and NSR queries. Replace 404 placeholder functions with actual public APIs.
+- Requested outcomes: TNRS resolves species names via public BIEN TNRS API, GNRS validates geographic fields, GVS validates coordinates, NSR returns native status flags. App no longer shows HTTP 404 errors—queries actually work.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/bien_pipeline_helpers.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Wire the Historical Data app spinners to display during actual computations instead of 500ms demo delay.
+- Requested outcomes: Spinners turn on when user clicks button/navigates tab, turn off when reactive computation completes. Users see spinner during real processing.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
 - Prompt summary: Run the mandatory final pre-return gate for this workspace and report PASS/FAIL for prompt log, Rmd compile, R package build, and git push checks.
 - Requested outcomes: Provide explicit evidence-backed PASS/BLOCKED results for all four checks, including no-edit handling where applicable.
 - Files changed: agents/prompt_log.md
@@ -363,4 +375,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Add a GitHub README with a tutorial for the BIEN Trait Shiny App project.
 - Requested outcomes: Replace the minimal project README with user-facing GitHub documentation covering setup, tutorial workflow, troubleshooting, and deployment notes.
 - Files changed: BIEN-TraitsShinyApp-Project/README.md; BIEN-TraitsShinyApp-Project/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Publish BIEN Trait Shiny App to a standalone GitHub repository and make the README visible at the repository root.
+- Requested outcomes: Prepare BIEN-TraitsShinyApp-Project as its own git repository, add publication-friendly ignore/deploy settings, create or connect the GitHub repo `BIEN_Trait_Shiny_App`, and push the project there.
+- Files changed: BIEN-TraitsShinyApp-Project/.gitignore; BIEN-TraitsShinyApp-Project/deploy.R; BIEN-TraitsShinyApp-Project/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot

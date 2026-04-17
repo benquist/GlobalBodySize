@@ -5,7 +5,7 @@ suppressWarnings(library(rsconnect))
 
 cat("Deploying BIEN Traits Shiny App to shinyapps.io...\n")
 rsconnect::deployApp(
-  appDir = "/Users/brianjenquist/VSCode/BIEN-TraitsShinyApp-Project",
+  appDir = ".",
   appName = "bien-traits-shinyapp",
   account = "benquist",
   forceUpdate = TRUE,

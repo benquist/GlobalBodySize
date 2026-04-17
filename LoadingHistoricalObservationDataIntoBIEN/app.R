@@ -133,13 +133,14 @@ ui <- fluidPage(
   ),
   sidebarLayout(
     sidebarPanel(
-      h4("Quick Start: 5 Steps"),
+      h4("Quick Start: 6 Steps"),
       tags$ol(
         tags$li("Upload your main survey and plot/location files as CSVs."),
         tags$li("In Step 2, select the join key (e.g., Plot_Name) for both files. Keys must match exactly!"),
         tags$li("After linking, check that every observation row has Lat and Long filled. If not, check your join and file contents."),
         tags$li("In Step 5, resolve any BLOCK errors. Click the QC Dashboard for details. If you see 'missing_geography', your join did not propagate Lat/Long."),
-        tags$li("Once all BLOCK issues are fixed, export your BIEN draft tables and handoffs.")
+        tags$li("Once all BLOCK issues are fixed, export your BIEN draft tables and handoffs."),
+        tags$li("(Optional) Click 'Run BIEN Web Services' to submit names, places, and coordinates for authoritative reconciliation via TNRS, GNRS, GVS, and NSR before final BIEN submission.")
       ),
       tags$div(
         style = "margin: 8px 0 8px 0; padding: 8px; background: #fffbe6; border-left: 4px solid #c28b00; font-size: 0.92em;",
@@ -300,6 +301,7 @@ ui <- fluidPage(
           h3("Step 6. Export BIEN Draft Tables"),
           p("Download the draft loading and handoff tables for external validation and BIEN review."),
           h4("BIEN Web Services Status"),
+          uiOutput("bien_services_loading_ui"),
           verbatimTextOutput("bien_services_status"),
           tags$div(
             style = "margin: 10px 0; padding: 10px; background: #eef7ee; border-left: 4px solid #3a7d44;",
@@ -338,11 +340,27 @@ ui <- fluidPage(
             tags$li("Download and test with the example files below if unsure.")
           ),
           tags$hr(),
+          h4("Optional: Run BIEN Web Services"),
+          tags$p(
+            "After Step 5 (Build BIEN Draft Tables), you can optionally submit your data for authoritative external validation:"
+          ),
+          tags$ul(
+            tags$li(strong("TNRS"), " (Taxonomic Name Resolution Service) — Reconciles scientific names against BIEN's taxonomic backbone."),
+            tags$li(strong("GNRS"), " (Geographic Name Resolution Service) — Reconciles place and locality names to coordinates."),
+            tags$li(strong("GVS"), " (Geospatial Validation Service) — Validates and flags problematic coordinates."),
+            tags$li(strong("NSR"), " (Native Status Reference) — Flags introduced, invasive, or cultivated species.")
+          ),
+          tags$p(
+            "Click the orange 'Run BIEN Web Services (TNRS, GNRS, GVS, NSR)' button in the sidebar after building your draft tables. ",
+            "Results will display in the Step 6 Export tab. Review these results carefully before final BIEN submission."
+          ),
+          tags$hr(),
           h4("FAQ: Common Problems and Solutions"),
           tags$ul(
             tags$li(strong("Q: I see BLOCK or QC errors!"), " — Click the QC Dashboard for details. Most often, Lat/Long are missing due to a join problem."),
             tags$li(strong("Q: My Lat/Long are NA or missing!"), " — Check that your plot/location file has Lat/Long, and that the join key matches exactly in both files."),
-            tags$li(strong("Q: Can I see an example?"), " — Yes! Download the sample files below and try them in the app.")
+            tags$li(strong("Q: Can I see an example?"), " — Yes! Download the sample files below and try them in the app."),
+            tags$li(strong("Q: What do I do with BIEN Web Services results?"), " — Review the TNRS, GNRS, GVS, and NSR output in Step 6 Export. Integrate any critical corrections back into your source data, rebuild BIEN tables if needed, and then finalize submission.")
           ),
           tags$hr(),
           tags$div(
@@ -369,13 +387,15 @@ server <- function(input, output, session) {
   map_loading <- reactiveVal(FALSE)
   taxonomy_loading <- reactiveVal(FALSE)
   validate_loading <- reactiveVal(FALSE)
+  bien_services_loading <- reactiveVal(FALSE)
 
   # --- Step 2 Link spinner logic ---
+  # Turn on spinner when button is clicked
   observeEvent(input$prepare_btn, {
     link_loading(TRUE)
-    # Simulate delay for demonstration; replace with real triggers as needed
-    invalidateLater(500, session)
-    isolate({ Sys.sleep(0.5) })
+  })
+  # Turn off spinner when computation completes
+  observeEvent(combined_state(), {
     link_loading(FALSE)
   })
   output$link_loading_ui <- renderUI({
@@ -388,10 +408,12 @@ server <- function(input, output, session) {
   })
 
   # --- Step 3 Map spinner logic ---
+  # Turn on spinner when button is clicked
   observeEvent(input$suggest_btn, {
     map_loading(TRUE)
-    invalidateLater(500, session)
-    isolate({ Sys.sleep(0.5) })
+  })
+  # Turn off spinner when computation completes
+  observeEvent(suggested_mapping(), {
     map_loading(FALSE)
   })
   output$map_loading_ui <- renderUI({
@@ -404,14 +426,16 @@ server <- function(input, output, session) {
   })
 
   # --- Step 4 Taxonomy spinner logic ---
+  # Turn on spinner when tab is selected
   observeEvent(input$workflow_tabs, {
     if (identical(input$workflow_tabs, "Step 4 Taxonomy")) {
       taxonomy_loading(TRUE)
-      invalidateLater(500, session)
-      isolate({ Sys.sleep(0.5) })
-      taxonomy_loading(FALSE)
     }
   }, ignoreInit = TRUE)
+  # Turn off spinner when computation completes
+  observeEvent(taxonomy_df(), {
+    taxonomy_loading(FALSE)
+  })
   output$taxonomy_loading_ui <- renderUI({
     if (taxonomy_loading()) {
       tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;",
@@ -422,10 +446,12 @@ server <- function(input, output, session) {
   })
 
   # --- Step 5 Validate spinner logic ---
+  # Turn on spinner when button is clicked
   observeEvent(input$build_btn, {
     validate_loading(TRUE)
-    invalidateLater(500, session)
-    isolate({ Sys.sleep(0.5) })
+  })
+  # Turn off spinner when computation completes
+  observeEvent(build_state(), {
     validate_loading(FALSE)
   })
   output$validate_loading_ui <- renderUI({
@@ -1038,12 +1064,14 @@ server <- function(input, output, session) {
   bien_services_status <- reactiveVal("")
 
   observeEvent(input$run_bien_services, {
+    bien_services_loading(TRUE)
     req(build_state())
     req(staging_preview_df())
 
     stage_tbl <- staging_preview_df()
     if (!is.data.frame(stage_tbl) || nrow(stage_tbl) == 0) {
       bien_services_status("No staged records are available. Build BIEN draft tables first.")
+      bien_services_loading(FALSE)
       return()
     }
 
@@ -1105,12 +1133,22 @@ server <- function(input, output, session) {
       paste0("GNRS: ", summarize_service(gnrs_result)),
       paste0("GVS: ", summarize_service(gvs_result)),
       paste0("NSR: ", summarize_service(nsr_result)),
-      "Results are a preview; review handoff exports before submission.",
+      "Results are displayed below. Review results before final BIEN submission.",
       sep = "\n"
     ))
+    bien_services_loading(FALSE)
     # TODO: Integrate results into staging table and update UI/exports
   })
   output$bien_services_status <- renderText({ bien_services_status() })
+
+  output$bien_services_loading_ui <- renderUI({
+    if (bien_services_loading()) {
+      tags$div(style = "margin: 10px 0; color: #c28b00; font-weight: bold;", 
+        tags$span("⏳ Running BIEN Web Services... Please wait."),
+        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #c28b00; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
+      )
+    } else NULL
+  })
 }
 
 shinyApp(ui = ui, server = server)

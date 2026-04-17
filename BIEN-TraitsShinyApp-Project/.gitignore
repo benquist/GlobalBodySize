@@ -1,0 +1,8 @@
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+rsconnect/
+*.Rproj
+renv/library/
+renv/staging/

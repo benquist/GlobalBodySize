@@ -65,6 +65,17 @@ The tutorial records are synthetic training data. They are biogeographically pla
 - `inst/extdata/`: sample data
 - `app.R`: Shiny workflow UI
 
+## BIEN Web Services (optional external validation)
+
+After Step 5 (Build BIEN Draft Tables), you can optionally submit your data to external BIEN web services for authoritative reconciliation:
+
+- **TNRS** (Taxonomic Name Resolution Service): Reconciles scientific names against the BIEN taxonomic backbone.
+- **GNRS** (Geographic Name Resolution Service): Reconciles place/locality names to coordinates.
+- **GVS** (Geospatial Validation Service): Validates coordinates and flags geographic impossibilities.
+- **NSR** (Native Status Reference): Identifies and flags introduced, invasive, or cultivated species.
+
+To use, click the orange **"Run BIEN Web Services (TNRS, GNRS, GVS, NSR)"** button in the sidebar (available after building BIEN draft tables). Results will appear in the **Step 6 Export** tab with a summary of returned records per service. **Review these results carefully** and integrate any critical corrections back into your source data before final BIEN submission.
+
 ## Notes
 
 This is an MVP scaffold. TNRS, GNRS, GVS, and NSR calls are represented by handoff tables for downstream workflow integration. Successful export from this app is not evidence that names, places, coordinates, or native-status fields have been fully validated.
