@@ -20,16 +20,19 @@ suppressPackageStartupMessages({
   library(jsonlite)
 })
 
-safe_bien_call <- function(expr, timeout_sec = 120) {
-  on.exit(setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE), add = TRUE)
-  setTimeLimit(elapsed = timeout_sec, transient = TRUE)
-  tryCatch(expr, error = function(e) e)
+# Safe wrapper: runs call_fn() (a zero-arg function) and captures errors.
+# setTimeLimit is intentionally NOT used here because R evaluates function
+# arguments eagerly before entering the callee, making it impossible to apply
+# setTimeLimit to a call passed as an argument. Shinyapps.io manages session
+# timeouts at the server level.
+safe_bien_call <- function(call_fn) {
+  tryCatch(call_fn(), error = function(e) e)
 }
 
-safe_bien_retry <- function(call_fn, timeout_sec = 120, attempts = 3, sleep_sec = 1) {
+safe_bien_retry <- function(call_fn, attempts = 3, sleep_sec = 2) {
   last <- NULL
   for (i in seq_len(attempts)) {
-    last <- safe_bien_call(call_fn(), timeout_sec = timeout_sec)
+    last <- safe_bien_call(call_fn)
     if (!inherits(last, "error")) {
       return(last)
     }
@@ -111,27 +114,26 @@ parse_species_input <- function(text_input, upload_path = NULL) {
 collect_trait_data <- function(
   species_vec,
   trait_filter = NULL,
-  max_records = 5000,
-  timeout_sec = 120
+  max_records = 5000
 ) {
   out <- list()
   errors <- character(0)
   for (i in seq_along(species_vec)) {
     sp <- species_vec[[i]]
+    local_sp <- sp
     dat <- safe_bien_retry(
       function() {
         BIEN_trait_species(
-          species = sp,
+          species = local_sp,
           all.taxonomy = TRUE,
           source.citation = TRUE,
           limit = as.integer(max_records),
-          record_limit = min(500L, as.integer(max_records)),
+          record_limit = min(1000L, as.integer(max_records)),
           fetch.query = FALSE
         )
       },
-      timeout_sec = timeout_sec,
       attempts = 3,
-      sleep_sec = 1
+      sleep_sec = 2
     )
 
     if (inherits(dat, "error")) {
@@ -248,7 +250,8 @@ reconcile_species <- function(species_vec, timeout_sec = 60) {
   }
 
   out <- lapply(species_vec, function(sp) {
-    tax <- safe_bien_call(BIEN_taxonomy_species(sp), timeout_sec = timeout_sec)
+    local_sp2 <- sp
+    tax <- safe_bien_call(function() BIEN_taxonomy_species(local_sp2))
     if (inherits(tax, "error") || !is.data.frame(tax) || nrow(tax) == 0) {
       return(data.frame(
         input_name = sp,
@@ -468,7 +471,7 @@ app_server <- function(input, output, session) {
       state$taxonomy <- tax_tbl
 
       incProgress(0.2, detail = "Loading trait catalog")
-      trait_list <- safe_bien_call(BIEN_trait_list(), timeout_sec = 60)
+      trait_list <- safe_bien_call(function() BIEN_trait_list())
       if (is.data.frame(trait_list)) {
         state$available_traits <- trait_list
       } else {
@@ -484,8 +487,7 @@ app_server <- function(input, output, session) {
       trait_tbl <- collect_trait_data(
         species_vec = species_vec,
         trait_filter = selected_traits,
-        max_records = input$max_records,
-        timeout_sec = 180
+        max_records = input$max_records
       )
       state$traits <- trait_tbl
 
