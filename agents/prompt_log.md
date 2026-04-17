@@ -11,6 +11,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by:
 
 ## Entries
+- Date: 2026-04-17
+- Prompt summary: BIEN Traits app returning "No trait observations" for Pinus ponderosa despite data existing in BIEN. Root cause: BIEN_trait_species called with invalid parameters (limit, record_limit, fetch.query) causing silent empty return.
+- Requested outcomes: Fix invalid BIEN_trait_species parameters, redeploy, verify data displays correctly.
+- Files changed: BIEN-TraitsShinyApp-Project/app.R
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-28
 - Prompt summary: Create an always agent that runs last and checks prompt logging, Rmd compile status, R package build status, and git push status.
 - Requested outcomes: Add new always agent and make it final gate before return.

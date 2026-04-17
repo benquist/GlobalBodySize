@@ -126,10 +126,7 @@ collect_trait_data <- function(
         BIEN_trait_species(
           species = local_sp,
           all.taxonomy = TRUE,
-          source.citation = TRUE,
-          limit = as.integer(max_records),
-          record_limit = min(1000L, as.integer(max_records)),
-          fetch.query = FALSE
+          source.citation = TRUE
         )
       },
       attempts = 3,
@@ -309,10 +306,7 @@ build_query_script <- function(species_vec, selected_traits, max_records, includ
     "  dat <- BIEN_trait_species(",
     "    species = sp,",
     "    all.taxonomy = TRUE,",
-    "    source.citation = TRUE,",
-    "    limit = max_records,",
-    "    record_limit = min(500L, max_records),",
-    "    fetch.query = FALSE",
+    "    source.citation = TRUE",
     "  )",
     "  if (!is.data.frame(dat) || nrow(dat) == 0) return(NULL)",
     "  dat$input_species <- sp",

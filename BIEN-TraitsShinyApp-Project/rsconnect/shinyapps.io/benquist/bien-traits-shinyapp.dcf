@@ -5,6 +5,6 @@ account: benquist
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 17159710
-bundleId: 11865208
+bundleId: 11865251
 url: https://benquist.shinyapps.io/bien-traits-shinyapp/
 version: 1
