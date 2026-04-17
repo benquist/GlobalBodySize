@@ -108,6 +108,7 @@ collect_trait_data <- function(
   timeout_sec = 120
 ) {
   out <- list()
+  errors <- character(0)
   for (i in seq_along(species_vec)) {
     sp <- species_vec[[i]]
     dat <- safe_bien_retry(
@@ -126,24 +127,26 @@ collect_trait_data <- function(
       sleep_sec = 1
     )
 
-    if (is.data.frame(dat) && nrow(dat) > 0) {
+    if (inherits(dat, "error")) {
+      errors <- c(errors, paste0("Error querying ", sp, ": ", conditionMessage(dat)))
+    } else if (is.data.frame(dat) && nrow(dat) > 0) {
       dat$input_species <- sp
       out[[length(out) + 1]] <- dat
     }
   }
 
   if (length(out) == 0) {
-    return(data.frame())
+    result <- data.frame()
+  } else {
+    result <- bind_rows(out)
+    trait_col <- first_existing_col(result, c("trait_name", "trait", "measurementType"))
+    if (!is.null(trait_col) && !is.null(trait_filter) && length(trait_filter) > 0) {
+      result <- result %>% filter(.data[[trait_col]] %in% trait_filter)
+    }
   }
 
-  traits <- bind_rows(out)
-
-  trait_col <- first_existing_col(traits, c("trait_name", "trait", "measurementType"))
-  if (!is.null(trait_col) && !is.null(trait_filter) && length(trait_filter) > 0) {
-    traits <- traits %>% filter(.data[[trait_col]] %in% trait_filter)
-  }
-
-  traits
+  attr(result, "errors") <- errors
+  result
 }
 
 apply_trait_filters <- function(
@@ -479,6 +482,15 @@ app_server <- function(input, output, session) {
       )
       state$traits <- trait_tbl
 
+      errs <- attr(trait_tbl, "errors")
+      if (length(errs) > 0) {
+        showNotification(
+          HTML(paste(c("Errors during query:", errs), collapse = "<br/>")),
+          type = "warning",
+          duration = 10
+        )
+      }
+
       state$query_script <- build_query_script(
         species_vec = species_vec,
         selected_traits = if (is.null(selected_traits)) character(0) else selected_traits,
@@ -492,7 +504,8 @@ app_server <- function(input, output, session) {
       n_rows <- if (is.data.frame(trait_tbl)) nrow(trait_tbl) else 0
       state$status <- paste0(
         "Completed query for ", length(species_vec), " species. ",
-        "Trait rows returned: ", n_rows, "."
+        "Trait rows returned: ", n_rows, ". ",
+        if (length(errs) > 0) paste0("(With ", length(errs), " query error(s) - see notification above)") else "(No errors)"
       )
     })
   })
