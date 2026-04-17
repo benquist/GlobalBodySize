@@ -14,3 +14,8 @@
 - Prompt summary: Deploy BIEN-TraitsShinyApp-Project to shinyapps.io.
 - Requested outcomes: Execute deployment with forceUpdate=TRUE, verify app is live at https://benquist.shinyapps.io/bien-traits-shinyapp/, and update provenance.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-17
+- Prompt summary: Redesign BIEN Traits app filter UX: show all traits by default, display counts by filter combo, filter only on download.
+- Requested outcomes: Query with no filters, show unfiltered traits + filter counts in Coverage tab, apply filters only when user downloads.
+- Completed by: GitHub Copilot

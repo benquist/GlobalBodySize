@@ -105,9 +105,6 @@ collect_trait_data <- function(
   species_vec,
   trait_filter = NULL,
   max_records = 5000,
-  include_cultivated = FALSE,
-  natives_only = TRUE,
-  geovalid_only = TRUE,
   timeout_sec = 120
 ) {
   out <- list()
@@ -141,6 +138,24 @@ collect_trait_data <- function(
 
   traits <- bind_rows(out)
 
+  trait_col <- first_existing_col(traits, c("trait_name", "trait", "measurementType"))
+  if (!is.null(trait_col) && !is.null(trait_filter) && length(trait_filter) > 0) {
+    traits <- traits %>% filter(.data[[trait_col]] %in% trait_filter)
+  }
+
+  traits
+}
+
+apply_trait_filters <- function(
+  traits,
+  include_cultivated = FALSE,
+  natives_only = FALSE,
+  geovalid_only = FALSE
+) {
+  if (!is.data.frame(traits) || nrow(traits) == 0) {
+    return(traits)
+  }
+
   cultivated_col <- first_existing_col(traits, c("cultivated", "is_cultivated"))
   introduced_col <- first_existing_col(traits, c("is_introduced", "introduced"))
   geovalid_col <- first_existing_col(traits, c("geovalid", "is_geovalid"))
@@ -163,12 +178,58 @@ collect_trait_data <- function(
     traits <- traits[keep, , drop = FALSE]
   }
 
-  trait_col <- first_existing_col(traits, c("trait_name", "trait", "measurementType"))
-  if (!is.null(trait_col) && !is.null(trait_filter) && length(trait_filter) > 0) {
-    traits <- traits %>% filter(.data[[trait_col]] %in% trait_filter)
+  traits
+}
+
+compute_trait_counts <- function(traits) {
+  if (!is.data.frame(traits) || nrow(traits) == 0) {
+    return(list(
+      total = 0,
+      cultivated = 0,
+      native = 0,
+      geovalid_yes = 0,
+      geovalid_no = 0,
+      cultivated_native = 0,
+      cultivated_geovalid = 0,
+      native_geovalid = 0,
+      all_filters = 0
+    ))
   }
 
-  traits
+  cultivated_col <- first_existing_col(traits, c("cultivated", "is_cultivated"))
+  introduced_col <- first_existing_col(traits, c("is_introduced", "introduced"))
+  geovalid_col <- first_existing_col(traits, c("geovalid", "is_geovalid"))
+
+  is_cultivated <- rep(FALSE, nrow(traits))
+  is_native <- rep(TRUE, nrow(traits))
+  is_geovalid_yes <- rep(TRUE, nrow(traits))
+
+  if (!is.null(cultivated_col)) {
+    val <- suppressWarnings(as.numeric(as.character(traits[[cultivated_col]])))
+    is_cultivated <- !is.na(val) & val == 1
+  }
+
+  if (!is.null(introduced_col)) {
+    val <- suppressWarnings(as.numeric(as.character(traits[[introduced_col]])))
+    is_native <- is.na(val) | val == 0
+  }
+
+  if (!is.null(geovalid_col)) {
+    val <- suppressWarnings(as.numeric(as.character(traits[[geovalid_col]])))
+    is_geovalid_yes <- is.na(val) | val == 1
+  }
+
+  list(
+    total = nrow(traits),
+    cultivated = sum(is_cultivated),
+    native = sum(is_native),
+    geovalid_yes = sum(is_geovalid_yes),
+    geovalid_no = nrow(traits) - sum(is_geovalid_yes),
+    cultivated_native = sum(is_cultivated & is_native),
+    cultivated_geovalid = sum(is_cultivated & is_geovalid_yes),
+    native_geovalid = sum(is_native & is_geovalid_yes),
+    all_filters = sum(is_cultivated == FALSE & is_native & is_geovalid_yes)
+  )
 }
 
 reconcile_species <- function(species_vec, timeout_sec = 60) {
@@ -261,7 +322,7 @@ app_ui <- fluidPage(
   titlePanel("BIEN Traits ShinyApp"),
   sidebarLayout(
     sidebarPanel(
-      tags$p("Query BIEN traits for one or many species, inspect citations, and export reproducible code."),
+      tags$p("Query BIEN traits for one or many species. Use filters to refine downloads."),
       textAreaInput(
         "species_text",
         "Species list (one per line, or comma-separated)",
@@ -270,9 +331,12 @@ app_ui <- fluidPage(
         placeholder = "e.g.\nQuercus agrifolia\nPinus ponderosa"
       ),
       fileInput("species_file", "Upload CSV of species", accept = c(".csv")),
+      tags$hr(),
+      tags$strong("Download filters (applied to downloads only):"),
       checkboxInput("use_cultivated", "Include cultivated records", value = FALSE),
-      checkboxInput("natives_only", "Native records only", value = TRUE),
-      checkboxInput("geovalid_only", "Geovalid coordinates only", value = TRUE),
+      checkboxInput("natives_only", "Native records only", value = FALSE),
+      checkboxInput("geovalid_only", "Geovalid coordinates only", value = FALSE),
+      tags$small("(See 'Coverage' tab to view trait counts by filter)"),
       numericInput("max_records", "Max trait records per species", value = 5000, min = 100, max = 50000, step = 100),
       actionButton("run_query", "Query BIEN", class = "btn-primary"),
       actionButton("reset_query", "Reset"),
@@ -295,13 +359,12 @@ app_ui <- fluidPage(
           DTOutput("taxonomy_table")
         ),
         tabPanel("Coverage",
-          h4("Selected taxa: trait observation counts"),
-          DTOutput("coverage_table"),
-          h4("Available BIEN traits (global catalog)") ,
-          DTOutput("available_traits_table")
+          h4("All trait observations (unfiltered) - counts by filter option:"),
+          DTOutput("filter_coverage_table"),
+          tags$p("Use the checkboxes in the sidebar to filter downloads. The Coverage tab shows how many traits match each filter combination.")
         ),
         tabPanel("Trait Data",
-          h4("Trait observations"),
+          h4("Trait observations (showing unfiltered data)"),
           DTOutput("trait_table"),
           h4("Trait summary by species, trait, and unit"),
           DTOutput("trait_summary_table")
@@ -328,20 +391,27 @@ app_ui <- fluidPage(
           h3("How to use this app"),
           tags$ol(
             tags$li("Enter species names or upload a CSV."),
-            tags$li("Click Query BIEN to fetch trait observations and citations."),
-            tags$li("Use Coverage to see trait availability and counts."),
+            tags$li("Click Query BIEN to fetch ALL available trait observations."),
+            tags$li("Use Coverage tab to see trait counts by filter option."),
+            tags$li("Check sidebar filters if you want to download only a subset (e.g., native records only)."),
             tags$li("Inspect trait rows, provenance, and map output."),
-            tags$li("Download data tables, citation bundle, and reproducible query code.")
+            tags$li("Download data tables (which will be filtered per your selections), citations, and reproducible code.")
+          ),
+          h4("Understanding the filters"),
+          tags$ul(
+            tags$li("By default, all traits are displayed. Sidebar filters control what gets downloaded."),
+            tags$li("'Include cultivated records' - if unchecked, download excludes cultivated occurrences."),
+            tags$li("'Native records only' - if checked, download includes only native occurrences."),
+            tags$li("'Geovalid coordinates only' - if checked, download includes only records with valid coordinates.")
           ),
           h4("Ecological interpretation caveats"),
           tags$ul(
+            tags$li("Trait availability varies by species and trait. Check Coverage tab for details."),
             tags$li("Trait maps reflect sampling effort and data availability, not full species ranges."),
             tags$li("Do not merge incompatible units without explicit conversion rules."),
             tags$li("Within-species variation can be large; avoid over-interpreting single summary values."),
             tags$li("Taxonomic reconciliation can be uncertain; unresolved names are retained and flagged.")
-          ),
-          h4("BIEN function references"),
-          tags$p("This app uses BIEN_taxonomy_species(), BIEN_trait_species(), and BIEN_trait_list() when available.")
+          )
         )
       )
     )
@@ -405,9 +475,6 @@ app_server <- function(input, output, session) {
         species_vec = species_vec,
         trait_filter = selected_traits,
         max_records = input$max_records,
-        include_cultivated = input$use_cultivated,
-        natives_only = input$natives_only,
-        geovalid_only = input$geovalid_only,
         timeout_sec = 180
       )
       state$traits <- trait_tbl
@@ -453,6 +520,48 @@ app_server <- function(input, output, session) {
     datatable(state$taxonomy, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
+  filtered_traits_reactive <- reactive({
+    apply_trait_filters(
+      traits = state$traits,
+      include_cultivated = input$use_cultivated,
+      natives_only = input$natives_only,
+      geovalid_only = input$geovalid_only
+    )
+  })
+
+  output$filter_coverage_table <- renderDT({
+    tr <- state$traits
+    if (!is.data.frame(tr) || nrow(tr) == 0) {
+      return(datatable(data.frame(message = "No trait observations to analyze."), options = list(dom = "t"), rownames = FALSE))
+    }
+
+    counts <- compute_trait_counts(tr)
+    cov_df <- data.frame(
+      Filter_Combination = c(
+        "All observations (no filters)",
+        "No cultivated records",
+        "Native records only",
+        "Geovalid only",
+        "Geovalid + No cultivated",
+        "Geovalid + Native only",
+        "No cultivated + Native only",
+        "All filters (no cultivated + native + geovalid)"
+      ),
+      Trait_Count = c(
+        counts$total,
+        counts$total - counts$cultivated,
+        counts$native,
+        counts$geovalid_yes,
+        counts$geovalid_yes - counts$cultivated_geovalid,
+        counts$native_geovalid,
+        counts$total - counts$cultivated - (counts$total - counts$native),
+        counts$all_filters
+      ),
+      stringsAsFactors = FALSE
+    )
+    datatable(cov_df, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
+  })
+
   output$available_traits_table <- renderDT({
     tr <- state$available_traits
     if (!is.data.frame(tr) || nrow(tr) == 0) {
@@ -473,27 +582,6 @@ app_server <- function(input, output, session) {
     }
 
     datatable(out, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
-  })
-
-  output$coverage_table <- renderDT({
-    tr <- state$traits
-    if (!is.data.frame(tr) || nrow(tr) == 0) {
-      return(datatable(data.frame(message = "No trait observations returned."), options = list(dom = "t"), rownames = FALSE))
-    }
-
-    species_col <- first_existing_col(tr, c("input_species", "scrubbed_species_binomial", "species"))
-    trait_col <- first_existing_col(tr, c("trait_name", "trait", "measurementType"))
-
-    if (is.null(species_col) || is.null(trait_col)) {
-      return(datatable(data.frame(message = "Could not detect species/trait columns in trait output."), options = list(dom = "t"), rownames = FALSE))
-    }
-
-    cov <- tr %>%
-      group_by(.data[[species_col]], .data[[trait_col]]) %>%
-      summarise(observation_count = n(), .groups = "drop") %>%
-      arrange(desc(.data$observation_count))
-
-    datatable(cov, options = list(pageLength = 15, scrollX = TRUE), rownames = FALSE)
   })
 
   output$trait_table <- renderDT({
@@ -684,14 +772,14 @@ app_server <- function(input, output, session) {
   output$download_traits <- downloadHandler(
     filename = function() sprintf("bien_traits_observations_%s.csv", format(Sys.Date(), "%Y%m%d")),
     content = function(file) {
-      write.csv(state$traits, file, row.names = FALSE)
+      write.csv(filtered_traits_reactive(), file, row.names = FALSE)
     }
   )
 
   output$download_summary <- downloadHandler(
     filename = function() sprintf("bien_traits_summary_%s.csv", format(Sys.Date(), "%Y%m%d")),
     content = function(file) {
-      tr <- state$traits
+      tr <- filtered_traits_reactive()
       if (!is.data.frame(tr) || nrow(tr) == 0) {
         write.csv(data.frame(), file, row.names = FALSE)
         return(NULL)
@@ -722,7 +810,7 @@ app_server <- function(input, output, session) {
   output$download_citations <- downloadHandler(
     filename = function() sprintf("bien_trait_citations_%s.csv", format(Sys.Date(), "%Y%m%d")),
     content = function(file) {
-      tr <- state$traits
+      tr <- filtered_traits_reactive()
       if (!is.data.frame(tr) || nrow(tr) == 0) {
         write.csv(data.frame(), file, row.names = FALSE)
         return(NULL)
