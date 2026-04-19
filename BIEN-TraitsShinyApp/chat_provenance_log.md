@@ -9,3 +9,8 @@
 - Prompt summary: Deploy the trait shiny app.
 - Requested outcomes: Deploy BIEN-TraitsShinyApp to shinyapps.io and verify the public app URL is live.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-19
+- Prompt summary: Fix species parsing bug where "Pinus ponderosa" was being split into fragments ("Pi", "Us po", "Derosa").
+- Requested outcomes: Correct species input splitting to use real delimiters (line breaks/commas/semicolons), redeploy app, and verify live endpoint.
+- Completed by: GitHub Copilot

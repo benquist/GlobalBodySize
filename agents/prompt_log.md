@@ -271,6 +271,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-19
+- Prompt summary: Run the mandatory final pre-return gate for this turn.
+- Requested outcomes: Verify prompt logging, changed-Rmd compile status, changed-package build status, and git push sync after deploying BIEN-TraitsShinyApp updates.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-17
 - Prompt summary: Mandatory pre-return gate for current workspace.
 - Requested outcomes: PASS/BLOCKED evidence for prompt log recorded, change-gated Rmd compile status, change-gated R package build status, git push confirmation, and install code when package build runs.
@@ -391,6 +397,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: BIEN-TraitsShinyApp-Project/app.R; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-19
+- Prompt summary: Fix live bien-traits-shinyapp parsing bug where `Pinus ponderosa` was split into `Pi`, `Us po`, and `Derosa`.
+- Requested outcomes: Patch parser in the actual deployed code path (`BIEN-TraitsShinyApp/app.R`), redeploy to shinyapps, and confirm deployment success.
+- Files changed: BIEN-TraitsShinyApp/app.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-17
 - Prompt summary: Add a GitHub README with a tutorial for the BIEN Trait Shiny App project.
 - Requested outcomes: Replace the minimal project README with user-facing GitHub documentation covering setup, tutorial workflow, troubleshooting, and deployment notes.
@@ -413,6 +425,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Run mandatory AGENTS.md pre-return checks and return PASS/FAIL for prompt logging, change-gated Rmd compile, change-gated package build, and git push status.
 - Requested outcomes: Confirm final gate compliance with concise evidence before returning to user.
 - Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-19
+- Prompt summary: Diagnose and fix startup lock where the spinning ball appears on app launch and blocks access to LoadingHistoricalObservationDataIntoBIEN.
+- Requested outcomes: Remove the blocking global busy overlay behavior, restore app usability on load, and redeploy the live app.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-17
