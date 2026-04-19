@@ -124,51 +124,7 @@ ui <- fluidPage(
     tags$style(HTML('
       @keyframes spin { 100% { transform: rotate(360deg); } }
       .spinner-border { animation: spin 0.75s linear infinite; }
-      #global-busy-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(255, 255, 255, 0.72);
-        z-index: 9999;
-      }
-      #global-busy-overlay .global-busy-content {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-        color: #1f4f7a;
-        font-weight: 700;
-        text-align: center;
-      }
-      #global-busy-overlay .global-busy-wheel {
-        width: 56px;
-        height: 56px;
-        border: 6px solid #2f6fab;
-        border-right-color: transparent;
-        border-radius: 50%;
-        animation: spin 0.75s linear infinite;
-      }
-    ')),
-    tags$script(HTML('
-      $(document).on("shiny:busy", function() {
-        $("#global-busy-overlay").show();
-      });
-      $(document).on("shiny:idle", function() {
-        $("#global-busy-overlay").hide();
-      });
     '))
-  ),
-  tags$div(
-    id = "global-busy-overlay",
-    tags$div(
-      class = "global-busy-content",
-      tags$div(class = "global-busy-wheel", role = "status", `aria-live` = "polite"),
-      tags$div("Processing. Please wait...")
-    )
   ),
   titlePanel("Historical Observation Data to BIEN"),
   tags$div(
@@ -331,7 +287,7 @@ ui <- fluidPage(
           tableOutput("taxonomy_summary"),
           textOutput("taxonomy_review_note"),
           h4("Names Requiring Review"),
-          tableOutput("taxonomy_review")
+          DT::DTOutput("taxonomy_review")
         ),
 
 
@@ -432,8 +388,6 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  taxonomy_review_max_rows <- 500
-
   # --- Loading spinner state for each step ---
   link_loading <- reactiveVal(FALSE)
   map_loading <- reactiveVal(FALSE)
@@ -478,16 +432,20 @@ server <- function(input, output, session) {
   })
 
   # --- Step 4 Taxonomy spinner logic ---
-  # Turn on spinner when tab is selected
   observeEvent(input$workflow_tabs, {
     if (identical(input$workflow_tabs, "Step 4 Taxonomy")) {
       taxonomy_loading(TRUE)
+      session$onFlushed(function() {
+        tryCatch(
+          taxonomy_view_state(),
+          error = function(e) NULL
+        )
+        taxonomy_loading(FALSE)
+      }, once = TRUE)
+    } else {
+      taxonomy_loading(FALSE)
     }
   }, ignoreInit = TRUE)
-  # Turn off spinner when computation completes
-  observeEvent(taxonomy_df(), {
-    taxonomy_loading(FALSE)
-  })
   output$taxonomy_loading_ui <- renderUI({
     if (taxonomy_loading()) {
       tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;",
@@ -783,9 +741,6 @@ server <- function(input, output, session) {
       ]
 
       total_review_rows <- nrow(review_tbl)
-      if (total_review_rows > taxonomy_review_max_rows) {
-        review_tbl <- utils::head(review_tbl, taxonomy_review_max_rows)
-      }
 
       metrics <- data.frame(
         metric = c("Total records", "Unique submitted names", "BIEN/backbone matched", "Needs review", "Blank scientificName"),
@@ -802,17 +757,13 @@ server <- function(input, output, session) {
       return(list(
         metrics = metrics,
         review_tbl = review_tbl,
-        total_review_rows = total_review_rows,
-        limited = total_review_rows > taxonomy_review_max_rows
+        total_review_rows = total_review_rows
       ))
     }
 
     tx <- taxonomy_df()
     review_tbl <- tx[tx$status %in% c("REVIEW", "UNRESOLVED"), , drop = FALSE]
     total_review_rows <- nrow(review_tbl)
-    if (total_review_rows > taxonomy_review_max_rows) {
-      review_tbl <- utils::head(review_tbl, taxonomy_review_max_rows)
-    }
 
     metrics <- data.frame(
       metric = c("Total unique names", "Candidate", "Review", "Unresolved"),
@@ -828,8 +779,7 @@ server <- function(input, output, session) {
     list(
       metrics = metrics,
       review_tbl = review_tbl,
-      total_review_rows = total_review_rows,
-      limited = total_review_rows > taxonomy_review_max_rows
+      total_review_rows = total_review_rows
     )
   })
 
@@ -903,20 +853,19 @@ server <- function(input, output, session) {
 
   output$taxonomy_review_note <- renderText({
     state <- taxonomy_view_state()
-    if (state$limited) {
-      paste0(
-        "Showing first ", taxonomy_review_max_rows,
-        " review rows of ", state$total_review_rows,
-        ". Download TNRS handoff for full reconciliation scope."
-      )
-    } else {
-      paste0("Review rows: ", state$total_review_rows)
-    }
+    paste0(
+      "Review rows: ", state$total_review_rows,
+      ". Use search, sorting, and pagination to inspect records quickly."
+    )
   })
 
-  output$taxonomy_review <- renderTable({
-    taxonomy_view_state()$review_tbl
-  }, striped = TRUE, bordered = TRUE)
+  output$taxonomy_review <- DT::renderDT({
+    DT::datatable(
+      taxonomy_view_state()$review_tbl,
+      options = list(pageLength = 25, lengthMenu = c(25, 50, 100), autoWidth = TRUE),
+      rownames = FALSE
+    )
+  }, server = TRUE)
 
   output$qc_table <- renderTable({
     req(qc_df())
@@ -968,6 +917,9 @@ server <- function(input, output, session) {
 
   output$export_readiness <- renderText({
     req(qc_df())
+    if (bien_services_loading()) {
+      return("BIEN Web Services are currently running. Export is available, but wait for the BIEN service run to complete if you want the latest TNRS/GNRS/GVS/NSR status before final submission.")
+    }
     if (qc_has_blockers(qc_df())) {
       "Export blocked: resolve BLOCK issues in Step 5 Validate before BIEN loading export."
     } else {
@@ -1163,14 +1115,15 @@ server <- function(input, output, session) {
   bien_services_status <- reactiveVal("")
 
   observeEvent(input$run_bien_services, {
-    bien_services_loading(TRUE)
     req(build_state())
     req(staging_preview_df())
+
+    bien_services_loading(TRUE)
+    on.exit(bien_services_loading(FALSE), add = TRUE)
 
     stage_tbl <- staging_preview_df()
     if (!is.data.frame(stage_tbl) || nrow(stage_tbl) == 0) {
       bien_services_status("No staged records are available. Build BIEN draft tables first.")
-      bien_services_loading(FALSE)
       return()
     }
 
@@ -1235,7 +1188,6 @@ server <- function(input, output, session) {
       "Results are displayed below. Review results before final BIEN submission.",
       sep = "\n"
     ))
-    bien_services_loading(FALSE)
     # TODO: Integrate results into staging table and update UI/exports
   })
   output$bien_services_status <- renderText({ bien_services_status() })

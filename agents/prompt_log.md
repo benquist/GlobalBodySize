@@ -259,6 +259,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/README.md; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/io_ingest.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/qc_checks.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/DESCRIPTION; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/NAMESPACE; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-19
+- Prompt summary: Review proposed trait-gateway frontend design and return biodiversity-informatics critiques and required adjustments.
+- Requested outcomes: Provide critical risks, required data-model fields and API/query contract for species/genus/family/trait-only flows, UX safeguards against taxonomy/scope mistakes, and concise Shiny+BIEN implementation recommendations.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-17
 - Prompt summary: Implement the cross-agent BIEN traits UX recommendations and update the Shiny app.
 - Requested outcomes: Upgrade BIEN-TraitsShinyApp with species-app-like styling, diagnostics and no-data guidance, safer unit-aware mapping defaults, startup trait-catalog loading, and stronger ecology interpretation cues.
@@ -433,8 +439,50 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-19
+- Prompt summary: Re-run AGENTS.md mandatory final pre-return checks now and report PASS/FAIL for prompt log, change-gated Rmd compile, change-gated package build, and git push status.
+- Requested outcomes: Confirm final-gate compliance after logging latest prompt entries.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-19
+- Prompt summary: Diagnose and fix Step 4 Taxonomic Reconciliation Triage hanging with a persistent spinner.
+- Requested outcomes: Identify why the Step 4 spinner stays on, correct the taxonomy tab loading lifecycle, align the taxonomy review table output/render pair, and redeploy the live app.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-17
 - Prompt summary: Diagnose why Step 4 Taxonomy feels hung/slow in LoadingHistoricalObservationDataIntoBIEN and optimize performance.
 - Requested outcomes: Identify bottlenecks, improve Step 4 responsiveness, keep taxonomy outputs usable on large datasets, and deploy the optimized app.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-19
+- Prompt summary: Act as supervisor and produce a frontend design proposal for the BIEN trait Shiny app as a streamlined trait-data gateway.
+- Requested outcomes: Provide concise product spec ordered as EcoInterface-style UI/UX first, ecology-user workflow first principles second, biodiversity guardrails third; include IA, user flows, wireframe sections, interaction model, minimal-text copy tone, component list, MVP and phase-2 scope.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-19
+- Prompt summary: Review this proposed frontend design for ecological validity and interpretation safety.
+- Requested outcomes: Return ecological interpretation risks, mandatory UI warnings/labels, recommendations for showing coverage bias and trait comparability, and a pre-download checklist to avoid false confidence.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-19
+- Prompt summary: Synthesize a final team-approved frontend design for the BIEN trait Shiny gateway from biodiversity, ecology, and statistics review outcomes.
+- Requested outcomes: Return final IA/page structure, exact UI components with microcopy, mandatory pre-download checklist, MVP vs phase-2 with Shiny implementation order, and explicit decisions on global trait-only download and default rank.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot (supervision)
+
+- Date: 2026-04-19
+- Prompt summary: Design the BIEN trait app frontend as a streamlined gateway for species/genus/family and trait-only downloads, consulting @M, EcoInterface/ecology-user priorities first, then biodiversity agents and team.
+- Requested outcomes: Produce an implementation-ready frontend design with IA, minimal-copy UX, trait-availability-first workflow, and reviewed guardrails from biodiversity/science/stats agents.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-19
+- Prompt summary: Run mandatory final pre-return gate for this turn.
+- Requested outcomes: Verify prompt log recorded, change-gated Rmd compile, change-gated R package build, and git push status; return PASS/BLOCKED with concise evidence.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot

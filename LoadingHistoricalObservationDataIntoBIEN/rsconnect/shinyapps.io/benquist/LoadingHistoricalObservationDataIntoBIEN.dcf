@@ -5,6 +5,6 @@ account: benquist
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 17149396
-bundleId: 11867470
+bundleId: 11873952
 url: https://benquist.shinyapps.io/LoadingHistoricalObservationDataIntoBIEN/
 version: 1
