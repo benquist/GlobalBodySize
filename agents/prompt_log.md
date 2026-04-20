@@ -540,3 +540,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Return required gate format with evidence for prompt log, change-gated Rmd/package checks, and git push sync.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Add a compact per-species by trait matrix to the trait-selection step.
+- Requested outcomes: Show trait coverage by species in Step 3 while keeping existing trait filters (one/many/all) and deploy live.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/rsconnect/shinyapps.io/benquist/bien-traits-shinyapp.dcf; agents/prompt_log.md; BIEN-TraitsShinyApp/chat_provenance_log.md
+- Completed by: GitHub Copilot

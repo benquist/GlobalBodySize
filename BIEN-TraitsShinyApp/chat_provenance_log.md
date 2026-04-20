@@ -29,3 +29,8 @@
 - Prompt summary: Add trait selection step before download (select one/many traits or download all).
 - Requested outcomes: Add UI to list returned traits with per-trait coverage, support custom trait selection vs download-all mode, and apply filter to preview/provenance/export.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Add compact species-by-trait coverage matrix in Step 3 of BIEN trait gateway.
+- Requested outcomes: Display top-species trait coverage table (counts) after query to guide trait selection before download.
+- Completed by: GitHub Copilot

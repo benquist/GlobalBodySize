@@ -604,7 +604,9 @@ traitSelectUI <- function(id) {
     div(class = "panel-body",
       uiOutput(ns("selector_controls")),
       h4("Traits Returned By Query:"),
-      DTOutput(ns("trait_summary"))
+      DTOutput(ns("trait_summary")),
+      h4("Species x Trait Coverage Matrix (top 50 species):"),
+      DTOutput(ns("species_trait_matrix"))
     )
   )
 }
@@ -679,6 +681,52 @@ traitSelectServer <- function(id, query_result) {
       tbl <- trait_summary_tbl()
       req(nrow(tbl) > 0)
       datatable(tbl, options = list(pageLength = 8), rownames = FALSE)
+    })
+
+    species_trait_matrix_tbl <- reactive({
+      req(query_result())
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) return(data.frame())
+
+      trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+      if (is.null(trait_col) || is.null(species_col)) return(data.frame())
+
+      sp <- as.character(dat[[species_col]])
+      tr <- as.character(dat[[trait_col]])
+      keep <- !is.na(sp) & nzchar(sp) & !is.na(tr) & nzchar(tr)
+      sp <- sp[keep]
+      tr <- tr[keep]
+      if (length(sp) == 0) return(data.frame())
+
+      mat <- table(sp, tr)
+      if (nrow(mat) == 0 || ncol(mat) == 0) return(data.frame())
+
+      # Keep matrix compact for UI performance/readability.
+      top_idx <- order(rowSums(mat), decreasing = TRUE)
+      top_idx <- head(top_idx, 50)
+      mat_top <- mat[top_idx, , drop = FALSE]
+
+      out <- as.data.frame.matrix(mat_top)
+      out$species <- rownames(out)
+      out$total_records <- rowSums(mat_top)
+      out <- out[, c("species", "total_records", setdiff(names(out), c("species", "total_records"))), drop = FALSE]
+      rownames(out) <- NULL
+      out
+    })
+
+    output$species_trait_matrix <- renderDT({
+      mat_tbl <- species_trait_matrix_tbl()
+      req(nrow(mat_tbl) > 0)
+      datatable(
+        mat_tbl,
+        options = list(
+          pageLength = 10,
+          scrollX = TRUE,
+          autoWidth = TRUE
+        ),
+        rownames = FALSE
+      )
     })
 
     reactive({
