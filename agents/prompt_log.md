@@ -681,3 +681,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** Run mandatory final gate for this turn. Context: user reported separate site inactive. Work done included fixes in external repo benquist/enquistlab-academic-site and prompt provenance update committed/pushed in workspace. Verify prompt log, Rmd compile applicability, package build applicability, and workspace git push status.
 
 **Fix:** Logged this final-gate request and re-ran the always gate with evidence-backed status checks.
+
+## 2026-04-20 — Inactive-site follow-up
+
+**Prompt:** the site https://benquist.github.io/enquistlab-academic-site/ is still not active
+
+**Fix:** Retrieved latest failed Actions logs and fixed additional deployment blockers in benquist/enquistlab-academic-site: simplified socials config to avoid jekyll-socials nil error and disabled imagemagick plugin to stabilize build time. Pushed fixes and triggered a fresh deploy run.
