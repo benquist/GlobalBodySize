@@ -657,3 +657,21 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** How can I help?
 
 **Fix:** Provided a targeted checklist for the user to unblock separate-site publishing, including repository settings checks and one clean push path.
+
+## 2026-04-21 — Mandatory final gate run request
+
+**Prompt:** Run mandatory final gate for this turn after prompt-log update. Verify prompt log, Rmd compile applicability, package build applicability, and git push sync. Return PASS/FAIL concisely.
+
+**Fix:** Logged this prompt, then executed the required always-gate checks for prompt logging, change-gated Rmd/package applicability, and branch push synchronization with evidence.
+
+- Date: 2026-04-20
+- Prompt summary: Run mandatory final gate for this turn with context that a separate site repo push succeeded using fallback git options; verify prompt log, Rmd compile applicability, package build applicability, and workspace git push status.
+- Requested outcomes: Return concise PASS/FAIL style final-gate evidence for all required checks.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+## 2026-04-20 — Separate site not active troubleshooting
+
+**Prompt:** the site https://benquist.github.io/enquistlab-academic-site/ still is not active
+
+**Fix:** Diagnosed and fixed multiple GitHub Pages deployment blockers in benquist/enquistlab-academic-site: enabled Pages (workflow build type), restored missing third_party_libraries config block, removed failing jekyll-archives-v2 dependency from Gemfile/Gemfile.lock, and updated deploy workflow to disable stuck bundler cache plus explicit bundle install. Triggered fresh deploy run and monitored status.
