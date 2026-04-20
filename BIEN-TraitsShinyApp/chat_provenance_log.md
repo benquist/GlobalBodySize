@@ -24,3 +24,8 @@
 - Prompt summary: Investigate and fix shinyapps startup error (`exit status 1`) for BIEN trait gateway.
 - Requested outcomes: Use deployment logs to diagnose root cause, patch app bootstrap, redeploy, and verify remote startup.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Add trait selection step before download (select one/many traits or download all).
+- Requested outcomes: Add UI to list returned traits with per-trait coverage, support custom trait selection vs download-all mode, and apply filter to preview/provenance/export.
+- Completed by: GitHub Copilot

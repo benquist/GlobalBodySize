@@ -347,7 +347,7 @@ diagnosticsUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-warning",
-    div(class = "panel-heading", h3("Step 3: Diagnostics & Preview")),
+    div(class = "panel-heading", h3("Step 4: Diagnostics & Preview")),
     div(class = "panel-body",
       uiOutput(ns("diagnostics_display")),
       h4("Data Preview (first 10 rows):"),
@@ -421,7 +421,7 @@ recordsUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-default",
-    div(class = "panel-heading", h3("Step 4: Complete Record Set")),
+    div(class = "panel-heading", h3("Step 5: Complete Record Set")),
     div(class = "panel-body",
       uiOutput(ns("records_display")),
       DTOutput(ns("records_table"))
@@ -469,7 +469,7 @@ provenanceUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-default",
-    div(class = "panel-heading", h3("Step 5: Provenance & Reproducibility")),
+    div(class = "panel-heading", h3("Step 6: Provenance & Reproducibility")),
     div(class = "panel-body",
       uiOutput(ns("provenance_display"))
     )
@@ -489,7 +489,9 @@ provenanceServer <- function(id, query_result) {
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(qr$data),
         unique_species = qr$diagnostics$unique_species,
-        unique_traits = qr$diagnostics$unique_traits
+        unique_traits = qr$diagnostics$unique_traits,
+        download_all_traits = isTRUE(qr$download_all),
+        selected_traits = qr$selected_traits
       )
       
       manifest_json <- toJSON(manifest, pretty = TRUE)
@@ -512,7 +514,9 @@ provenanceServer <- function(id, query_result) {
         query_taxon = query_result()$taxon,
         timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
         app_version = "BIEN Trait Gateway v1.0",
-        records = nrow(query_result()$data)
+        records = nrow(query_result()$data),
+        download_all_traits = isTRUE(query_result()$download_all),
+        selected_traits = query_result()$selected_traits
       )
       manifest
     })
@@ -529,6 +533,8 @@ provenanceServer <- function(id, query_result) {
           timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
           app_version = "BIEN Trait Gateway v1.0",
           records = nrow(query_result()$data),
+          download_all_traits = isTRUE(query_result()$download_all),
+          selected_traits = query_result()$selected_traits,
           diagnostics = query_result()$diagnostics
         )
         writeLines(toJSON(manifest, pretty = TRUE, auto_unbox = TRUE), con = file)
@@ -579,11 +585,168 @@ downloadGateUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-success",
-    div(class = "panel-heading", h3("Step 6: Pre-Download Checklist")),
+    div(class = "panel-heading", h3("Step 7: Pre-Download Checklist")),
     div(class = "panel-body",
       uiOutput(ns("checklist_display"))
     )
   )
+}
+
+# ============================================================================
+# SHINY MODULE: TraitSelectUI & TraitSelectServer
+# ============================================================================
+
+traitSelectUI <- function(id) {
+  ns <- NS(id)
+  div(
+    class = "panel panel-primary",
+    div(class = "panel-heading", h3("Step 3: Select Traits To Download")),
+    div(class = "panel-body",
+      uiOutput(ns("selector_controls")),
+      h4("Traits Returned By Query:"),
+      DTOutput(ns("trait_summary"))
+    )
+  )
+}
+
+traitSelectServer <- function(id, query_result) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    trait_summary_tbl <- reactive({
+      req(query_result())
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) return(data.frame())
+
+      trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      if (is.null(trait_col)) return(data.frame())
+
+      species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+      out <- dat %>%
+        group_by(.data[[trait_col]]) %>%
+        summarise(
+          n_records = n(),
+          n_species = if (!is.null(species_col)) n_distinct(.data[[species_col]]) else NA_integer_,
+          .groups = "drop"
+        ) %>%
+        rename(trait_name = 1) %>%
+        arrange(desc(n_records))
+      out
+    })
+
+    observeEvent(trait_summary_tbl(), {
+      tbl <- trait_summary_tbl()
+      choices <- if (nrow(tbl) > 0) tbl$trait_name else character(0)
+      updateSelectInput(session, "selected_traits", choices = choices, selected = choices)
+      updateCheckboxInput(session, "download_all", value = TRUE)
+    }, ignoreInit = FALSE)
+
+    output$selector_controls <- renderUI({
+      req(query_result())
+      dat <- query_result()$data
+
+      if (!is.data.frame(dat) || nrow(dat) == 0) {
+        return(p("Run a query first to choose traits.", style = "color: #666;"))
+      }
+
+      tbl <- trait_summary_tbl()
+      if (nrow(tbl) == 0) {
+        return(div(
+          class = "alert alert-warning",
+          strong("Trait column not detected in returned data."),
+          p("All rows will be kept for preview and download.")
+        ))
+      }
+
+      tagList(
+        checkboxInput(ns("download_all"), "Download all returned traits", value = TRUE),
+        selectInput(
+          ns("selected_traits"),
+          "Choose one or more traits:",
+          choices = tbl$trait_name,
+          selected = tbl$trait_name,
+          multiple = TRUE,
+          width = "100%"
+        ),
+        p(
+          class = "text-muted",
+          "Tip: uncheck 'Download all returned traits' to activate custom trait selection."
+        )
+      )
+    })
+
+    output$trait_summary <- renderDT({
+      tbl <- trait_summary_tbl()
+      req(nrow(tbl) > 0)
+      datatable(tbl, options = list(pageLength = 8), rownames = FALSE)
+    })
+
+    reactive({
+      req(query_result())
+      base <- query_result()
+      base_rank <- if (!is.null(base$rank)) base$rank else "species"
+      base_taxon <- if (!is.null(base$taxon)) base$taxon else ""
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) {
+        return(list(
+          data = data.frame(),
+          selected_traits = character(0),
+          all_traits = character(0),
+          download_all = TRUE,
+          trait_col = NULL,
+          rank = base_rank,
+          taxon = base_taxon,
+          diagnostics = compute_diagnostics(data.frame(), base_rank, base_taxon),
+          is_loading = isTRUE(base$is_loading),
+          base = base
+        ))
+      }
+
+      trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      if (is.null(trait_col)) {
+        return(list(
+          data = dat,
+          selected_traits = character(0),
+          all_traits = character(0),
+          download_all = TRUE,
+          trait_col = NULL,
+          rank = base_rank,
+          taxon = base_taxon,
+          diagnostics = compute_diagnostics(dat, base_rank, base_taxon),
+          is_loading = isTRUE(base$is_loading),
+          base = base
+        ))
+      }
+
+      all_traits <- unique(as.character(dat[[trait_col]]))
+      all_traits <- all_traits[!is.na(all_traits) & nzchar(all_traits)]
+
+      is_all <- isTRUE(input$download_all)
+      picked <- input$selected_traits
+      if (is.null(picked)) picked <- character(0)
+
+      filtered <- if (is_all) {
+        dat
+      } else if (length(picked) == 0) {
+        dat[0, , drop = FALSE]
+      } else {
+        dat %>% filter(.data[[trait_col]] %in% picked)
+      }
+
+      list(
+        data = filtered,
+        selected_traits = if (is_all) all_traits else picked,
+        all_traits = all_traits,
+        download_all = is_all,
+        trait_col = trait_col,
+        rank = base_rank,
+        taxon = base_taxon,
+        diagnostics = compute_diagnostics(filtered, base_rank, base_taxon),
+        is_loading = isTRUE(base$is_loading),
+        base = base
+      )
+    })
+  })
 }
 
 downloadGateServer <- function(id, query_result) {
@@ -670,6 +833,7 @@ ui <- fluidPage(
     
     queryUI("query"),
     scopeUI("scope"),
+    traitSelectUI("traitSelect"),
     diagnosticsUI("diagnostics"),
     recordsUI("records"),
     provenanceUI("provenance"),
@@ -694,10 +858,11 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   query_result <- queryServer("query")
   scope_result <- scopeServer("scope", query_result)
-  diag_result <- diagnosticsServer("diagnostics", query_result)
-  records_result <- recordsServer("records", query_result)
-  prov_result <- provenanceServer("provenance", query_result)
-  download_result <- downloadGateServer("downloadGate", query_result)
+  trait_result <- traitSelectServer("traitSelect", query_result)
+  diag_result <- diagnosticsServer("diagnostics", trait_result)
+  records_result <- recordsServer("records", trait_result)
+  prov_result <- provenanceServer("provenance", trait_result)
+  download_result <- downloadGateServer("downloadGate", trait_result)
 }
 
 # ============================================================================

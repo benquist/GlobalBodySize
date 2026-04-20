@@ -522,3 +522,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Validate prompt-log presence, change-gated Rmd/package checks, and git push sync with concrete evidence; return required final-gate fields.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Add a trait-selection step so users can choose specific traits (or download all) before export.
+- Requested outcomes: Show returned traits for the query scope, allow selecting one/many/all traits, and filter downstream preview/provenance/download outputs accordingly.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/rsconnect/shinyapps.io/benquist/bien-traits-shinyapp.dcf; agents/prompt_log.md; BIEN-TraitsShinyApp/chat_provenance_log.md
+- Completed by: GitHub Copilot
