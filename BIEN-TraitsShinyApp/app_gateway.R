@@ -672,6 +672,19 @@ traitSelectServer <- function(id, query_result) {
       }
     }, ignoreNULL = FALSE, ignoreInit = TRUE)
 
+    # Clicking rows in the trait table should drive the same selection used for download.
+    observeEvent(input$trait_summary_rows_selected, {
+      idx <- input$trait_summary_rows_selected
+      if (is.null(idx) || length(idx) == 0) return()
+      tbl <- trait_summary_tbl()
+      if (nrow(tbl) == 0) return()
+      idx <- idx[idx >= 1 & idx <= nrow(tbl)]
+      if (length(idx) == 0) return()
+      picked_from_table <- as.character(tbl$trait_name[idx])
+      updateSelectInput(session, "selected_traits", selected = picked_from_table)
+      updateCheckboxInput(session, "download_all", value = FALSE)
+    }, ignoreInit = TRUE)
+
     # When user re-checks "download all", re-select all traits
     observeEvent(input$download_all, {
       if (isTRUE(input$download_all)) {
@@ -727,7 +740,12 @@ traitSelectServer <- function(id, query_result) {
     output$trait_summary <- renderDT({
       tbl <- trait_summary_tbl()
       req(nrow(tbl) > 0)
-      datatable(tbl, options = list(pageLength = 8), rownames = FALSE)
+      datatable(
+        tbl,
+        options = list(pageLength = 8),
+        selection = list(mode = "multiple", target = "row"),
+        rownames = FALSE
+      )
     })
 
     species_trait_matrix_tbl <- reactive({
@@ -818,6 +836,17 @@ traitSelectServer <- function(id, query_result) {
 
       is_all <- isTRUE(input$download_all)
       picked <- input$selected_traits
+
+      # Prefer explicit table-row selections when present.
+      row_idx <- input$trait_summary_rows_selected
+      if (!is.null(row_idx) && length(row_idx) > 0) {
+        tbl <- trait_summary_tbl()
+        row_idx <- row_idx[row_idx >= 1 & row_idx <= nrow(tbl)]
+        if (length(row_idx) > 0) {
+          picked <- as.character(tbl$trait_name[row_idx])
+        }
+      }
+
       if (is.null(picked)) picked <- character(0)
 
       filtered <- if (is_all) {

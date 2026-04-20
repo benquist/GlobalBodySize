@@ -608,3 +608,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** Make sure that the download of traits corresponds to the traits selected.
 
 **Fix:** Added a final safety filter inside `downloadHandler(content=...)` in `BIEN-TraitsShinyApp/app_gateway.R` so CSV export is filtered by `selected_traits` whenever `download_all` is false, even if upstream reactive state drifts.
+
+## 2026-04-20 — Tie trait table clicks to download subset
+
+**Prompt:** Still not working: clicking subset of traits still downloads full trait dataset.
+
+**Fix:** In `traitSelectServer`, wired `input$trait_summary_rows_selected` into effective selection used for filtering and download. Trait table now supports multi-row selection and row clicks sync to `selected_traits` + force `download_all = FALSE`.
