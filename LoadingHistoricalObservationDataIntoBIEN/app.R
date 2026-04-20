@@ -723,6 +723,51 @@ server <- function(input, output, session) {
     reconcile_taxonomy_local(names_vec)
   })
 
+  # --- TNRS Query Cache ---
+  tnrs_cache <- reactiveVal(NULL)
+  
+  tnrs_results <- reactive({
+    req(taxonomy_df())
+    
+    # Check if cache is already populated
+    if (!is.null(tnrs_cache())) {
+      return(tnrs_cache())
+    }
+    
+    # Extract unique names with cap of 50
+    unique_names <- unique(trimws(as.character(taxonomy_df()$scientificName)))
+    unique_names <- unique_names[!is.na(unique_names) & unique_names != ""]
+    
+    if (length(unique_names) == 0) {
+      tnrs_cache(data.frame(
+        submitted_name = character(0),
+        tnrs_matched = character(0),
+        tnrs_confidence = numeric(0),
+        tnrs_acceptedname = character(0),
+        stringsAsFactors = FALSE
+      ))
+      return(tnrs_cache())
+    }
+    
+    # Cap at 50 names to avoid overwhelming the API
+    names_to_query <- unique_names[1:min(50, length(unique_names))]
+    
+    tryCatch({
+      results <- bien_tnrs_query(names_to_query)
+      tnrs_cache(results)
+      results
+    }, error = function(e) {
+      # Return empty results on error but don't cache so it can be retried
+      data.frame(
+        submitted_name = names_to_query,
+        tnrs_matched = NA_character_,
+        tnrs_confidence = NA_real_,
+        tnrs_acceptedname = NA_character_,
+        stringsAsFactors = FALSE
+      )
+    })
+  })
+
   taxonomy_view_state <- reactive({
     if (!is.null(build_state())) {
       bien_tbl <- staging_preview_df()
@@ -762,16 +807,47 @@ server <- function(input, output, session) {
     }
 
     tx <- taxonomy_df()
-    review_tbl <- tx[tx$status %in% c("REVIEW", "UNRESOLVED"), , drop = FALSE]
+    
+    # Merge with TNRS results
+    tnrs_tbl <- tnrs_results()
+    if (!is.null(tnrs_tbl) && is.data.frame(tnrs_tbl) && nrow(tnrs_tbl) > 0) {
+      # Merge TNRS results on submitted_name
+      names_tnrs <- tolower(trimws(as.character(tnrs_tbl$submitted_name)))
+      names_tx <- tolower(trimws(as.character(tx$scientificName)))
+      
+      tx$tnrs_matched <- NA_character_
+      tx$tnrs_confidence <- NA_real_
+      tx$tnrs_acceptedname <- NA_character_
+      
+      for (i in seq_len(nrow(tx))) {
+        match_idx <- which(names_tnrs == names_tx[i])
+        if (length(match_idx) > 0) {
+          match_idx <- match_idx[1]
+          tx$tnrs_matched[i] <- tnrs_tbl$tnrs_matched[match_idx]
+          tx$tnrs_confidence[i] <- tnrs_tbl$tnrs_confidence[match_idx]
+          tx$tnrs_acceptedname[i] <- tnrs_tbl$tnrs_acceptedname[match_idx]
+        }
+      }
+    } else {
+      tx$tnrs_matched <- NA_character_
+      tx$tnrs_confidence <- NA_real_
+      tx$tnrs_acceptedname <- NA_character_
+    }
+    
+    # Review rows: local unresolved or TNRS confidence < 0.8
+    review_idx <- tx$status %in% c("REVIEW", "UNRESOLVED") | 
+                  (!is.na(tx$tnrs_confidence) & tx$tnrs_confidence < 0.8)
+    review_tbl <- tx[review_idx, , drop = FALSE]
     total_review_rows <- nrow(review_tbl)
 
     metrics <- data.frame(
-      metric = c("Total unique names", "Candidate", "Review", "Unresolved"),
+      metric = c("Total unique names", "Candidate", "Review", "Unresolved", "TNRS high-confidence match"),
       value = c(
         nrow(tx),
         sum(tx$status == "CANDIDATE"),
         sum(tx$status == "REVIEW"),
-        sum(tx$status == "UNRESOLVED")
+        sum(tx$status == "UNRESOLVED"),
+        sum(!is.na(tx$tnrs_confidence) & tx$tnrs_confidence >= 0.8, na.rm = TRUE)
       ),
       stringsAsFactors = FALSE
     )
@@ -855,13 +931,46 @@ server <- function(input, output, session) {
     state <- taxonomy_view_state()
     paste0(
       "Review rows: ", state$total_review_rows,
-      ". Use search, sorting, and pagination to inspect records quickly."
+      ". Includes unresolved names and low-confidence TNRS matches (< 80%). ",
+      "Use search, sorting, and pagination to inspect records quickly."
     )
   })
 
   output$taxonomy_review <- DT::renderDT({
+    review_tbl <- taxonomy_view_state()$review_tbl
+    
+    # Prepare columns for display
+    if (nrow(review_tbl) > 0) {
+      # Ensure TNRS columns exist
+      if (!"tnrs_matched" %in% names(review_tbl)) {
+        review_tbl$tnrs_matched <- NA_character_
+        review_tbl$tnrs_confidence <- NA_real_
+        review_tbl$tnrs_acceptedname <- NA_character_
+      }
+      
+      # Format confidence as percentage
+      review_tbl$tnrs_confidence_pct <- if ("tnrs_confidence" %in% names(review_tbl)) {
+        ifelse(is.na(review_tbl$tnrs_confidence), "", 
+               paste0(round(review_tbl$tnrs_confidence * 100, 0), "%"))
+      } else {
+        ""
+      }
+      
+      # Select columns for display
+      display_cols <- intersect(
+        c("scientificName", "status", "tnrs_matched", "tnrs_confidence_pct", "tnrs_acceptedname"),
+        names(review_tbl)
+      )
+      review_tbl_display <- review_tbl[, display_cols, drop = FALSE]
+      
+      # Rename for clarity
+      names(review_tbl_display) <- gsub("_", " ", tools::toTitleCase(names(review_tbl_display)))
+    } else {
+      review_tbl_display <- review_tbl
+    }
+    
     DT::datatable(
-      taxonomy_view_state()$review_tbl,
+      review_tbl_display,
       options = list(pageLength = 25, lengthMenu = c(25, 50, 100), autoWidth = TRUE),
       rownames = FALSE
     )
