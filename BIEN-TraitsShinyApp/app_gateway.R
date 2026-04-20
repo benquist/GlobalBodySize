@@ -75,8 +75,10 @@ ensure_unique_names <- function(df) {
   df
 }
 
-# Identify plot-based traits and enrich with plot/project metadata
+# Identify plot-based traits and enrich with available source metadata
 # Plot traits: stem diameter, height, basal area, crown metrics, wood density from plots
+# NOTE: BIEN trait API returns observations but not plot-level metadata directly.
+# Use url_source and source_citation to access full plot details.
 enrich_plot_metadata <- function(dat) {
   if (!is.data.frame(dat) || nrow(dat) == 0) return(dat)
 
@@ -93,19 +95,6 @@ enrich_plot_metadata <- function(dat) {
     rep(FALSE, nrow(dat))
   }
   
-  # Preserve all available metadata columns for plot data
-  metadata_cols <- c("plot_name", "plot_area_ha", "sampling_protocol",
-                     "dataset", "datasource", "dataowner", "custodial_institution_codes",
-                     "collection_code", "project_pi", "url_source", "source_citation")
-  
-  # For rows where metadata is missing but is_plot_trait=TRUE, 
-  # add empty columns so they're available for users to see
-  for (col in metadata_cols) {
-    if (!col %in% names(dat)) {
-      dat[[col]] <- NA_character_
-    }
-  }
-  
   # Add a marker column so users can filter to plot-sourced traits
   dat$is_plot_trait <- is_plot_trait
   
@@ -119,25 +108,24 @@ organize_columns_for_export <- function(dat) {
   # Standard priority columns: species, trait info, value
   core_cols <- c("scrubbed_species_binomial", "trait_name", "trait_value", "unit", "method")
   
-  # Plot metadata priority columns (show first for plot traits)
-  plot_meta_cols <- c("is_plot_trait", "plot_name", "plot_area_ha", "sampling_protocol",
-                      "dataset", "datasource", "dataowner", "project_pi")
+  # Source/citation first (especially important for plot traits to access metadata)
+  source_cols <- c("url_source", "source_citation", "project_pi")
   
-  # Location/source columns
+  # Location columns
   location_cols <- c("latitude", "longitude", "elevation_m")
   
-  # Taxonomy columns
-  tax_cols <- names(dat)[grepl("^scrubbed_", names(dat)) && !grepl("binomial|species", names(dat))]
+  # Plot trait marker
+  marker_cols <- c("is_plot_trait")
   
-  # Source/citation
-  source_cols <- c("url_source", "source_citation")
+  # Taxonomy columns
+  tax_cols <- names(dat)[which(grepl("^scrubbed_", names(dat)) & !grepl("binomial|species", names(dat)))]
   
   # Query metadata
   query_cols <- c("query_rank", "query_taxon", "query_timestamp")
   
-  # Build column order: core → plot_meta → location → taxonomy → source → query → other
+  # Build column order: core → source → location → marker → taxonomy → query → other
   col_order <- c()
-  for (col_set in list(core_cols, plot_meta_cols, location_cols, tax_cols, source_cols, query_cols)) {
+  for (col_set in list(core_cols, source_cols, location_cols, marker_cols, tax_cols, query_cols)) {
     col_order <- c(col_order, col_set[col_set %in% names(dat)])
   }
   
@@ -248,7 +236,7 @@ compute_diagnostics <- function(dat, query_rank, query_taxon) {
   if (n_plot_traits > 0) {
     pct_plot <- round(100 * n_plot_traits / nrow(dat), 1)
     warnings <- c(warnings, sprintf(
-      "Plot-based traits detected (%d%% of records): plot metadata (name, dataset, datasource, sampling protocol, project PI) included.", 
+      "Plot-based traits detected (%d%% of records). For full plot metadata (name, sampling protocol, dataset, project details), click the 'url_source' or 'source_citation' links in the download.", 
       pct_plot
     ))
   }

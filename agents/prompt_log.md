@@ -632,3 +632,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** For trait data from plots (DBH, height, etc.), include associated plot metadata (plot name, project type, dataset, datasource, sampling protocol, project PI).
 
 **Fix:** Added enrich_plot_metadata() function to detect plot-based traits (diameter, DBH, height, basal area, crown, wood density, biomass, age, growth) and preserve all available BIEN plot metadata columns. Added organize_columns_for_export() to surface plot metadata prominently in CSV downloads. Enhanced diagnostics to report plot-trait detection rate and available metadata.
+
+- Date: 2026-04-20
+- Prompt summary: Run the mandatory always gate checks. Return PASS or FAIL with details on each of the 4 checks: (1) prompt logged, (2) changed Rmd compile, (3) changed R package build, (4) git push status.
+- Requested outcomes: Execute all four gate checks with evidence-backed results. For Rmd and R package checks, only proceed if files changed. Return strict Status (PASS/BLOCKED), detailed Checks for all four items, Missing actions (or None), Decision (Continue work / Ready to return), and InstallCode if packages were built.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
