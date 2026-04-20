@@ -651,3 +651,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** can you run git push -u origin main?
 
 **Fix:** Ran `git push -u origin main` in `~/GitHub/enquistlab-academic-site`. Push attempted but failed with `fatal: the remote end hung up unexpectedly` after object upload; command exited with code 1.
+
+## 2026-04-21 — User asks how to help
+
+**Prompt:** How can I help?
+
+**Fix:** Provided a targeted checklist for the user to unblock separate-site publishing, including repository settings checks and one clean push path.
