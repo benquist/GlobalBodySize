@@ -658,7 +658,7 @@ traitSelectServer <- function(id, query_result) {
       tbl <- trait_summary_tbl()
       choices <- if (nrow(tbl) > 0) tbl$trait_name else character(0)
       updateSelectInput(session, "selected_traits", choices = choices, selected = choices)
-      updateCheckboxInput(session, "download_all", value = TRUE)
+      updateCheckboxInput(session, "download_all", value = FALSE)
     }, ignoreInit = FALSE)
 
     # Auto-uncheck "download all" when user deselects traits in the picker
@@ -707,7 +707,7 @@ traitSelectServer <- function(id, query_result) {
         checkboxInput(
           ns("download_all"),
           "Download all returned traits (override trait picker below)",
-          value = TRUE
+          value = FALSE
         ),
         selectInput(
           ns("selected_traits"),
@@ -910,8 +910,22 @@ downloadGateServer <- function(id, query_result) {
         if (!all_checked) {
           stop("Please check all checklist items before downloading.")
         }
-        
-        write.csv(query_result()$data, file, row.names = FALSE)
+
+        # Final safety filter so download always matches the Step 3 selection.
+        qr <- query_result()
+        dat <- qr$data
+        trait_col <- qr$trait_col
+        selected_traits <- qr$selected_traits
+
+        if (!isTRUE(qr$download_all) && !is.null(trait_col) && is.data.frame(dat)) {
+          if (is.null(selected_traits) || length(selected_traits) == 0) {
+            dat <- dat[0, , drop = FALSE]
+          } else {
+            dat <- dat %>% filter(.data[[trait_col]] %in% selected_traits)
+          }
+        }
+
+        write.csv(dat, file, row.names = FALSE)
       }
     )
     

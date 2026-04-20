@@ -602,3 +602,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** User missed the "Download all returned traits" box; requested clearer behavior.
 
 **Fix:** Added explicit warning text in Step 3 that checked "download all" overrides the trait picker, renamed the checkbox to include "override", and added a final Step 7 info banner showing active download mode (all traits vs selected trait count).
+
+## 2026-04-20 — Enforce selected-trait subset at download time
+
+**Prompt:** Make sure that the download of traits corresponds to the traits selected.
+
+**Fix:** Added a final safety filter inside `downloadHandler(content=...)` in `BIEN-TraitsShinyApp/app_gateway.R` so CSV export is filtered by `selected_traits` whenever `download_all` is false, even if upstream reactive state drifts.
