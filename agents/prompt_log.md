@@ -589,3 +589,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** For clicking on the query BIEN button. I would like the user to experience a feeling that the app is waiting on the query. Can the query button change color? maybe a spinning ball to indicate we are waiting?
 
 **Fix:** Added shinyjs package. Button now shows a Font Awesome fa-spin spinner icon and turns amber/warning color while querying BIEN. withProgress() overlay shows "Querying BIEN..." during the BIEN call. Button is re-enabled and turns blue again when done.
+
+## 2026-04-20 — Fix exit status 1 crash (shinyjs not on shinyapps.io)
+
+**Prompt:** Getting "exit status 1 - The application failed to start."
+
+**Root cause:** shinyjs package not installed on shinyapps.io runtime.
+**Fix:** Removed shinyjs dependency entirely. Replaced shinyjs::disable/enable/runjs calls with a Shiny custom message handler (session$sendCustomMessage / Shiny.addCustomMessageHandler) using plain jQuery/JS. Spinner and button color-change behavior preserved.

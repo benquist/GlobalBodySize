@@ -4,14 +4,13 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "shinyjs", "BIEN", "dplyr", "stringr", "DT", "jsonlite")
+  required_packages <- c("shiny", "BIEN", "dplyr", "stringr", "DT", "jsonlite")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
   }
 
   library(shiny)
-  library(shinyjs)
   library(BIEN)
   library(dplyr)
   library(stringr)
@@ -231,12 +230,11 @@ queryServer <- function(id) {
       rv$is_querying <- TRUE
       rv$error_msg <- ""
 
-      # Visually disable button and show spinner
-      shinyjs::disable("query_btn")
-      shinyjs::runjs(sprintf(
-        "$('#%s').removeClass('btn-primary').addClass('btn-warning');
-         $('#%s').show();",
-        session$ns("query_btn"), session$ns("query_btn_spinner")
+      # Visually disable button and show spinner via plain JS message
+      session$sendCustomMessage("queryBtnState", list(
+        btnId    = session$ns("query_btn"),
+        spinnerId = session$ns("query_btn_spinner"),
+        loading  = TRUE
       ))
 
       tryCatch({
@@ -263,11 +261,10 @@ queryServer <- function(id) {
       })
 
       # Restore button
-      shinyjs::enable("query_btn")
-      shinyjs::runjs(sprintf(
-        "$('#%s').removeClass('btn-warning').addClass('btn-primary');
-         $('#%s').hide();",
-        session$ns("query_btn"), session$ns("query_btn_spinner")
+      session$sendCustomMessage("queryBtnState", list(
+        btnId    = session$ns("query_btn"),
+        spinnerId = session$ns("query_btn_spinner"),
+        loading  = FALSE
       ))
       rv$is_querying <- FALSE
     })
@@ -914,9 +911,25 @@ downloadGateServer <- function(id, query_result) {
 # ============================================================================
 
 ui <- fluidPage(
-  useShinyjs(),
-  tags$head(tags$link(rel = "stylesheet",
-    href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css")),
+  tags$head(
+    tags$link(rel = "stylesheet",
+      href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"),
+    tags$script(HTML("
+      Shiny.addCustomMessageHandler('queryBtnState', function(msg) {
+        var btn = $('#' + msg.btnId);
+        var spinner = $('#' + msg.spinnerId);
+        if (msg.loading) {
+          btn.prop('disabled', true)
+             .removeClass('btn-primary').addClass('btn-warning');
+          spinner.show();
+        } else {
+          btn.prop('disabled', false)
+             .removeClass('btn-warning').addClass('btn-primary');
+          spinner.hide();
+        }
+      });
+    "))
+  ),
   div(class = "container-fluid",
     div(class = "page-header",
       h1("BIEN Trait Data Gateway", tags$small("Availability-First Access to Trait Observations")),
