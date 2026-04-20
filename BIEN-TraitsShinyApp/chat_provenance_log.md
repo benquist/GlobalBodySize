@@ -19,3 +19,8 @@
 - Prompt summary: Continue build/deploy of redesigned BIEN trait gateway with species/genus/family/trait-only query modes.
 - Requested outcomes: Fix module rendering and download wiring issues, set gateway as app entrypoint, validate app load, deploy to shinyapps.io.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Investigate and fix shinyapps startup error (`exit status 1`) for BIEN trait gateway.
+- Requested outcomes: Use deployment logs to diagnose root cause, patch app bootstrap, redeploy, and verify remote startup.
+- Completed by: GitHub Copilot
