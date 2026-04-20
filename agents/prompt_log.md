@@ -639,3 +639,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** @M how do I name my agents using the @ sign?
 
 **Fix:** Provided naming guidance for agent mentions: use exact registered agent name (case-sensitive), prefer the agent picker/autocomplete, and use @m in this workspace rather than @M.
+
+## 2026-04-21 — Agent @ mention cheat sheet
+
+**Prompt:** yes
+
+**Fix:** Generated a one-page cheat sheet of available workspace agents and exact @ mention names, grouped by common workflow use.
+
+## 2026-04-21 — Run git push for separate site
+
+**Prompt:** can you run git push -u origin main?
+
+**Fix:** Ran `git push -u origin main` in `~/GitHub/enquistlab-academic-site`. Push attempted but failed with `fatal: the remote end hung up unexpectedly` after object upload; command exited with code 1.
