@@ -576,3 +576,16 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** For Prunus, if I click on the traits leaf dry mass / leaf nitrogen content per leaf dry mass and then click download I get all the traits and not the selected subset.
 
 **Fix:** Added two observers in `traitSelectServer`: (1) auto-uncheck `download_all` when user deselects traits in the picker; (2) re-select all traits when user re-checks `download_all`. Root cause: `download_all` defaulted to TRUE and was never unchecked automatically, so the reactive always returned all data regardless of selectInput state.
+
+## 2026-04-20 — Always gate manual check
+
+**Prompt:** Run the mandatory always gate checks. Return PASS or FAIL with details on each of the 4 checks: (1) prompt logged, (2) changed Rmd compile, (3) changed R package build, (4) git push status.
+
+**Fix:** N/A — diagnostic run only. No files changed.
+- Completed by: GitHub Copilot
+
+## 2026-04-20 — Query button loading state (spinner + color change)
+
+**Prompt:** For clicking on the query BIEN button. I would like the user to experience a feeling that the app is waiting on the query. Can the query button change color? maybe a spinning ball to indicate we are waiting?
+
+**Fix:** Added shinyjs package. Button now shows a Font Awesome fa-spin spinner icon and turns amber/warning color while querying BIEN. withProgress() overlay shows "Querying BIEN..." during the BIEN call. Button is re-enabled and turns blue again when done.

@@ -4,13 +4,14 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "dplyr", "stringr", "DT", "jsonlite")
+  required_packages <- c("shiny", "shinyjs", "BIEN", "dplyr", "stringr", "DT", "jsonlite")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
   }
 
   library(shiny)
+  library(shinyjs)
   library(BIEN)
   library(dplyr)
   library(stringr)
@@ -205,7 +206,8 @@ queryUI <- function(id) {
         )
       ),
       div(
-        actionButton(ns("query_btn"), "Query BIEN", 
+        actionButton(ns("query_btn"), 
+                    label = tagList(span(id = ns("query_btn_spinner"), class = "fa fa-spinner fa-spin", style = "display:none; margin-right:6px;"), "Query BIEN"),
                     class = "btn btn-primary btn-lg", 
                     style = "width: 100%; margin-top: 10px;"),
         textOutput(ns("query_status"))
@@ -225,29 +227,48 @@ queryServer <- function(id) {
     
     observeEvent(input$query_btn, {
       req(input$taxon, nzchar(str_trim(input$taxon)))
-      
+
       rv$is_querying <- TRUE
       rv$error_msg <- ""
-      
+
+      # Visually disable button and show spinner
+      shinyjs::disable("query_btn")
+      shinyjs::runjs(sprintf(
+        "$('#%s').removeClass('btn-primary').addClass('btn-warning');
+         $('#%s').show();",
+        session$ns("query_btn"), session$ns("query_btn_spinner")
+      ))
+
       tryCatch({
         taxon_clean <- normalize_taxon_name(input$taxon)
-        
-        dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
-                                 max_records = 5000, timeout_sec = 120)
-        
-        rv$query_data <- dat
-        rv$diagnostics <- compute_diagnostics(dat, input$rank, taxon_clean)
-        rv$error_msg <- if (nrow(dat) == 0) {
-          "No trait records found for this query"
-        } else {
-          ""
-        }
+
+        withProgress(message = "Querying BIEN...",
+                     detail = "This may take 30\u201360 seconds",
+                     value = 0.3, {
+          dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
+                                   max_records = 5000, timeout_sec = 120)
+          incProgress(0.7, message = "Processing results...")
+          rv$query_data <- dat
+          rv$diagnostics <- compute_diagnostics(dat, input$rank, taxon_clean)
+          rv$error_msg <- if (nrow(dat) == 0) {
+            "No trait records found for this query"
+          } else {
+            ""
+          }
+        })
       }, error = function(e) {
         rv$query_data <- data.frame()
         rv$diagnostics <- NULL
         rv$error_msg <- paste("Error:", conditionMessage(e))
       })
-      
+
+      # Restore button
+      shinyjs::enable("query_btn")
+      shinyjs::runjs(sprintf(
+        "$('#%s').removeClass('btn-warning').addClass('btn-primary');
+         $('#%s').hide();",
+        session$ns("query_btn"), session$ns("query_btn_spinner")
+      ))
       rv$is_querying <- FALSE
     })
     
@@ -893,6 +914,9 @@ downloadGateServer <- function(id, query_result) {
 # ============================================================================
 
 ui <- fluidPage(
+  useShinyjs(),
+  tags$head(tags$link(rel = "stylesheet",
+    href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css")),
   div(class = "container-fluid",
     div(class = "page-header",
       h1("BIEN Trait Data Gateway", tags$small("Availability-First Access to Trait Observations")),
