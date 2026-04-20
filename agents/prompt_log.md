@@ -570,3 +570,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify if current update satisfies original request, identify any gaps or regressions, and state whether it exceeds requested scope.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+## 2026-04-20 — Fix trait selection download bug
+
+**Prompt:** For Prunus, if I click on the traits leaf dry mass / leaf nitrogen content per leaf dry mass and then click download I get all the traits and not the selected subset.
+
+**Fix:** Added two observers in `traitSelectServer`: (1) auto-uncheck `download_all` when user deselects traits in the picker; (2) re-select all traits when user re-checks `download_all`. Root cause: `download_all` defaulted to TRUE and was never unchecked automatically, so the reactive always returned all data regardless of selectInput state.

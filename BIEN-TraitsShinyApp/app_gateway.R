@@ -643,6 +643,26 @@ traitSelectServer <- function(id, query_result) {
       updateCheckboxInput(session, "download_all", value = TRUE)
     }, ignoreInit = FALSE)
 
+    # Auto-uncheck "download all" when user deselects traits in the picker
+    observeEvent(input$selected_traits, {
+      tbl <- trait_summary_tbl()
+      if (nrow(tbl) == 0) return()
+      all_choices <- tbl$trait_name
+      if (!isTRUE(input$download_all)) return()  # already unchecked, nothing to do
+      if (!setequal(input$selected_traits, all_choices)) {
+        updateCheckboxInput(session, "download_all", value = FALSE)
+      }
+    }, ignoreNULL = FALSE, ignoreInit = TRUE)
+
+    # When user re-checks "download all", re-select all traits
+    observeEvent(input$download_all, {
+      if (isTRUE(input$download_all)) {
+        tbl <- trait_summary_tbl()
+        choices <- if (nrow(tbl) > 0) tbl$trait_name else character(0)
+        updateSelectInput(session, "selected_traits", choices = choices, selected = choices)
+      }
+    }, ignoreInit = TRUE)
+
     output$selector_controls <- renderUI({
       req(query_result())
       dat <- query_result()$data

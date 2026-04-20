@@ -124,7 +124,24 @@ ui <- fluidPage(
     tags$style(HTML('
       @keyframes spin { 100% { transform: rotate(360deg); } }
       .spinner-border { animation: spin 0.75s linear infinite; }
+      .global-loading-pill {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 1050;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(47, 111, 171, 0.1);
+        border: 1px solid rgba(47, 111, 171, 0.35);
+        color: #1f4f82;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
     '))
+    ,
+    tags$script(HTML(
+      "$(document).on('shiny:connected', function() { Shiny.setInputValue('app_busy', false, {priority: 'event'}); });\n$(document).on('shiny:busy', function() { Shiny.setInputValue('app_busy', true, {priority: 'event'}); });\n$(document).on('shiny:idle', function() { Shiny.setInputValue('app_busy', false, {priority: 'event'}); });"
+    ))
   ),
   titlePanel("Historical Observation Data to BIEN"),
   tags$div(
@@ -136,6 +153,7 @@ ui <- fluidPage(
     style = "margin: 0 0 10px 0; color: #5a6b7a; font-size: 0.9em;",
     build_release_note()
   ),
+  uiOutput("global_loading_ui"),
   sidebarLayout(
     sidebarPanel(
       h4("Quick Start: 6 Steps"),
@@ -394,6 +412,31 @@ server <- function(input, output, session) {
   taxonomy_loading <- reactiveVal(FALSE)
   validate_loading <- reactiveVal(FALSE)
   bien_services_loading <- reactiveVal(FALSE)
+
+  any_step_loading <- reactive({
+    isTRUE(input$app_busy) ||
+      link_loading() ||
+      map_loading() ||
+      taxonomy_loading() ||
+      validate_loading() ||
+      bien_services_loading()
+  })
+
+  output$global_loading_ui <- renderUI({
+    if (!any_step_loading()) {
+      return(NULL)
+    }
+
+    tags$div(
+      class = "global-loading-pill",
+      tags$span("⏳ Working..."),
+      tags$div(
+        class = "spinner-border",
+        role = "status",
+        style = "display:inline-block; width: 1rem; height: 1rem; margin-left: 8px; vertical-align: middle; border: 0.2em solid #2f6fab; border-right-color: transparent; border-radius: 50%;"
+      )
+    )
+  })
 
   # --- Step 2 Link spinner logic ---
   # Turn on spinner when button is clicked
@@ -725,6 +768,25 @@ server <- function(input, output, session) {
 
   # --- TNRS Query Cache ---
   tnrs_cache <- reactiveVal(NULL)
+  tnrs_cache_key <- reactiveVal("")
+
+  observeEvent(taxonomy_df(), {
+    tx <- taxonomy_df()
+    if (!is.data.frame(tx) || !"scientificName" %in% names(tx)) {
+      tnrs_cache(NULL)
+      tnrs_cache_key("")
+      return()
+    }
+
+    unique_names <- sort(unique(trimws(as.character(tx$scientificName))))
+    unique_names <- unique_names[!is.na(unique_names) & unique_names != ""]
+    next_key <- paste(unique_names, collapse = "||")
+
+    if (!identical(next_key, tnrs_cache_key())) {
+      tnrs_cache(NULL)
+      tnrs_cache_key(next_key)
+    }
+  }, ignoreInit = FALSE)
   
   tnrs_results <- reactive({
     req(taxonomy_df())
