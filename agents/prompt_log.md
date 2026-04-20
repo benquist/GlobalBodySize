@@ -11,20 +11,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by:
 
 ## Entries
-- Date: 2026-04-17
-- Prompt summary: Implement real, working TNRS, GNRS, GVS, and NSR queries. Replace 404 placeholder functions with actual public APIs.
-- Requested outcomes: TNRS resolves species names via public BIEN TNRS API, GNRS validates geographic fields, GVS validates coordinates, NSR returns native status flags. App no longer shows HTTP 404 errors—queries actually work.
-- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/bien_pipeline_helpers.R; agents/prompt_log.md
-- Completed by: GitHub Copilot
 
-- Date: 2026-04-17
-- Prompt summary: Wire the Historical Data app spinners to display during actual computations instead of 500ms demo delay.
-- Requested outcomes: Spinners turn on when user clicks button/navigates tab, turn off when reactive computation completes. Users see spinner during real processing.
-- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; agents/prompt_log.md
-- Completed by: GitHub Copilot
-
-- Date: 2026-04-17
 - Prompt summary: Run the mandatory final pre-return gate for this workspace and report PASS/FAIL for prompt log, Rmd compile, R package build, and git push checks.
+++ (awaiting always gate check)
 - Requested outcomes: Provide explicit evidence-backed PASS/BLOCKED results for all four checks, including no-edit handling where applicable.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
@@ -33,6 +22,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: BIEN Traits app returning "No trait observations" for Pinus ponderosa despite data existing in BIEN. Root cause: BIEN_trait_species called with invalid parameters (limit, record_limit, fetch.query) causing silent empty return.
 - Requested outcomes: Fix invalid BIEN_trait_species parameters, redeploy, verify data displays correctly.
 - Files changed: BIEN-TraitsShinyApp-Project/app.R
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Keep the old website intact and create the redesigned academic website as a separate GitHub site.
+- Requested outcomes: Restore a clean local clone of the original EnquistLab site, create a standalone repo-ready folder for the new al-folio site, and configure separate GitHub Pages deployment path.
+- Files changed: ~/GitHub/enquistlab-academic-site/_config.yml, ~/GitHub/enquistlab-academic-site/_pages/people.md, ~/GitHub/enquistlab-academic-site/_pages/join.md, agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-03-28
@@ -259,15 +254,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/README.md; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/io_ingest.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/R/qc_checks.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/DESCRIPTION; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp/NAMESPACE; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
-- Date: 2026-04-19
-- Prompt summary: Review proposed trait-gateway frontend design and return biodiversity-informatics critiques and required adjustments.
-- Requested outcomes: Provide critical risks, required data-model fields and API/query contract for species/genus/family/trait-only flows, UX safeguards against taxonomy/scope mistakes, and concise Shiny+BIEN implementation recommendations.
-- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
-
-- Date: 2026-04-17
+- Prompt summary: Review proposed trait-gateway frontend design and return biodiversity-informatics critiques and required adjustments.
 - Prompt summary: Implement the cross-agent BIEN traits UX recommendations and update the Shiny app.
-- Requested outcomes: Upgrade BIEN-TraitsShinyApp with species-app-like styling, diagnostics and no-data guidance, safer unit-aware mapping defaults, startup trait-catalog loading, and stronger ecology interpretation cues.
 - Files changed: BIEN-TraitsShinyApp/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
@@ -638,3 +627,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Execute all four gate checks with evidence-backed results. For Rmd and R package checks, only proceed if files changed. Return strict Status (PASS/BLOCKED), detailed Checks for all four items, Missing actions (or None), Decision (Continue work / Ready to return), and InstallCode if packages were built.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Initialize workspace instructions by following init.prompt workflow, discover conventions, and merge into existing root AGENTS.md.
+- Requested outcomes: Bootstrap/merge workspace-level instructions from current conventions; keep concise sections for architecture, build/test triggers, biodiversity conventions, and linked docs; avoid duplication.
+- Files changed: AGENTS.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+## 2026-04-20 — Agent naming with @ mentions
+
+**Prompt:** @M how do I name my agents using the @ sign?
+
+**Fix:** Provided naming guidance for agent mentions: use exact registered agent name (case-sensitive), prefer the agent picker/autocomplete, and use @m in this workspace rather than @M.
