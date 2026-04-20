@@ -75,6 +75,79 @@ ensure_unique_names <- function(df) {
   df
 }
 
+# Identify plot-based traits and enrich with plot/project metadata
+# Plot traits: stem diameter, height, basal area, crown metrics, wood density from plots
+enrich_plot_metadata <- function(dat) {
+  if (!is.data.frame(dat) || nrow(dat) == 0) return(dat)
+
+  trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+  
+  # Keywords indicating plot-based trait data
+  plot_trait_keywords <- c("diameter", "dbh", "height", "basal area", "crown",
+                          "wood density", "biomass", "age", "growth", "increment")
+  
+  is_plot_trait <- if (!is.null(trait_col)) {
+    grepl(paste(plot_trait_keywords, collapse = "|"), 
+          tolower(dat[[trait_col]]), perl = TRUE)
+  } else {
+    rep(FALSE, nrow(dat))
+  }
+  
+  # Preserve all available metadata columns for plot data
+  metadata_cols <- c("plot_name", "plot_area_ha", "sampling_protocol",
+                     "dataset", "datasource", "dataowner", "custodial_institution_codes",
+                     "collection_code", "project_pi", "url_source", "source_citation")
+  
+  # For rows where metadata is missing but is_plot_trait=TRUE, 
+  # add empty columns so they're available for users to see
+  for (col in metadata_cols) {
+    if (!col %in% names(dat)) {
+      dat[[col]] <- NA_character_
+    }
+  }
+  
+  # Add a marker column so users can filter to plot-sourced traits
+  dat$is_plot_trait <- is_plot_trait
+  
+  dat
+}
+
+# Reorganize columns to surface plot metadata for plot-based traits
+organize_columns_for_export <- function(dat) {
+  if (!is.data.frame(dat) || nrow(dat) == 0) return(dat)
+  
+  # Standard priority columns: species, trait info, value
+  core_cols <- c("scrubbed_species_binomial", "trait_name", "trait_value", "unit", "method")
+  
+  # Plot metadata priority columns (show first for plot traits)
+  plot_meta_cols <- c("is_plot_trait", "plot_name", "plot_area_ha", "sampling_protocol",
+                      "dataset", "datasource", "dataowner", "project_pi")
+  
+  # Location/source columns
+  location_cols <- c("latitude", "longitude", "elevation_m")
+  
+  # Taxonomy columns
+  tax_cols <- names(dat)[grepl("^scrubbed_", names(dat)) && !grepl("binomial|species", names(dat))]
+  
+  # Source/citation
+  source_cols <- c("url_source", "source_citation")
+  
+  # Query metadata
+  query_cols <- c("query_rank", "query_taxon", "query_timestamp")
+  
+  # Build column order: core → plot_meta → location → taxonomy → source → query → other
+  col_order <- c()
+  for (col_set in list(core_cols, plot_meta_cols, location_cols, tax_cols, source_cols, query_cols)) {
+    col_order <- c(col_order, col_set[col_set %in% names(dat)])
+  }
+  
+  # Add any remaining columns at end
+  remaining <- setdiff(names(dat), col_order)
+  col_order <- c(col_order, remaining)
+  
+  dat[, col_order, drop = FALSE]
+}
+
 # Query trait data by rank (species/genus/family/trait-only)
 query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120) {
   if (rank == "species") {
@@ -121,6 +194,9 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
   # Repair once at ingest so downstream dplyr verbs are stable.
   dat <- ensure_unique_names(dat)
   
+  # Enrich with plot metadata where available
+  dat <- enrich_plot_metadata(dat)
+  
   dat$query_rank <- rank
   dat$query_taxon <- taxon
   dat$query_timestamp <- Sys.time()
@@ -163,6 +239,18 @@ compute_diagnostics <- function(dat, query_rank, query_taxon) {
   }
   if (query_rank == "trait-only") {
     warnings <- c(warnings, "Trait-only queries combine all species; verify meaningful comparisons")
+  }
+  
+  # Check for plot-based traits and highlight plot metadata availability
+  plot_trait_col <- first_existing_col(dat, c("is_plot_trait"))
+  n_plot_traits <- if (!is.null(plot_trait_col)) sum(dat[[plot_trait_col]], na.rm = TRUE) else 0
+  
+  if (n_plot_traits > 0) {
+    pct_plot <- round(100 * n_plot_traits / nrow(dat), 1)
+    warnings <- c(warnings, sprintf(
+      "Plot-based traits detected (%d%% of records): plot metadata (name, dataset, datasource, sampling protocol, project PI) included.", 
+      pct_plot
+    ))
   }
   
   list(
@@ -953,6 +1041,9 @@ downloadGateServer <- function(id, query_result) {
             dat <- dat %>% filter(.data[[trait_col]] %in% selected_traits)
           }
         }
+        
+        # Reorganize columns to surface plot metadata where present
+        dat <- organize_columns_for_export(dat)
 
         write.csv(dat, file, row.names = FALSE)
       }

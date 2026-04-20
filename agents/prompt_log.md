@@ -626,3 +626,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** Replace scroll-heavy Step 1..7 layout with top tabs and run by design agent.
 
 **Fix:** Ran agent `m` for UX review and implemented top tab navigation in `BIEN-TraitsShinyApp/app_gateway.R` using `tabsetPanel` with one tab per step (Query, Scope, Traits, Diagnostics, Records, Provenance, Download). Preserved existing module wiring and download gating.
+
+## 2026-04-20 — Add plot metadata enrichment for plot-based traits
+
+**Prompt:** For trait data from plots (DBH, height, etc.), include associated plot metadata (plot name, project type, dataset, datasource, sampling protocol, project PI).
+
+**Fix:** Added enrich_plot_metadata() function to detect plot-based traits (diameter, DBH, height, basal area, crown, wood density, biomass, age, growth) and preserve all available BIEN plot metadata columns. Added organize_columns_for_export() to surface plot metadata prominently in CSV downloads. Enhanced diagnostics to report plot-trait detection rate and available metadata.
