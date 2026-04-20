@@ -546,3 +546,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Show trait coverage by species in Step 3 while keeping existing trait filters (one/many/all) and deploy live.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/rsconnect/shinyapps.io/benquist/bien-traits-shinyapp.dcf; agents/prompt_log.md; BIEN-TraitsShinyApp/chat_provenance_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Run final pre-return checks per agents/always.agent.md for /Users/brianjenquist/VSCode after adding species-by-trait matrix to Step 3.
+- Requested outcomes: Validate latest prompt log presence, change-gated Rmd compile status, change-gated R package build status, and git push sync status; return exact required output fields including InstallCode.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
