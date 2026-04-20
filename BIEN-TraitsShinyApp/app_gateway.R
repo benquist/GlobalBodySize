@@ -67,6 +67,14 @@ first_existing_col <- function(df, candidates) {
   nm[idx[1]]
 }
 
+ensure_unique_names <- function(df) {
+  if (!is.data.frame(df) || ncol(df) == 0) {
+    return(df)
+  }
+  names(df) <- make.unique(names(df), sep = "__dup")
+  df
+}
+
 # Query trait data by rank (species/genus/family/trait-only)
 query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120) {
   if (rank == "species") {
@@ -108,6 +116,10 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
   
   if (inherits(dat, "bien_error")) return(data.frame())
   if (!is.data.frame(dat)) return(data.frame())
+
+  # BIEN can return duplicated names (for example scrubbed_genus).
+  # Repair once at ingest so downstream dplyr verbs are stable.
+  dat <- ensure_unique_names(dat)
   
   dat$query_rank <- rank
   dat$query_taxon <- taxon
