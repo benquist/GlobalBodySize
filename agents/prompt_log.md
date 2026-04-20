@@ -498,3 +498,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify prompt log recorded, change-gated Rmd compile, change-gated R package build, and git push status; return PASS/BLOCKED with concise evidence.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Implement automatic TNRS query in Step 4 of LoadingHistoricalObservationDataIntoBIEN Shiny app with caching and safety cap.
+- Requested outcomes: Step 4 Taxonomic Reconciliation automatically runs TNRS on uploaded species names, caches results to avoid redundant API calls, and enforces a safety cap to prevent runaway queries on large datasets.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/BIEN_Historical_Data_ShinyApp
+- Completed by: GitHub Copilot
