@@ -599,3 +599,19 @@ Outcome: Append-only agent provenance and prompt logging remain current for this
 2026-04-19 | active chat (ecological frontend safety review) | Reviewed proposed trait-gateway frontend design for ecological validity and interpretation safety, then updated agents/prompt_log.md and this append-only provenance log to satisfy mandatory final-gate policy.
 2026-04-19 | active chat (trait gateway final synthesis) | Synthesized the final BIEN trait gateway frontend specification from biodiversity informatics, ecology, and statistics review outcomes; updated agents/prompt_log.md and this append-only provenance log to satisfy mandatory final-gate policy before return.
 2026-04-19 | active chat (BIEN trait gateway frontend design) | Orchestrated @M-led design planning with EcoInterface/ecology-user priorities, then biodiversity-informatics/science/stats review, then final team synthesis into a build-ready streamlined frontend spec.
+
+[21] Date: 2026-04-20
+Source: active chat request
+Request summary: User asked to continue build/deploy work and retry until completed.
+Files affected:
+- BIEN-TraitsShinyApp/app_gateway.R
+- BIEN-TraitsShinyApp/app.R
+- BIEN-TraitsShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Fixed modular gateway DT rendering pattern issues and added missing provenance download handlers.
+- Set app entrypoint to gateway implementation and validated parsing/source loading in R.
+- Deployed updated app to shinyapps.io successfully.
+- Appended required prompt and provenance logs for mandatory gate compliance.
+Outcome: Build/deploy continuation completed with live deployment and final-gate readiness.

@@ -4,7 +4,7 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "dplyr", "stringr", "DT", "jsonlite", "lubridate")
+  required_packages <- c("shiny", "BIEN", "dplyr", "stringr", "DT", "jsonlite")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
@@ -16,7 +16,6 @@ suppressPackageStartupMessages({
   library(stringr)
   library(DT)
   library(jsonlite)
-  library(lubridate)
 })
 
 # ============================================================================
@@ -439,8 +438,8 @@ recordsServer <- function(id, query_result) {
         scrollX = TRUE,
         pageLength = 10,
         columnDefs = list(list(width = "100px", targets = "_all")),
-        dom = "Bfrtip"
-      ), extensions = "Buttons", rownames = FALSE)
+        dom = "frtip"
+      ), rownames = FALSE)
     })
     
     reactive({
@@ -651,7 +650,6 @@ downloadGateServer <- function(id, query_result) {
 # ============================================================================
 
 ui <- fluidPage(
-  theme = "bootstrap",
   div(class = "container-fluid",
     div(class = "page-header",
       h1("BIEN Trait Data Gateway", tags$small("Availability-First Access to Trait Observations")),

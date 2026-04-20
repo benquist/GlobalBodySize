@@ -14,3 +14,8 @@
 - Prompt summary: Fix species parsing bug where "Pinus ponderosa" was being split into fragments ("Pi", "Us po", "Derosa").
 - Requested outcomes: Correct species input splitting to use real delimiters (line breaks/commas/semicolons), redeploy app, and verify live endpoint.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Continue build/deploy of redesigned BIEN trait gateway with species/genus/family/trait-only query modes.
+- Requested outcomes: Fix module rendering and download wiring issues, set gateway as app entrypoint, validate app load, deploy to shinyapps.io.
+- Completed by: GitHub Copilot
