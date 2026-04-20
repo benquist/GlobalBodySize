@@ -596,3 +596,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 **Root cause:** shinyjs package not installed on shinyapps.io runtime.
 **Fix:** Removed shinyjs dependency entirely. Replaced shinyjs::disable/enable/runjs calls with a Shiny custom message handler (session$sendCustomMessage / Shiny.addCustomMessageHandler) using plain jQuery/JS. Spinner and button color-change behavior preserved.
+
+## 2026-04-20 — Clarify Step 3 download-all behavior
+
+**Prompt:** User missed the "Download all returned traits" box; requested clearer behavior.
+
+**Fix:** Added explicit warning text in Step 3 that checked "download all" overrides the trait picker, renamed the checkbox to include "override", and added a final Step 7 info banner showing active download mode (all traits vs selected trait count).

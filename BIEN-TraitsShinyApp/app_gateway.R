@@ -699,7 +699,16 @@ traitSelectServer <- function(id, query_result) {
       }
 
       tagList(
-        checkboxInput(ns("download_all"), "Download all returned traits", value = TRUE),
+        div(
+          class = "alert alert-warning",
+          strong("Important: "),
+          "If this box is checked, your CSV will include all returned traits, even if only some traits are selected below."
+        ),
+        checkboxInput(
+          ns("download_all"),
+          "Download all returned traits (override trait picker below)",
+          value = TRUE
+        ),
         selectInput(
           ns("selected_traits"),
           "Choose one or more traits:",
@@ -710,7 +719,7 @@ traitSelectServer <- function(id, query_result) {
         ),
         p(
           class = "text-muted",
-          "Tip: uncheck 'Download all returned traits' to activate custom trait selection."
+          "Tip: uncheck the box above to download only the selected traits."
         )
       )
     })
@@ -854,8 +863,18 @@ downloadGateServer <- function(id, query_result) {
       if (nrow(query_result()$data) == 0) {
         return(p("Query data first.", style = "color: #666;"))
       }
+
+      download_mode <- if (isTRUE(query_result()$download_all)) {
+        "Download mode: ALL returned traits"
+      } else {
+        sprintf("Download mode: %d selected trait(s)", length(query_result()$selected_traits))
+      }
       
       tagList(
+        div(
+          class = "alert alert-info",
+          strong(download_mode)
+        ),
         div(class = "alert alert-danger",
           span(class = "glyphicon glyphicon-exclamation-sign"),
           strong(" Important:"), p("Before downloading, confirm you understand the following:")
