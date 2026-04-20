@@ -997,14 +997,18 @@ ui <- fluidPage(
       h1("BIEN Trait Data Gateway", tags$small("Availability-First Access to Trait Observations")),
       p("Query traits by species, genus, family, or trait type with full provenance tracking")
     ),
-    
-    queryUI("query"),
-    scopeUI("scope"),
-    traitSelectUI("traitSelect"),
-    diagnosticsUI("diagnostics"),
-    recordsUI("records"),
-    provenanceUI("provenance"),
-    downloadGateUI("downloadGate"),
+
+    tabsetPanel(
+      id = "workflow_tabs",
+      type = "tabs",
+      tabPanel("Step 1: Query", queryUI("query")),
+      tabPanel("Step 2: Scope", scopeUI("scope")),
+      tabPanel("Step 3: Traits", traitSelectUI("traitSelect")),
+      tabPanel("Step 4: Diagnostics", diagnosticsUI("diagnostics")),
+      tabPanel("Step 5: Records", recordsUI("records")),
+      tabPanel("Step 6: Provenance", provenanceUI("provenance")),
+      tabPanel("Step 7: Download", downloadGateUI("downloadGate"))
+    ),
     
     hr(),
     p(class = "text-muted", 
@@ -1015,6 +1019,9 @@ ui <- fluidPage(
     body { padding: 20px 0; background: #f8f8f8; }
     .page-header { padding: 20px; background: white; border-bottom: 1px solid #ddd; margin: -20px 0 20px 0; }
     .panel { margin-bottom: 20px; }
+    .nav-tabs { margin-bottom: 15px; }
+    .nav-tabs > li > a { font-weight: 600; }
+    .tab-content { background: white; border: 1px solid #ddd; border-top: 0; padding: 15px; }
   ")))
 )
 

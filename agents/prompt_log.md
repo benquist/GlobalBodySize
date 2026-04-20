@@ -614,3 +614,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** Still not working: clicking subset of traits still downloads full trait dataset.
 
 **Fix:** In `traitSelectServer`, wired `input$trait_summary_rows_selected` into effective selection used for filtering and download. Trait table now supports multi-row selection and row clicks sync to `selected_traits` + force `download_all = FALSE`.
+
+## 2026-04-20 — Review Step 1..7 vertical layout to top-tab workflow
+
+**Prompt:** Review this UI change request for a Shiny app: replace vertically stacked Step 1..Step 7 sections (which require scrolling) with top tabs for each step so users can navigate without page scrolling. Provide a concise design recommendation tailored for a data-heavy Shiny app: tab labels, ordering, whether to allow jumping ahead vs linear progression cues, how to keep critical warnings visible, and any accessibility/usability caveats. Then provide concrete implementation guidance for a Shiny app currently built from modular UIs queryUI/scopeUI/traitSelectUI/diagnosticsUI/recordsUI/provenanceUI/downloadGateUI.
+
+**Fix:** Pending in-chat design and implementation guidance only (no app code changes requested in this turn).
+
+## 2026-04-20 — Convert stacked steps to top tabs
+
+**Prompt:** Replace scroll-heavy Step 1..7 layout with top tabs and run by design agent.
+
+**Fix:** Ran agent `m` for UX review and implemented top tab navigation in `BIEN-TraitsShinyApp/app_gateway.R` using `tabsetPanel` with one tab per step (Query, Scope, Traits, Diagnostics, Records, Provenance, Download). Preserved existing module wiring and download gating.
