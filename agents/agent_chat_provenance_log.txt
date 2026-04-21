@@ -218,6 +218,76 @@ Prompt: make a new agent that pauses and asks me for feedback if the other agent
 12) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
 Prompt: can you give me all the previous chats that gave rise to the creation and directon of all my agents. put in a separate text file in the agents folder. Update this file with any new chat that led to the creation/alteration etc.
 
+[7] Date: 2026-04-21
+Source: active chat request
+Request summary: Add accepted BIEN species-name autocomplete to BIEN-SpeciesShinyApp and complete mandatory final gate checks.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Replaced Species free-text input with BIEN-backed selectize autocomplete using accepted taxonomy names from BIEN.
+- Updated random-species workflow to target the new selectize control.
+- Logged implementation prompt and final-gate prompt in agents/prompt_log.md.
+- Appended this entry to preserve append-only provenance for agent-folder changes.
+Outcome: Species-name lookup now uses accepted BIEN autocomplete suggestions and agent-folder traceability remains current.
+
+[8] Date: 2026-04-21
+Source: active chat request
+Request summary: Deploy the updated BIEN-SpeciesShinyApp to shinyapps.io now.
+Files affected:
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Ran BIEN-SpeciesShinyApp deployment script deploy_safe.R to publish the latest app bundle.
+- Verified successful deployment and checked live URL content for BIEN Species app header/UI.
+- Logged deployment prompt and this provenance entry for agent-folder traceability.
+Outcome: App deployment completed and public URL is live with expected BIEN Species interface.
+
+[9] Date: 2026-04-21
+Source: active chat request
+Request summary: Fix BIEN-SpeciesShinyApp species-name entry because typed text disappears and the selectize dropdown arrow is not working normally.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Diagnosed the issue as a reactive observer rebuilding the selectize input on every keystroke.
+- Changed autocomplete initialization to run once per session so typed text is not cleared while searching accepted BIEN names.
+- Logged the prompt and appended this provenance entry for agent-folder traceability.
+Outcome: Species autocomplete no longer resets during typing and the dropdown behaves normally.
+
+[10] Date: 2026-04-21
+Source: active chat request
+Request summary: Make the BIEN-SpeciesShinyApp species name box larger.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Increased the species-input column width in the sidebar row.
+- Added dedicated selectize styling to increase the control height and font size.
+- Logged the prompt and appended this provenance entry for agent-folder traceability.
+Outcome: The species lookup box is visually larger and easier to read/use.
+
+[11] Date: 2026-04-21
+Source: active chat request
+Request summary: Fix BIEN-SpeciesShinyApp startup species display so Pinus ponderosa name shows in the species box when the app launches.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Changed selectizeInput initialization from `choices = NULL` to `choices = STARTUP_SPECIES` so the startup value displays immediately.
+- The once-per-session observer continues to load all accepted BIEN names while keeping the startup species selected.
+- Logged the prompt and appended this provenance entry for agent-folder traceability.
+Outcome: Pinus ponderosa now displays in the species box on app startup.
+
 13) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
 Prompt: Now create an 'always agent' that always runs. It is called always. It always checks that prompts have been recoreded in teh propt file. That RMD
 
@@ -616,3 +686,17 @@ Action taken:
 - Appended required prompt and provenance logs for mandatory gate compliance.
 Outcome: Build/deploy continuation completed with live deployment and final-gate readiness.
 2026-04-20 | active chat (Shiny top-tab workflow review) | Logged user request to replace vertical Step 1..7 layout with top tabs and produce implementation guidance for modular UIs (queryUI/scopeUI/traitSelectUI/diagnosticsUI/recordsUI/provenanceUI/downloadGateUI). Updated agents/prompt_log.md and appended this provenance line for append-only compliance.
+2026-04-20 | active chat (workspace instruction bootstrap/merge) | Loaded agent-customization skill and workspace-instructions template, discovered existing conventions/docs across monorepo, and merged concise project-wide guidance into root AGENTS.md (architecture, build/test triggers, conventions, and linked docs). Updated agents/prompt_log.md and appended this provenance entry for append-only compliance.
+2026-04-21 | active chat (agent mention cheat sheet) | Compiled exact workspace agent names from agents/*.agent.md and prepared @ mention cheat sheet guidance. Updated agents/prompt_log.md and appended this provenance entry for append-only compliance.
+2026-04-21 | active chat (mandatory final gate run after prompt-log update) | Logged the user request in agents/prompt_log.md, then executed always-gate checks for prompt log presence, change-gated Rmd applicability, change-gated package applicability, and git push synchronization.
+
+[21] Date: 2026-04-20
+Source: active chat request
+Request summary: Run mandatory always final gate and verify prompt log, Rmd applicability, package build applicability, and workspace git push status with concise evidence.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the exact prompt to agents/prompt_log.md for final-gate traceability.
+- Appended this provenance record because an agents-folder file was updated during this turn.
+Outcome: Agent-folder provenance remains append-only and current.

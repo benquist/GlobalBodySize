@@ -1,0 +1,17 @@
+Package: BIENSpeciesShinyApp
+Type: Package
+Title: BIEN Species Shiny App
+Version: 0.1.0
+Authors@R: c(person(given = "Brian", family = "Enquist", role = c("aut")), person(given = "Cory", family = "Merow", role = c("aut", "cre"), email = "cory.merow@example.com"))
+Description: Installable wrapper package for the BIEN Species Shiny App.
+    Provides a single runApp() entry point that launches the bundled
+    species-level BIEN occurrence, trait, and range explorer.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Imports: shiny
+Depends: R (>= 4.1.0)
+NeedsCompilation: no
+Packaged: 2026-04-21 11:56:59 UTC; brianjenquist
+Author: Brian Enquist [aut],
+  Cory Merow [aut, cre]
+Maintainer: Cory Merow <cory.merow@example.com>

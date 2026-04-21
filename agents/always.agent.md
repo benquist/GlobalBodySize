@@ -55,3 +55,7 @@ When one or more package builds ran, include an additional section:
   - `install.packages("<package_tarball>.tar.gz", repos = NULL, type = "source")`
 If no package build ran, set:
 - `InstallCode`: `None (no package build was required)`
+An error has occurred
+The application failed to start.
+
+exit status 1
