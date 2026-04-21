@@ -104,3 +104,8 @@
 - Prompt summary: Revise BIEN-TraitsShinyApp landing header text and make workflow step tabs more visually distinct and appealing, informed by EcoInterface design principles.
 - Requested outcomes: Rename main title to "Trait Data Portal: Data Visualizer & Download", remove subtitle, and apply high-contrast tab-chip styling with stronger active-state differentiation.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: App startup failure reported by user with shinyapps.io message "The application failed to start. exit status 1".
+- Requested outcomes: Trace startup error via shinyapps logs, repair module definition/scoping so `distributionsUI` resolves at startup, redeploy, and verify remote instance boots.
+- Completed by: GitHub Copilot
