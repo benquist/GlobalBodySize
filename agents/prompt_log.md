@@ -12,6 +12,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 
+- Date: 2026-04-20
+- Prompt summary: yes, do a second pass to clean typography and formatting from the WordPress-imported text so each page reads more polished and less archive-like. also import pictures etc
+- Requested outcomes: Polish migrated page copy and import representative WordPress media into the new site pages.
+- Files changed: ~/GitHub/enquistlab-academic-site/_pages/about.md; ~/GitHub/enquistlab-academic-site/_pages/research.md; ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/teaching.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/_pages/join.md; ~/GitHub/enquistlab-academic-site/_pages/software.md; ~/GitHub/enquistlab-academic-site/assets/img/wordpress/*; ~/GitHub/enquistlab-academic-site/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: Re-run the mandatory final pre-return gate now.
 - Requested outcomes: Verify prompt log recording, Rmd compile applicability, R package build applicability, and git push sync status, then return PASS/FAIL.
