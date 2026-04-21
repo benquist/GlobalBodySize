@@ -327,3 +327,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Replace placeholder page content with real WordPress-sourced text; conduct design-atelier consultation for a photo-forward redesign plan leveraging field photography.
 - Files changed: enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/teaching.md; enquistlab-site-migration/_pages/contact.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: BIEN-SpeciesShinyApp: typing a misspelled species name (e.g. "Pinus pinderosa") and hitting Query returns nothing, even with "Suggest closest match" checked.
+- Requested outcomes: Fix selectize so free-form misspellings can be submitted, allowing the existing fuzzy-match logic to fire and suggest the correct BIEN accepted name.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot

@@ -771,3 +771,17 @@ Action taken:
 - Created a new user-invocable `design-atelier` agent in both agent registries with clear trigger keywords and implementation-oriented design workflow guidance.
 - Logged prompt and provenance updates required by workspace policy.
 Outcome: New design-focused agent is now available with consistent policy-compliant traceability.
+
+---
+[15] Date: 2026-04-21
+Prompt: BIEN-SpeciesShinyApp: misspelled species name "Pinus pinderosa" returns nothing even with Suggest closest match checked.
+Files changed:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Diagnosed: selectize create=FALSE blocked free-form text submission; misspellings never reached the server-side fuzzy logic.
+- Fixed: set create=TRUE, createOnBlur=TRUE so unrecognized typed names are submitted and trigger find_best_species_spelling().
+- Deployed to https://benquist.shinyapps.io/bien-species-shinyapp/.
+Outcome: Typing a misspelling and clicking Query now surfaces the closest accepted BIEN taxon suggestion with confidence rating.
