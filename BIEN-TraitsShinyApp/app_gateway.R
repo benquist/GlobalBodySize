@@ -40,6 +40,22 @@ normalize_taxon_name <- function(x) {
   }, character(1))
 }
 
+extract_rank_token <- function(rank, taxon) {
+  taxon <- str_squish(as.character(taxon))
+  if (!nzchar(taxon)) return(taxon)
+
+  # Genus/family queries should use a single cleaned token.
+  if (rank %in% c("genus", "family")) {
+    token <- strsplit(taxon, "\\s+")[[1]][1]
+    token <- gsub("[^A-Za-z-]", "", token)
+    if (!nzchar(token)) return(taxon)
+    token <- paste0(str_to_upper(substr(token, 1, 1)), str_to_lower(substr(token, 2, nchar(token))))
+    return(token)
+  }
+
+  taxon
+}
+
 safe_bien_call <- function(expr, timeout_sec = 120) {
   tryCatch(expr, error = function(e) {
     structure(list(error = conditionMessage(e)), class = "bien_error")
@@ -138,6 +154,8 @@ organize_columns_for_export <- function(dat) {
 
 # Query trait data by rank (species/genus/family/trait-only)
 query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120) {
+  taxon <- extract_rank_token(rank, taxon)
+
   if (rank == "species") {
     dat <- safe_bien_retry(function() {
       BIEN_trait_species(species = taxon, all.taxonomy = TRUE, 
@@ -148,6 +166,17 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
       BIEN_trait_genus(genus = taxon, all.taxonomy = TRUE, 
                       source.citation = TRUE, limit = max_records)
     }, timeout_sec = timeout_sec, attempts = 3)
+
+    # Fallback for genus inputs that include extra text/punctuation.
+    if (!inherits(dat, "bien_error") && is.data.frame(dat) && nrow(dat) == 0) {
+      genus_token <- extract_rank_token("genus", taxon)
+      if (!identical(genus_token, taxon)) {
+        dat <- safe_bien_retry(function() {
+          BIEN_trait_genus(genus = genus_token, all.taxonomy = TRUE,
+                          source.citation = TRUE, limit = max_records)
+        }, timeout_sec = timeout_sec, attempts = 2)
+      }
+    }
   } else if (rank == "family") {
     dat <- safe_bien_retry(function() {
       BIEN_trait_family(family = taxon, all.taxonomy = TRUE, 
@@ -175,8 +204,16 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
     }
   }
   
-  if (inherits(dat, "bien_error")) return(data.frame())
-  if (!is.data.frame(dat)) return(data.frame())
+  if (inherits(dat, "bien_error")) {
+    out <- data.frame()
+    attr(out, "bien_error") <- dat$error
+    return(out)
+  }
+  if (!is.data.frame(dat)) {
+    out <- data.frame()
+    attr(out, "bien_error") <- "BIEN returned an unexpected response format"
+    return(out)
+  }
 
   # BIEN can return duplicated names (for example scrubbed_genus).
   # Repair once at ingest so downstream dplyr verbs are stable.
@@ -321,11 +358,14 @@ queryServer <- function(id) {
                      value = 0.3, {
           dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
                                    max_records = 5000, timeout_sec = 120)
+          bien_err <- attr(dat, "bien_error", exact = TRUE)
           incProgress(0.7, message = "Processing results...")
           rv$query_data <- dat
           rv$diagnostics <- compute_diagnostics(dat, input$rank, taxon_clean)
-          rv$error_msg <- if (nrow(dat) == 0) {
-            "No trait records found for this query"
+          rv$error_msg <- if (is.character(bien_err) && nzchar(bien_err)) {
+            paste("BIEN query error:", bien_err)
+          } else if (nrow(dat) == 0) {
+            "No trait records found for this query. For genus/family mode, try a plain name (for example: Prunus)."
           } else {
             ""
           }

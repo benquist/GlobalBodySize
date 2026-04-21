@@ -34,3 +34,8 @@
 - Prompt summary: Add compact species-by-trait coverage matrix in Step 3 of BIEN trait gateway.
 - Requested outcomes: Display top-species trait coverage table (counts) after query to guide trait selection before download.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Fix genus query returning no data for valid genus input (example: Prunus).
+- Requested outcomes: Diagnose root cause and patch BIEN-TraitsShinyApp so genus/family queries handle formatted text robustly and report BIEN errors explicitly.
+- Completed by: GitHub Copilot

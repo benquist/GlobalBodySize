@@ -700,6 +700,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 **Fix:** Provided naming guidance for agent mentions: use exact registered agent name (case-sensitive), prefer the agent picker/autocomplete, and use @m in this workspace rather than @M.
 
+## 2026-04-20 — Genus query returned no data for Prunus
+
+**Prompt:** I just queried the genus Prunus and it did not return any data. It is a valid genus.
+
+**Fix:** Reproduced BIEN genus query behavior and patched `BIEN-TraitsShinyApp/app_gateway.R` to improve genus/family query robustness and error transparency: sanitize genus/family token input, add retry fallback for punctuated genus text, and surface BIEN query errors to the UI instead of showing a generic no-data message.
+
 ## 2026-04-21 — Agent @ mention cheat sheet
 
 **Prompt:** yes
