@@ -742,6 +742,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 **Fix:** Added exact total-count retrieval for each query using BIEN SQL count queries, then surfaced returned-vs-total and remaining-record counts in query status, Step 2 scope panel, diagnostics warnings, and query manifest exports.
 
+- Date: 2026-04-21
+- Prompt summary: Run mandatory final pre-return checks after BIEN total-record visibility feature deployment.
+- Requested outcomes: Verify prompt log, changed Rmd compile applicability, changed package build applicability, and git push sync for commit 10b439f.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 ## 2026-04-21 — Agent @ mention cheat sheet
 
 **Prompt:** yes
