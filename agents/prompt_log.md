@@ -724,6 +724,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 **Fix:** Confirmed same formatter issue path in diagnostics and validated the patched formatter with family query flow (`query_bien_traits("family", "Fabaceae")` + `compute_diagnostics`). Deployed updated app bundle so live family queries use the corrected format string.
 
+- Date: 2026-04-20
+- Prompt summary: Run mandatory final pre-return checks for this turn after deploying Fabaceae family-query formatter fix.
+- Requested outcomes: Verify prompt logged, changed Rmd compile applicability, changed package build applicability, and git push sync for commit b224349.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 ## 2026-04-21 — Agent @ mention cheat sheet
 
 **Prompt:** yes
