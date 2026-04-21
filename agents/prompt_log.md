@@ -161,6 +161,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-21
+- Prompt summary: Clean up publications page long list by removing duplicates and normalizing formatting.
+- Requested outcomes: De-duplicate repeated publication entries and normalize long-list citation formatting on the publications tab/page.
+- Files changed: enquistlab-site-migration/_includes/publications_full_from_doc.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
 - Prompt summary: Run the mandatory final pre-return gate and return strict PASS/BLOCKED with evidence for prompt log, Rmd compile trigger, package build trigger, and git push status.
 - Requested outcomes: Execute final-gate checks and report PASS/BLOCKED decision with concise evidence.
 - Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
