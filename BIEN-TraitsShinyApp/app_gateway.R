@@ -268,25 +268,11 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
                        source.citation = TRUE, limit = max_records)
     }, timeout_sec = timeout_sec, attempts = 3)
   } else {
-    # trait-only: get all traits then filter
-    trait_catalog <- safe_bien_retry(function() {
-      BIEN_trait_list()
-    }, timeout_sec = timeout_sec, attempts = 2)
-    
-    if (inherits(trait_catalog, "bien_error") || !is.data.frame(trait_catalog)) {
-      return(data.frame())
-    }
-    
-    # For trait-only, we fetch the single trait specified
-    trait_col <- first_existing_col(trait_catalog, c("trait_name", "trait", "measurementType"))
-    if (!is.null(trait_col) && taxon %in% trait_catalog[[trait_col]]) {
-      dat <- safe_bien_retry(function() {
-        BIEN_trait_trait(trait = taxon, all.taxonomy = TRUE, 
-                        source.citation = TRUE, limit = max_records)
-      }, timeout_sec = timeout_sec, attempts = 3)
-    } else {
-      dat <- data.frame()
-    }
+    # trait-only: query directly by trait name (already validated via UI dropdown)
+    dat <- safe_bien_retry(function() {
+      BIEN_trait_trait(trait = taxon, all.taxonomy = TRUE,
+                      source.citation = TRUE, limit = max_records)
+    }, timeout_sec = timeout_sec, attempts = 3)
   }
   
   if (inherits(dat, "bien_error")) {
