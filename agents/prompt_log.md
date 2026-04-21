@@ -196,3 +196,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Increase the visible size of the species lookup control without breaking the sidebar layout.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Fix BIEN-SpeciesShinyApp startup so Pinus ponderosa name displays in the species box when the app launches.
+- Requested outcomes: Populate the species lookup box with the startup species name immediately so it displays while the accepted-name list loads.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+## Date: 2026-04-21
+- Prompt summary: User asked whether enquistlab.github.io has updated and why deployment is delayed.
+- Requested outcomes: Confirm live site status and diagnose delay cause.
+- Files changed: none
+- Completed by: GitHub Copilot
