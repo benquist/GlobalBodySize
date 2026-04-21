@@ -1,3 +1,8 @@
+- Date: 2026-04-21
+- Prompt summary: Consult design-atelier for full photo-forward redesign of Enquist Lab website
+- Requested outcomes: Hero image on homepage, editorial field photos per site, Scandinavian-minimal CSS components, WordPress CDN image sourcing
+- Files changed: _sass/_lab-redesign.scss, _pages/about.md, _pages/research.md, _pages/field-sites.md
+
 2026-04-16 | User requested retry of shinyapps.io deployment after timeout. Agent performed redeploy, confirmed success, and updated provenance.
 # Prompt Log
 
