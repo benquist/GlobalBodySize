@@ -239,6 +239,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-21
+- Prompt summary: Consult design-atelier guidance and compare BIEN-SpeciesShinyApp against BIEN-TraitsShinyApp to define a minimal visual alignment plan without changing Traits.
+- Requested outcomes: Return concise implementation guidance for header/logo placement, typography, button language, tab styling, and minimal layout changes that preserve Species functionality.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
 - Prompt summary: Fix lag where switching Query Rank from Genus to Trait Only makes Taxon/Trait dropdown take multiple clicks to activate.
 - Requested outcomes: Make Trait Only transitions immediately load trait suggestions without transient taxa-state refresh.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
@@ -340,4 +346,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Download WordPress field photos locally into assets/img/field/ and switch all image references from WordPress CDN to local paths.
 - Requested outcomes: All field-site images served from local assets/img/field/ instead of WordPress CDN; committed and pushed to EnquistLab/enquistlab.github.io main (commit e70070e).
 - Files changed: enquistlab-site-migration/assets/img/field/ (new images); enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/_pages/research.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Website updates: publications tab blocked by Google Doc auth; about page hero moved to top and address moved to bottom; new home landing page at / and about moved to /about/; team page enriched with field photos; resources and navigation updated; run the standard always-agent final gate.
+- Requested outcomes: Append this prompt to agents/prompt_log.md, confirm git push for the workspace and site repos, and return PASS or FAIL for final-gate checks.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
