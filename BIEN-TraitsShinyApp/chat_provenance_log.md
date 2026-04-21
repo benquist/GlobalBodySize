@@ -89,3 +89,8 @@
 - Prompt summary: Fix lag when toggling Query Rank from Genus to Trait Only where Taxon/Trait dropdown needs multiple clicks to activate.
 - Requested outcomes: Force trait suggestion mode before suggestion loading so Trait Only avoids intermediate taxa refresh and becomes responsive immediately.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Simplify the Step 7 download checklist to one acknowledgement checkbox with a longer caveat and explicit emphasis on citing original data sources; fix persistent lag in Genus→Trait Only dropdown activation.
+- Requested outcomes: Replace six separate checkboxes with one acknowledgement gate while retaining all caveats in expanded text and source-citation emphasis, and make Trait Only autocomplete activate immediately after rank toggles.
+- Completed by: GitHub Copilot

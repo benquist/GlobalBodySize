@@ -551,6 +551,29 @@ queryServer <- function(id) {
       if (!is.null(input$rank) && identical(input$rank, "trait-only") && !identical(input$suggest_mode, "traits")) {
         updateRadioButtons(session, "suggest_mode", selected = "traits")
       }
+
+      if (!is.null(input$rank) && identical(input$rank, "trait-only")) {
+        key <- "traits::traits"
+        choices <- rv$suggestion_cache[[key]]
+        if (is.null(choices)) {
+          choices <- load_trait_suggestions()
+          rv$suggestion_cache[[key]] <- choices
+        }
+
+        updateSelectizeInput(
+          session,
+          "taxon",
+          choices = choices,
+          selected = "",
+          server = FALSE,
+          options = list(
+            create = FALSE,
+            maxOptions = 2000,
+            openOnFocus = TRUE,
+            placeholder = "Type to find BIEN trait names (accepted list)."
+          )
+        )
+      }
     }, ignoreInit = TRUE)
 
     observeEvent(list(input$suggest_mode, input$rank), {
@@ -590,10 +613,11 @@ queryServer <- function(id) {
         "taxon",
         choices = choices,
         selected = selected,
-        server = TRUE,
+        server = !identical(mode, "traits"),
         options = list(
           create = FALSE,
           maxOptions = 2000,
+          openOnFocus = TRUE,
           placeholder = placeholder
         )
       )
@@ -1050,7 +1074,7 @@ downloadGateUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-success",
-    div(class = "panel-heading", h3("Step 7: Pre-Download Checklist")),
+    div(class = "panel-heading", h3("Step 7: Data Use Acknowledgement")),
     div(class = "panel-body",
       uiOutput(ns("checklist_display"))
     )
@@ -1327,15 +1351,6 @@ downloadGateServer <- function(id, query_result) {
   moduleServer(id, function(input, output, session) {
     ns <- NS(id)
     
-    checklist_items <- c(
-      "I understand availability (records in database) ≠ abundance (prevalence in nature)",
-      "I have reviewed the taxonomic reconciliation for my queries",
-      "I acknowledge this data represents biased sampling across studies",
-      "I understand trait measurement methods vary across sources",
-      "I have checked for missing data and small sample sizes",
-      "I will cite this data with the provided provenance manifest"
-    )
-    
     output$checklist_display <- renderUI({
       req(query_result())
       
@@ -1350,25 +1365,35 @@ downloadGateServer <- function(id, query_result) {
       }
       
       tagList(
+        div(class = "alert alert-info", strong(download_mode)),
         div(
-          class = "alert alert-info",
-          strong(download_mode)
-        ),
-        div(class = "alert alert-danger",
-          span(class = "glyphicon glyphicon-exclamation-sign"),
-          strong(" Important:"), p("Before downloading, confirm you understand the following:")
-        ),
-        div(
-          lapply(seq_along(checklist_items), function(i) {
-            div(class = "checkbox",
-              tags$label(
-                checkboxInput(ns(paste0("check_", i)), NULL, value = FALSE),
-                checklist_items[[i]]
-              )
+          class = "alert alert-warning",
+          style = "border-left: 5px solid #d9534f; background: #fff8f8;",
+          tags$h4(
+            style = "margin-top: 0; color: #a94442;",
+            tags$span(class = "glyphicon glyphicon-exclamation-sign"), " Data Use Acknowledgement"
+          ),
+          tags$p("By downloading, you confirm that you understand and accept all of the following:"),
+          tags$ul(
+            style = "margin-bottom: 8px;",
+            tags$li("Availability (records in database) ≠ abundance (prevalence in nature)."),
+            tags$li("You have reviewed taxonomic reconciliation results for your query and confirmed they are appropriate for your use case."),
+            tags$li("These data represent biased sampling across studies, regions, and taxa; BIEN coverage is uneven."),
+            tags$li("Trait measurement methods, instruments, and protocols vary across sources and may reduce direct comparability."),
+            tags$li("You have checked for missing data and small sample sizes before interpretation."),
+            tags$li(
+              tags$strong("You will cite the original data sources"),
+              " using the provenance manifest provided in Step 6."
             )
-          })
+          ),
+          div(class = "checkbox", style = "margin-top: 10px; font-weight: 600;",
+            tags$label(
+              checkboxInput(ns("acknowledged"), NULL, value = FALSE),
+              "I have read and accept the above conditions."
+            )
+          )
         ),
-        div(style = "margin-top: 20px;",
+        div(style = "margin-top: 12px;",
           downloadButton(ns("download_data"), "Download Data as CSV", 
                         class = "btn btn-success btn-lg bien-download-btn")
         )
@@ -1381,12 +1406,9 @@ downloadGateServer <- function(id, query_result) {
       },
       content = function(file) {
         req(query_result())
-        all_checked <- all(vapply(seq_along(checklist_items), function(i) {
-          isTRUE(input[[paste0("check_", i)]])
-        }, logical(1)))
-        
-        if (!all_checked) {
-          stop("Please check all checklist items before downloading.")
+
+        if (!isTRUE(input$acknowledged)) {
+          stop("Please check the acknowledgement box before downloading.")
         }
 
         # Final safety filter so download always matches the Step 3 selection.
@@ -1412,9 +1434,7 @@ downloadGateServer <- function(id, query_result) {
     
     reactive({
       list(
-        can_download = all(vapply(seq_along(checklist_items), 
-                                 function(i) isTRUE(input[[paste0("check_", i)]]), 
-                                 logical(1)))
+        can_download = isTRUE(input$acknowledged)
       )
     })
   })

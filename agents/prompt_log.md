@@ -226,3 +226,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Make Trait Only transitions immediately load trait suggestions without transient taxa-state refresh.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Simplify Step 7 download gating to one acknowledgement checkbox with a stronger caveat emphasizing citation of original sources; also re-fix lingering Genus→Trait Only dropdown lag.
+- Requested outcomes: Replace multi-checkbox checklist with one explicit acknowledgement, preserve key caveats in longer text, highlight citing original data sources via provenance manifest, and harden Trait Only suggestion activation responsiveness.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
