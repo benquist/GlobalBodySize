@@ -298,3 +298,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Implement reduced-clutter IA, cleaner homepage layout, and push redesign live to EnquistLab/enquistlab.github.io.
 - Files changed: enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/research.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/people.md; enquistlab-site-migration/_pages/join.md; enquistlab-site-migration/_pages/contact.md; enquistlab-site-migration/_pages/news.md; enquistlab-site-migration/_pages/blog.md; enquistlab-site-migration/_pages/cv.md; enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/_pages/collaborators.md; enquistlab-site-migration/_pages/teaching.md; enquistlab-site-migration/_pages/press-media.md; enquistlab-site-migration/_config.yml; enquistlab-site-migration/assets/css/main.scss; enquistlab-site-migration/_sass/_lab-redesign.scss
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Re-run mandatory final pre-return checks for the same task now that the final-gate prompt has been appended to agents/prompt_log.md.
+- Requested outcomes: Return strict PASS/BLOCKED with evidence for prompt log, change-gated Rmd/package checks, and git push status.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot

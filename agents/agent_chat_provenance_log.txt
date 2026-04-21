@@ -288,6 +288,51 @@ Action taken:
 - Logged the prompt and appended this provenance entry for agent-folder traceability.
 Outcome: Pinus ponderosa now displays in the species box on app startup.
 
+[12] Date: 2026-04-21
+Source: active chat request
+Request summary: Clarify species-autofill source and fix missing `Sciadodendron` suggestion when typing `Sciadoden`.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Confirmed autocomplete source query uses BIEN taxonomy accepted species names (`bien_taxonomy.scrubbed_species_binomial` where status is Accepted).
+- Removed the hard SQL `LIMIT 75000` that alphabetically truncated accepted names and could hide later-letter taxa.
+- Redeployed BIEN-SpeciesShinyApp and verified live URL availability.
+- Logged prompt and appended this provenance entry for agent-folder traceability.
+Outcome: Species autocomplete now pulls the full accepted BIEN species list, restoring suggestions for later-alphabet names such as Sciadodendron.
+
+[13] Date: 2026-04-21
+Source: active chat request
+Request summary: Add a popup warning when a name is found in BIEN taxonomy but no mappable occurrence points are available under current filters.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added taxonomy-presence cache and lookup helper in the Species app server.
+- Added query-time warning popup shown when mappable points are zero, BIEN connection is healthy, and taxonomy confirms the submitted species name.
+- Deployed updated BIEN-SpeciesShinyApp to shinyapps.io.
+- Logged prompt and appended this provenance entry for agent-folder traceability.
+Outcome: Users now receive an explicit popup explaining that the name exists in BIEN taxonomy but active filters yield no mappable occurrence points.
+
+[13] Date: 2026-04-21
+Source: active chat request
+Request summary: Upgrade BIEN-SpeciesShinyApp Query/random/help controls to stronger button styling like BIEN-TraitsShinyApp, and move random species below the species box.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Reworked sidebar layout so random species button sits directly under the species input.
+- Added raised gradient button classes (`bien-query-btn`, `bien-random-btn`, `bien-help-btn`) and shared interaction styling for stronger click affordance.
+- Redeployed BIEN-SpeciesShinyApp and verified app availability.
+- Logged prompt and appended this provenance entry for agent-folder traceability.
+Outcome: Species app controls now use more tactile, traits-style buttons and random species appears below the species name field.
+
 13) Session: 909eaa62-e66c-41fa-b625-9632505b8769 | Created: 2026-03-28 16:11:53 -0700
 Prompt: Now create an 'always agent' that always runs. It is called always. It always checks that prompts have been recoreded in teh propt file. That RMD
 
@@ -700,3 +745,17 @@ Action taken:
 - Appended the exact prompt to agents/prompt_log.md for final-gate traceability.
 - Appended this provenance record because an agents-folder file was updated during this turn.
 Outcome: Agent-folder provenance remains append-only and current.
+
+[22] Date: 2026-04-21
+Source: active chat request
+Request summary: Create a new design specialist agent with art and architecture background, UX flair, Scandinavian minimal taste, and practical coding/workflow/build understanding.
+Files affected:
+- agents/design-atelier.agent.md
+- .github/agents/design-atelier.agent.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+- chat_provenance_log.md
+Action taken:
+- Created a new user-invocable `design-atelier` agent in both agent registries with clear trigger keywords and implementation-oriented design workflow guidance.
+- Logged prompt and provenance updates required by workspace policy.
+Outcome: New design-focused agent is now available with consistent policy-compliant traceability.
