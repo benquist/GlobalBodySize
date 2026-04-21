@@ -353,3 +353,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Append this prompt to agents/prompt_log.md, confirm git push for the workspace and site repos, and return PASS or FAIL for final-gate checks.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Standardize BIEN-SpeciesShinyApp tab, header, logo placement, buttons, and overall visual design to match BIEN-TraitsShinyApp, with the BIEN logo always first on the left and design-atelier consultation.
+- Requested outcomes: Update only BIEN-SpeciesShinyApp as needed so its header, typography, button language, tab styling, and color palette align closely with BIEN-TraitsShinyApp without changing BIEN-TraitsShinyApp behavior.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
