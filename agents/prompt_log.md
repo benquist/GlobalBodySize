@@ -13,6 +13,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-21
+- Prompt summary: Go through my https://brianjenquist.wordpress.com/brian-j-enquist/ website and populate the new website
+- Requested outcomes: Populate the new GitHub academic site with migrated content from the WordPress website.
+- Files changed: ~/GitHub/enquistlab-academic-site/_config.yml; ~/GitHub/enquistlab-academic-site/_pages/about.md; ~/GitHub/enquistlab-academic-site/_pages/research.md; ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/teaching.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/_pages/join.md; ~/GitHub/enquistlab-academic-site/_pages/software.md; ~/GitHub/enquistlab-academic-site/_pages/publications.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
 - Prompt summary: Go through the WordPress site and populate the new GitHub academic website with legacy content.
 - Requested outcomes: Migrate core profile, research, people, teaching, field-site, join, software/data, and publications content into the new al-folio site and preserve blog continuity.
 - Files changed: ~/GitHub/enquistlab-academic-site/_config.yml; ~/GitHub/enquistlab-academic-site/_pages/about.md; ~/GitHub/enquistlab-academic-site/_pages/research.md; ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/teaching.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/_pages/join.md; ~/GitHub/enquistlab-academic-site/_pages/software.md; ~/GitHub/enquistlab-academic-site/_pages/publications.md; agents/prompt_log.md
