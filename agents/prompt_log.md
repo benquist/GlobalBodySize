@@ -208,3 +208,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Confirm live site status and diagnose delay cause.
 - Files changed: none
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Clarify BIEN source used for species-name autocomplete and fix missing match for Sciadodendron when typing Sciadoden.
+- Requested outcomes: Explain autocomplete source and ensure accepted BIEN names are not truncated by alphabetic limit.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+## Date: 2026-04-21
+- Prompt summary: User asked me to change GitHub Pages settings to publish enquistlab.github.io from gh-pages.
+- Requested outcomes: Set Pages source branch/path and verify build status.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
