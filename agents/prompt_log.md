@@ -377,3 +377,19 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Update only BIEN-SpeciesShinyApp as needed so its header, typography, button language, tab styling, and color palette align closely with BIEN-TraitsShinyApp without changing BIEN-TraitsShinyApp behavior.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- 2026-04-21: Publications page update: remove "Selected and Indexed Publications"; keep search over a single complete publication list; make each publication title a hyperlink using URL, DOI fallback, and scholar-search fallback.
+
+- Date: 2026-04-21
+- Prompt summary: User could not see full publication list. Restore publications page to show full Google-Doc-derived include and add a search input that filters the complete list by year and entries.
+- Requested outcomes: Restore publications page to include the full Google-Doc-derived publication list and add a search input that filters complete entries by year and text.
+- Files changed: enquistlab-site-migration/_pages/publications.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+---
+
+- Date: 2026-04-21
+- Prompt summary: User asked why the live publications page still shows "Selected and Indexed Publications" and requested search against the complete publication list.
+- Requested outcomes: Verify current deployment status and confirm that the section was removed in source and replaced with complete-list search behavior.
+- Files changed: none (diagnostic-only turn)
+- Completed by: GitHub Copilot
