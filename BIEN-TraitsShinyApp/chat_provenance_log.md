@@ -39,3 +39,13 @@
 - Prompt summary: Fix genus query returning no data for valid genus input (example: Prunus).
 - Requested outcomes: Diagnose root cause and patch BIEN-TraitsShinyApp so genus/family queries handle formatted text robustly and report BIEN errors explicitly.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Fix runtime status error for Prunus genus query (`invalid format '%d'` for numeric object).
+- Requested outcomes: Patch formatter bug and validate genus query path renders without error.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-20
+- Prompt summary: Fix runtime status error for Fabaceae family query (`invalid format '%d'` for numeric object).
+- Requested outcomes: Ensure family query diagnostics no longer trigger format errors and deploy corrected app build.
+- Completed by: GitHub Copilot

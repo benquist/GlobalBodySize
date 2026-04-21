@@ -273,7 +273,7 @@ compute_diagnostics <- function(dat, query_rank, query_taxon) {
   if (n_plot_traits > 0) {
     pct_plot <- round(100 * n_plot_traits / nrow(dat), 1)
     warnings <- c(warnings, sprintf(
-      "Plot-based traits detected (%d%% of records). For full plot metadata (name, sampling protocol, dataset, project details), click the 'url_source' or 'source_citation' links in the download.", 
+      "Plot-based traits detected (%.1f%% of records). For full plot metadata (name, sampling protocol, dataset, project details), click the 'url_source' or 'source_citation' links in the download.", 
       pct_plot
     ))
   }

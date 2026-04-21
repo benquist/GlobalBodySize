@@ -706,6 +706,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 **Fix:** Reproduced BIEN genus query behavior and patched `BIEN-TraitsShinyApp/app_gateway.R` to improve genus/family query robustness and error transparency: sanitize genus/family token input, add retry fallback for punctuated genus text, and surface BIEN query errors to the UI instead of showing a generic no-data message.
 
+## 2026-04-20 — Prunus genus query throws invalid format error
+
+**Prompt:** For a genus search on Prunus I get 'Status: Error: invalid format '%d'; use format %f, %e, %g or %a for numeric objects'
+
+**Fix:** Patched diagnostics warning formatter in `BIEN-TraitsShinyApp/app_gateway.R` from `%d%%` to `%.1f%%` for `pct_plot`, which is numeric. Validated with a live Prunus genus helper query and diagnostics render path.
+
+## 2026-04-20 — Fabaceae family query throws invalid format error
+
+**Prompt:** For a Family search on Fabaceae I get Status: Error: invalid format '%d'; use format %f, %e, %g or %a for numeric objects.
+
+**Fix:** Confirmed same formatter issue path in diagnostics and validated the patched formatter with family query flow (`query_bien_traits("family", "Fabaceae")` + `compute_diagnostics`). Deployed updated app bundle so live family queries use the corrected format string.
+
 ## 2026-04-21 — Agent @ mention cheat sheet
 
 **Prompt:** yes
