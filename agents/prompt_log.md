@@ -13,6 +13,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-20
+- Prompt summary: Final content QA pass page-by-page
+- Requested outcomes: Run a final page-by-page content QA and fix remaining copy, formatting, and link-quality issues.
+- Files changed: ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/teaching.md; ~/GitHub/enquistlab-academic-site/_pages/software.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-20
 - Prompt summary: yes implement these
 - Requested outcomes: Implement the five recommended website fixes for navigation cleanup, missing pages, people/copy polish, and media accessibility/performance.
 - Files changed: ~/GitHub/enquistlab-academic-site/_pages/projects.md; ~/GitHub/enquistlab-academic-site/_pages/repositories.md; ~/GitHub/enquistlab-academic-site/_pages/dropdown.md; ~/GitHub/enquistlab-academic-site/_pages/teaching.md; ~/GitHub/enquistlab-academic-site/_pages/software.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/_pages/join.md; ~/GitHub/enquistlab-academic-site/_pages/collaborators.md; ~/GitHub/enquistlab-academic-site/_pages/blog.md; ~/GitHub/enquistlab-academic-site/_pages/publications.md; ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/contact.md; ~/GitHub/enquistlab-academic-site/_pages/press-media.md; ~/GitHub/enquistlab-academic-site/chat_provenance_log.md; ~/GitHub/enquistlab-academic-site/assets/img/wordpress/avery-ridge.jpg; ~/GitHub/enquistlab-academic-site/assets/img/wordpress/dsc_2963.jpg; agents/prompt_log.md
