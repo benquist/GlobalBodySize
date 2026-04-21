@@ -316,3 +316,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Diagnose startup crash from server logs, patch app startup failure, redeploy, and confirm app starts cleanly.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Update lab website pages (about, field-sites, software, teaching, contact) with real content from WordPress source. Then consult design-atelier for photo-forward website redesign using field photos from WordPress.
+- Requested outcomes: Replace placeholder page content with real WordPress-sourced text; conduct design-atelier consultation for a photo-forward redesign plan leveraging field photography.
+- Files changed: enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/teaching.md; enquistlab-site-migration/_pages/contact.md
+- Completed by: GitHub Copilot
