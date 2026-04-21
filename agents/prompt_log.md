@@ -160,3 +160,21 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Fix the trait-only query path in BIEN-TraitsShinyApp so BIEN_trait_trait() is called directly without the redundant BIEN_trait_list() catalog validation that was blocking results.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Fix BIEN-SpeciesShinyApp species autocomplete input because typed text disappears and the dropdown arrow is not behaving normally.
+- Requested outcomes: Stop the species lookup control from resetting while typing and restore normal selectize dropdown behavior.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Run the mandatory final pre-return gate for the BIEN-SpeciesShinyApp autocomplete typing fix and deployment verification.
+- Requested outcomes: Verify prompt logging, change-gated Rmd/package checks, and git push status; return strict PASS/BLOCKED.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Update the live BIEN Traits shinyapps.io app so the trait-only query fix is deployed publicly.
+- Requested outcomes: Deploy BIEN-TraitsShinyApp to shinyapps.io and verify the public app URL is reachable with the latest code.
+- Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot

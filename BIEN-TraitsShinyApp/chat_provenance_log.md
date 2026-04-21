@@ -74,3 +74,8 @@
 - Prompt summary: Correct Step 1 autocomplete to suggest accepted BIEN names and handle typo/prefix behavior.
 - Requested outcomes: Ensure accepted-name-only suggestions from BIEN, disallow free-created invalid suggestions, and verify `Pinus pond` suggests `Pinus ponderosa` while typo `Pinus ponderose` is absent.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Update the live BIEN Traits shinyapps.io app with the latest trait-only query fix.
+- Requested outcomes: Deploy BIEN-TraitsShinyApp to shinyapps.io and verify the public app URL is reachable.
+- Completed by: GitHub Copilot
