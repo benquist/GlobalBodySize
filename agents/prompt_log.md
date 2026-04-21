@@ -748,6 +748,24 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+## 2026-04-21 — Match download button style to query button
+
+**Prompt:** Make the Download Data button use a similar button style to Query BIEN.
+
+**Fix:** Updated Step 7 download button to a 3D BIEN-styled button class with matching affordance (depth, hover, press states) while keeping the existing workflow and checklist behavior.
+
+## 2026-04-21 — Fix accepted-name autocomplete behavior
+
+**Prompt:** Autocomplete should only suggest accepted BIEN names. Typing `Pinus ponderose` should not produce an accepted match; typing `Pinus pond` should suggest `Pinus ponderosa`.
+
+**Fix:** Completed server-side autocomplete wiring with BIEN-backed catalogs and accepted-name filtering, disabled free creation in selectize, and switched species suggestions to accepted BIEN names ranked by trait-record frequency so valid common names like `Pinus ponderosa` appear while typos do not.
+
+## 2026-04-21 — Traits app visual alignment to Species app
+
+**Prompt:** Include BIEN logo like the Species app, make Query BIEN button look more 3D/clickable and less long, and keep a similar color scheme while preserving app organization.
+
+**Fix:** Added BIEN logo asset and branded header, restyled query button with 3D affordance and compact width, and updated app CSS to a BIEN blue/green palette aligned with Species app visual language.
+
 ## 2026-04-21 — Agent @ mention cheat sheet
 
 **Prompt:** yes

@@ -59,3 +59,18 @@
 - Prompt summary: Show total BIEN trait matches and remaining records beyond app limit for each taxa/trait query.
 - Requested outcomes: Compute and display exact BIEN total records, returned records, and not-yet-returned records due to active limit.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Align BIEN-TraitsShinyApp visual branding and controls with BIEN-SpeciesShinyApp.
+- Requested outcomes: Add BIEN logo, improve query button click affordance and width, and apply Species-like blue/green color scheme without changing workflow organization.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Make Step 7 Download Data button match Query BIEN button affordance.
+- Requested outcomes: Apply similar 3D clickable button styling to download control while preserving existing download logic.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Correct Step 1 autocomplete to suggest accepted BIEN names and handle typo/prefix behavior.
+- Requested outcomes: Ensure accepted-name-only suggestions from BIEN, disallow free-created invalid suggestions, and verify `Pinus pond` suggests `Pinus ponderosa` while typo `Pinus ponderose` is absent.
+- Completed by: GitHub Copilot

@@ -91,6 +91,91 @@ ensure_unique_names <- function(df) {
   df
 }
 
+load_trait_suggestions <- function(timeout_sec = 120) {
+  trait_catalog <- safe_bien_retry(function() {
+    BIEN_trait_list()
+  }, timeout_sec = timeout_sec, attempts = 2)
+
+  if (inherits(trait_catalog, "bien_error") || !is.data.frame(trait_catalog) || nrow(trait_catalog) == 0) {
+    return(character(0))
+  }
+
+  trait_col <- first_existing_col(trait_catalog, c("trait_name", "trait", "measurementType"))
+  if (is.null(trait_col)) return(character(0))
+
+  vals <- unique(as.character(trait_catalog[[trait_col]]))
+  vals <- vals[!is.na(vals) & nzchar(vals)]
+  sort(vals)
+}
+
+load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120) {
+  sql <- switch(rank,
+    species = sprintf(
+      paste0(
+        "SELECT a.scrubbed_species_binomial AS taxon, COUNT(*) AS n_rec ",
+        "FROM agg_traits a ",
+        "WHERE a.scrubbed_species_binomial IS NOT NULL AND a.scrubbed_species_binomial <> '' ",
+        "AND EXISTS (",
+        "  SELECT 1 FROM bien_taxonomy b ",
+        "  WHERE b.scrubbed_species_binomial = a.scrubbed_species_binomial ",
+        "  AND b.scrubbed_taxonomic_status = 'Accepted'",
+        ") ",
+        "GROUP BY a.scrubbed_species_binomial ",
+        "ORDER BY n_rec DESC, a.scrubbed_species_binomial ",
+        "LIMIT %d;"
+      ),
+      as.integer(max_choices)
+    ),
+    genus = sprintf(
+      paste0(
+        "SELECT a.scrubbed_genus AS taxon, COUNT(*) AS n_rec ",
+        "FROM agg_traits a ",
+        "WHERE a.scrubbed_genus IS NOT NULL AND a.scrubbed_genus <> '' ",
+        "AND EXISTS (",
+        "  SELECT 1 FROM bien_taxonomy b ",
+        "  WHERE b.scrubbed_genus = a.scrubbed_genus ",
+        "  AND b.scrubbed_taxonomic_status = 'Accepted'",
+        ") ",
+        "GROUP BY a.scrubbed_genus ",
+        "ORDER BY n_rec DESC, a.scrubbed_genus ",
+        "LIMIT %d;"
+      ),
+      as.integer(max_choices)
+    ),
+    family = sprintf(
+      paste0(
+        "SELECT a.scrubbed_family AS taxon, COUNT(*) AS n_rec ",
+        "FROM agg_traits a ",
+        "WHERE a.scrubbed_family IS NOT NULL AND a.scrubbed_family <> '' ",
+        "AND EXISTS (",
+        "  SELECT 1 FROM bien_taxonomy b ",
+        "  WHERE b.scrubbed_family = a.scrubbed_family ",
+        "  AND b.scrubbed_taxonomic_status = 'Accepted'",
+        ") ",
+        "GROUP BY a.scrubbed_family ",
+        "ORDER BY n_rec DESC, a.scrubbed_family ",
+        "LIMIT %d;"
+      ),
+      as.integer(max_choices)
+    ),
+    NULL
+  )
+  if (is.null(sql)) return(character(0))
+
+  bien_sql <- get(".BIEN_sql", envir = asNamespace("BIEN"))
+  out <- safe_bien_retry(function() {
+    bien_sql(query = sql, fetch.query = FALSE)
+  }, timeout_sec = timeout_sec, attempts = 2)
+
+  if (inherits(out, "bien_error") || !is.data.frame(out) || nrow(out) == 0 || !"taxon" %in% names(out)) {
+    return(character(0))
+  }
+
+  vals <- unique(as.character(out$taxon))
+  vals <- vals[!is.na(vals) & nzchar(vals)]
+  vals
+}
+
 # Identify plot-based traits and enrich with available source metadata
 # Plot traits: stem diameter, height, basal area, crown metrics, wood density from plots
 # NOTE: BIEN trait API returns observations but not plot-level metadata directly.
@@ -367,8 +452,28 @@ queryUI <- function(id) {
         div(class = "col-sm-6",
           div(class = "form-group",
             tags$label("Taxon / Trait Name:", `for` = ns("taxon")),
-            textInput(ns("taxon"), NULL, placeholder = "e.g., Pinus ponderosa, Pinaceae, leaf area",
-                     width = "100%")
+            radioButtons(
+              ns("suggest_mode"), NULL,
+              choices = c("Suggest taxa" = "taxa", "Suggest traits" = "traits"),
+              selected = "taxa",
+              inline = TRUE
+            ),
+            selectizeInput(
+              ns("taxon"), NULL,
+              choices = NULL,
+              selected = "",
+              options = list(
+                placeholder = "Start typing to search BIEN suggestions...",
+                create = FALSE,
+                maxOptions = 2000
+              ),
+              width = "100%"
+            ),
+            p(
+              class = "text-muted",
+              style = "margin-top: 6px;",
+              "Autocomplete uses BIEN-backed suggestions. You can still type custom values."
+            )
           )
         )
       ),
@@ -389,8 +494,8 @@ queryUI <- function(id) {
       div(
         actionButton(ns("query_btn"), 
                     label = tagList(span(id = ns("query_btn_spinner"), class = "fa fa-spinner fa-spin", style = "display:none; margin-right:6px;"), "Query BIEN"),
-                    class = "btn btn-primary btn-lg", 
-                    style = "width: 100%; margin-top: 10px;"),
+                    class = "btn btn-primary btn-lg bien-query-btn", 
+                    style = "margin-top: 10px;"),
         textOutput(ns("query_status"))
       )
     )
@@ -403,8 +508,53 @@ queryServer <- function(id) {
       query_data = data.frame(),
       diagnostics = NULL,
       is_querying = FALSE,
-      error_msg = ""
+      error_msg = "",
+      suggestion_cache = list()
     ) -> rv
+
+    observeEvent(input$rank, {
+      if (!is.null(input$rank) && identical(input$rank, "trait-only") && !identical(input$suggest_mode, "traits")) {
+        updateRadioButtons(session, "suggest_mode", selected = "traits")
+      }
+    }, ignoreInit = TRUE)
+
+    observeEvent(list(input$suggest_mode, input$rank), {
+      mode <- if (is.null(input$suggest_mode) || !nzchar(input$suggest_mode)) "taxa" else input$suggest_mode
+      rank <- if (is.null(input$rank) || !nzchar(input$rank)) "species" else input$rank
+      key <- paste(mode, if (identical(mode, "taxa")) rank else "traits", sep = "::")
+
+      choices <- rv$suggestion_cache[[key]]
+      if (is.null(choices)) {
+        choices <- if (identical(mode, "traits")) {
+          load_trait_suggestions()
+        } else {
+          cap <- if (identical(rank, "species")) 75000 else if (identical(rank, "genus")) 25000 else 5000
+          load_taxon_suggestions(rank = rank, max_choices = cap)
+        }
+        rv$suggestion_cache[[key]] <- choices
+      }
+
+      current <- input$taxon
+      selected <- if (!is.null(current) && nzchar(current) && current %in% choices) current else ""
+      placeholder <- if (identical(mode, "traits")) {
+        "Type to find BIEN trait names (accepted list)."
+      } else {
+        sprintf("Type to find accepted BIEN %s names.", rank)
+      }
+
+      updateSelectizeInput(
+        session,
+        "taxon",
+        choices = choices,
+        selected = selected,
+        server = TRUE,
+        options = list(
+          create = FALSE,
+          maxOptions = 2000,
+          placeholder = placeholder
+        )
+      )
+    }, ignoreInit = FALSE)
     
     observeEvent(input$query_btn, {
       req(input$taxon, nzchar(str_trim(input$taxon)))
@@ -1158,8 +1308,7 @@ downloadGateServer <- function(id, query_result) {
         ),
         div(style = "margin-top: 20px;",
           downloadButton(ns("download_data"), "Download Data as CSV", 
-                        class = "btn btn-success btn-lg",
-                        style = "width: 100%;")
+                        class = "btn btn-success btn-lg bien-download-btn")
         )
       )
     })
@@ -1235,8 +1384,13 @@ ui <- fluidPage(
   ),
   div(class = "container-fluid",
     div(class = "page-header",
-      h1("BIEN Trait Data Gateway", tags$small("Availability-First Access to Trait Observations")),
-      p("Query traits by species, genus, family, or trait type with full provenance tracking")
+      div(class = "bien-header-brand",
+        tags$img(src = "bien.png", alt = "BIEN logo", class = "bien-logo"),
+        div(
+          h1("BIEN Trait Data Gateway", tags$small("Availability-First Access to Trait Observations")),
+          p("Query traits by species, genus, family, or trait type with full provenance tracking")
+        )
+      )
     ),
 
     tabsetPanel(
@@ -1257,12 +1411,136 @@ ui <- fluidPage(
       " | Query timestamp: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"))
   ),
   tags$head(tags$style(HTML("
-    body { padding: 20px 0; background: #f8f8f8; }
-    .page-header { padding: 20px; background: white; border-bottom: 1px solid #ddd; margin: -20px 0 20px 0; }
-    .panel { margin-bottom: 20px; }
-    .nav-tabs { margin-bottom: 15px; }
-    .nav-tabs > li > a { font-weight: 600; }
-    .tab-content { background: white; border: 1px solid #ddd; border-top: 0; padding: 15px; }
+    :root {
+      --bien-blue: #2f79b7;
+      --bien-blue-deep: #1f5b8f;
+      --bien-green: #74b64a;
+      --bien-green-deep: #4e8c2c;
+      --panel-border: #cfe2f3;
+    }
+    body {
+      padding: 20px 0;
+      background: linear-gradient(180deg, #f7fbff 0%, #fbfef9 100%);
+      color: #24445f;
+    }
+    .page-header {
+      padding: 20px;
+      background: linear-gradient(180deg, #ffffff 0%, #f2f9ff 100%);
+      border-bottom: 1px solid var(--panel-border);
+      margin: -20px 0 20px 0;
+      box-shadow: 0 3px 12px rgba(31, 91, 143, 0.08);
+    }
+    .bien-header-brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .bien-logo {
+      height: 62px;
+      width: auto;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+    }
+    .page-header h1 {
+      color: var(--bien-blue-deep);
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+    .page-header p {
+      color: #426988;
+      margin-bottom: 0;
+      max-width: 920px;
+    }
+    .panel {
+      margin-bottom: 20px;
+      border-color: var(--panel-border);
+      box-shadow: 0 2px 8px rgba(47, 121, 183, 0.08);
+    }
+    .panel-primary > .panel-heading {
+      background: linear-gradient(90deg, var(--bien-blue), var(--bien-green));
+      border-color: var(--bien-blue-deep);
+      color: #fff;
+    }
+    .panel-info > .panel-heading,
+    .panel-warning > .panel-heading,
+    .panel-success > .panel-heading,
+    .panel-default > .panel-heading {
+      background: linear-gradient(180deg, #ecf6ff 0%, #f4fbef 100%);
+      color: var(--bien-blue-deep);
+      border-color: var(--panel-border);
+    }
+    .nav-tabs {
+      margin-bottom: 15px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+    .nav-tabs > li > a {
+      font-weight: 600;
+      color: #2f5f86;
+      border-radius: 8px 8px 0 0;
+    }
+    .nav-tabs > li.active > a,
+    .nav-tabs > li.active > a:focus,
+    .nav-tabs > li.active > a:hover {
+      color: var(--bien-blue-deep);
+      background: linear-gradient(180deg, #ecf6ff 0%, #f4fbef 100%);
+      border: 1px solid var(--panel-border);
+      border-bottom-color: #fff;
+    }
+    .tab-content {
+      background: #fff;
+      border: 1px solid var(--panel-border);
+      border-top: 0;
+      padding: 15px;
+    }
+    .bien-query-btn {
+      min-width: 180px;
+      width: auto;
+      border-radius: 10px;
+      padding: 11px 18px;
+      border: 1px solid var(--bien-blue-deep);
+      background: linear-gradient(180deg, #4f98d8 0%, var(--bien-blue) 55%, var(--bien-blue-deep) 100%);
+      box-shadow: 0 4px 0 #18456f, 0 8px 16px rgba(31, 91, 143, 0.25);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.2s ease;
+    }
+    .bien-query-btn:hover,
+    .bien-query-btn:focus {
+      filter: brightness(1.04);
+      transform: translateY(-1px);
+      box-shadow: 0 5px 0 #18456f, 0 10px 16px rgba(31, 91, 143, 0.24);
+    }
+    .bien-query-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #18456f, 0 4px 8px rgba(31, 91, 143, 0.2);
+    }
+    .btn-warning.bien-query-btn {
+      border-color: #a97816;
+      background: linear-gradient(180deg, #ffdd8f 0%, #f1b84f 55%, #bf7f12 100%);
+      box-shadow: 0 4px 0 #85580d, 0 8px 14px rgba(145, 103, 28, 0.22);
+      color: #3f2a00;
+      text-shadow: none;
+    }
+    .bien-download-btn {
+      min-width: 220px;
+      width: auto;
+      border-radius: 10px;
+      padding: 11px 18px;
+      border: 1px solid var(--bien-green-deep);
+      background: linear-gradient(180deg, #9acf6d 0%, var(--bien-green) 55%, var(--bien-green-deep) 100%);
+      box-shadow: 0 4px 0 #386620, 0 8px 16px rgba(62, 112, 36, 0.24);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.2s ease;
+    }
+    .bien-download-btn:hover,
+    .bien-download-btn:focus {
+      filter: brightness(1.04);
+      transform: translateY(-1px);
+      box-shadow: 0 5px 0 #386620, 0 10px 16px rgba(62, 112, 36, 0.24);
+    }
+    .bien-download-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #386620, 0 4px 8px rgba(62, 112, 36, 0.2);
+    }
   ")))
 )
 
