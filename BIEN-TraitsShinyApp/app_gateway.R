@@ -228,11 +228,48 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
   dat
 }
 
+# Query exact total number of matching BIEN trait rows (without limit)
+query_bien_total_records <- function(rank, taxon, timeout_sec = 120) {
+  taxon <- extract_rank_token(rank, taxon)
+
+  build_sql <- function() {
+    if (rank == "species") {
+      BIEN_trait_species(species = taxon, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE)
+    } else if (rank == "genus") {
+      BIEN_trait_genus(genus = taxon, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE)
+    } else if (rank == "family") {
+      BIEN_trait_family(family = taxon, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE)
+    } else {
+      BIEN_trait_trait(trait = taxon, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE)
+    }
+  }
+
+  sql <- safe_bien_retry(build_sql, timeout_sec = timeout_sec, attempts = 2)
+  if (inherits(sql, "bien_error") || !is.character(sql) || !nzchar(sql)) return(NA_integer_)
+
+  sql_clean <- gsub(";\\s*$", "", sql)
+  count_sql <- sprintf("SELECT COUNT(*) AS total_records FROM (%s) bien_trait_query", sql_clean)
+
+  bien_sql <- get(".BIEN_sql", envir = asNamespace("BIEN"))
+  cnt <- safe_bien_retry(function() {
+    bien_sql(query = count_sql, fetch.query = FALSE)
+  }, timeout_sec = timeout_sec, attempts = 2)
+
+  if (inherits(cnt, "bien_error") || !is.data.frame(cnt) || nrow(cnt) == 0 || !"total_records" %in% names(cnt)) {
+    return(NA_integer_)
+  }
+
+  as.integer(cnt$total_records[[1]])
+}
+
 # Add diagnostic summary statistics
-compute_diagnostics <- function(dat, query_rank, query_taxon) {
+compute_diagnostics <- function(dat, query_rank, query_taxon, total_available = NA_integer_, max_records = NA_integer_) {
   if (!is.data.frame(dat) || nrow(dat) == 0) {
     return(list(
       total_records = 0,
+      total_available_records = if (is.na(total_available)) NA_integer_ else as.integer(total_available),
+      records_not_returned = if (is.na(total_available)) NA_integer_ else max(as.integer(total_available), 0L),
+      limit_used = if (is.na(max_records)) NA_integer_ else as.integer(max_records),
       unique_species = 0,
       unique_traits = 0,
       coverage_by_trait = data.frame(),
@@ -265,6 +302,21 @@ compute_diagnostics <- function(dat, query_rank, query_taxon) {
   if (query_rank == "trait-only") {
     warnings <- c(warnings, "Trait-only queries combine all species; verify meaningful comparisons")
   }
+
+  total_available_i <- if (is.na(total_available)) NA_integer_ else as.integer(total_available)
+  max_records_i <- if (is.na(max_records)) NA_integer_ else as.integer(max_records)
+  records_not_returned <- if (is.na(total_available_i)) NA_integer_ else max(total_available_i - nrow(dat), 0L)
+
+  if (!is.na(total_available_i) && records_not_returned > 0) {
+    limit_txt <- if (is.na(max_records_i)) "an active limit" else paste0("limit = ", max_records_i)
+    warnings <- c(warnings, sprintf(
+      "BIEN contains %d matching trait records; app returned %d (%d more available due to %s).",
+      total_available_i,
+      nrow(dat),
+      records_not_returned,
+      limit_txt
+    ))
+  }
   
   # Check for plot-based traits and highlight plot metadata availability
   plot_trait_col <- first_existing_col(dat, c("is_plot_trait"))
@@ -280,6 +332,9 @@ compute_diagnostics <- function(dat, query_rank, query_taxon) {
   
   list(
     total_records = nrow(dat),
+    total_available_records = total_available_i,
+    records_not_returned = records_not_returned,
+    limit_used = max_records_i,
     unique_species = if (!is.null(species_col)) n_distinct(dat[[species_col]]) else 0,
     unique_traits = if (!is.null(trait_col)) n_distinct(dat[[trait_col]]) else 0,
     coverage_by_trait = coverage,
@@ -317,6 +372,20 @@ queryUI <- function(id) {
           )
         )
       ),
+      div(class = "row",
+        div(class = "col-sm-6",
+          div(class = "form-group",
+            tags$label("Max records to sample:", `for` = ns("max_records")),
+            numericInput(ns("max_records"), NULL,
+                         value = 5000, min = 100, max = 50000, step = 500,
+                         width = "100%")
+          )
+        ),
+        div(class = "col-sm-6",
+          p(class = "text-muted", style = "margin-top: 28px;",
+            "Higher limits may take longer and can increase BIEN timeout risk.")
+        )
+      ),
       div(
         actionButton(ns("query_btn"), 
                     label = tagList(span(id = ns("query_btn_spinner"), class = "fa fa-spinner fa-spin", style = "display:none; margin-right:6px;"), "Query BIEN"),
@@ -352,16 +421,27 @@ queryServer <- function(id) {
 
       tryCatch({
         taxon_clean <- normalize_taxon_name(input$taxon)
+        max_records <- suppressWarnings(as.integer(input$max_records))
+        if (is.na(max_records) || max_records < 100) max_records <- 5000
+        max_records <- min(max_records, 50000)
 
         withProgress(message = "Querying BIEN...",
                      detail = "This may take 30\u201360 seconds",
                      value = 0.3, {
           dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
-                                   max_records = 5000, timeout_sec = 120)
+                                   max_records = max_records, timeout_sec = 120)
+          total_available <- query_bien_total_records(rank = input$rank, taxon = taxon_clean,
+                                                     timeout_sec = 120)
           bien_err <- attr(dat, "bien_error", exact = TRUE)
           incProgress(0.7, message = "Processing results...")
           rv$query_data <- dat
-          rv$diagnostics <- compute_diagnostics(dat, input$rank, taxon_clean)
+          rv$diagnostics <- compute_diagnostics(
+            dat,
+            input$rank,
+            taxon_clean,
+            total_available = total_available,
+            max_records = max_records
+          )
           rv$error_msg <- if (is.character(bien_err) && nzchar(bien_err)) {
             paste("BIEN query error:", bien_err)
           } else if (nrow(dat) == 0) {
@@ -391,8 +471,17 @@ queryServer <- function(id) {
       } else if (nzchar(rv$error_msg)) {
         paste("Status:", rv$error_msg)
       } else if (nrow(rv$query_data) > 0) {
-        paste("✓ Found", nrow(rv$query_data), "records across", 
-              rv$diagnostics$unique_species, "species")
+        if (!is.null(rv$diagnostics$total_available_records) && !is.na(rv$diagnostics$total_available_records)) {
+          paste(
+            "✓ Returned", nrow(rv$query_data), "of", rv$diagnostics$total_available_records,
+            "BIEN records across", rv$diagnostics$unique_species, "species",
+            "(limit:", input$max_records, ")"
+          )
+        } else {
+          paste("✓ Found", nrow(rv$query_data), "records across",
+                rv$diagnostics$unique_species, "species",
+                "(limit:", input$max_records, ")")
+        }
       } else {
         ""
       }
@@ -404,6 +493,7 @@ queryServer <- function(id) {
         diagnostics = rv$diagnostics,
         rank = input$rank,
         taxon = input$taxon,
+        max_records = input$max_records,
         is_loading = rv$is_querying
       )
     })
@@ -446,6 +536,22 @@ scopeServer <- function(id, query_result) {
           p(paste("Found", diag$total_records, "trait observations across",
                   diag$unique_species, "species with", diag$unique_traits, "trait types"))
         ),
+        if (!is.null(diag$total_available_records) && !is.na(diag$total_available_records)) {
+          div(class = if (isTRUE(diag$records_not_returned > 0)) "alert alert-warning" else "alert alert-success",
+            span(class = "glyphicon glyphicon-stats"),
+            strong(" BIEN Total Match Count:"),
+            p(paste0(
+              "Returned ", diag$total_records,
+              " of ", diag$total_available_records,
+              " matching BIEN records",
+              if (!is.na(diag$records_not_returned) && diag$records_not_returned > 0) {
+                paste0(" (", diag$records_not_returned, " more available).")
+              } else {
+                "."
+              }
+            ))
+          )
+        },
         if (length(diag$warnings) > 0) {
           div(class = "alert alert-warning",
             span(class = "glyphicon glyphicon-warning-sign"),
@@ -619,9 +725,12 @@ provenanceServer <- function(id, query_result) {
       manifest <- list(
         query_rank = qr$rank,
         query_taxon = qr$taxon,
+        max_records = qr$max_records,
         timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(qr$data),
+        total_available_records = qr$diagnostics$total_available_records,
+        records_not_returned = qr$diagnostics$records_not_returned,
         unique_species = qr$diagnostics$unique_species,
         unique_traits = qr$diagnostics$unique_traits,
         download_all_traits = isTRUE(qr$download_all),
@@ -646,9 +755,12 @@ provenanceServer <- function(id, query_result) {
       manifest <- list(
         query_rank = query_result()$rank,
         query_taxon = query_result()$taxon,
+        max_records = query_result()$max_records,
         timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(query_result()$data),
+        total_available_records = query_result()$diagnostics$total_available_records,
+        records_not_returned = query_result()$diagnostics$records_not_returned,
         download_all_traits = isTRUE(query_result()$download_all),
         selected_traits = query_result()$selected_traits
       )
@@ -664,9 +776,12 @@ provenanceServer <- function(id, query_result) {
         manifest <- list(
           query_rank = query_result()$rank,
           query_taxon = query_result()$taxon,
+          max_records = query_result()$max_records,
           timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
           app_version = "BIEN Trait Gateway v1.0",
           records = nrow(query_result()$data),
+          total_available_records = query_result()$diagnostics$total_available_records,
+          records_not_returned = query_result()$diagnostics$records_not_returned,
           download_all_traits = isTRUE(query_result()$download_all),
           selected_traits = query_result()$selected_traits,
           diagnostics = query_result()$diagnostics
@@ -683,14 +798,17 @@ provenanceServer <- function(id, query_result) {
         req(query_result())
         rank <- query_result()$rank
         taxon <- query_result()$taxon
+        max_records <- suppressWarnings(as.integer(query_result()$max_records))
+        if (is.na(max_records) || max_records < 100) max_records <- 5000
+        max_records <- min(max_records, 50000)
         call_line <- if (rank == "species") {
-          sprintf("BIEN::BIEN_trait_species(species = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = 5000)", taxon)
+          sprintf("BIEN::BIEN_trait_species(species = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = %d)", taxon, max_records)
         } else if (rank == "genus") {
-          sprintf("BIEN::BIEN_trait_genus(genus = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = 5000)", taxon)
+          sprintf("BIEN::BIEN_trait_genus(genus = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = %d)", taxon, max_records)
         } else if (rank == "family") {
-          sprintf("BIEN::BIEN_trait_family(family = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = 5000)", taxon)
+          sprintf("BIEN::BIEN_trait_family(family = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = %d)", taxon, max_records)
         } else {
-          sprintf("BIEN::BIEN_trait_trait(trait = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = 5000)", taxon)
+          sprintf("BIEN::BIEN_trait_trait(trait = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = %d)", taxon, max_records)
         }
 
         script <- c(
@@ -700,6 +818,7 @@ provenanceServer <- function(id, query_result) {
           "",
           sprintf("query_rank <- \"%s\"", rank),
           sprintf("query_taxon <- \"%s\"", taxon),
+          sprintf("max_records <- %d", max_records),
           "",
           sprintf("dat <- %s", call_line),
           "write.csv(dat, 'bien_gateway_export.csv', row.names = FALSE)",
@@ -925,6 +1044,7 @@ traitSelectServer <- function(id, query_result) {
           trait_col = NULL,
           rank = base_rank,
           taxon = base_taxon,
+          max_records = base$max_records,
           diagnostics = compute_diagnostics(data.frame(), base_rank, base_taxon),
           is_loading = isTRUE(base$is_loading),
           base = base
@@ -941,6 +1061,7 @@ traitSelectServer <- function(id, query_result) {
           trait_col = NULL,
           rank = base_rank,
           taxon = base_taxon,
+          max_records = base$max_records,
           diagnostics = compute_diagnostics(dat, base_rank, base_taxon),
           is_loading = isTRUE(base$is_loading),
           base = base
@@ -981,6 +1102,7 @@ traitSelectServer <- function(id, query_result) {
         trait_col = trait_col,
         rank = base_rank,
         taxon = base_taxon,
+        max_records = base$max_records,
         diagnostics = compute_diagnostics(filtered, base_rank, base_taxon),
         is_loading = isTRUE(base$is_loading),
         base = base

@@ -730,6 +730,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+## 2026-04-21 — User-configurable BIEN sample limit
+
+**Prompt:** The default sampling is set to 5000. Can the user change this?
+
+**Fix:** Added a `Max records to sample` input in Step 1 and wired it through query execution, status text, manifest JSON, and generated reproducibility script so users can control BIEN query limit instead of using a fixed 5000.
+
+## 2026-04-21 — Show total BIEN match count vs returned limit
+
+**Prompt:** When a query is done for a given taxa or trait, the user should know just how many traits are in BIENdb. The app only returns a limit (5000), but if there are more we should know how many more traits are in the BIEN db.
+
+**Fix:** Added exact total-count retrieval for each query using BIEN SQL count queries, then surfaced returned-vs-total and remaining-record counts in query status, Step 2 scope panel, diagnostics warnings, and query manifest exports.
+
 ## 2026-04-21 — Agent @ mention cheat sheet
 
 **Prompt:** yes

@@ -49,3 +49,13 @@
 - Prompt summary: Fix runtime status error for Fabaceae family query (`invalid format '%d'` for numeric object).
 - Requested outcomes: Ensure family query diagnostics no longer trigger format errors and deploy corrected app build.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Make BIEN sample limit user-configurable instead of fixed at 5000.
+- Requested outcomes: Add UI control for max records and propagate value to query calls and provenance/repro exports.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Show total BIEN trait matches and remaining records beyond app limit for each taxa/trait query.
+- Requested outcomes: Compute and display exact BIEN total records, returned records, and not-yet-returned records due to active limit.
+- Completed by: GitHub Copilot
