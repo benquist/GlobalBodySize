@@ -220,3 +220,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Set Pages source branch/path and verify build status.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Fix lag where switching Query Rank from Genus to Trait Only makes Taxon/Trait dropdown take multiple clicks to activate.
+- Requested outcomes: Make Trait Only transitions immediately load trait suggestions without transient taxa-state refresh.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot

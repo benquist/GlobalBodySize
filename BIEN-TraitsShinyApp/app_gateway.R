@@ -556,6 +556,14 @@ queryServer <- function(id) {
     observeEvent(list(input$suggest_mode, input$rank), {
       mode <- if (is.null(input$suggest_mode) || !nzchar(input$suggest_mode)) "taxa" else input$suggest_mode
       rank <- if (is.null(input$rank) || !nzchar(input$rank)) "species" else input$rank
+
+      # Prevent a transient taxa refresh when rank switches to trait-only.
+      # That transient state can make the selectize control feel unresponsive.
+      if (identical(rank, "trait-only") && !identical(mode, "traits")) {
+        mode <- "traits"
+        updateRadioButtons(session, "suggest_mode", selected = "traits")
+      }
+
       key <- paste(mode, if (identical(mode, "taxa")) rank else "traits", sep = "::")
 
       choices <- rv$suggestion_cache[[key]]
@@ -605,7 +613,11 @@ queryServer <- function(id) {
       ))
 
       tryCatch({
-        taxon_clean <- normalize_taxon_name(input$taxon)
+        taxon_clean <- if (identical(input$rank, "trait-only")) {
+          str_squish(as.character(input$taxon))
+        } else {
+          normalize_taxon_name(input$taxon)
+        }
         max_records <- suppressWarnings(as.integer(input$max_records))
         if (is.na(max_records) || max_records < 100) max_records <- 5000
         max_records <- min(max_records, 50000)
