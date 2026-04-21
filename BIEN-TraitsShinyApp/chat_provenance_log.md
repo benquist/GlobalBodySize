@@ -96,6 +96,11 @@
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-21
+- Prompt summary: Add a new tab to visualize trait frequency distributions and summary statistics, with content recommendations aligned to biodiversity-science-guard and ecology-user guidance.
+- Requested outcomes: Implement a new distributions step with histogram controls, descriptive summary statistics, ecological QA warnings (units/missingness/low n), and source breakdown context.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
 - Prompt summary: Revise BIEN-TraitsShinyApp landing header text and make workflow step tabs more visually distinct and appealing, informed by EcoInterface design principles.
 - Requested outcomes: Rename main title to "Trait Data Portal: Data Visualizer & Download", remove subtitle, and apply high-contrast tab-chip styling with stronger active-state differentiation.
 - Completed by: GitHub Copilot

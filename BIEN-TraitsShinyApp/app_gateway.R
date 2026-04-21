@@ -808,7 +808,7 @@ diagnosticsUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-warning",
-    div(class = "panel-heading", h3("Step 4: Diagnostics & Preview")),
+    div(class = "panel-heading", h3("Step 5: Diagnostics & Preview")),
     div(class = "panel-body",
       uiOutput(ns("diagnostics_display")),
       h4("Data Preview (first 10 rows):"),
@@ -882,7 +882,7 @@ recordsUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-default",
-    div(class = "panel-heading", h3("Step 5: Complete Record Set")),
+    div(class = "panel-heading", h3("Step 6: Complete Record Set")),
     div(class = "panel-body",
       uiOutput(ns("records_display")),
       DTOutput(ns("records_table"))
@@ -930,7 +930,7 @@ provenanceUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-default",
-    div(class = "panel-heading", h3("Step 6: Provenance & Reproducibility")),
+    div(class = "panel-heading", h3("Step 7: Provenance & Reproducibility")),
     div(class = "panel-body",
       uiOutput(ns("provenance_display"))
     )
@@ -1074,7 +1074,7 @@ downloadGateUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-success",
-    div(class = "panel-heading", h3("Step 7: Data Use Acknowledgement")),
+    div(class = "panel-heading", h3("Step 8: Data Use Acknowledgement")),
     div(class = "panel-body",
       uiOutput(ns("checklist_display"))
     )
@@ -1106,6 +1106,315 @@ traitSelectServer <- function(id, query_result) {
 
     trait_summary_tbl <- reactive({
       req(query_result())
+# SHINY MODULE: DistributionsUI & DistributionsServer
+# ============================================================================
+
+distributionsUI <- function(id) {
+  ns <- NS(id)
+  div(
+    class = "panel panel-info",
+    div(class = "panel-heading", h3("Step 4: Trait Distributions")),
+    div(class = "panel-body",
+      uiOutput(ns("caveat_banner")),
+      fluidRow(
+        div(class = "col-sm-4",
+          uiOutput(ns("dist_controls")),
+          uiOutput(ns("scope_badge")),
+          h4("Summary Statistics"),
+          tableOutput(ns("summary_stats"))
+        ),
+        div(class = "col-sm-8",
+          plotOutput(ns("hist_plot"), height = "360px"),
+          textOutput(ns("na_note"))
+        )
+      ),
+      h4("Source Breakdown"),
+      DTOutput(ns("source_breakdown"))
+    )
+  )
+}
+
+distributionsServer <- function(id, query_result) {
+  moduleServer(id, function(input, output, session) {
+    dist_payload <- reactive({
+      req(query_result())
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) {
+        return(list(ok = FALSE, message = "Run a query first to view distributions."))
+      }
+
+      trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      value_col <- first_existing_col(dat, c("trait_value", "value", "measurement", "trait_value_original"))
+      unit_col <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit"))
+      source_col <- first_existing_col(dat, c("source_citation", "datasource", "dataset", "dataset_name"))
+
+      if (is.null(trait_col) || is.null(value_col)) {
+        return(list(ok = FALSE, message = "Trait name/value columns were not detected in this query."))
+      }
+
+      trait_vals <- as.character(dat[[trait_col]])
+      trait_vals <- trait_vals[!is.na(trait_vals) & nzchar(trait_vals)]
+      trait_choices <- sort(unique(trait_vals))
+
+      list(
+        ok = TRUE,
+        dat = dat,
+        trait_col = trait_col,
+        value_col = value_col,
+        unit_col = unit_col,
+        source_col = source_col,
+        trait_choices = trait_choices
+      )
+    })
+
+    output$dist_controls <- renderUI({
+      payload <- dist_payload()
+      if (!isTRUE(payload$ok)) {
+        return(div(class = "alert alert-warning", payload$message))
+      }
+
+      selected_trait <- if (!is.null(input$dist_trait) && input$dist_trait %in% payload$trait_choices) {
+        input$dist_trait
+      } else if (length(payload$trait_choices) > 0) {
+        payload$trait_choices[[1]]
+      } else {
+        ""
+      }
+
+      tagList(
+        selectInput(
+          session$ns("dist_trait"),
+          "Trait:",
+          choices = payload$trait_choices,
+          selected = selected_trait,
+          width = "100%"
+        ),
+        sliderInput(
+          session$ns("dist_bins"),
+          "Histogram bins:",
+          min = 10,
+          max = 80,
+          value = 30,
+          step = 1,
+          width = "100%"
+        ),
+        checkboxInput(session$ns("dist_show_density"), "Show density overlay", value = TRUE),
+        checkboxInput(session$ns("dist_log10"), "Use log10 scale (positive values only)", value = FALSE)
+      )
+    })
+
+    dist_selected <- reactive({
+      payload <- dist_payload()
+      req(isTRUE(payload$ok))
+      req(!is.null(input$dist_trait), nzchar(input$dist_trait))
+
+      dat <- payload$dat
+      trait_col <- payload$trait_col
+      value_col <- payload$value_col
+      unit_col <- payload$unit_col
+      source_col <- payload$source_col
+
+      sub <- dat[as.character(dat[[trait_col]]) == input$dist_trait, , drop = FALSE]
+      raw_vals <- suppressWarnings(as.numeric(as.character(sub[[value_col]])))
+      keep <- !is.na(raw_vals) & is.finite(raw_vals)
+      vals <- raw_vals[keep]
+      total_n <- length(raw_vals)
+      used_n <- length(vals)
+      missing_n <- total_n - used_n
+      missing_pct <- if (total_n > 0) 100 * missing_n / total_n else 100
+
+      unit_vals <- character(0)
+      if (!is.null(unit_col)) {
+        unit_vals <- tolower(str_squish(as.character(sub[[unit_col]])))
+        unit_vals <- unit_vals[!is.na(unit_vals) & nzchar(unit_vals)]
+      }
+      unique_units <- sort(unique(unit_vals))
+
+      source_tbl <- data.frame()
+      if (!is.null(source_col)) {
+        source_tbl <- sub %>%
+          mutate(source_clean = ifelse(is.na(.data[[source_col]]) | !nzchar(as.character(.data[[source_col]])),
+                                       "Unknown/Not provided", as.character(.data[[source_col]]))) %>%
+          count(source_clean, name = "n_records") %>%
+          mutate(percent = round(100 * n_records / sum(n_records), 1)) %>%
+          arrange(desc(n_records))
+      }
+
+      q <- stats::quantile(vals, probs = c(0.25, 0.75), na.rm = TRUE, names = FALSE)
+      iqr_val <- if (length(vals) > 0) diff(q) else NA_real_
+      outlier_n <- if (length(vals) > 0 && is.finite(iqr_val)) {
+        lo <- q[1] - 1.5 * iqr_val
+        hi <- q[2] + 1.5 * iqr_val
+        sum(vals < lo | vals > hi, na.rm = TRUE)
+      } else {
+        0L
+      }
+
+      list(
+        sub = sub,
+        vals = vals,
+        total_n = total_n,
+        used_n = used_n,
+        missing_n = missing_n,
+        missing_pct = missing_pct,
+        unique_units = unique_units,
+        source_tbl = source_tbl,
+        outlier_n = outlier_n
+      )
+    })
+
+    output$caveat_banner <- renderUI({
+      payload <- dist_payload()
+      if (!isTRUE(payload$ok)) return(NULL)
+
+      sel <- tryCatch(dist_selected(), error = function(e) NULL)
+      if (is.null(sel)) return(NULL)
+
+      alerts <- list(
+        div(
+          class = "alert alert-info",
+          strong("Warning: "),
+          "This figure summarizes available BIEN-linked trait records, not a complete or unbiased sample of species biology. Differences may reflect sampling effort, taxonomic coverage, or data harmonization decisions."
+        )
+      )
+
+      if (length(sel$unique_units) > 1) {
+        alerts[[length(alerts) + 1]] <- div(
+          class = "alert alert-danger",
+          strong("Warning: "),
+          "Multiple trait units were detected. Values are not directly comparable until converted to a common unit. Summary statistics may be misleading."
+        )
+      }
+
+      if (is.finite(sel$missing_pct) && sel$missing_pct > 20) {
+        alerts[[length(alerts) + 1]] <- div(
+          class = "alert alert-warning",
+          strong("Warning: "),
+          "Missing trait values exceed 20 percent for the current filter. Distribution shape and summary statistics may be unstable and should be interpreted cautiously."
+        )
+      }
+
+      if (sel$used_n > 0 && sel$used_n < 30) {
+        alerts[[length(alerts) + 1]] <- div(
+          class = "alert alert-warning",
+          strong("Warning: "),
+          "Fewer than 30 non-missing observations are available. Treat distribution patterns as exploratory, not confirmatory."
+        )
+      }
+
+      do.call(tagList, alerts)
+    })
+
+    output$scope_badge <- renderUI({
+      req(query_result())
+      qr <- query_result()
+      diag <- qr$diagnostics
+      species_n <- if (!is.null(diag$unique_species)) diag$unique_species else NA_integer_
+      record_n <- if (is.data.frame(qr$data)) nrow(qr$data) else 0
+
+      div(
+        class = "alert alert-info",
+        style = "margin-top: 8px;",
+        strong("Scope: "),
+        sprintf("%s: %s | %s species | %s observations",
+                str_to_title(qr$rank), qr$taxon, species_n, record_n)
+      )
+    })
+
+    output$summary_stats <- renderTable({
+      sel <- dist_selected()
+      vals <- sel$vals
+      req(length(vals) > 0)
+
+      stats_df <- data.frame(
+        metric = c("N (non-missing)", "Mean", "Median", "SD", "IQR", "Min", "Max", "5th percentile", "95th percentile", "Outliers (1.5*IQR)"),
+        value = c(
+          length(vals),
+          round(mean(vals, na.rm = TRUE), 4),
+          round(median(vals, na.rm = TRUE), 4),
+          round(stats::sd(vals, na.rm = TRUE), 4),
+          round(stats::IQR(vals, na.rm = TRUE), 4),
+          round(min(vals, na.rm = TRUE), 4),
+          round(max(vals, na.rm = TRUE), 4),
+          round(stats::quantile(vals, 0.05, na.rm = TRUE, names = FALSE), 4),
+          round(stats::quantile(vals, 0.95, na.rm = TRUE, names = FALSE), 4),
+          sel$outlier_n
+        ),
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+      stats_df
+    }, striped = TRUE, bordered = TRUE, width = "100%")
+
+    output$na_note <- renderText({
+      sel <- dist_selected()
+      unit_msg <- if (length(sel$unique_units) == 0) {
+        "Units: unknown"
+      } else if (length(sel$unique_units) == 1) {
+        paste("Units:", sel$unique_units[[1]])
+      } else {
+        paste("Units detected:", paste(sel$unique_units, collapse = ", "))
+      }
+      sprintf("Used %d of %d rows (%d missing/non-numeric excluded; %.1f%% missing). %s",
+              sel$used_n, sel$total_n, sel$missing_n, sel$missing_pct, unit_msg)
+    })
+
+    output$hist_plot <- renderPlot({
+      sel <- dist_selected()
+      vals <- sel$vals
+
+      if (length(vals) == 0) {
+        plot.new()
+        text(0.5, 0.5, "No numeric values available for this trait.")
+        return(invisible(NULL))
+      }
+
+      if (isTRUE(input$dist_log10)) {
+        vals <- vals[vals > 0]
+        if (length(vals) == 0) {
+          plot.new()
+          text(0.5, 0.5, "No positive values available for log10 display.")
+          return(invisible(NULL))
+        }
+        vals <- log10(vals)
+      }
+
+      h <- hist(
+        vals,
+        breaks = input$dist_bins,
+        col = "#7fb8e6",
+        border = "#2f79b7",
+        main = paste("Distribution:", input$dist_trait),
+        xlab = if (isTRUE(input$dist_log10)) "log10(trait value)" else "Trait value",
+        ylab = "Frequency"
+      )
+
+      rug(vals, col = "#1f5b8f")
+
+      if (isTRUE(input$dist_show_density) && length(vals) > 1) {
+        d <- density(vals, na.rm = TRUE)
+        bw <- if (length(h$breaks) > 1) diff(h$breaks[1:2]) else 1
+        lines(d$x, d$y * length(vals) * bw, col = "#d9534f", lwd = 2)
+      }
+    })
+
+    output$source_breakdown <- renderDT({
+      sel <- dist_selected()
+      tbl <- sel$source_tbl
+      if (!is.data.frame(tbl) || nrow(tbl) == 0) {
+        return(datatable(data.frame(note = "No source citation column was detected."), rownames = FALSE,
+                        options = list(dom = "t", paging = FALSE, searching = FALSE)))
+      }
+      datatable(tbl, rownames = FALSE, options = list(pageLength = 8))
+    })
+
+    reactive({
+      list(ok = TRUE)
+    })
+  })
+}
+
+# ============================================================================
       dat <- query_result()$data
       if (!is.data.frame(dat) || nrow(dat) == 0) return(data.frame())
 
@@ -1481,10 +1790,11 @@ ui <- fluidPage(
       tabPanel("Step 1: Query", queryUI("query")),
       tabPanel("Step 2: Scope", scopeUI("scope")),
       tabPanel("Step 3: Traits", traitSelectUI("traitSelect")),
-      tabPanel("Step 4: Diagnostics", diagnosticsUI("diagnostics")),
-      tabPanel("Step 5: Records", recordsUI("records")),
-      tabPanel("Step 6: Provenance", provenanceUI("provenance")),
-      tabPanel("Step 7: Download", downloadGateUI("downloadGate"))
+      tabPanel("Step 4: Distributions", distributionsUI("distributions")),
+      tabPanel("Step 5: Diagnostics", diagnosticsUI("diagnostics")),
+      tabPanel("Step 6: Records", recordsUI("records")),
+      tabPanel("Step 7: Provenance", provenanceUI("provenance")),
+      tabPanel("Step 8: Download", downloadGateUI("downloadGate"))
     ),
     
     hr(),
@@ -1677,6 +1987,7 @@ server <- function(input, output, session) {
   query_result <- queryServer("query")
   scope_result <- scopeServer("scope", query_result)
   trait_result <- traitSelectServer("traitSelect", query_result)
+  distributions_result <- distributionsServer("distributions", trait_result)
   diag_result <- diagnosticsServer("diagnostics", trait_result)
   records_result <- recordsServer("records", trait_result)
   prov_result <- provenanceServer("provenance", trait_result)
