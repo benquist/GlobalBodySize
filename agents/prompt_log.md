@@ -13,6 +13,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-20
+- Prompt summary: Here are details about People. I noticed we have two 'People' tabs. https://brianjenquist.wordpress.com/people/
+- Requested outcomes: Resolve duplicate People tabs and update People-related content from WordPress page data and photos.
+- Files changed: ~/GitHub/enquistlab-academic-site/_pages/profiles.md; ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/collaborators.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/_pages/join.md; ~/GitHub/enquistlab-academic-site/assets/img/wordpress/*; ~/GitHub/enquistlab-academic-site/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-20
 - Prompt summary: do a dedicated CV pass next and fully populate
 - Requested outcomes: Populate the website CV section with extracted CV information and replace template data.
 - Files changed: ~/GitHub/enquistlab-academic-site/_data/cv.yml; ~/GitHub/enquistlab-academic-site/_pages/cv.md; ~/GitHub/enquistlab-academic-site/chat_provenance_log.md; agents/prompt_log.md
