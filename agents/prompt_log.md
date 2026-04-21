@@ -12,6 +12,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## Entries
 
+- Date: 2026-04-21
+- Prompt summary: Go through the WordPress site and populate the new GitHub academic website with legacy content.
+- Requested outcomes: Migrate core profile, research, people, teaching, field-site, join, software/data, and publications content into the new al-folio site and preserve blog continuity.
+- Files changed: ~/GitHub/enquistlab-academic-site/_config.yml; ~/GitHub/enquistlab-academic-site/_pages/about.md; ~/GitHub/enquistlab-academic-site/_pages/research.md; ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/teaching.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/_pages/join.md; ~/GitHub/enquistlab-academic-site/_pages/software.md; ~/GitHub/enquistlab-academic-site/_pages/publications.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Prompt summary: Run the mandatory final pre-return gate for this workspace and report PASS/FAIL for prompt log, Rmd compile, R package build, and git push checks.
 ++ (awaiting always gate check)
 - Requested outcomes: Provide explicit evidence-backed PASS/BLOCKED results for all four checks, including no-edit handling where applicable.
@@ -693,3 +699,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** Run mandatory final gate for this turn. Context: user reports the site is still inactive after multiple deploy fixes. Verify prompt log, Rmd compile applicability, package build applicability, and workspace git push sync. Return PASS/FAIL with concise evidence.
 
 **Fix:** Logged this exact final-gate prompt and reran the always agent checks.
+
+## 2026-04-20 — Final gate request after site recovery (HTTP 200)
+
+**Prompt:** Run mandatory final gate for this turn. Context: user reported site inactive; deploy and Pages config were fixed and URL now returns HTTP 200. Verify prompt log, Rmd compile applicability, package build applicability, and workspace git push sync. Return PASS/FAIL with concise evidence.
+
+**Fix:** Executed the always-mode final gate checks with concrete evidence for prompt logging, Rmd/package applicability, package builds where applicable, and workspace upstream sync status.
