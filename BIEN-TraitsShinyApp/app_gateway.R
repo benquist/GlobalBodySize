@@ -1469,7 +1469,7 @@ ui <- fluidPage(
       div(class = "bien-header-brand",
         tags$img(src = "bien.png", alt = "BIEN logo", class = "bien-logo"),
         div(
-          h1("BIEN Trait Data Gateway", tags$small("Availability-First Access to Trait Observations")),
+          h1("Trait Data Portal: Data Visualizer & Download"),
           p("Query traits by species, genus, family, or trait type with full provenance tracking")
         )
       )
@@ -1552,27 +1552,70 @@ ui <- fluidPage(
       border-color: var(--panel-border);
     }
     .nav-tabs {
-      margin-bottom: 15px;
-      border-bottom: 1px solid var(--panel-border);
+      margin-bottom: 12px;
+      border-bottom: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 2px;
+    }
+    .nav-tabs > li {
+      float: none;
+      margin-bottom: 0;
     }
     .nav-tabs > li > a {
-      font-weight: 600;
-      color: #2f5f86;
-      border-radius: 8px 8px 0 0;
+      font-weight: 700;
+      color: #1f4f73;
+      border: 2px solid #b8cee2;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f8fcff 0%, #edf6ff 100%);
+      padding: 10px 14px;
+      transition: transform 0.08s ease, box-shadow 0.12s ease, filter 0.2s ease;
+      box-shadow: 0 1px 0 #d7e6f4, 0 3px 8px rgba(27, 75, 111, 0.08);
     }
+    .nav-tabs > li > a:hover,
+    .nav-tabs > li > a:focus {
+      filter: brightness(1.03);
+      transform: translateY(-1px);
+      box-shadow: 0 1px 0 #d7e6f4, 0 5px 10px rgba(27, 75, 111, 0.14);
+      border-color: #92b7d6;
+      color: #163d5a;
+    }
+    .nav-tabs > li:nth-child(1) > a { border-left: 6px solid #2f79b7; }
+    .nav-tabs > li:nth-child(2) > a { border-left: 6px solid #49a078; }
+    .nav-tabs > li:nth-child(3) > a { border-left: 6px solid #69b34c; }
+    .nav-tabs > li:nth-child(4) > a { border-left: 6px solid #d4a537; }
+    .nav-tabs > li:nth-child(5) > a { border-left: 6px solid #e07a5f; }
+    .nav-tabs > li:nth-child(6) > a { border-left: 6px solid #7b8ec8; }
+    .nav-tabs > li:nth-child(7) > a { border-left: 6px solid #4e8c2c; }
     .nav-tabs > li.active > a,
     .nav-tabs > li.active > a:focus,
     .nav-tabs > li.active > a:hover {
-      color: var(--bien-blue-deep);
-      background: linear-gradient(180deg, #ecf6ff 0%, #f4fbef 100%);
-      border: 1px solid var(--panel-border);
-      border-bottom-color: #fff;
+      color: #ffffff;
+      background: linear-gradient(180deg, #3d89c8 0%, #1f5b8f 100%);
+      border: 2px solid #1f5b8f;
+      box-shadow: 0 2px 0 #18456f, 0 7px 14px rgba(31, 91, 143, 0.25);
+      transform: translateY(-1px);
+    }
+    .nav-tabs > li.active:nth-child(2) > a,
+    .nav-tabs > li.active:nth-child(2) > a:focus,
+    .nav-tabs > li.active:nth-child(2) > a:hover,
+    .nav-tabs > li.active:nth-child(3) > a,
+    .nav-tabs > li.active:nth-child(3) > a:focus,
+    .nav-tabs > li.active:nth-child(3) > a:hover,
+    .nav-tabs > li.active:nth-child(7) > a,
+    .nav-tabs > li.active:nth-child(7) > a:focus,
+    .nav-tabs > li.active:nth-child(7) > a:hover {
+      background: linear-gradient(180deg, #87c95d 0%, #4e8c2c 100%);
+      border-color: #4e8c2c;
+      box-shadow: 0 2px 0 #386620, 0 7px 14px rgba(62, 112, 36, 0.22);
     }
     .tab-content {
       background: #fff;
-      border: 1px solid var(--panel-border);
-      border-top: 0;
-      padding: 15px;
+      border: 2px solid #b8cee2;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 6px 16px rgba(33, 82, 120, 0.08);
     }
     .bien-query-btn {
       min-width: 180px;

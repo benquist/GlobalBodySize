@@ -215,6 +215,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-21
+- Prompt summary: Add popup warning when species name is found in BIEN taxonomy but no mappable occurrence points are available under current filters.
+- Requested outcomes: Show a clear in-app warning for taxonomy-found/no-mappable cases and deploy to live BIEN Species app.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Run mandatory final pre-return checks for the taxonomy-found/no-mappable popup warning task.
+- Requested outcomes: Verify prompt logging, change-gated Rmd/package checks, and git push status; return strict PASS/BLOCKED.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 ## Date: 2026-04-21
 - Prompt summary: User asked me to change GitHub Pages settings to publish enquistlab.github.io from gh-pages.
 - Requested outcomes: Set Pages source branch/path and verify build status.
@@ -232,3 +244,33 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Replace multi-checkbox checklist with one explicit acknowledgement, preserve key caveats in longer text, highlight citing original data sources via provenance manifest, and harden Trait Only suggestion activation responsiveness.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Update BIEN-TraitsShinyApp main page title text and improve visual distinction/appeal of step tabs using EcoInterface design guidance.
+- Requested outcomes: Change title to "Trait Data Portal: Data Visualizer & Download", remove subtitle text, and redesign tab styling for stronger contrast and clearer tab separation.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Upgrade BIEN-SpeciesShinyApp Query, random species, and Help controls to a stronger button style similar to BIEN-TraitsShinyApp, and move random species under the species input.
+- Requested outcomes: Apply raised/gradient button affordances and reposition random species below the species name box, then redeploy.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Orchestrate EcoInterface, ecology-user, and enhanced-theory perspectives to produce a concrete redesign blueprint for an al-folio lab homepage and key navigation pages.
+- Requested outcomes: Deliver IA map, homepage wireframe blocks, typography/color guidance, anti-clutter component rules, migration checklist from old pages/blog/CV, and a minimal-risk implementation plan with CV fallback if external source is unavailable.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (supervision)
+
+- Date: 2026-04-21
+- Prompt summary: Add a new BIEN-TraitsShinyApp tab to plot frequency distributions of trait values and show summary statistics, coordinated with biodiversity-science-guard and ecology-user guidance.
+- Requested outcomes: Provide implementation-ready guidance covering required tab content, exact caveat language, QA checks for unit heterogeneity and missingness, MVP layout/controls, and interpretation red flags.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (supervision)
+
+- Date: 2026-04-21
+- Prompt summary: Orchestrate EcoInterface, ecology-user, and enhanced-theory perspectives to produce a concrete redesign blueprint for an al-folio lab homepage and key navigation pages.
+- Requested outcomes: Deliver IA map, homepage wireframe blocks, typography/color guidance, anti-clutter component rules, migration checklist from old pages/blog/CV, and a minimal-risk implementation plan with CV fallback if external source is unavailable.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (supervision)

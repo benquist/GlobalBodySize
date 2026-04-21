@@ -94,3 +94,8 @@
 - Prompt summary: Simplify the Step 7 download checklist to one acknowledgement checkbox with a longer caveat and explicit emphasis on citing original data sources; fix persistent lag in Genus→Trait Only dropdown activation.
 - Requested outcomes: Replace six separate checkboxes with one acknowledgement gate while retaining all caveats in expanded text and source-citation emphasis, and make Trait Only autocomplete activate immediately after rank toggles.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Revise BIEN-TraitsShinyApp landing header text and make workflow step tabs more visually distinct and appealing, informed by EcoInterface design principles.
+- Requested outcomes: Rename main title to "Trait Data Portal: Data Visualizer & Download", remove subtitle, and apply high-contrast tab-chip styling with stronger active-state differentiation.
+- Completed by: GitHub Copilot
