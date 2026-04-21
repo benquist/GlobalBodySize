@@ -13,6 +13,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-20
+- Prompt summary: Run the mandatory final pre-return gate for this turn and report PASS/FAIL with concise evidence.
+- Requested outcomes: Verify prompt logging, Rmd applicability, package build applicability, and git push status for this read-only review turn.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-20
 - Prompt summary: Here are details about People. I noticed we have two 'People' tabs. https://brianjenquist.wordpress.com/people/
 - Requested outcomes: Resolve duplicate People tabs and update People-related content from WordPress page data and photos.
 - Files changed: ~/GitHub/enquistlab-academic-site/_pages/profiles.md; ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/collaborators.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/_pages/join.md; ~/GitHub/enquistlab-academic-site/assets/img/wordpress/*; ~/GitHub/enquistlab-academic-site/chat_provenance_log.md; agents/prompt_log.md
@@ -735,3 +741,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** Run mandatory final gate for this turn. Context: user reported site inactive; deploy and Pages config were fixed and URL now returns HTTP 200. Verify prompt log, Rmd compile applicability, package build applicability, and workspace git push sync. Return PASS/FAIL with concise evidence.
 
 **Fix:** Executed the always-mode final gate checks with concrete evidence for prompt logging, Rmd/package applicability, package builds where applicable, and workspace upstream sync status.
+
+## 2026-04-20 — Enquist lab website migration review request
+
+**Prompt:** Review the new lab website implementation in ~/GitHub/enquistlab-academic-site against the original WordPress site and EcoInterface guidance; provide severity-ranked findings on migration correctness, duplicate/conflicting navigation/pages, design quality, typography/content polish, and media accessibility/performance; do not modify site files.
+
+**Fix:** Performed a read-only audit of page content, navigation metadata, typography/theme settings, media assets, and WordPress menu/title mappings, then produced severity-ranked findings and a prioritized fix list.
