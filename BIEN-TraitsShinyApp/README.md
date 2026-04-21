@@ -1,5 +1,9 @@
 # BIEN Traits Shiny App
 
+[![BIEN logo](www/bien.png)](https://biendata.org/)
+
+Learn more about BIEN at **[biendata.org](https://biendata.org/)**.
+
 Interactive Shiny app for querying BIEN trait observations, visualizing trait points on a map, reviewing observation-level provenance and citations, and exporting reproducible BIEN query code.
 
 ## Target deployment URL
