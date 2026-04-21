@@ -178,3 +178,21 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Deploy BIEN-TraitsShinyApp to shinyapps.io and verify the public app URL is reachable with the latest code.
 - Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Fix trait-only queries for partial trait names (e.g. "leaf phosphorus") by expanding to all matching exact BIEN trait names and combining results; also fix reproducibility export to generate multi-trait queries.
+- Requested outcomes: Implement trait name expansion logic, update query and script export to use expanded trait names, deploy updated app to public URL.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: The random species button is no longer populating the species text automatically.
+- Requested outcomes: Diagnose the BIEN species input regression and restore automatic species-field population from the random button.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Make the BIEN-SpeciesShinyApp species name box larger.
+- Requested outcomes: Increase the visible size of the species lookup control without breaking the sidebar layout.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot

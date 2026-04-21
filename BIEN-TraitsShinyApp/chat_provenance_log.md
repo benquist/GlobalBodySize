@@ -79,3 +79,8 @@
 - Prompt summary: Update the live BIEN Traits shinyapps.io app with the latest trait-only query fix.
 - Requested outcomes: Deploy BIEN-TraitsShinyApp to shinyapps.io and verify the public app URL is reachable.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Fix trait-only queries for partial trait names—when user selects "leaf phosphorus" it fails because BIEN requires exact trait names like "leaf phosphorus content per leaf dry mass". Expand partial names to exact matches and combine results; fix reproducibility export for multi-trait queries.
+- Requested outcomes: Implement expand_trait_name() function, update trait-only query path to use expanded names and bind rows, fix script export to generate working multi-trait queries.
+- Completed by: GitHub Copilot
