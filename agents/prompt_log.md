@@ -13,6 +13,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-20
+- Prompt summary: Run the mandatory final pre-return gate for this turn and return PASS/FAIL with concise evidence.
+- Requested outcomes: Verify prompt logging, Rmd/package applicability checks, and git push confirmation after the final page-by-page QA pass.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-20
 - Prompt summary: Final content QA pass page-by-page
 - Requested outcomes: Run a final page-by-page content QA and fix remaining copy, formatting, and link-quality issues.
 - Files changed: ~/GitHub/enquistlab-academic-site/_pages/people.md; ~/GitHub/enquistlab-academic-site/_pages/teaching.md; ~/GitHub/enquistlab-academic-site/_pages/software.md; ~/GitHub/enquistlab-academic-site/_pages/field-sites.md; ~/GitHub/enquistlab-academic-site/chat_provenance_log.md; agents/prompt_log.md
