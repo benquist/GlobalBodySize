@@ -13,6 +13,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entries
 
 - Date: 2026-04-20
+- Prompt summary: run a live post-deploy smoke check of all nav links and report any 404s or formatting regressions.
+- Requested outcomes: Validate live deployed navigation links and report broken links or formatting regressions.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-20
 - Prompt summary: Run the mandatory final pre-return gate for this turn and return PASS/FAIL with concise evidence.
 - Requested outcomes: Verify prompt logging, Rmd/package applicability checks, and git push confirmation after the final page-by-page QA pass.
 - Files changed: agents/prompt_log.md
