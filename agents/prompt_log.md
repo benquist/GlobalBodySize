@@ -246,6 +246,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-21
+- Prompt summary: Add a new BIEN-TraitsShinyApp distributions tab with frequency plots and summary statistics, guided by biodiversity-science-guard and ecology-user recommendations.
+- Requested outcomes: Add a workflow tab for trait-value histograms and summary stats, include ecological QA caveats (unit heterogeneity, missingness, low sample size), and show source-breakdown context.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
 - Prompt summary: Update BIEN-TraitsShinyApp main page title text and improve visual distinction/appeal of step tabs using EcoInterface design guidance.
 - Requested outcomes: Change title to "Trait Data Portal: Data Visualizer & Download", remove subtitle text, and redesign tab styling for stronger contrast and clearer tab separation.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
@@ -270,6 +276,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot (supervision)
 
 - Date: 2026-04-21
+- Prompt summary: Create a new agent specialized in design with background in art, architecture, UX flair, Scandinavian minimal taste, and practical coding/project workflow understanding.
+- Requested outcomes: Add a user-invocable design specialist agent profile aligned to existing agent conventions.
+- Files changed: agents/design-atelier.agent.md; .github/agents/design-atelier.agent.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt; chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
 - Prompt summary: Add a new BIEN-TraitsShinyApp tab to plot frequency distributions of trait values and show summary statistics, coordinated with biodiversity-science-guard and ecology-user guidance.
 - Requested outcomes: Provide implementation-ready guidance covering required tab content, exact caveat language, QA checks for unit heterogeneity and missingness, MVP layout/controls, and interpretation red flags.
 - Files changed: agents/prompt_log.md
@@ -280,3 +292,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Deliver IA map, homepage wireframe blocks, typography/color guidance, anti-clutter component rules, migration checklist from old pages/blog/CV, and a minimal-risk implementation plan with CV fallback if external source is unavailable.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot (supervision)
+
+## Date: 2026-04-21
+- Prompt summary: User requested an elegant, simpler redesign of enquistlab.github.io using EcoInterface, ecology-user, and enhanced-theory guidance, with existing website and CV content.
+- Requested outcomes: Implement reduced-clutter IA, cleaner homepage layout, and push redesign live to EnquistLab/enquistlab.github.io.
+- Files changed: enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/research.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/people.md; enquistlab-site-migration/_pages/join.md; enquistlab-site-migration/_pages/contact.md; enquistlab-site-migration/_pages/news.md; enquistlab-site-migration/_pages/blog.md; enquistlab-site-migration/_pages/cv.md; enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/_pages/collaborators.md; enquistlab-site-migration/_pages/teaching.md; enquistlab-site-migration/_pages/press-media.md; enquistlab-site-migration/_config.yml; enquistlab-site-migration/assets/css/main.scss; enquistlab-site-migration/_sass/_lab-redesign.scss
+- Completed by: GitHub Copilot
