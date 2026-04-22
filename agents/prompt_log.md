@@ -179,6 +179,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-22
+- Prompt summary: Confirm and execute a refinement pass to make Resources explicit and more prominent.
+- Requested outcomes: Update resources navigation/path naming, add exact TNRS sentence wording, and add a prominent BIEN web-services card grid; keep links to TNRS/GNRS/NSR/GVS plus fluxible/traitstrap content intact.
+- Files changed: enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/home.md; enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
 - Prompt summary: Add more WordPress-sourced lab/work/equation photos to the site and fully update Resources with BIEN web services, TNRS/GNRS/NSR/GVS links, service vignettes, and fluxible/traitstrap package links.
 - Requested outcomes: Import additional WordPress images, surface them on key pages, and expand the resources page with complete BIEN services and related R package references.
 - Files changed: enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/research.md; enquistlab-site-migration/assets/img/wordpress/dsc_3443.jpeg; enquistlab-site-migration/assets/img/wordpress/dsc_3225.jpg; enquistlab-site-migration/assets/img/wordpress/img_0597.jpg; enquistlab-site-migration/assets/img/wordpress/yoda_self_thinning_fig1.png; enquistlab-site-migration/assets/img/wordpress/yoda_self_thinning_fig2.png; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
