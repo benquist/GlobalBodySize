@@ -4,6 +4,8 @@
 - Files changed: _sass/_lab-redesign.scss, _pages/about.md, _pages/research.md, _pages/field-sites.md
 
 2026-04-16 | User requested retry of shinyapps.io deployment after timeout. Agent performed redeploy, confirmed success, and updated provenance.
+
+2026-04-22 | Performance audit of LoadingHistoricalObservationDataIntoBIEN pipeline (app.R, R/dwc_mapping.R, R/multi_file_merge.R, R/bien_pipeline_helpers.R). Identified and fixed 5 bottlenecks: (H1) cached load_header_synonyms CSV read; (H2) cached alias normalization in suggest_bien_field; (H3) batched TNRS HTTP requests with sequential fallback; (M1) vectorized find_duplicate_metadata_conflicts with pre-split indices; (M2) vectorized apply_dwc_mapping column assignment; (M3) capped join_conflicts_table display at 200 rows.
 # Prompt Log
 
 Record each user prompt that led to creation, direction, or alteration of agent files/folder policy.
@@ -256,6 +258,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Fix Step 4/Run BIEN Service Checks hang when using tutorial demo data in LoadingHistoricalObservationDataIntoBIEN.
 - Requested outcomes: Remove blocking behavior in Step 4 taxonomy flow, keep service checks explicit, improve responsiveness for TNRS calls, and redeploy.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Fix delayed Taxon/Trait autocomplete after changing Query Rank in BIEN-TraitsShinyApp.
+- Requested outcomes: Make rank-switch autocomplete responsive by removing duplicate suggestion refreshes and reducing heavy taxon suggestion payload sizes.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-22
@@ -619,3 +627,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: (1) code-checker identified req() race condition in combined_state, hard-coded dictionary path in suggest_mapping, bad duplicate_strategy default, and spinner label misalignment; (2) optimizer fixed all four: merge_plan() fallback when input$primary_file/primary_key are NULL, resolve_dict_path() helper, duplicate_strategy default changed to first_non_empty, corrected spinner step labels; (3) smoke tests passed; (4) deployed to shinyapps.io (new bundle).
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot (M → code-checker → optimizer pipeline)
+
+- Date: 2026-04-22
+- Prompt summary: Fix step-instruction/button label mismatch and speed up LoadingHistoricalObservationDataIntoBIEN pipeline; resolve Step 4 Taxonomy hang.
+- Requested outcomes: Correct instruction text so labels match lettered pipeline buttons (A–E); simplify taxonomy_view_state() to always use taxonomy_df() instead of staging_preview_df() so Step 4 no longer blocks on augment_bien_pipeline(); deploy updated app to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; agents/prompt_log.md
+- Completed by: GitHub Copilot

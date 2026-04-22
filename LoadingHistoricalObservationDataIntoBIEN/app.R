@@ -324,7 +324,7 @@ ui <- fluidPage(
         class = "bien-sidebar-section",
         h5("Run Pipeline"),
         actionButton("prepare_btn",
-          tags$span(tags$span(class = "step-badge", "1"), " Prepare Linked Table"),
+          tags$span(tags$span(class = "step-badge", "A"), " Prepare Linked Table"),
           class = "btn btn-step btn-step-primary", width = "100%"),
         selectInput(
           "duplicate_strategy",
@@ -338,14 +338,14 @@ ui <- fluidPage(
           selected = "first_non_empty"
         ),
         actionButton("suggest_btn",
-          tags$span(tags$span(class = "step-badge", "2"), " Suggest Mapping"),
+          tags$span(tags$span(class = "step-badge", "B"), " Suggest Mapping"),
           class = "btn btn-step btn-step-primary", width = "100%"),
         fileInput("mapping_csv", "Optional Mapping Override CSV", accept = ".csv"),
         actionButton("build_btn",
-          tags$span(tags$span(class = "step-badge", "3"), " Build BIEN Draft Tables"),
+          tags$span(tags$span(class = "step-badge", "C"), " Build BIEN Draft Tables"),
           class = "btn btn-step btn-step-success", width = "100%"),
         actionButton("run_bien_services",
-          tags$span(tags$span(class = "step-badge", "4"), " Run BIEN Service Checks"),
+          tags$span(tags$span(class = "step-badge", "D"), " Run BIEN Service Checks"),
           class = "btn btn-step btn-step-warning", width = "100%")
       ),
 
@@ -390,6 +390,15 @@ ui <- fluidPage(
         tabPanel(
           "Step 1 Upload",
           h3("Step 1. Upload and Inspect Files"),
+          tags$div(
+            style = "margin: 10px 0; padding: 10px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
+            strong("What to do in this step"),
+            tags$ol(
+              tags$li("In the left sidebar, check 'Use built-in tutorial fake data' — or upload your own CSV files."),
+              tags$li("Review the Suggested Merge Plan and Loaded File Summary below to confirm the app detected the right primary observation file and join key."),
+              tags$li("When ready, click the '", tags$strong("A Prepare Linked Table"), "' button in the sidebar. Results appear in the Step 2 Link tab.")
+            )
+          ),
           uiOutput("merge_controls"),
           uiOutput("merge_plan_box"),
           h4("Suggested Merge Plan"),
@@ -402,7 +411,15 @@ ui <- fluidPage(
         tabPanel(
           "Step 2 Link",
           h3("Step 2. Link Observations with Metadata"),
-          p("Select a primary observation file and one or more metadata files (location, plot, traits)."),
+          tags$div(
+            style = "margin: 10px 0; padding: 10px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
+            strong("What to do in this step"),
+            tags$ol(
+              tags$li("This tab shows results after you click '", tags$strong("A Prepare Linked Table"), "' in the sidebar from Step 1."),
+              tags$li("Check the Join Audit table — rows marked BLOCK must be resolved before proceeding (many-to-many join). WARN rows are informational."),
+              tags$li("If the join looks correct, proceed to Step 3 Map and click '", tags$strong("B Suggest Mapping"), "'.")
+            )
+          ),
           uiOutput("link_loading_ui"),
           h4("Join Audit"),
           uiOutput("join_warning_box"),
@@ -415,18 +432,21 @@ ui <- fluidPage(
         tabPanel(
           "Step 3 Map",
           h3("Step 3. Darwin Core Mapping"),
-          p("Auto-suggestions come from header synonym matching plus BIEN-aware field matching. You can upload a mapping override CSV with source_column,dwc_term."),
-          uiOutput("map_loading_ui"),
           tags$div(
             style = "margin: 10px 0; padding: 10px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
-            strong("What to review in this step"),
+            strong("What to do in this step"),
             tags$ol(
-              tags$li("Click 'Step 3: Suggest Mapping' in the left sidebar."),
-              tags$li("Confirm that the species column maps to scientificName and any latitude/longitude columns map to decimalLatitude and decimalLongitude."),
-              tags$li("If a DBH or diameter column is detected, the app may map it to measurementValue automatically and add measurementType = diameter_at_breast_height with a default unit when possible."),
-              tags$li("If any suggestion is wrong, upload a mapping override CSV before continuing.")
+              tags$li("Click the '", tags$strong("B Suggest Mapping"), "' button in the left sidebar. Results appear below."),
+              tags$li("Confirm that the species column maps to ", tags$code("scientificName"), " and any latitude/longitude columns map to ", tags$code("decimalLatitude"), " and ", tags$code("decimalLongitude"), "."),
+              tags$li("If a DBH or diameter column is detected, the app may map it to ", tags$code("measurementValue"), " automatically and add ", tags$code("measurementType = diameter_at_breast_height"), " with a default unit when possible."),
+              tags$li("If any suggestion is wrong, upload a mapping override CSV (optional) before continuing."),
+              tags$li("When satisfied, click '", tags$strong("C Build BIEN Draft Tables"), "' in the sidebar to proceed to Step 5 Validate.")
+            ),
+            tags$p(style = "margin: 8px 0 0 0; font-size: 0.9em; color: #555;",
+              "You can also upload a custom mapping CSV with columns ", tags$code("source_column"), " and ", tags$code("dwc_term"), " to override the auto-suggestions."
             )
           ),
+          uiOutput("map_loading_ui"),
           h4("Suggested Mapping"),
           tableOutput("mapping_table"),
           h4("Active Mapping"),
@@ -437,7 +457,20 @@ ui <- fluidPage(
         tabPanel(
           "Step 4 Taxonomy",
           h3("Step 4. Taxonomic Reconciliation Triage"),
-          p("This stage provides preliminary taxonomy triage. Authoritative reconciliation still requires downstream TNRS/backbone review."),
+          tags$div(
+            style = "margin: 10px 0; padding: 10px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
+            strong("What to do in this step"),
+            tags$ol(
+              tags$li("This tab shows a local taxonomy triage of your scientific names — no button click needed. It updates automatically after Step 2 (Prepare Linked Table) completes."),
+              tags$li("Review the Taxonomy Summary table. Names flagged as REVIEW contain uncertain qualifiers (sp., cf., aff., indet.) and should be inspected before submission."),
+              tags$li("Names flagged as CANDIDATE are ready for external backbone checking — this happens in Step 6 via the 'D Run BIEN Service Checks' button, not here."),
+              tags$li("When you are satisfied with the name review, click the 'C Build BIEN Draft Tables' button in the sidebar to proceed.")
+            ),
+            tags$p(
+              style = "margin: 8px 0 0 0; font-size: 0.9em; color: #555;",
+              "Note: This triage is local and fast. Authoritative reconciliation against the BIEN taxonomic backbone requires the downstream TNRS service (Step 6)."
+            )
+          ),
           uiOutput("taxonomy_loading_ui"),
           uiOutput("taxonomy_cap_warning_ui"),
           h4("Taxonomy Summary"),
@@ -489,9 +522,9 @@ ui <- fluidPage(
           h3("How to Use This App"),
           tags$ol(
             tags$li("Upload your survey and plot/location CSVs in Step 1 Upload, or turn on tutorial mode for a demo."),
-            tags$li("Click 1) Prepare Linked Table and confirm the Step 2 Link join key matches exactly across files."),
-            tags$li("Click 2) Suggest Mapping, then verify scientificName and any latitude/longitude fields in Step 3 Map."),
-            tags$li("Click 3) Build BIEN Draft Tables, then use Step 5 Validate to clear any BLOCK errors. If you see 'missing_geography', your join did not propagate Lat/Long."),
+            tags$li("Click 'A Prepare Linked Table' and confirm the Step 2 Link join key matches exactly across files."),
+            tags$li("Click 'B Suggest Mapping', then verify scientificName and any latitude/longitude fields in Step 3 Map."),
+            tags$li("Click 'C Build BIEN Draft Tables', then use Step 5 Validate to clear any BLOCK errors. If you see 'missing_geography', your join did not propagate Lat/Long."),
             tags$li("Use Step 6 Export for draft BIEN tables and handoffs only after blockers are cleared.")
           ),
           tags$hr(),
@@ -505,7 +538,7 @@ ui <- fluidPage(
           tags$hr(),
           h4("Optional: Run BIEN Web Services"),
           tags$p(
-            "After you click 3) Build BIEN Draft Tables and review Step 5 Validate, you can optionally request BIEN service-state checks for downstream reconciliation:"
+            "After you click 'C Build BIEN Draft Tables' and review Step 5 Validate, you can optionally request BIEN service-state checks for downstream reconciliation:"
           ),
           tags$ul(
             tags$li(strong("TNRS"), " (Taxonomic Name Resolution Service) — Reconciles scientific names against BIEN's taxonomic backbone."),
@@ -514,7 +547,7 @@ ui <- fluidPage(
             tags$li(strong("NSR"), " (Native Status Reference) — Flags introduced, invasive, or cultivated species.")
           ),
           tags$p(
-            "Click the orange 4) Run BIEN Service Checks button in the sidebar after building your draft tables. ",
+            "Click the 'D Run BIEN Service Checks' button in the sidebar after building your draft tables. ",
             "Results display in Step 6 Export as conservative service-state summaries. Review and reconcile downstream before final BIEN submission."
           ),
           tags$hr(),
@@ -585,9 +618,9 @@ server <- function(input, output, session) {
       footer = modalButton("Close"),
       tags$ol(
         tags$li("Upload all required CSV files in Step 1 Upload (observations plus metadata)."),
-        tags$li("Click 1) Prepare Linked Table, then clear any Step 2 Link BLOCK rows before moving on."),
-        tags$li("Click 2) Suggest Mapping, review Step 3 Map and Step 4 Taxonomy, then click 3) Build BIEN Draft Tables."),
-        tags$li("Review Step 5 Validate. If you run 4) Run BIEN Service Checks, treat the results as service-state summaries, not final authority."),
+        tags$li("Click 'A Prepare Linked Table', then clear any Step 2 Link BLOCK rows before moving on."),
+        tags$li("Click 'B Suggest Mapping', review Step 3 Map and Step 4 Taxonomy, then click 'C Build BIEN Draft Tables'."),
+        tags$li("Review Step 5 Validate. If you run 'D Run BIEN Service Checks', treat the results as service-state summaries, not final authority."),
         tags$li("Use Step 6 Export for draft handoff files only after blockers are cleared, then complete downstream expert and service reconciliation before BIEN submission.")
       )
     ))
@@ -1113,63 +1146,21 @@ server <- function(input, output, session) {
   })
 
   taxonomy_view_state <- reactive({
-    if (!is.null(build_state())) {
-      bien_tbl <- staging_preview_df()
-      scientific_name <- as.character(bien_tbl$scientificName)
-      taxonomy_status <- as.character(bien_tbl$bien_taxonomy_status)
-      matched_name <- as.character(bien_tbl$bien_matched_name)
-
-      review_idx <- grepl("review|unresolved", taxonomy_status, ignore.case = TRUE) |
-        is.na(scientific_name) |
-        trimws(scientific_name) == ""
-
-      review_tbl <- bien_tbl[
-        review_idx,
-        c("occurrenceID", "scientificName", "bien_matched_name", "bien_taxonomy_status", "bien_family"),
-        drop = FALSE
-      ]
-
-      total_review_rows <- nrow(review_tbl)
-
-      metrics <- data.frame(
-        metric = c("Total records", "Unique submitted names", "BIEN/backbone matched", "Needs review", "Blank scientificName"),
-        value = c(
-          nrow(bien_tbl),
-          length(unique(scientific_name)),
-          sum(!is.na(matched_name) & trimws(matched_name) != ""),
-          sum(review_idx, na.rm = TRUE),
-          sum(is.na(scientific_name) | trimws(scientific_name) == "")
-        ),
-        stringsAsFactors = FALSE
-      )
-
-      return(list(
-        metrics = metrics,
-        review_tbl = review_tbl,
-        total_review_rows = total_review_rows
-      ))
-    }
-
     tx <- taxonomy_df()
 
-    # Keep Step 4 local and responsive. External TNRS calls are run only from
-    # the explicit "Run BIEN Service Checks" action in Step 6.
-    tx$tnrs_matched <- NA_character_
-    tx$tnrs_confidence <- NA_real_
-    tx$tnrs_acceptedname <- NA_character_
-
+    # Step 4 is always the fast local triage path — no augment_bien_pipeline().
+    # External TNRS calls are run only from the "Run BIEN Service Checks" action in Step 6.
     review_idx <- tx$status %in% c("REVIEW", "UNRESOLVED")
     review_tbl <- tx[review_idx, , drop = FALSE]
     total_review_rows <- nrow(review_tbl)
 
     metrics <- data.frame(
-      metric = c("Total unique names", "Candidate", "Review", "Unresolved", "TNRS high-confidence match (from service checks)"),
+      metric = c("Total unique names", "Candidate for backbone check", "Needs review", "Unresolved (blank)"),
       value = c(
         nrow(tx),
         sum(tx$status == "CANDIDATE"),
         sum(tx$status == "REVIEW"),
-        sum(tx$status == "UNRESOLVED"),
-        sum(!is.na(tx$tnrs_confidence) & tx$tnrs_confidence >= 0.8, na.rm = TRUE)
+        sum(tx$status == "UNRESOLVED")
       ),
       stringsAsFactors = FALSE
     )
@@ -1210,7 +1201,7 @@ server <- function(input, output, session) {
         stringsAsFactors = FALSE
       ))
     }
-    join_conflicts()
+    utils::head(join_conflicts(), 200)
   }, striped = TRUE, bordered = TRUE)
 
   output$join_warning_box <- renderUI({
@@ -1251,80 +1242,32 @@ server <- function(input, output, session) {
 
   output$taxonomy_review_note <- renderText({
     state <- taxonomy_view_state()
-    lookup_total <- if (!is.null(build_state()) && "taxonomy_lookup_total_unique_names" %in% names(staging_preview_df())) {
-      unique(stats::na.omit(staging_preview_df()$taxonomy_lookup_total_unique_names))[1]
-    } else {
-      nrow(taxonomy_df())
-    }
-    cap_note <- if (!is.na(lookup_total) && lookup_total > taxonomy_lookup_cap) {
-      paste0(" Taxonomy lookup cap applied: first ", taxonomy_lookup_cap, " of ", lookup_total, " unique names were processed in this pass.")
-    } else {
-      ""
-    }
     paste0(
       "Review rows: ", state$total_review_rows,
-      ". Includes unresolved names and low-confidence TNRS matches (< 80%). ",
-      "Use search, sorting, and pagination to inspect records quickly.",
-      cap_note
+      ". Names flagged REVIEW contain uncertain qualifiers (sp./cf./aff./indet.). ",
+      "Use search, sorting, and pagination to inspect records quickly."
     )
   })
 
   output$taxonomy_cap_warning_ui <- renderUI({
-    total_unique <- if (!is.null(build_state()) && "taxonomy_lookup_total_unique_names" %in% names(staging_preview_df())) {
-      unique(stats::na.omit(staging_preview_df()$taxonomy_lookup_total_unique_names))[1]
-    } else {
-      nrow(taxonomy_df())
-    }
-
-    if (is.na(total_unique) || total_unique <= taxonomy_lookup_cap) {
-      return(NULL)
-    }
-
-    tags$div(
-      style = "margin: 8px 0 12px 0; padding: 10px; background: #fff3cd; border-left: 4px solid #b7791f;",
-      strong("Taxonomy cap warning: "),
-      paste0(
-        total_unique,
-        " unique names detected, but this run processed only the first ",
-        taxonomy_lookup_cap,
-        " names for initial taxonomy lookup. Split data or run follow-up passes for full coverage."
-      )
-    )
+    # Step 4 local triage processes all unique names — no cap applied here.
+    NULL
   })
 
   output$taxonomy_review <- DT::renderDT({
     review_tbl <- taxonomy_view_state()$review_tbl
-    
-    # Prepare columns for display
+
     if (nrow(review_tbl) > 0) {
-      # Ensure TNRS columns exist
-      if (!"tnrs_matched" %in% names(review_tbl)) {
-        review_tbl$tnrs_matched <- NA_character_
-        review_tbl$tnrs_confidence <- NA_real_
-        review_tbl$tnrs_acceptedname <- NA_character_
-      }
-      
-      # Format confidence as percentage
-      review_tbl$tnrs_confidence_pct <- if ("tnrs_confidence" %in% names(review_tbl)) {
-        ifelse(is.na(review_tbl$tnrs_confidence), "", 
-               paste0(round(review_tbl$tnrs_confidence * 100, 0), "%"))
-      } else {
-        ""
-      }
-      
-      # Select columns for display
       display_cols <- intersect(
-        c("scientificName", "status", "tnrs_matched", "tnrs_confidence_pct", "tnrs_acceptedname"),
+        c("scientificName", "canonicalName", "status", "note"),
         names(review_tbl)
       )
       review_tbl_display <- review_tbl[, display_cols, drop = FALSE]
-      
-      # Rename for clarity
       names(review_tbl_display) <- gsub("_", " ", tools::toTitleCase(names(review_tbl_display)))
     } else {
       review_tbl_display <- review_tbl
     }
-    
+
     DT::datatable(
       review_tbl_display,
       options = list(pageLength = 25, lengthMenu = c(25, 50, 100), autoWidth = TRUE),
