@@ -178,6 +178,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: enquistlab-site-migration/_pages/publications.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-22
+- Prompt summary: Add more WordPress-sourced lab/work/equation photos to the site and fully update Resources with BIEN web services, TNRS/GNRS/NSR/GVS links, service vignettes, and fluxible/traitstrap package links.
+- Requested outcomes: Import additional WordPress images, surface them on key pages, and expand the resources page with complete BIEN services and related R package references.
+- Files changed: enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/research.md; enquistlab-site-migration/assets/img/wordpress/dsc_3443.jpeg; enquistlab-site-migration/assets/img/wordpress/dsc_3225.jpg; enquistlab-site-migration/assets/img/wordpress/img_0597.jpg; enquistlab-site-migration/assets/img/wordpress/yoda_self_thinning_fig1.png; enquistlab-site-migration/assets/img/wordpress/yoda_self_thinning_fig2.png; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Set up an automated check of the Google Docs CV and update the website CV automatically when the Google Doc changes.
+- Requested outcomes: Implement scheduled Google Docs CV change detection and automatic CV artifact refresh in the site repository.
+- Files changed: enquistlab-site-migration/.github/workflows/sync-google-doc-cv.yml; enquistlab-site-migration/scripts/sync_google_doc_cv.sh; enquistlab-site-migration/_pages/cv.md; enquistlab-site-migration/assets/pdf/enquist_cv.pdf; enquistlab-site-migration/assets/cv/google_doc_cv_latest.txt; enquistlab-site-migration/assets/cv/google_doc_cv.sha256; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: Run the mandatory final pre-return gate and return strict PASS/BLOCKED with evidence for prompt log, Rmd compile trigger, package build trigger, and git push status.
 - Requested outcomes: Execute final-gate checks and report PASS/BLOCKED decision with concise evidence.
