@@ -393,3 +393,21 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify current deployment status and confirm that the section was removed in source and replaced with complete-list search behavior.
 - Files changed: none (diagnostic-only turn)
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Fix publications page bug where complete list rendered as one long text string by markdownifying included publication content.
+- Requested outcomes: Append prompt log entry, verify git push status for site repo commit 1e3ec2f, and run standard always-agent final gate PASS/FAIL.
+- Files changed: enquistlab-site-migration/_pages/publications.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Publications page: fix search input rendering issue where input text appeared as literal; use stable bib_search input and ensure search filters complete list; auto-link paper titles to DOI/URL targets.
+- Requested outcomes: Repair publications search input rendering, stabilize bib_search filtering against full publication list, and auto-link titles to DOI/URL destinations.
+- Files changed: enquistlab-site-migration/_pages/publications.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Publications titles are not clickable; retry so each paper title uses the Google Doc's embedded hyperlink.
+- Requested outcomes: Regenerate publications content from the shared Google Doc preserving embedded anchors, and update publications page behavior to keep full-list search/filter working.
+- Files changed: enquistlab-site-migration/_includes/publications_full_from_doc.md; enquistlab-site-migration/_pages/publications.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
