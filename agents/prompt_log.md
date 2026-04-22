@@ -172,6 +172,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: enquistlab-site-migration/_includes/publications_full_from_doc.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-22
+- Prompt summary: Broaden publications subject-category assignment, explicitly placing papers with “Flux” and “stoichiometry” in ecophysiology.
+- Requested outcomes: Refine the publications page topic matcher rules so ecophysiology captures flux-, stoichiometry-, carbon-exchange-, and primary-productivity-related papers more accurately.
+- Files changed: enquistlab-site-migration/_pages/publications.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: Run the mandatory final pre-return gate and return strict PASS/BLOCKED with evidence for prompt log, Rmd compile trigger, package build trigger, and git push status.
 - Requested outcomes: Execute final-gate checks and report PASS/BLOCKED decision with concise evidence.
