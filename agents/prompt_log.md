@@ -16,6 +16,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by:
 
 ## Entries
+- Date: 2026-04-22
+- Prompt summary: Apply targeted fixes from code-checker review in LoadingHistoricalObservationDataIntoBIEN.
+- Requested outcomes: Align Help copy with current stage labels and conservative BIEN service messaging; update README worked example; enforce join-blocker gating in key download handlers; fix coordinate-ready count logic; improve small-screen persistent Help button responsiveness; run smoke checks.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/tests/smoke_join_blocker_service_state.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-03-28
 - Prompt summary: Create an always agent that runs last and checks prompt logging, Rmd compile status, R package build status, and git push status.
 - Requested outcomes: Add new always agent and make it final gate before return.
@@ -196,6 +202,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: enquistlab-site-migration/.github/workflows/sync-google-doc-cv.yml; enquistlab-site-migration/scripts/sync_google_doc_cv.sh; enquistlab-site-migration/_pages/cv.md; enquistlab-site-migration/assets/pdf/enquist_cv.pdf; enquistlab-site-migration/assets/cv/google_doc_cv_latest.txt; enquistlab-site-migration/assets/cv/google_doc_cv.sha256; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-22
+- Prompt summary: Review the Enquist Lab site design and add more science-in-action photos to Contact and Join, plus Plant Functional Trait Course resources to Resources.
+- Requested outcomes: Improve Contact and Join page presentation with field and teaching imagery, and add a prominent PFTC resources section with links to course materials, data workflows, curation, community data, trait data, and lectures.
+- Files changed: enquistlab-site-migration/_pages/contact.md; enquistlab-site-migration/_pages/join.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: Run the mandatory final pre-return gate and return strict PASS/BLOCKED with evidence for prompt log, Rmd compile trigger, package build trigger, and git push status.
 - Requested outcomes: Execute final-gate checks and report PASS/BLOCKED decision with concise evidence.
@@ -218,6 +230,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Fix BIEN-SpeciesShinyApp species autocomplete input because typed text disappears and the dropdown arrow is not behaving normally.
 - Requested outcomes: Stop the species lookup control from resetting while typing and restore normal selectize dropdown behavior.
 - Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Review the design direction for the Enquist Lab site contact, join, and resources pages and recommend small implementation-ready improvements that fit the current Jekyll visual language.
+- Requested outcomes: Provide concise guidance to add more science-in-action photography to contact and join, integrate Plant Functional Trait Course links into resources, and suggest low-risk content/layout/component refinements without broad redesign.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Redesign LoadingHistoricalObservationDataIntoBIEN to align with BIEN app organization style while preserving ingest, Darwin Core mapping, BIEN service checks, and staging-table workflow.
+- Requested outcomes: Rename app/tool copy, simplify UX and stage progression, add persistent help modal button, tighten join/cardinality build gating, fix GNRS structured-input contract, add explicit non-authoritative reconciliation state messaging, surface taxonomy-cap warnings, and update documentation/provenance.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_handoff.R; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/DESCRIPTION; LoadingHistoricalObservationDataIntoBIEN/tests/smoke_join_blocker_service_state.R; agents/prompt_log.md; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-21
