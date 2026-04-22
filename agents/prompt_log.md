@@ -447,3 +447,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Add tabs for Macroecology, Metabolic Scaling and Allometry, Trait-based Ecology, Ecophysiology, Functional Ecology, Tropical Ecology, Arctic and Alpine, and Biodiversity Informatics, with automatic grouping from the full chronological publication list.
 - Files changed: enquistlab-site-migration/_pages/publications.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+## 2026-04-21 — Design + ecology improvements
+
+**Prompt:** "Agreed. Lets make it happen" (implementing design-atelier + ecology-user audit recommendations)
+
+**Changes:**
+- `_sass/_lab-redesign.scss`: added `.home-stats`, `.home-stat`, `.tool-tag`/`.tool-tags`, `.theory-figure-pair`, `.bien-quickstart` CSS blocks
+- `_pages/home.md`: inserted three-column stat row (~85M records, 100k+ range maps, 400+ publications) between mission and card grid
+- `_pages/research.md`: replaced raw yoda PNG `<img>` tags with `.theory-figure-pair` figure pair; added collapsible BIEN R quick-start code block
+- `_pages/software.md`: added data-type `.tool-tag` badges to every tool heading (occurrence/trait/range/taxonomy/spatial/niche/co-occurrence/climate/flux/native status); removed two redundant BIEN service bullet-link sections (kept card grid + vignettes only)
+
+**Commits:** e4bf24e (site), pushed to main
