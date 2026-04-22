@@ -12,6 +12,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 2026-04-22 | Fix structural hang issues in LoadingHistoricalObservationDataIntoBIEN/app.R: (1) replaced req() race condition in combined_state with fallback logic using merge_plan(); (2) added resolve_dict_path() helper and used it in suggested_mapping eventReactive; (3) changed duplicate_strategy default to first_non_empty; (4) corrected spinner step labels (Step 1→2, Step 3→5).
 
+2026-04-22 | Step 3 mapping performance: replaced per-column linear scan in suggest_dwc_mapping with O(1) named-vector lookup; replaced lapply+do.call(rbind) with direct vector + single data.frame call; added .bien_lookup_tables cached helper in bien_pipeline_helpers.R so bien_norm and alias reverse-map computed once; updated suggest_bien_field to use .bien_lookup_tables; added .suggest_bien_fields_vec vectorized batch helper in dwc_mapping.R; app.R passes combined_df()[0L,] to suggest_dwc_mapping; fixed spinner label Step 2→Step 3. Deployed to shinyapps.io.
+
 ## Entry Template
 - Date:
 - Prompt summary:
@@ -20,6 +22,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by:
 
 ## Entries
+- Date: 2026-04-22
+- Prompt summary: Dramatically speed up Step 3 DWC field mapping in LoadingHistoricalObservationDataIntoBIEN.
+- Requested outcomes: (1) O(1) named-vector lookup in suggest_dwc_mapping replacing per-column linear scan; (2) direct vector + single data.frame call replacing lapply+do.call(rbind); (3) .bien_lookup_tables cached helper in bien_pipeline_helpers.R (bien_norm and alias reverse-map computed once); (4) suggest_bien_field updated to use .bien_lookup_tables; (5) .suggest_bien_fields_vec vectorized batch helper in dwc_mapping.R; (6) app.R passes combined_df()[0L,] to suggest_dwc_mapping; (7) spinner label corrected Step 2→Step 3. Deployed to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/dwc_mapping.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-22
 - Prompt summary: Apply targeted fixes from code-checker review in LoadingHistoricalObservationDataIntoBIEN.
 - Requested outcomes: Align Help copy with current stage labels and conservative BIEN service messaging; update README worked example; enforce join-blocker gating in key download handlers; fix coordinate-ready count logic; improve small-screen persistent Help button responsiveness; run smoke checks.

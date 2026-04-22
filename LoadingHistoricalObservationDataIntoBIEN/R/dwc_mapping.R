@@ -13,65 +13,84 @@ infer_measurement_unit <- function(source_col_name) {
   NA_character_
 }
 
-load_header_synonyms <- function(path = "inst/dictionaries/header_synonyms.csv") {
-  if (!file.exists(path)) {
-    stop("Header synonym dictionary not found: ", path)
-  }
+load_header_synonyms <- local({
+  cache <- list()
 
-  syn <- utils::read.csv(path, stringsAsFactors = FALSE)
-  needed <- c("alias", "dwc_term")
-  if (!all(needed %in% names(syn))) {
-    stop("Synonym dictionary must contain columns: alias, dwc_term")
-  }
+  function(path = "inst/dictionaries/header_synonyms.csv") {
+    if (!is.null(cache[[path]])) {
+      return(cache[[path]])
+    }
+    if (!file.exists(path)) {
+      stop("Header synonym dictionary not found: ", path)
+    }
 
-  syn$alias_canonical <- canonicalize_header(syn$alias)
-  syn
+    syn <- utils::read.csv(path, stringsAsFactors = FALSE)
+    needed <- c("alias", "dwc_term")
+    if (!all(needed %in% names(syn))) {
+      stop("Synonym dictionary must contain columns: alias, dwc_term")
+    }
+
+    syn$alias_canonical <- canonicalize_header(syn$alias)
+    cache[[path]] <<- syn
+    syn
+  }
+})
+
+# Vectorized BIEN field suggestion for a canonical name vector.
+# Uses pre-cached lookup tables from bien_pipeline_helpers.R.
+.suggest_bien_fields_vec <- function(src_canonical) {
+  tbl       <- .bien_lookup_tables()
+  exact_idx <- match(src_canonical, tbl$bien_norm)
+  alias_hit <- tbl$alias_rev[src_canonical]           # named vector; NA where no alias match
+
+  field  <- ifelse(!is.na(exact_idx), tbl$bien_ref[exact_idx],
+             ifelse(!is.na(alias_hit), as.character(alias_hit), ""))
+  conf   <- ifelse(!is.na(exact_idx), "high",
+             ifelse(!is.na(alias_hit), "medium", "low"))
+  reason <- ifelse(!is.na(exact_idx), "exact_header_match",
+             ifelse(!is.na(alias_hit), "alias_match", "no_bien_match"))
+
+  list(field = field, confidence = conf, reason = reason)
 }
 
 suggest_dwc_mapping <- function(df, dictionary_path = "inst/dictionaries/header_synonyms.csv") {
-  if (!is.data.frame(df)) {
-    stop("df must be a data.frame")
+  if (!is.data.frame(df)) stop("df must be a data.frame")
+
+  src <- names(df)
+  if (length(src) == 0) {
+    return(data.frame(
+      source_column = character(0), suggested_dwc_term = character(0),
+      confidence = character(0), suggested_bien_field = character(0),
+      bien_confidence = character(0), bien_reason = character(0),
+      stringsAsFactors = FALSE
+    ))
   }
 
-  syn <- load_header_synonyms(dictionary_path)
-  src <- names(df)
+  syn           <- load_header_synonyms(dictionary_path)
   src_canonical <- canonicalize_header(src)
-  bien_reference_fields <- get_bien_reference_fields()
 
-  suggestions <- lapply(seq_along(src), function(i) {
-    hits <- syn[syn$alias_canonical == src_canonical[i], , drop = FALSE]
-    bien_hit <- suggest_bien_field(src[i], bien_reference_fields = bien_reference_fields)
-    if (nrow(hits) > 0) {
-      data.frame(
-        source_column = src[i],
-        suggested_dwc_term = hits$dwc_term[1],
-        confidence = "high",
-        suggested_bien_field = bien_hit$field,
-        bien_confidence = bien_hit$confidence,
-        bien_reason = bien_hit$reason,
-        stringsAsFactors = FALSE
-      )
-    } else {
-      inferred_dwc <- ""
-      inferred_conf <- "low"
-      if (grepl("dbh|diameter", src_canonical[i])) {
-        inferred_dwc <- "measurementValue"
-        inferred_conf <- "medium"
-      }
+  # O(1) per-column dictionary lookup via named vector (replaces per-column table scan)
+  syn_lookup     <- setNames(syn$dwc_term, syn$alias_canonical)
+  matched_dwc    <- syn_lookup[src_canonical]          # NA where no match
+  has_dbh        <- grepl("dbh|diameter", src_canonical)
 
-      data.frame(
-        source_column = src[i],
-        suggested_dwc_term = inferred_dwc,
-        confidence = inferred_conf,
-        suggested_bien_field = bien_hit$field,
-        bien_confidence = bien_hit$confidence,
-        bien_reason = bien_hit$reason,
-        stringsAsFactors = FALSE
-      )
-    }
-  })
+  suggested_dwc_term <- ifelse(!is.na(matched_dwc), matched_dwc,
+                               ifelse(has_dbh, "measurementValue", ""))
+  confidence         <- ifelse(!is.na(matched_dwc), "high",
+                               ifelse(has_dbh, "medium", "low"))
 
-  do.call(rbind, suggestions)
+  # BIEN suggestions: fully vectorized, single pass over all columns
+  bien_hits <- .suggest_bien_fields_vec(src_canonical)
+
+  data.frame(
+    source_column      = src,
+    suggested_dwc_term = suggested_dwc_term,
+    confidence         = confidence,
+    suggested_bien_field = bien_hits$field,
+    bien_confidence    = bien_hits$confidence,
+    bien_reason        = bien_hits$reason,
+    stringsAsFactors   = FALSE
+  )
 }
 
 apply_dwc_mapping <- function(df, mapping_df) {
@@ -82,16 +101,16 @@ apply_dwc_mapping <- function(df, mapping_df) {
     stop("mapping_df must include source_column and dwc_term")
   }
 
-  out <- df[, 0, drop = FALSE]
-  for (i in seq_len(nrow(mapping_df))) {
-    src <- mapping_df$source_column[i]
-    dwc <- mapping_df$dwc_term[i]
-
-    if (!nzchar(dwc) || !src %in% names(df)) {
-      next
-    }
-
-    out[[dwc]] <- df[[src]]
+  valid <- nzchar(mapping_df$dwc_term) & (mapping_df$source_column %in% names(df))
+  valid_map <- mapping_df[valid, , drop = FALSE]
+  col_data <- setNames(
+    lapply(valid_map$source_column, function(src) df[[src]]),
+    valid_map$dwc_term
+  )
+  out <- if (length(col_data) > 0) {
+    as.data.frame(col_data, stringsAsFactors = FALSE, check.names = FALSE)
+  } else {
+    df[, 0L, drop = FALSE]
   }
 
   if (!"occurrenceID" %in% names(out)) {

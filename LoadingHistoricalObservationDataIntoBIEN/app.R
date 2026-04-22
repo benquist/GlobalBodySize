@@ -670,7 +670,7 @@ server <- function(input, output, session) {
     tags$div(
       class = "bien-working-banner",
       tags$div(class = "bien-working-spinner spinner-border"),
-      tags$span("Step 2: Suggesting field mapping — please wait...")
+      tags$span("Step 3: Suggesting field mapping — please wait...")
     )
   })
 
@@ -1009,7 +1009,8 @@ server <- function(input, output, session) {
   })
 
   suggested_mapping <- eventReactive(input$suggest_btn, {
-    suggest_dwc_mapping(combined_df(), dictionary_path = resolve_dict_path("header_synonyms.csv"))
+    # Only column names are needed — pass a zero-row stub to avoid copying the full dataset.
+    suggest_dwc_mapping(combined_df()[0L, ], dictionary_path = resolve_dict_path("header_synonyms.csv"))
   })
 
   active_mapping <- reactive({

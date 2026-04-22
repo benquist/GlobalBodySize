@@ -60,21 +60,46 @@ get_bien_field_aliases <- function() {
   )
 }
 
-suggest_bien_field <- function(column_name, bien_reference_fields = get_bien_reference_fields()) {
-  col_norm <- canonicalize_bien_header(column_name)
-  bien_norm <- canonicalize_bien_header(bien_reference_fields)
+# Pre-normalized alias table — computed once, reused for every column in suggest_dwc_mapping.
+.bien_field_aliases_normalized <- local({
+  cache <- NULL
+  function() {
+    if (!is.null(cache)) return(cache)
+    cache <<- lapply(get_bien_field_aliases(), canonicalize_bien_header)
+    cache
+  }
+})
 
-  exact_idx <- which(bien_norm == col_norm)
-  if (length(exact_idx) > 0) {
-    return(list(field = bien_reference_fields[[exact_idx[[1]]]], confidence = "high", reason = "exact_header_match"))
+# Pre-computed BIEN lookup tables — built once per session, reused for all mapping calls.
+# Keyed lookups eliminate repeated canonicalize calls inside suggest_dwc_mapping loops.
+.bien_lookup_tables <- local({
+  cache <- NULL
+  function() {
+    if (!is.null(cache)) return(cache)
+    bien_ref  <- get_bien_reference_fields()
+    bien_norm <- canonicalize_bien_header(bien_ref)
+    aliases   <- .bien_field_aliases_normalized()
+    # Reverse alias map: alias_canonical -> field_name (O(1) lookup)
+    alias_rev <- unlist(lapply(names(aliases), function(f) {
+      setNames(rep(f, length(aliases[[f]])), aliases[[f]])
+    }))
+    cache <<- list(bien_ref = bien_ref, bien_norm = bien_norm, alias_rev = alias_rev)
+    cache
+  }
+})
+
+suggest_bien_field <- function(column_name, bien_reference_fields = get_bien_reference_fields()) {
+  tbl      <- .bien_lookup_tables()
+  col_norm <- canonicalize_bien_header(column_name)
+
+  exact_idx <- match(col_norm, tbl$bien_norm)
+  if (!is.na(exact_idx)) {
+    return(list(field = tbl$bien_ref[[exact_idx]], confidence = "high", reason = "exact_header_match"))
   }
 
-  aliases <- get_bien_field_aliases()
-  for (field in names(aliases)) {
-    alias_norm <- canonicalize_bien_header(aliases[[field]])
-    if (col_norm %in% alias_norm) {
-      return(list(field = field, confidence = "medium", reason = "alias_match"))
-    }
+  alias_hit <- tbl$alias_rev[col_norm]
+  if (!is.na(alias_hit)) {
+    return(list(field = alias_hit[[1]], confidence = "medium", reason = "alias_match"))
   }
 
   list(field = "", confidence = "low", reason = "no_bien_match")
@@ -399,87 +424,92 @@ library(httr)
 # TNRS: Taxonomic Name Resolution Service
 # Uses the public iPlant Collaborative TNRS API
 bien_tnrs_query <- function(names, request_timeout = 6, max_names = 20) {
-  if (length(names) == 0 || all(is.na(names))) {
-    return(data.frame(
-      submitted_name = character(0),
-      tnrs_matched = character(0),
-      tnrs_confidence = numeric(0),
-      tnrs_acceptedname = character(0),
-      stringsAsFactors = FALSE
-    ))
+  empty_result <- function(submitted = character(0)) {
+    data.frame(
+      submitted_name    = submitted,
+      tnrs_matched      = if (length(submitted)) NA_character_ else character(0),
+      tnrs_confidence   = if (length(submitted)) NA_real_      else numeric(0),
+      tnrs_acceptedname = if (length(submitted)) NA_character_ else character(0),
+      stringsAsFactors  = FALSE
+    )
   }
-  
+
+  if (length(names) == 0 || all(is.na(names))) return(empty_result())
+
   names <- unique(trimws(as.character(names)))
   names <- names[!is.na(names) & names != ""]
+  if (length(names) > max_names) names <- names[seq_len(max_names)]
+  if (length(names) == 0) return(empty_result())
 
-  if (length(names) > max_names) {
-    names <- names[seq_len(max_names)]
+  url <- "https://tnrs.biendata.org/tnrs_api_r.php"
+
+  # Attempt a single batched request (newline-separated names) — reduces N
+  # sequential HTTP round-trips to 1.  Falls back to sequential on failure.
+  parse_tnrs_csv <- function(content_text, expected_names) {
+    if (!nzchar(content_text)) return(NULL)
+    df <- tryCatch(
+      read.csv(text = content_text, stringsAsFactors = FALSE),
+      error = function(e) NULL
+    )
+    if (is.null(df) || nrow(df) == 0 || !"Name_submitted" %in% names(df)) return(NULL)
+    df
   }
-  
-  if (length(names) == 0) {
+
+  batch_timeout <- min(max(request_timeout, request_timeout * length(names)), 60L)
+  batch_result <- tryCatch({
+    resp <- httr::POST(
+      url,
+      body = list(names = paste(names, collapse = "\n"), source = "ioplant"),
+      encode = "form",
+      httr::timeout(batch_timeout),
+      httr::user_agent("HistoricalObservationDataToBIEN/0.1.0")
+    )
+    if (httr::status_code(resp) != 200) return(NULL)
+    parse_tnrs_csv(httr::content(resp, as = "text", encoding = "UTF-8"), names)
+  }, error = function(e) NULL)
+
+  if (!is.null(batch_result)) {
+    # One row per submitted name (first match per name)
+    df <- batch_result[!duplicated(batch_result$Name_submitted), , drop = FALSE]
     return(data.frame(
-      submitted_name = character(0),
-      tnrs_matched = character(0),
-      tnrs_confidence = numeric(0),
-      tnrs_acceptedname = character(0),
-      stringsAsFactors = FALSE
+      submitted_name    = df$Name_submitted,
+      tnrs_matched      = if ("Name_matched"  %in% names(df)) df$Name_matched  else NA_character_,
+      tnrs_confidence   = if ("Overall_score" %in% names(df)) df$Overall_score else NA_real_,
+      tnrs_acceptedname = if ("Name_accepted" %in% names(df)) df$Name_accepted else NA_character_,
+      stringsAsFactors  = FALSE
     ))
   }
-  
-  results_list <- list()
-  
+
+  # Fallback: sequential requests (original behaviour)
+  results_list <- vector("list", length(names))
   for (i in seq_along(names)) {
     name <- names[i]
     tryCatch({
-      # Call public TNRS API
-      url <- "https://tnrs.biendata.org/tnrs_api_r.php"
       resp <- httr::POST(
         url,
-        body = list(
-          names = name,
-          source = "ioplant"
-        ),
+        body = list(names = name, source = "ioplant"),
         encode = "form",
         httr::timeout(request_timeout),
         httr::user_agent("HistoricalObservationDataToBIEN/0.1.0")
       )
-      
       if (httr::status_code(resp) == 200) {
         content <- httr::content(resp, as = "text", encoding = "UTF-8")
-        # Parse CSV response
-        if (nzchar(content)) {
-          df <- tryCatch(
-            read.csv(text = content, stringsAsFactors = FALSE),
-            error = function(e) data.frame(Name_submitted = name, Overall_score = 0.0, Name_matched = "", Name_accepted = "")
+        df <- parse_tnrs_csv(content, name)
+        if (!is.null(df) && nrow(df) > 0) {
+          results_list[[i]] <- data.frame(
+            submitted_name    = name,
+            tnrs_matched      = df$Name_matched[1],
+            tnrs_confidence   = df$Overall_score[1],
+            tnrs_acceptedname = df$Name_accepted[1],
+            stringsAsFactors  = FALSE
           )
-          if (nrow(df) > 0) {
-            # Use first match
-            results_list[[i]] <- data.frame(
-              submitted_name = name,
-              tnrs_matched = df$Name_matched[1],
-              tnrs_confidence = df$Overall_score[1],
-              tnrs_acceptedname = df$Name_accepted[1],
-              stringsAsFactors = FALSE
-            )
-          }
         }
       }
-    }, error = function(e) {
-      # Silently continue on API errors
-    })
+    }, error = function(e) {})
   }
-  
-  if (length(results_list) > 0) {
-    return(do.call(rbind, results_list))
-  } else {
-    return(data.frame(
-      submitted_name = names,
-      tnrs_matched = NA_character_,
-      tnrs_confidence = NA_real_,
-      tnrs_acceptedname = NA_character_,
-      stringsAsFactors = FALSE
-    ))
-  }
+
+  results_list <- Filter(Negate(is.null), results_list)
+  if (length(results_list) > 0) do.call(rbind, results_list) else empty_result(names)
 }
 
 # GNRS: Geographic Name Resolution Service
