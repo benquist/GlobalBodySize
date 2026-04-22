@@ -59,7 +59,7 @@ read_local_app_version <- function(desc_path = "DESCRIPTION") {
 build_release_note <- function() {
   version_txt <- read_local_app_version()
   app_mtime <- tryCatch(format(file.info("app.R")$mtime, "%Y-%m-%d %H:%M"), error = function(e) "unknown")
-  paste0("Build ", version_txt, " | app.R updated ", app_mtime, " | includes GNRS preview and submission packet export")
+  paste0("BIEN Observation Ingest Tool build ", version_txt, " | app.R updated ", app_mtime, " | includes GNRS preview and submission packet export")
 }
 
 write_submission_packet <- function(zipfile, combined_tbl, join_audit_tbl, mapping_tbl, qc_tbl, bien_tbl, handoff_tbls, join_conflicts_tbl = NULL) {
@@ -100,7 +100,7 @@ write_submission_packet <- function(zipfile, combined_tbl, join_audit_tbl, mappi
   utils::write.csv(manifest, file.path(packet_dir, "submission_packet_manifest.csv"), row.names = FALSE)
 
   readme_lines <- c(
-    "Historical Observation Data to BIEN - Submission Packet",
+    "BIEN Observation Ingest and Reconciliation Tool - Submission Packet",
     paste0("Build note: ", build_release_note()),
     "",
     "Contents:",
@@ -137,33 +137,65 @@ ui <- fluidPage(
         font-weight: 600;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       }
+      .global-help-btn {
+        position: fixed;
+        top: 12px;
+        right: 210px;
+        z-index: 1050;
+      }
+      @media (max-width: 767px) {
+        .global-help-btn {
+          right: 145px;
+        }
+        .global-loading-pill {
+          max-width: calc(100vw - 24px);
+          font-size: 0.88em;
+        }
+      }
+      @media (max-width: 575px) {
+        .global-help-btn {
+          top: 56px;
+          right: 12px;
+        }
+        .global-help-btn .btn {
+          padding: 6px 10px;
+          font-size: 0.9em;
+        }
+      }
     '))
     ,
     tags$script(HTML(
       "$(document).on('shiny:connected', function() { Shiny.setInputValue('app_busy', false, {priority: 'event'}); });\n$(document).on('shiny:busy', function() { Shiny.setInputValue('app_busy', true, {priority: 'event'}); });\n$(document).on('shiny:idle', function() { Shiny.setInputValue('app_busy', false, {priority: 'event'}); });"
     ))
   ),
-  titlePanel("Historical Observation Data to BIEN"),
+  titlePanel("BIEN Observation Ingest and Reconciliation Tool"),
   tags$div(
     style = "margin: 10px 0; padding: 10px; background: #eef6ff; border-left: 4px solid #2f6fab;",
     strong("Goal: "),
-    "Upload flat files, link tables, map to Darwin Core, run validation, and export BIEN draft handoff tables."
+    "Ingest observation datasets, map to Darwin Core, prepare BIEN reconciliation packets, and build staging-ready outputs."
   ),
   tags$div(
     style = "margin: 0 0 10px 0; color: #5a6b7a; font-size: 0.9em;",
     build_release_note()
   ),
+  tags$div(
+    class = "global-help-btn",
+    actionButton("open_global_help", "Help", class = "btn-info")
+  ),
   uiOutput("global_loading_ui"),
   sidebarLayout(
     sidebarPanel(
-      h4("Quick Start: 6 Steps"),
+      h4("Simple Workflow"),
       tags$ol(
-        tags$li("Upload your main survey and plot/location files as CSVs."),
-        tags$li("In Step 2, select the join key (e.g., Plot_Name) for both files. Keys must match exactly!"),
-        tags$li("After linking, check that every observation row has Lat and Long filled. If not, check your join and file contents."),
-        tags$li("In Step 5, resolve any BLOCK errors. Click the QC Dashboard for details. If you see 'missing_geography', your join did not propagate Lat/Long."),
-        tags$li("Once all BLOCK issues are fixed, export your BIEN draft tables and handoffs."),
-        tags$li("(Optional) Click 'Run BIEN Web Services' to submit names, places, and coordinates for authoritative reconciliation via TNRS, GNRS, GVS, and NSR before final BIEN submission.")
+        tags$li("Upload observation and metadata CSVs."),
+        tags$li("Prepare linked data and confirm join audit has no BLOCK rows."),
+        tags$li("Suggest mapping, review QC, and build BIEN draft outputs."),
+        tags$li("Optionally run TNRS/GNRS/GVS/NSR checks, then export handoff files.")
+      ),
+      tags$div(
+        style = "margin: 8px 0 10px 0; padding: 10px; background: #eef7ff; border-left: 4px solid #2f6fab;",
+        strong("Workflow status"),
+        verbatimTextOutput("workflow_status_text")
       ),
       tags$div(
         style = "margin: 8px 0 8px 0; padding: 8px; background: #fffbe6; border-left: 4px solid #c28b00; font-size: 0.92em;",
@@ -175,10 +207,21 @@ ui <- fluidPage(
         )
       ),
       checkboxInput("use_tutorial_data", "Use built-in tutorial fake data", value = FALSE),
-      fileInput("input_csv", "Upload CSV File(s)", accept = ".csv", multiple = TRUE),
+      conditionalPanel(
+        condition = "!input.use_tutorial_data",
+        fileInput("input_csv", "Upload CSV File(s)", accept = ".csv", multiple = TRUE)
+      ),
+      conditionalPanel(
+        condition = "input.use_tutorial_data",
+        tags$div(
+          style = "margin: 4px 0 10px 0; padding: 8px; background: #eef7ff; border-left: 3px solid #2f6fab; font-size: 0.9em;",
+          tags$strong("Tutorial mode active."),
+          " Using built-in synthetic observation and plot-metadata files. Uncheck above to upload your own data."
+        )
+      ),
       tags$hr(),
       h4("Step Actions"),
-      actionButton("prepare_btn", "Step 2: Prepare Linked Table", class = "btn-primary"),
+      actionButton("prepare_btn", "1) Prepare Linked Table", class = "btn-primary"),
       selectInput(
         "duplicate_strategy",
         "Duplicate metadata key resolution",
@@ -190,10 +233,10 @@ ui <- fluidPage(
         ),
         selected = "require_manual_resolution"
       ),
-      actionButton("suggest_btn", "Step 3: Suggest Mapping", class = "btn-primary"),
+      actionButton("suggest_btn", "2) Suggest Mapping", class = "btn-primary"),
       fileInput("mapping_csv", "Optional Mapping Override CSV", accept = ".csv"),
-      actionButton("build_btn", "Step 5: Build BIEN Draft Tables", class = "btn-success"),
-      actionButton("run_bien_services", "Run BIEN Web Services (TNRS, GNRS, GVS, NSR)", class = "btn-warning"),
+      actionButton("build_btn", "3) Build BIEN Draft Tables", class = "btn-success"),
+      actionButton("run_bien_services", "4) Run BIEN Service Checks", class = "btn-warning"),
       tags$hr(),
       h4("Downloads"),
       tags$div(
@@ -299,8 +342,9 @@ ui <- fluidPage(
         tabPanel(
           "Step 4 Taxonomy",
           h3("Step 4. Taxonomic Reconciliation Triage"),
-          p("This step flags unresolved names locally. Use exported TNRS handoff for authoritative reconciliation."),
+          p("This stage provides preliminary taxonomy triage. Authoritative reconciliation still requires downstream TNRS/backbone review."),
           uiOutput("taxonomy_loading_ui"),
+          uiOutput("taxonomy_cap_warning_ui"),
           h4("Taxonomy Summary"),
           tableOutput("taxonomy_summary"),
           textOutput("taxonomy_review_note"),
@@ -324,7 +368,7 @@ ui <- fluidPage(
           "Step 6 Export",
           h3("Step 6. Export BIEN Draft Tables"),
           p("Download the draft loading and handoff tables for external validation and BIEN review."),
-          h4("BIEN Web Services Status"),
+          h4("BIEN Service Run State (Not Final Authority)"),
           uiOutput("bien_services_loading_ui"),
           verbatimTextOutput("bien_services_status"),
           tags$div(
@@ -349,11 +393,11 @@ ui <- fluidPage(
           "Help",
           h3("How to Use This App"),
           tags$ol(
-            tags$li("Upload your main survey and plot/location files as CSVs, or turn on tutorial mode for a demo."),
-            tags$li("In Step 2, select the join key (e.g., Plot_Name) for both files. Keys must match exactly!"),
-            tags$li("After linking, check that every observation row has Lat and Long filled. If not, check your join and file contents."),
-            tags$li("In Step 5, resolve any BLOCK errors. Click the QC Dashboard for details. If you see 'missing_geography', your join did not propagate Lat/Long."),
-            tags$li("Once all BLOCK issues are fixed, export your BIEN draft tables and handoffs.")
+            tags$li("Upload your survey and plot/location CSVs in Step 1 Upload, or turn on tutorial mode for a demo."),
+            tags$li("Click 1) Prepare Linked Table and confirm the Step 2 Link join key matches exactly across files."),
+            tags$li("Click 2) Suggest Mapping, then verify scientificName and any latitude/longitude fields in Step 3 Map."),
+            tags$li("Click 3) Build BIEN Draft Tables, then use Step 5 Validate to clear any BLOCK errors. If you see 'missing_geography', your join did not propagate Lat/Long."),
+            tags$li("Use Step 6 Export for draft BIEN tables and handoffs only after blockers are cleared.")
           ),
           tags$hr(),
           h4("How to prepare your data for BIEN"),
@@ -366,7 +410,7 @@ ui <- fluidPage(
           tags$hr(),
           h4("Optional: Run BIEN Web Services"),
           tags$p(
-            "After Step 5 (Build BIEN Draft Tables), you can optionally submit your data for authoritative external validation:"
+            "After you click 3) Build BIEN Draft Tables and review Step 5 Validate, you can optionally request BIEN service-state checks for downstream reconciliation:"
           ),
           tags$ul(
             tags$li(strong("TNRS"), " (Taxonomic Name Resolution Service) — Reconciles scientific names against BIEN's taxonomic backbone."),
@@ -375,8 +419,8 @@ ui <- fluidPage(
             tags$li(strong("NSR"), " (Native Status Reference) — Flags introduced, invasive, or cultivated species.")
           ),
           tags$p(
-            "Click the orange 'Run BIEN Web Services (TNRS, GNRS, GVS, NSR)' button in the sidebar after building your draft tables. ",
-            "Results will display in the Step 6 Export tab. Review these results carefully before final BIEN submission."
+            "Click the orange 4) Run BIEN Service Checks button in the sidebar after building your draft tables. ",
+            "Results display in Step 6 Export as conservative service-state summaries. Review and reconcile downstream before final BIEN submission."
           ),
           tags$hr(),
           h4("FAQ: Common Problems and Solutions"),
@@ -384,7 +428,7 @@ ui <- fluidPage(
             tags$li(strong("Q: I see BLOCK or QC errors!"), " — Click the QC Dashboard for details. Most often, Lat/Long are missing due to a join problem."),
             tags$li(strong("Q: My Lat/Long are NA or missing!"), " — Check that your plot/location file has Lat/Long, and that the join key matches exactly in both files."),
             tags$li(strong("Q: Can I see an example?"), " — Yes! Download the sample files below and try them in the app."),
-            tags$li(strong("Q: What do I do with BIEN Web Services results?"), " — Review the TNRS, GNRS, GVS, and NSR output in Step 6 Export. Integrate any critical corrections back into your source data, rebuild BIEN tables if needed, and then finalize submission.")
+            tags$li(strong("Q: What do I do with BIEN Web Services results?"), " — Review the TNRS, GNRS, GVS, and NSR service-state output in Step 6 Export. Integrate any critical corrections back into your source data, rebuild BIEN tables if needed, and complete downstream reconciliation before submission.")
           ),
           tags$hr(),
           tags$div(
@@ -406,6 +450,8 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  taxonomy_lookup_cap <- 50
+
   # --- Loading spinner state for each step ---
   link_loading <- reactiveVal(FALSE)
   map_loading <- reactiveVal(FALSE)
@@ -438,14 +484,35 @@ server <- function(input, output, session) {
     )
   })
 
+  observeEvent(input$open_global_help, {
+    showModal(modalDialog(
+      title = "BIEN Observation Ingest Help",
+      easyClose = TRUE,
+      footer = modalButton("Close"),
+      tags$ol(
+        tags$li("Upload all required CSV files in Step 1 Upload (observations plus metadata)."),
+        tags$li("Click 1) Prepare Linked Table, then clear any Step 2 Link BLOCK rows before moving on."),
+        tags$li("Click 2) Suggest Mapping, review Step 3 Map and Step 4 Taxonomy, then click 3) Build BIEN Draft Tables."),
+        tags$li("Review Step 5 Validate. If you run 4) Run BIEN Service Checks, treat the results as service-state summaries, not final authority."),
+        tags$li("Use Step 6 Export for draft handoff files only after blockers are cleared, then complete downstream expert and service reconciliation before BIEN submission.")
+      )
+    ))
+  })
+
   # --- Step 2 Link spinner logic ---
-  # Turn on spinner when button is clicked
+  # Single observer: always clears spinner even if combined_state() errors or req() fails silently.
   observeEvent(input$prepare_btn, {
     link_loading(TRUE)
-  })
-  # Turn off spinner when computation completes
-  observeEvent(combined_state(), {
-    link_loading(FALSE)
+    session$onFlushed(function() {
+      tryCatch(
+        combined_state(),
+        error = function(e) {
+          showNotification(paste0("Step 2 error: ", conditionMessage(e)),
+                           type = "error", duration = 15)
+        }
+      )
+      link_loading(FALSE)
+    }, once = TRUE)
   })
   output$link_loading_ui <- renderUI({
     if (link_loading()) {
@@ -457,13 +524,19 @@ server <- function(input, output, session) {
   })
 
   # --- Step 3 Map spinner logic ---
-  # Turn on spinner when button is clicked
+  # Single observer: always clears spinner even if suggested_mapping() errors or req() fails silently.
   observeEvent(input$suggest_btn, {
     map_loading(TRUE)
-  })
-  # Turn off spinner when computation completes
-  observeEvent(suggested_mapping(), {
-    map_loading(FALSE)
+    session$onFlushed(function() {
+      tryCatch(
+        suggested_mapping(),
+        error = function(e) {
+          showNotification(paste0("Step 3 error: ", conditionMessage(e)),
+                           type = "error", duration = 15)
+        }
+      )
+      map_loading(FALSE)
+    }, once = TRUE)
   })
   output$map_loading_ui <- renderUI({
     if (map_loading()) {
@@ -499,13 +572,19 @@ server <- function(input, output, session) {
   })
 
   # --- Step 5 Validate spinner logic ---
-  # Turn on spinner when button is clicked
+  # Single observer: always clears spinner even if build_state() errors or req() fails silently.
   observeEvent(input$build_btn, {
     validate_loading(TRUE)
-  })
-  # Turn off spinner when computation completes
-  observeEvent(build_state(), {
-    validate_loading(FALSE)
+    session$onFlushed(function() {
+      tryCatch(
+        build_state(),
+        error = function(e) {
+          showNotification(paste0("Step 5 error: ", conditionMessage(e)),
+                           type = "error", duration = 15)
+        }
+      )
+      validate_loading(FALSE)
+    }, once = TRUE)
   })
   output$validate_loading_ui <- renderUI({
     if (validate_loading()) {
@@ -516,18 +595,54 @@ server <- function(input, output, session) {
     } else NULL
   })
 
+  # Robust path resolution: works both from source dir and when deployed as a package.
+  resolve_extdata_path <- function(filename) {
+    # 1. Prefer system.file (works when installed as package on shinyapps.io).
+    pkg_path <- system.file("extdata", filename, package = "HistoricalObsToBIEN")
+    if (nzchar(pkg_path) && file.exists(pkg_path)) return(pkg_path)
+    # 2. Fall back to relative inst/extdata (works from source dir).
+    rel <- file.path("inst", "extdata", filename)
+    if (file.exists(rel)) return(rel)
+    # 3. App-root extdata (alternative deploy layout).
+    alt <- file.path("extdata", filename)
+    if (file.exists(alt)) return(alt)
+    stop(paste0("Tutorial data file not found: ", filename,
+                " (searched system.file, inst/extdata, extdata)"))
+  }
+
   tutorial_files <- reactive({
-    list(
-      "tutorial_observations.csv" = read_historical_csv("inst/extdata/tutorial_observations.csv"),
-      "sample_plot_metadata.csv" = read_historical_csv("inst/extdata/sample_plot_metadata.csv")
+    tryCatch(
+      list(
+        "tutorial_observations.csv" = read_historical_csv(
+          resolve_extdata_path("tutorial_observations.csv")
+        ),
+        "sample_plot_metadata.csv" = read_historical_csv(
+          resolve_extdata_path("sample_plot_metadata.csv")
+        )
+      ),
+      error = function(e) {
+        showNotification(
+          paste0("Could not load tutorial data: ", conditionMessage(e)),
+          type = "error", duration = 12
+        )
+        NULL
+      }
     )
   })
 
   available_files <- reactive({
     if (isTRUE(input$use_tutorial_data)) {
-      return(tutorial_files())
+      tut <- tutorial_files()
+      validate(
+        need(!is.null(tut),
+             "Tutorial data could not be loaded. See error notification. Try uploading your own files instead.")
+      )
+      return(tut)
     }
-    req(input$input_csv)
+    validate(
+      need(!is.null(input$input_csv),
+           "Please upload at least one CSV file, or check the 'Use built-in tutorial fake data' box.")
+    )
     read_uploaded_csv_list(input$input_csv)
   })
 
@@ -627,6 +742,24 @@ server <- function(input, output, session) {
     req(input$primary_file)
     utils::head(available_files()[[input$primary_file]], 10)
   }, striped = TRUE, bordered = TRUE)
+
+  output$workflow_status_text <- renderText({
+    upload_ready <- if (isTRUE(input$use_tutorial_data)) TRUE else !is.null(input$input_csv)
+    link_ready <- !is.null(combined_state())
+    join_blocked <- if (link_ready) has_join_blockers(join_audit()) else FALSE
+    mapping_ready <- !is.null(suggested_mapping())
+    build_ready <- !is.null(build_state())
+    qc_blocked <- if (build_ready) qc_has_blockers(qc_df()) else NA
+
+    paste(
+      paste0("Upload: ", if (upload_ready) "ready" else "waiting for files"),
+      paste0("Link: ", if (!link_ready) "not started" else if (join_blocked) "blocked (join blockers)" else "complete"),
+      paste0("Map: ", if (mapping_ready) "complete" else "pending"),
+      paste0("Build: ", if (!build_ready) "pending" else if (isTRUE(qc_blocked)) "blocked (QC BLOCK)" else "complete"),
+      "Services: optional after successful build",
+      sep = "\n"
+    )
+  })
 
   combined_state <- eventReactive(input$prepare_btn, {
     files <- available_files()
@@ -730,6 +863,20 @@ server <- function(input, output, session) {
   })
 
   build_state <- eventReactive(input$build_btn, {
+    req(join_audit())
+    if (has_join_blockers(join_audit())) {
+      blocker_tbl <- join_audit()[join_audit()$severity == "BLOCK", c("metadata_file", "join_cardinality", "detail"), drop = FALSE]
+      stop(
+        paste0(
+          "Join blockers must be resolved before build. Blocking joins: ",
+          paste(
+            paste0(blocker_tbl$metadata_file, " (", blocker_tbl$join_cardinality, ")"),
+            collapse = "; "
+          )
+        )
+      )
+    }
+
     dwc <- apply_dwc_mapping(combined_df(), active_mapping())
     qc <- run_dwc_qc(dwc)
     list(dwc = dwc, qc = qc)
@@ -747,7 +894,7 @@ server <- function(input, output, session) {
 
   staging_preview_df <- reactive({
     req(build_state())
-    build_bien_loading_table(dwc_df())
+    build_bien_loading_table(dwc_df(), taxonomy_cap = taxonomy_lookup_cap)
   })
 
   taxonomy_df <- reactive({
@@ -811,8 +958,8 @@ server <- function(input, output, session) {
       return(tnrs_cache())
     }
     
-    # Cap at 50 names to avoid overwhelming the API
-    names_to_query <- unique_names[1:min(50, length(unique_names))]
+    # Cap queried names to maintain predictable response times.
+    names_to_query <- unique_names[seq_len(min(taxonomy_lookup_cap, length(unique_names)))]
     
     tryCatch({
       results <- bien_tnrs_query(names_to_query)
@@ -869,41 +1016,19 @@ server <- function(input, output, session) {
     }
 
     tx <- taxonomy_df()
-    
-    # Merge with TNRS results
-    tnrs_tbl <- tnrs_results()
-    if (!is.null(tnrs_tbl) && is.data.frame(tnrs_tbl) && nrow(tnrs_tbl) > 0) {
-      # Merge TNRS results on submitted_name
-      names_tnrs <- tolower(trimws(as.character(tnrs_tbl$submitted_name)))
-      names_tx <- tolower(trimws(as.character(tx$scientificName)))
-      
-      tx$tnrs_matched <- NA_character_
-      tx$tnrs_confidence <- NA_real_
-      tx$tnrs_acceptedname <- NA_character_
-      
-      for (i in seq_len(nrow(tx))) {
-        match_idx <- which(names_tnrs == names_tx[i])
-        if (length(match_idx) > 0) {
-          match_idx <- match_idx[1]
-          tx$tnrs_matched[i] <- tnrs_tbl$tnrs_matched[match_idx]
-          tx$tnrs_confidence[i] <- tnrs_tbl$tnrs_confidence[match_idx]
-          tx$tnrs_acceptedname[i] <- tnrs_tbl$tnrs_acceptedname[match_idx]
-        }
-      }
-    } else {
-      tx$tnrs_matched <- NA_character_
-      tx$tnrs_confidence <- NA_real_
-      tx$tnrs_acceptedname <- NA_character_
-    }
-    
-    # Review rows: local unresolved or TNRS confidence < 0.8
-    review_idx <- tx$status %in% c("REVIEW", "UNRESOLVED") | 
-                  (!is.na(tx$tnrs_confidence) & tx$tnrs_confidence < 0.8)
+
+    # Keep Step 4 local and responsive. External TNRS calls are run only from
+    # the explicit "Run BIEN Service Checks" action in Step 6.
+    tx$tnrs_matched <- NA_character_
+    tx$tnrs_confidence <- NA_real_
+    tx$tnrs_acceptedname <- NA_character_
+
+    review_idx <- tx$status %in% c("REVIEW", "UNRESOLVED")
     review_tbl <- tx[review_idx, , drop = FALSE]
     total_review_rows <- nrow(review_tbl)
 
     metrics <- data.frame(
-      metric = c("Total unique names", "Candidate", "Review", "Unresolved", "TNRS high-confidence match"),
+      metric = c("Total unique names", "Candidate", "Review", "Unresolved", "TNRS high-confidence match (from service checks)"),
       value = c(
         nrow(tx),
         sum(tx$status == "CANDIDATE"),
@@ -991,10 +1116,44 @@ server <- function(input, output, session) {
 
   output$taxonomy_review_note <- renderText({
     state <- taxonomy_view_state()
+    lookup_total <- if (!is.null(build_state()) && "taxonomy_lookup_total_unique_names" %in% names(staging_preview_df())) {
+      unique(stats::na.omit(staging_preview_df()$taxonomy_lookup_total_unique_names))[1]
+    } else {
+      nrow(taxonomy_df())
+    }
+    cap_note <- if (!is.na(lookup_total) && lookup_total > taxonomy_lookup_cap) {
+      paste0(" Taxonomy lookup cap applied: first ", taxonomy_lookup_cap, " of ", lookup_total, " unique names were processed in this pass.")
+    } else {
+      ""
+    }
     paste0(
       "Review rows: ", state$total_review_rows,
       ". Includes unresolved names and low-confidence TNRS matches (< 80%). ",
-      "Use search, sorting, and pagination to inspect records quickly."
+      "Use search, sorting, and pagination to inspect records quickly.",
+      cap_note
+    )
+  })
+
+  output$taxonomy_cap_warning_ui <- renderUI({
+    total_unique <- if (!is.null(build_state()) && "taxonomy_lookup_total_unique_names" %in% names(staging_preview_df())) {
+      unique(stats::na.omit(staging_preview_df()$taxonomy_lookup_total_unique_names))[1]
+    } else {
+      nrow(taxonomy_df())
+    }
+
+    if (is.na(total_unique) || total_unique <= taxonomy_lookup_cap) {
+      return(NULL)
+    }
+
+    tags$div(
+      style = "margin: 8px 0 12px 0; padding: 10px; background: #fff3cd; border-left: 4px solid #b7791f;",
+      strong("Taxonomy cap warning: "),
+      paste0(
+        total_unique,
+        " unique names detected, but this run processed only the first ",
+        taxonomy_lookup_cap,
+        " names for initial taxonomy lookup. Split data or run follow-up passes for full coverage."
+      )
     )
   })
 
@@ -1057,7 +1216,13 @@ server <- function(input, output, session) {
     qc_blocks <- qc_severity_count(qc_df(), "BLOCK")
     qc_warns <- qc_severity_count(qc_df(), "WARN")
     bien_matches <- if ("bien_matched_name" %in% names(staging_preview_df())) sum(!is.na(staging_preview_df()$bien_matched_name) & trimws(as.character(staging_preview_df()$bien_matched_name)) != "") else 0
-    coord_ready <- if ("coordinate_valid_basic" %in% names(staging_preview_df())) sum(isTRUE(staging_preview_df()$coordinate_valid_basic), na.rm = TRUE) else 0
+    coord_ready <- if ("coordinate_valid_basic" %in% names(staging_preview_df())) count_basic_valid_coordinates(staging_preview_df()$coordinate_valid_basic) else 0
+    taxonomy_unique_total <- if ("taxonomy_lookup_total_unique_names" %in% names(staging_preview_df())) unique(stats::na.omit(staging_preview_df()$taxonomy_lookup_total_unique_names))[1] else NA_integer_
+    taxonomy_cap_msg <- if (!is.na(taxonomy_unique_total) && taxonomy_unique_total > taxonomy_lookup_cap) {
+      paste0("Taxonomy lookup cap applied: first ", taxonomy_lookup_cap, " of ", taxonomy_unique_total, " unique names processed")
+    } else {
+      paste0("Taxonomy lookup coverage: ", ifelse(is.na(taxonomy_unique_total), "unknown", taxonomy_unique_total), " unique names")
+    }
 
     paste(
       paste0("Loaded files: ", length(available_files())),
@@ -1068,10 +1233,12 @@ server <- function(input, output, session) {
       paste0("Join duplicate-conflict rows: ", join_conflict_rows),
       paste0("Mapped Darwin Core columns: ", ncol(dwc_df())),
       paste0("BIEN/backbone matched names: ", bien_matches),
+      taxonomy_cap_msg,
       paste0("Rows with basic-valid coordinates: ", coord_ready),
       if (length(missing) == 0) "Required Darwin Core terms present: yes" else paste0("Missing required terms: ", paste(missing, collapse = ", ")),
       paste0("QC blockers: ", qc_blocks, " | warnings: ", qc_warns),
       if (qc_blocks > 0) "BIEN export blocked until BLOCK issues are fixed." else "Draft handoff tables generated.",
+      "Service checks report processing state only; authoritative completion requires downstream expert/service review.",
       sep = "\n"
     )
   })
@@ -1088,13 +1255,17 @@ server <- function(input, output, session) {
 
   output$export_readiness <- renderText({
     req(qc_df())
+    req(join_audit())
     if (bien_services_loading()) {
       return("BIEN Web Services are currently running. Export is available, but wait for the BIEN service run to complete if you want the latest TNRS/GNRS/GVS/NSR status before final submission.")
+    }
+    if (has_join_blockers(join_audit())) {
+      return("Export blocked: resolve join cardinality BLOCK issues in Step 2 Link before final BIEN loading export.")
     }
     if (qc_has_blockers(qc_df())) {
       "Export blocked: resolve BLOCK issues in Step 5 Validate before BIEN loading export."
     } else {
-      "Export ready: download the BIEN loading draft with BIEN-backed taxonomy, coordinate, staging-status, and GNRS-ready augmentation plus TNRS/GNRS/GVS/NSR handoff files."
+      "Export ready: draft BIEN loading and TNRS/GNRS/GVS/NSR handoff files are available. Final authoritative reconciliation still requires downstream service and expert review."
     }
   })
 
@@ -1223,12 +1394,17 @@ server <- function(input, output, session) {
 
   output$download_bien <- downloadHandler(
     filename = function() "bien_loading_table.csv",
-    content = function(file) utils::write.csv(bien_df(), file, row.names = FALSE)
+    content = function(file) {
+      ensure_join_clear_for_export(join_audit(), "BIEN Loading Draft")
+      utils::write.csv(bien_df(), file, row.names = FALSE)
+    }
   )
 
   output$download_tnrs <- downloadHandler(
     filename = function() "tnrs_handoff.csv",
     content = function(file) {
+      ensure_join_clear_for_export(join_audit(), "TNRS Handoff")
+
       tnrs_tbl <- tryCatch({
         req(build_state())
         build_bien_handoff_tables(staging_preview_df())$tnrs
@@ -1254,22 +1430,33 @@ server <- function(input, output, session) {
 
   output$download_gnrs <- downloadHandler(
     filename = function() "gnrs_handoff.csv",
-    content = function(file) utils::write.csv(handoff()$gnrs, file, row.names = FALSE)
+    content = function(file) {
+      ensure_join_clear_for_export(join_audit(), "GNRS Handoff")
+      utils::write.csv(handoff()$gnrs, file, row.names = FALSE)
+    }
   )
 
   output$download_gvs <- downloadHandler(
     filename = function() "gvs_handoff.csv",
-    content = function(file) utils::write.csv(handoff()$gvs, file, row.names = FALSE)
+    content = function(file) {
+      ensure_join_clear_for_export(join_audit(), "GVS Handoff")
+      utils::write.csv(handoff()$gvs, file, row.names = FALSE)
+    }
   )
 
   output$download_nsr <- downloadHandler(
     filename = function() "nsr_handoff.csv",
-    content = function(file) utils::write.csv(handoff()$nsr, file, row.names = FALSE)
+    content = function(file) {
+      ensure_join_clear_for_export(join_audit(), "NSR Handoff")
+      utils::write.csv(handoff()$nsr, file, row.names = FALSE)
+    }
   )
 
   output$download_submission_packet <- downloadHandler(
     filename = function() paste0("historical_obs_submission_packet_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".zip"),
     content = function(file) {
+      ensure_join_clear_for_export(join_audit(), "Submission Packet Zip")
+
       write_submission_packet(
         zipfile = file,
         combined_tbl = combined_df(),
@@ -1288,6 +1475,16 @@ server <- function(input, output, session) {
   observeEvent(input$run_bien_services, {
     req(build_state())
     req(staging_preview_df())
+    req(join_audit())
+
+    if (has_join_blockers(join_audit())) {
+      bien_services_status("Cannot run BIEN service checks: resolve join BLOCK issues in Step 2 Link first.")
+      return()
+    }
+    if (qc_has_blockers(qc_df())) {
+      bien_services_status("Cannot run BIEN service checks: resolve QC BLOCK issues in Step 5 Validate first.")
+      return()
+    }
 
     bien_services_loading(TRUE)
     on.exit(bien_services_loading(FALSE), add = TRUE)
@@ -1306,26 +1503,36 @@ server <- function(input, output, session) {
       character(0)
     }
     name_vec <- name_vec[!is.na(name_vec) & name_vec != ""]
-
-    locality_vec <- if ("locality" %in% names(stage_tbl)) {
-      unique(trimws(as.character(stage_tbl$locality)))
-    } else {
-      character(0)
+    tnrs_name_cap <- 20L
+    if (length(name_vec) > tnrs_name_cap) {
+      name_vec <- name_vec[seq_len(tnrs_name_cap)]
+      bien_services_status(
+        paste0(
+          "Starting BIEN web service workflow... TNRS capped to first ",
+          tnrs_name_cap,
+          " unique names for responsiveness."
+        )
+      )
     }
-    locality_vec <- locality_vec[!is.na(locality_vec) & locality_vec != ""]
 
     coord_tbl <- stage_tbl[, intersect(c("decimalLatitude", "decimalLongitude"), names(stage_tbl)), drop = FALSE]
+    gnrs_input <- tryCatch({
+      gnrs_tbl <- build_bien_handoff_tables(stage_tbl)$gnrs
+      gnrs_tbl[, intersect(c("country", "stateProvince", "county", "locality"), names(gnrs_tbl)), drop = FALSE]
+    }, error = function(e) {
+      data.frame(stringsAsFactors = FALSE)
+    })
 
     # 1. TNRS
-    bien_services_status("Submitting names to TNRS...")
+    bien_services_status("Running service-state checks: submitting names to TNRS...")
     tnrs_result <- tryCatch({
-      bien_tnrs_query(name_vec)
+      bien_tnrs_query(name_vec, request_timeout = 6, max_names = tnrs_name_cap)
     }, error = function(e) e)
 
     # 2. GNRS
-    bien_services_status("Submitting place names to GNRS...")
+    bien_services_status("Submitting structured geography fields to GNRS...")
     gnrs_result <- tryCatch({
-      bien_gnrs_query(locality_vec)
+      bien_gnrs_query(gnrs_input)
     }, error = function(e) e)
 
     # 3. GVS
@@ -1340,23 +1547,13 @@ server <- function(input, output, session) {
       bien_nsr_query(name_vec)
     }, error = function(e) e)
 
-    summarize_service <- function(x) {
-      if (inherits(x, "error")) {
-        return(paste0("ERROR: ", conditionMessage(x)))
-      }
-      if (!is.data.frame(x)) {
-        return("No structured response")
-      }
-      paste0("OK (", nrow(x), " rows)")
-    }
-
     bien_services_status(paste(
-      "BIEN service run complete.",
-      paste0("TNRS: ", summarize_service(tnrs_result)),
-      paste0("GNRS: ", summarize_service(gnrs_result)),
-      paste0("GVS: ", summarize_service(gvs_result)),
-      paste0("NSR: ", summarize_service(nsr_result)),
-      "Results are displayed below. Review results before final BIEN submission.",
+      "BIEN service-state run complete.",
+      summarize_bien_service_state("TNRS", tnrs_result, authoritative = TRUE),
+      summarize_bien_service_state("GNRS", gnrs_result, authoritative = FALSE),
+      summarize_bien_service_state("GVS", gvs_result, authoritative = FALSE),
+      summarize_bien_service_state("NSR", nsr_result, authoritative = FALSE),
+      "Do not treat this stage as final authority. Complete downstream reconciliation and expert review before BIEN submission.",
       sep = "\n"
     ))
     # TODO: Integrate results into staging table and update UI/exports
