@@ -92,7 +92,7 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Run final pre-return checks now after adding the latest prompt-log entry.
 - Requested outcomes: Verify prompt logging, change-gated Rmd/package checks, and git push status; return strict PASS/BLOCKED output.
 - Files changed: agents/prompt_log.md
-- Completed by: GitHub Copilot
+- Completed by: 
 
 - Date: 2026-03-28
 - Prompt summary: Push all California poppy code and results to the CaliPoppySDM GitHub repository.
@@ -242,6 +242,24 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Redesign LoadingHistoricalObservationDataIntoBIEN to align with BIEN app organization style while preserving ingest, Darwin Core mapping, BIEN service checks, and staging-table workflow.
 - Requested outcomes: Rename app/tool copy, simplify UX and stage progression, add persistent help modal button, tighten join/cardinality build gating, fix GNRS structured-input contract, add explicit non-authoritative reconciliation state messaging, surface taxonomy-cap warnings, and update documentation/provenance.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_handoff.R; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/DESCRIPTION; LoadingHistoricalObservationDataIntoBIEN/tests/smoke_join_blocker_service_state.R; agents/prompt_log.md; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Fix Step 4/Run BIEN Service Checks hang when using tutorial demo data in LoadingHistoricalObservationDataIntoBIEN.
+- Requested outcomes: Remove blocking behavior in Step 4 taxonomy flow, keep service checks explicit, improve responsiveness for TNRS calls, and redeploy.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Step 4 still appears hung after initial fix; remove remaining hidden network dependency in taxonomy preview/build path.
+- Requested outcomes: Ensure Step 4 taxonomy is local and non-blocking by default, keep explicit service checks in Step 6, and redeploy.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Run final mandatory gate checks for the latest Step 4 hang fix in LoadingHistoricalObservationDataIntoBIEN.
+- Requested outcomes: Verify prompt logging, changed-file-triggered Rmd/package checks, and git push status in strict final-gate format.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-21
@@ -489,3 +507,59 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Remove text max-width cap on field-sites page; replace SEFDP photo-pair with two ForestGEO Flickr images downloaded locally; confirm ForestGEO link is correct; commit and push to EnquistLab/enquistlab.github.io main.
 - Files changed: enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/assets/img/field/sefdp_diameter_measure.jpg; enquistlab-site-migration/assets/img/field/sefdp_forest_canopy.jpg
 - Completed by: GitHub Copilot
+
+## 2026-04-22 — Publications vein/venation categorization
+
+**Prompt:** "For publications page, any publications based on leaf veins or venation networks should be categorized under ecophysiology."
+
+**Changes:**
+- `enquistlab-site-migration/_pages/publications.md`: added `{ pattern: /vein\b|venation|leaf vein/i, weight: 2 }` to ecophysiology matchers
+
+**Commits:** e1feef1, pushed to origin/main
+
+- Date: 2026-04-22
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Publications: larger year headers + fixed sidebar year navigator with IntersectionObserver scroll highlighting
+- Commit: 39cc53a
+- Requested outcomes: Larger year labels and a sidebar year scroller on enquistlab.github.io/publications/
+- Files changed: enquistlab-site-migration/_pages/publications.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Biodiversity Informatics deeper classification on enquistlab.github.io/publications/.
+- Requested outcomes: Expand matchers in _pages/publications.md to cover thesaurus, code sharing, open science, academic software, future-proof trait data, sPlot, Plant-O-Matic.
+- Files changed: _pages/publications.md (enquistlab-site-migration)
+- Commit: f6e7c21
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Fix Step 4 hang in LoadingHistoricalObservationDataIntoBIEN when using demo dataset and clicking 4) Run BIEN Service Checks.
+- Requested outcomes: Keep Step 4 local and non-blocking, cap/timeout TNRS service checks for responsiveness, rerun smoke tests, redeploy shiny app, and verify final gate status.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Re-run mandatory final pre-return checks after updating agents/prompt_log.md for the current user prompt.
+- Requested outcomes: Strict PASS/FAIL with concise evidence for prompt log, Rmd compile trigger checks, R package build trigger checks, and git push status confirmation.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Step 2 Link and suggest mapping button taking a long time / hung. Fix get_bien_reference_fields() blocking UI by removing live BIEN API calls.
+- Requested outcomes: Remove BIEN::BIEN_occurrence_species and BIEN::BIEN_trait_species live calls from get_bien_reference_fields(); always use static fallback field list; redeploy app; run always gate checks.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Testing new deployment showed Step 2 Link Observations with Metadata was still too slow; suspected prior fix was insufficient.
+- Requested outcomes: Optimize suggest_merge_plan() in LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R by avoiding repeated full-vector canonicalization inside nested column-pair loops; smoke test; deploy updated app.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/tests/smoke_join_qc.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Step 2 "preparing linked table" spinner hangs permanently (spinning ball, third time raised). Fix spinner hang on Steps 2, 3, and 5 in LoadingHistoricalObservationDataIntoBIEN app.
+- Requested outcomes: Diagnose root cause (broken two-observer spinner pattern) and apply session$onFlushed + tryCatch fix so spinner always clears regardless of success, error, or silent req() failure.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot (commit 7d92514)
