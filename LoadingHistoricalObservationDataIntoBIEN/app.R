@@ -124,43 +124,150 @@ ui <- fluidPage(
     tags$style(HTML('
       @keyframes spin { 100% { transform: rotate(360deg); } }
       .spinner-border { animation: spin 0.75s linear infinite; }
+
+      /* ── Global loading pill ── */
       .global-loading-pill {
         position: fixed;
-        top: 12px;
-        right: 12px;
+        top: 14px;
+        right: 14px;
         z-index: 1050;
-        padding: 8px 12px;
+        padding: 10px 18px;
         border-radius: 999px;
-        background: rgba(47, 111, 171, 0.1);
-        border: 1px solid rgba(47, 111, 171, 0.35);
-        color: #1f4f82;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        background: #2f6fab;
+        border: none;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.95em;
+        box-shadow: 0 4px 14px rgba(47, 111, 171, 0.45);
+        letter-spacing: 0.01em;
       }
       .global-help-btn {
         position: fixed;
-        top: 12px;
-        right: 210px;
+        top: 14px;
+        right: 220px;
         z-index: 1050;
       }
+
+      /* ── Sidebar section cards ── */
+      .bien-sidebar-section {
+        margin: 0 0 14px 0;
+        padding: 12px 14px;
+        background: #f8fbff;
+        border: 1px solid #d0e4f7;
+        border-radius: 6px;
+      }
+      .bien-sidebar-section h5 {
+        margin: 0 0 10px 0;
+        font-size: 0.85em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #1f4f82;
+      }
+
+      /* ── Step action buttons ── */
+      .btn-step {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        font-size: 1em;
+        font-weight: 600;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition: filter 0.15s, transform 0.1s;
+      }
+      .btn-step:active {
+        transform: scale(0.98);
+        filter: brightness(0.93);
+      }
+      .btn-step-primary {
+        background: #2f6fab;
+        color: #fff;
+      }
+      .btn-step-primary:hover {
+        background: #245d96;
+        color: #fff;
+      }
+      .btn-step-success {
+        background: #2d7a3a;
+        color: #fff;
+      }
+      .btn-step-success:hover {
+        background: #236130;
+        color: #fff;
+      }
+      .btn-step-warning {
+        background: #b87c00;
+        color: #fff;
+      }
+      .btn-step-warning:hover {
+        background: #9a6700;
+        color: #fff;
+      }
+
+      /* ── Working banners ── */
+      .bien-working-banner {
+        margin: 8px 0 12px 0;
+        padding: 14px 18px;
+        background: #e8f0fb;
+        border-left: 5px solid #2f6fab;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 1em;
+        color: #1a3d6e;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .bien-working-spinner {
+        display: inline-block;
+        width: 1.4rem;
+        height: 1.4rem;
+        border: 3px solid #2f6fab;
+        border-right-color: transparent;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* ── Step number badge ── */
+      .step-badge {
+        display: inline-block;
+        width: 1.6em;
+        height: 1.6em;
+        line-height: 1.6em;
+        text-align: center;
+        background: rgba(255,255,255,0.25);
+        border-radius: 50%;
+        font-size: 0.88em;
+        font-weight: 800;
+        margin-right: 8px;
+      }
+
+      /* ── Download section ── */
+      .bien-download-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+        margin-top: 6px;
+      }
+      .bien-download-grid .btn {
+        font-size: 0.78em;
+        padding: 5px 6px;
+        white-space: normal;
+        text-align: center;
+      }
+
       @media (max-width: 767px) {
-        .global-help-btn {
-          right: 145px;
-        }
-        .global-loading-pill {
-          max-width: calc(100vw - 24px);
-          font-size: 0.88em;
-        }
+        .global-help-btn { right: 145px; }
+        .global-loading-pill { max-width: calc(100vw - 24px); font-size: 0.88em; }
+        .bien-download-grid { grid-template-columns: 1fr; }
       }
       @media (max-width: 575px) {
-        .global-help-btn {
-          top: 56px;
-          right: 12px;
-        }
-        .global-help-btn .btn {
-          padding: 6px 10px;
-          font-size: 0.9em;
-        }
+        .global-help-btn { top: 56px; right: 12px; }
+        .global-help-btn .btn { padding: 6px 10px; font-size: 0.9em; }
       }
     '))
     ,
@@ -185,110 +292,98 @@ ui <- fluidPage(
   uiOutput("global_loading_ui"),
   sidebarLayout(
     sidebarPanel(
-      h4("Simple Workflow"),
-      tags$ol(
-        tags$li("Upload observation and metadata CSVs."),
-        tags$li("Prepare linked data and confirm join audit has no BLOCK rows."),
-        tags$li("Suggest mapping, review QC, and build BIEN draft outputs."),
-        tags$li("Optionally run TNRS/GNRS/GVS/NSR checks, then export handoff files.")
-      ),
+      # ── Workflow status card ──
       tags$div(
-        style = "margin: 8px 0 10px 0; padding: 10px; background: #eef7ff; border-left: 4px solid #2f6fab;",
-        strong("Workflow status"),
+        class = "bien-sidebar-section",
+        style = "background: #eef7ff; border-color: #2f6fab;",
+        h5("Workflow Status"),
         verbatimTextOutput("workflow_status_text")
       ),
+
+      # ── Section 1: Upload ──
       tags$div(
-        style = "margin: 8px 0 8px 0; padding: 8px; background: #fffbe6; border-left: 4px solid #c28b00; font-size: 0.92em;",
-        strong("Troubleshooting:"),
-        tags$ul(
-          tags$li("If you see BLOCK or QC errors, click the QC Dashboard for details."),
-          tags$li("Missing Lat/Long? Check your join key and file contents. Plot/location file must have Lat/Long, and join key must match survey file exactly."),
-          tags$li("Still stuck? Download the example files from the Help tab and try those first.")
+        class = "bien-sidebar-section",
+        h5("Upload"),
+        checkboxInput("use_tutorial_data", "Use built-in tutorial fake data", value = FALSE),
+        conditionalPanel(
+          condition = "!input.use_tutorial_data",
+          fileInput("input_csv", "Upload CSV File(s)", accept = ".csv", multiple = TRUE)
+        ),
+        conditionalPanel(
+          condition = "input.use_tutorial_data",
+          tags$div(
+            style = "margin: 4px 0 2px 0; padding: 8px; background: #eef7ff; border-left: 3px solid #2f6fab; font-size: 0.9em;",
+            tags$strong("Tutorial mode active."),
+            " Using built-in synthetic observation and plot-metadata files. Uncheck above to upload your own data."
+          )
         )
       ),
-      checkboxInput("use_tutorial_data", "Use built-in tutorial fake data", value = FALSE),
-      conditionalPanel(
-        condition = "!input.use_tutorial_data",
-        fileInput("input_csv", "Upload CSV File(s)", accept = ".csv", multiple = TRUE)
+
+      # ── Section 2: Actions ──
+      tags$div(
+        class = "bien-sidebar-section",
+        h5("Run Pipeline"),
+        actionButton("prepare_btn",
+          tags$span(tags$span(class = "step-badge", "1"), " Prepare Linked Table"),
+          class = "btn btn-step btn-step-primary", width = "100%"),
+        selectInput(
+          "duplicate_strategy",
+          "Duplicate metadata key resolution",
+          choices = c(
+            "First non-empty value" = "first_non_empty",
+            "Last non-empty value" = "last_non_empty",
+            "Most frequent non-empty value" = "most_frequent_non_empty",
+            "Block and resolve manually" = "require_manual_resolution"
+          ),
+          selected = "require_manual_resolution"
+        ),
+        actionButton("suggest_btn",
+          tags$span(tags$span(class = "step-badge", "2"), " Suggest Mapping"),
+          class = "btn btn-step btn-step-primary", width = "100%"),
+        fileInput("mapping_csv", "Optional Mapping Override CSV", accept = ".csv"),
+        actionButton("build_btn",
+          tags$span(tags$span(class = "step-badge", "3"), " Build BIEN Draft Tables"),
+          class = "btn btn-step btn-step-success", width = "100%"),
+        actionButton("run_bien_services",
+          tags$span(tags$span(class = "step-badge", "4"), " Run BIEN Service Checks"),
+          class = "btn btn-step btn-step-warning", width = "100%")
       ),
-      conditionalPanel(
-        condition = "input.use_tutorial_data",
+
+      # ── Section 3: Downloads ──
+      tags$div(
+        class = "bien-sidebar-section",
+        h5("Downloads"),
+        tags$p(
+          style = "margin: 0 0 8px 0; font-size: 0.85em; color: #444;",
+          "Starter templates:"
+        ),
+        downloadButton("download_historical_template", "Template: Historical Observations",
+          style = "width:100%; margin-bottom:4px; font-size:0.82em;"),
+        downloadButton("download_ecological_template", "Template: New Ecological Source",
+          style = "width:100%; margin-bottom:10px; font-size:0.82em;"),
+        tags$p(
+          style = "margin: 0 0 6px 0; font-size: 0.85em; color: #444;",
+          "Pipeline outputs:"
+        ),
         tags$div(
-          style = "margin: 4px 0 10px 0; padding: 8px; background: #eef7ff; border-left: 3px solid #2f6fab; font-size: 0.9em;",
-          tags$strong("Tutorial mode active."),
-          " Using built-in synthetic observation and plot-metadata files. Uncheck above to upload your own data."
-        )
-      ),
-      tags$hr(),
-      h4("Step Actions"),
-      actionButton("prepare_btn", "1) Prepare Linked Table", class = "btn-primary"),
-      selectInput(
-        "duplicate_strategy",
-        "Duplicate metadata key resolution",
-        choices = c(
-          "First non-empty value" = "first_non_empty",
-          "Last non-empty value" = "last_non_empty",
-          "Most frequent non-empty value" = "most_frequent_non_empty",
-          "Block and resolve manually" = "require_manual_resolution"
+          class = "bien-download-grid",
+          downloadButton("download_combined", "Source Table"),
+          downloadButton("download_join_audit", "Join Audit"),
+          downloadButton("download_join_conflicts", "Join Conflicts"),
+          downloadButton("download_mapping", "Active Mapping"),
+          downloadButton("download_qc", "QC Report"),
+          downloadButton("download_bien", "BIEN Draft"),
+          downloadButton("download_tnrs", "TNRS Handoff"),
+          downloadButton("download_gnrs", "GNRS Handoff"),
+          downloadButton("download_gvs", "GVS Handoff"),
+          downloadButton("download_nsr", "NSR Handoff")
         ),
-        selected = "require_manual_resolution"
-      ),
-      actionButton("suggest_btn", "2) Suggest Mapping", class = "btn-primary"),
-      fileInput("mapping_csv", "Optional Mapping Override CSV", accept = ".csv"),
-      actionButton("build_btn", "3) Build BIEN Draft Tables", class = "btn-success"),
-      actionButton("run_bien_services", "4) Run BIEN Service Checks", class = "btn-warning"),
-      tags$hr(),
-      h4("Downloads"),
-      tags$div(
-        style = "margin: 8px 0 10px 0; padding: 8px; background: #f4f8ff; border-left: 4px solid #2f6fab;",
-        strong("Starter templates"),
-        tags$p(
-          style = "margin: 6px 0 0 0; font-size: 0.9em;",
-          "Use these to start common BIEN onboarding workflows."
-        ),
-        downloadButton("download_historical_template", "Template: Historical Observations"),
-        tags$div(style = "height: 6px;"),
-        downloadButton("download_ecological_template", "Template: New Ecological Source")
-      ),
-      downloadButton("download_combined", "Combined Source Table"),
-      downloadButton("download_join_audit", "Join Audit Report"),
-      downloadButton("download_join_conflicts", "Join Conflict Report"),
-      downloadButton("download_mapping", "Active Mapping"),
-      downloadButton("download_qc", "QC Report"),
-      downloadButton("download_bien", "BIEN Loading Draft"),
-      downloadButton("download_tnrs", "TNRS Handoff"),
-      downloadButton("download_gnrs", "GNRS Handoff"),
-      downloadButton("download_gvs", "GVS Handoff"),
-      downloadButton("download_nsr", "NSR Handoff"),
-      tags$div(
-        style = "margin: 6px 0 4px 0; padding: 8px 10px; background: #f0f4ff; border-left: 3px solid #2f6fab; font-size: 0.85em;",
-        strong("Submission Packet includes:"),
-        tags$ul(
-          style = "margin: 4px 0 0 0; padding-left: 16px;",
-          tags$li("combined_observation_stream.csv"),
-          tags$li("join_audit_report.csv"),
-          tags$li("active_mapping.csv"),
-          tags$li("dwc_qc_report.csv"),
-          tags$li("bien_loading_table.csv"),
-          tags$li("tnrs_handoff.csv"),
-          tags$li("gnrs_handoff.csv"),
-          tags$li("gvs_handoff.csv"),
-          tags$li("nsr_handoff.csv"),
-          tags$li("submission_packet_manifest.csv"),
-          tags$li("README_submission_packet.txt")
-        )
-      ),
-      downloadButton("download_submission_packet", "Submission Packet Zip"),
-      tags$hr(),
-      tags$div(
-        style = "padding: 10px; background: #fff8e1; border-left: 4px solid #c28b00; font-size: 0.92em;",
-        strong("Important"),
-        tags$p(
-          style = "margin: 6px 0 0 0;",
-          "Exports are draft handoff tables. Complete downstream TNRS, GNRS, GVS, and NSR review before BIEN submission."
-        )
+        tags$div(style = "height: 8px;"),
+        downloadButton("download_submission_packet", "⬇ Submission Packet Zip",
+          style = "width:100%; font-weight:700; background:#2f6fab; color:#fff; border:none;")
       )
     ),
+
     mainPanel(
       tabsetPanel(
         id = "workflow_tabs",
@@ -472,15 +567,14 @@ server <- function(input, output, session) {
     if (!any_step_loading()) {
       return(NULL)
     }
-
     tags$div(
       class = "global-loading-pill",
-      tags$span("⏳ Working..."),
       tags$div(
         class = "spinner-border",
         role = "status",
-        style = "display:inline-block; width: 1rem; height: 1rem; margin-left: 8px; vertical-align: middle; border: 0.2em solid #2f6fab; border-right-color: transparent; border-radius: 50%;"
-      )
+        style = "display:inline-block; width: 1.1rem; height: 1.1rem; margin-right: 8px; vertical-align: middle; border: 0.25em solid rgba(255,255,255,0.85); border-right-color: transparent; border-radius: 50%;"
+      ),
+      tags$span("Working...")
     )
   })
 
@@ -515,12 +609,12 @@ server <- function(input, output, session) {
     }, once = TRUE)
   })
   output$link_loading_ui <- renderUI({
-    if (link_loading()) {
-      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-        tags$span("⏳ Preparing linked table... Please wait."),
-        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-      )
-    } else NULL
+    if (!link_loading()) return(NULL)
+    tags$div(
+      class = "bien-working-banner",
+      tags$div(class = "bien-working-spinner spinner-border"),
+      tags$span("Step 1: Preparing linked table — please wait...")
+    )
   })
 
   # --- Step 3 Map spinner logic ---
@@ -539,12 +633,12 @@ server <- function(input, output, session) {
     }, once = TRUE)
   })
   output$map_loading_ui <- renderUI({
-    if (map_loading()) {
-      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-        tags$span("⏳ Suggesting mapping... Please wait."),
-        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-      )
-    } else NULL
+    if (!map_loading()) return(NULL)
+    tags$div(
+      class = "bien-working-banner",
+      tags$div(class = "bien-working-spinner spinner-border"),
+      tags$span("Step 2: Suggesting field mapping — please wait...")
+    )
   })
 
   # --- Step 4 Taxonomy spinner logic ---
@@ -563,12 +657,12 @@ server <- function(input, output, session) {
     }
   }, ignoreInit = TRUE)
   output$taxonomy_loading_ui <- renderUI({
-    if (taxonomy_loading()) {
-      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;",
-        tags$span("⏳ Reconciling taxonomy... Please wait."),
-        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-      )
-    } else NULL
+    if (!taxonomy_loading()) return(NULL)
+    tags$div(
+      class = "bien-working-banner",
+      tags$div(class = "bien-working-spinner spinner-border"),
+      tags$span("Step 4: Reconciling taxonomy — please wait...")
+    )
   })
 
   # --- Step 5 Validate spinner logic ---
@@ -587,12 +681,12 @@ server <- function(input, output, session) {
     }, once = TRUE)
   })
   output$validate_loading_ui <- renderUI({
-    if (validate_loading()) {
-      tags$div(style = "margin: 10px 0; color: #2f6fab; font-weight: bold;", 
-        tags$span("⏳ Validating and building BIEN draft tables... Please wait."),
-        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #2f6fab; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-      )
-    } else NULL
+    if (!validate_loading()) return(NULL)
+    tags$div(
+      class = "bien-working-banner",
+      tags$div(class = "bien-working-spinner spinner-border"),
+      tags$span("Step 3: Validating and building BIEN draft tables — please wait...")
+    )
   })
 
   # Robust path resolution: works both from source dir and when deployed as a package.
@@ -1561,12 +1655,13 @@ server <- function(input, output, session) {
   output$bien_services_status <- renderText({ bien_services_status() })
 
   output$bien_services_loading_ui <- renderUI({
-    if (bien_services_loading()) {
-      tags$div(style = "margin: 10px 0; color: #c28b00; font-weight: bold;", 
-        tags$span("⏳ Running BIEN Web Services... Please wait."),
-        tags$div(class = "spinner-border", role = "status", style = "display:inline-block; width: 1.5rem; height: 1.5rem; margin-left: 10px; vertical-align: middle; border: 0.25em solid #c28b00; border-right-color: transparent; border-radius: 50%; animation: spin 0.75s linear infinite;")
-      )
-    } else NULL
+    if (!bien_services_loading()) return(NULL)
+    tags$div(
+      class = "bien-working-banner",
+      style = "border-left-color: #b87c00;",
+      tags$div(class = "bien-working-spinner spinner-border", style = "border-color: #b87c00; border-right-color: transparent;"),
+      tags$span("Step 4: Running BIEN Web Services — please wait...")
+    )
   })
 }
 

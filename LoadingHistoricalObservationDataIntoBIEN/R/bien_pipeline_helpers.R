@@ -10,6 +10,11 @@ canonicalize_join_values <- function(x) {
   tolower(vals)
 }
 
+count_basic_valid_coordinates <- function(x) {
+  flags <- as.logical(x)
+  sum(!is.na(flags) & flags)
+}
+
 safe_bien_runtime_call <- function(expr) {
   tryCatch(expr, error = function(e) e)
 }
@@ -33,37 +38,8 @@ get_bien_reference_fields <- local({
       "method", "country", "stateProvince", "county", "locality"
     )
 
-    if (!is_bien_runtime_available()) {
-      cache <<- fallback
-      return(cache)
-    }
-
-    occ <- safe_bien_runtime_call(
-      BIEN::BIEN_occurrence_species(
-        "Pinus ponderosa",
-        cultivated = FALSE,
-        natives.only = TRUE,
-        only.geovalid = TRUE,
-        all.taxonomy = TRUE,
-        limit = 1,
-        record_limit = 1,
-        fetch.query = FALSE
-      )
-    )
-    traits <- safe_bien_runtime_call(
-      BIEN::BIEN_trait_species(
-        "Pinus ponderosa",
-        all.taxonomy = TRUE,
-        source.citation = TRUE,
-        limit = 1,
-        record_limit = 1,
-        fetch.query = FALSE
-      )
-    )
-
-    occ_fields <- if (is.data.frame(occ)) names(occ) else character(0)
-    trait_fields <- if (is.data.frame(traits)) names(traits) else character(0)
-    cache <<- unique(c(occ_fields, trait_fields, fallback))
+    # Always use the static fallback to avoid blocking BIEN database calls at startup.
+    cache <<- fallback
     cache
   }
 })
@@ -213,14 +189,42 @@ suggest_merge_plan <- function(data_list) {
   primary_file <- file_summary$file[[1]]
   primary_df <- data_list[[primary_file]]
 
+  # Pre-compute unique canonical values per column to avoid re-processing full
+  # column vectors inside the O(P × M) nested loop.
+  precompute_col_uniques <- function(df) {
+    lapply(df, function(vec) {
+      vals <- unique(stats::na.omit(canonicalize_join_values(vec)))
+      utils::head(vals, 500)
+    })
+  }
+
+  score_from_precomputed <- function(p_vals, m_vals) {
+    if (length(p_vals) == 0 || length(m_vals) == 0) {
+      return(list(shared = 0L, primary_overlap = 0, metadata_overlap = 0, score = 0))
+    }
+    shared <- intersect(p_vals, m_vals)
+    primary_overlap <- length(shared) / length(p_vals)
+    metadata_overlap <- length(shared) / length(m_vals)
+    score <- length(shared) * ((primary_overlap + metadata_overlap) / 2)
+    list(
+      shared = length(shared),
+      primary_overlap = round(primary_overlap, 3),
+      metadata_overlap = round(metadata_overlap, 3),
+      score = round(score, 3)
+    )
+  }
+
+  primary_uniques <- precompute_col_uniques(primary_df)
+
   join_rows <- list()
   for (metadata_file in setdiff(names(data_list), primary_file)) {
     metadata_df <- data_list[[metadata_file]]
+    metadata_uniques <- precompute_col_uniques(metadata_df)
     best <- NULL
 
     for (primary_col in names(primary_df)) {
       for (metadata_col in names(metadata_df)) {
-        this_score <- score_join_columns(primary_df[[primary_col]], metadata_df[[metadata_col]])
+        this_score <- score_from_precomputed(primary_uniques[[primary_col]], metadata_uniques[[metadata_col]])
         if (this_score$shared == 0) {
           next
         }
@@ -289,7 +293,7 @@ local_taxonomy_triage <- function(scientific_names) {
   )
 }
 
-augment_bien_pipeline <- function(dwc_df, taxonomy_cap = 50) {
+augment_bien_pipeline <- function(dwc_df, taxonomy_cap = 50, use_external_taxonomy = FALSE) {
   if (!is.data.frame(dwc_df) || nrow(dwc_df) == 0) {
     stop("dwc_df must be a non-empty data.frame")
   }
@@ -319,11 +323,12 @@ augment_bien_pipeline <- function(dwc_df, taxonomy_cap = 50) {
 
   unique_names <- unique(trimws(as.character(out$scientificName)))
   unique_names <- unique_names[!is.na(unique_names) & unique_names != ""]
+  total_unique_names <- length(unique_names)
   unique_names <- utils::head(unique_names, taxonomy_cap)
 
   tax_lookup <- if (length(unique_names) == 0) {
     local_taxonomy_triage(character(0))
-  } else if (!is_bien_runtime_available()) {
+  } else if (!isTRUE(use_external_taxonomy) || !is_bien_runtime_available()) {
     local_taxonomy_triage(unique_names)
   } else {
     rows <- lapply(unique_names, function(one_name) {
@@ -359,7 +364,7 @@ augment_bien_pipeline <- function(dwc_df, taxonomy_cap = 50) {
     ),
     "missing_geography"
   )
-  out$gvs_status <- ifelse(isTRUE(out$coordinate_valid_basic), "ready_for_gvs", "review_coordinates")
+  out$gvs_status <- ifelse(!is.na(out$coordinate_valid_basic) & out$coordinate_valid_basic == TRUE, "ready_for_gvs", "review_coordinates")
   out$nsr_status <- ifelse(
     !is.na(out$scientificName) & trimws(as.character(out$scientificName)) != "" & "country" %in% names(out),
     "ready_for_nsr",
@@ -378,6 +383,9 @@ augment_bien_pipeline <- function(dwc_df, taxonomy_cap = 50) {
   out$gnrs_ready_for_submission <-
     (!is.na(out$gnrs_input_country) & out$gnrs_input_country != "") |
     (!is.na(out$gnrs_input_locality) & out$gnrs_input_locality != "")
+  out$taxonomy_lookup_total_unique_names <- total_unique_names
+  out$taxonomy_lookup_cap <- taxonomy_cap
+  out$taxonomy_lookup_capped <- total_unique_names > taxonomy_cap
 
   out
 }
@@ -390,7 +398,7 @@ library(httr)
 
 # TNRS: Taxonomic Name Resolution Service
 # Uses the public iPlant Collaborative TNRS API
-bien_tnrs_query <- function(names) {
+bien_tnrs_query <- function(names, request_timeout = 6, max_names = 20) {
   if (length(names) == 0 || all(is.na(names))) {
     return(data.frame(
       submitted_name = character(0),
@@ -403,6 +411,10 @@ bien_tnrs_query <- function(names) {
   
   names <- unique(trimws(as.character(names)))
   names <- names[!is.na(names) & names != ""]
+
+  if (length(names) > max_names) {
+    names <- names[seq_len(max_names)]
+  }
   
   if (length(names) == 0) {
     return(data.frame(
@@ -428,7 +440,7 @@ bien_tnrs_query <- function(names) {
           source = "ioplant"
         ),
         encode = "form",
-        httr::timeout(15),
+        httr::timeout(request_timeout),
         httr::user_agent("HistoricalObservationDataToBIEN/0.1.0")
       )
       
@@ -473,7 +485,7 @@ bien_tnrs_query <- function(names) {
 # GNRS: Geographic Name Resolution Service
 # Validates and returns standardized geographic information
 bien_gnrs_query <- function(locations) {
-  if (is.null(locations) || nrow(locations) == 0) {
+  if (is.null(locations)) {
     return(data.frame(
       submitted_location = character(0),
       gnrs_country = character(0),
@@ -481,17 +493,60 @@ bien_gnrs_query <- function(locations) {
       stringsAsFactors = FALSE
     ))
   }
+
+  if (!is.data.frame(locations) && (is.vector(locations) || is.factor(locations))) {
+    locations <- data.frame(locality = as.character(locations), stringsAsFactors = FALSE)
+  }
+
+  if (!is.data.frame(locations) || nrow(locations) == 0) {
+    return(data.frame(
+      submitted_location = character(0),
+      gnrs_country = character(0),
+      gnrs_valid = logical(0),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  locations <- as.data.frame(lapply(locations, function(col) {
+    trimws(as.character(col))
+  }), stringsAsFactors = FALSE)
+
+  submitted_parts <- intersect(c("country", "stateProvince", "county", "locality"), names(locations))
+  if (length(submitted_parts) == 0) {
+    submitted_parts <- names(locations)[1]
+  }
   
   # For now, perform basic validation on country/locality names
   # In production, this would call a full geographic service
   results <- data.frame(
-    submitted_location = apply(locations, 1, function(x) paste(x[!is.na(x)], collapse = ", ")),
+    submitted_location = apply(locations[, submitted_parts, drop = FALSE], 1, function(x) {
+      cleaned <- x[!is.na(x) & x != ""]
+      paste(cleaned, collapse = ", ")
+    }),
     gnrs_country = if ("country" %in% colnames(locations)) locations$country else NA_character_,
     gnrs_valid = if ("country" %in% colnames(locations)) !is.na(locations$country) & locations$country != "" else FALSE,
     stringsAsFactors = FALSE
   )
   
   return(results)
+}
+
+summarize_bien_service_state <- function(service_name, result_obj, authoritative = FALSE) {
+  service_name <- as.character(service_name)
+
+  if (inherits(result_obj, "error")) {
+    return(paste0(service_name, ": request failed (", conditionMessage(result_obj), ")."))
+  }
+
+  if (!is.data.frame(result_obj)) {
+    return(paste0(service_name, ": no structured response. External validation still required."))
+  }
+
+  if (authoritative) {
+    return(paste0(service_name, ": response received with ", nrow(result_obj), " rows. Treat as draft reconciliation evidence pending expert review."))
+  }
+
+  paste0(service_name, ": local preview generated with ", nrow(result_obj), " rows (not authoritative service completion).")
 }
 
 # GVS: Geospatial Validation Service

@@ -599,3 +599,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Replace fixed integer column indices with dynamic header-name lookup so the sync script works with a direct-edit Google Sheet (not a Google Form).
 - Files changed: enquistlab-site-migration/scripts/sync_people_sheet.py; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Move outdated people listings to Alumni section; test entry for Robert MacArthur; fix sync script header matching; alumni grid CSS.
+- Requested outcomes: Clear postdocs/grad_students/visiting_students from people.yml and move former members to new alumni: section; guard active sections with size > 0 in people.md; add Alumni data-driven card loop with .team-grid--alumni; add CSS modifier for alumni cards; switch sync_people_sheet.py from exact to substring keyword header matching.
+- Files changed: enquistlab-site-migration/_data/people.yml; enquistlab-site-migration/_pages/people.md; enquistlab-site-migration/_sass/_lab-redesign.scss; enquistlab-site-migration/scripts/sync_people_sheet.py; agents/prompt_log.md; enquistlab-site-migration/chat_provenance_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Match look and feel and flow of LoadingHistoricalObservationDataIntoBIEN Shiny app to other BIEN Shiny apps; make action buttons clear and prominent; improve working indicator visibility.
+- Requested outcomes: Redesign CSS and sidebar layout with full-width numbered .btn-step action buttons, prominent .bien-working-banner loading indicators for all 5 step spinners, .bien-sidebar-section card groupings for Upload/Actions/Downloads, solid blue global loading pill, remove duplicate troubleshooting sidebar block. Smoke tests and deployment to shinyapps.io (bundle 11891924).
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot

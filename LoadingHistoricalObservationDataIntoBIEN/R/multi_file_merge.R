@@ -77,16 +77,39 @@ collapse_by_key <- function(df, key_col, duplicate_strategy = "first_non_empty")
   }
 
   key_vals <- as.character(df[[key_col]])
+  key_tab <- table(key_vals, useNA = "no")
+
+  # Fast path: no duplicate keys — return the data frame as-is.
+  # This is the common case for clean metadata files and avoids an O(n^2) rbind.
+  if (!any(key_tab > 1L)) {
+    return(df)
+  }
+
+  # Duplicate path: collapse column-by-column (vectorised) instead of row-by-row.
+  uniq_keys <- names(key_tab)
   split_idx <- split(seq_len(nrow(df)), key_vals)
 
-  rows <- lapply(split_idx, function(idx) {
-    chunk <- df[idx, , drop = FALSE]
-    out_row <- lapply(chunk, resolve_duplicate_value, strategy = duplicate_strategy)
-    as.data.frame(out_row, stringsAsFactors = FALSE)
+  out_cols <- lapply(names(df), function(col) {
+    vec <- df[[col]]
+    if (is.factor(vec)) vec <- as.character(vec)
+    sapply(uniq_keys, function(k) {
+      x <- vec[split_idx[[k]]]
+      x_chr <- trimws(as.character(x))
+      keep <- !is.na(x) & x_chr != ""
+      x <- x[keep]
+      if (length(x) == 0L) return(NA_character_)
+      if (identical(duplicate_strategy, "last_non_empty"))
+        return(as.character(x[[length(x)]]))
+      if (identical(duplicate_strategy, "most_frequent_non_empty")) {
+        tab <- sort(table(as.character(x)), decreasing = TRUE)
+        return(names(tab)[[1L]])
+      }
+      as.character(x[[1L]])  # first_non_empty (default)
+    }, USE.NAMES = FALSE)
   })
 
-  out <- do.call(rbind, rows)
-  rownames(out) <- NULL
+  out <- as.data.frame(out_cols, stringsAsFactors = FALSE)
+  names(out) <- names(df)
   out
 }
 
@@ -316,6 +339,21 @@ audit_join_quality <- function(data_list, primary_file, primary_key, metadata_fi
   }
 
   do.call(rbind, rows)
+}
+
+has_join_blockers <- function(join_audit_tbl) {
+  is.data.frame(join_audit_tbl) && nrow(join_audit_tbl) > 0 && any(join_audit_tbl$severity == "BLOCK", na.rm = TRUE)
+}
+
+ensure_join_clear_for_export <- function(join_audit_tbl, artifact_label = "this export") {
+  if (has_join_blockers(join_audit_tbl)) {
+    stop(
+      paste0("Cannot download ", artifact_label, ": resolve join BLOCK issues in Step 2 Link first."),
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
 }
 
 find_duplicate_metadata_conflicts <- function(data_list, metadata_files, metadata_keys) {
