@@ -118,6 +118,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot (supervision)
 
+- Date: 2026-04-21
+- Prompt summary: Design subject-area tabs for the Enquist Lab publications page using the full publication list as the source of truth.
+- Requested outcomes: Return a minimal implementation design, recommended category-matching strategy, tab and search UI behavior, and key risks or ambiguities.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (supervision)
+
 - Date: 2026-03-28
 - Prompt summary: Run final mandatory gate and return PASS/FAIL for prompt log recorded, updated Rmd compile, updated R packages build, git push status confirmed.
 - Requested outcomes: Execute mandatory final gate checks and return PASS/FAIL with evidence.
@@ -410,4 +416,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Publications titles are not clickable; retry so each paper title uses the Google Doc's embedded hyperlink.
 - Requested outcomes: Regenerate publications content from the shared Google Doc preserving embedded anchors, and update publications page behavior to keep full-list search/filter working.
 - Files changed: enquistlab-site-migration/_includes/publications_full_from_doc.md; enquistlab-site-migration/_pages/publications.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-21
+- Prompt summary: Add subject-area tabs to the complete publication list so papers can be grouped and searched by theme.
+- Requested outcomes: Add tabs for Macroecology, Metabolic Scaling and Allometry, Trait-based Ecology, Ecophysiology, Functional Ecology, Tropical Ecology, Arctic and Alpine, and Biodiversity Informatics, with automatic grouping from the full chronological publication list.
+- Files changed: enquistlab-site-migration/_pages/publications.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
