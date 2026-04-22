@@ -459,3 +459,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - `_pages/software.md`: added data-type `.tool-tag` badges to every tool heading (occurrence/trait/range/taxonomy/spatial/niche/co-occurrence/climate/flux/native status); removed two redundant BIEN service bullet-link sections (kept card grid + vignettes only)
 
 **Commits:** e4bf24e (site), pushed to main
+
+- Date: 2026-04-21
+- Prompt summary: For field sites - text could fill in more of the space to the right (very bunched). Find photos for each project. For San Emilio use photos from https://forestgeo.si.edu/sites/san-emilio and replace the incorrect URL hotlink with that one.
+- Requested outcomes: Remove text max-width cap on field-sites page; replace SEFDP photo-pair with two ForestGEO Flickr images downloaded locally; confirm ForestGEO link is correct; commit and push to EnquistLab/enquistlab.github.io main.
+- Files changed: enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/assets/img/field/sefdp_diameter_measure.jpg; enquistlab-site-migration/assets/img/field/sefdp_forest_canopy.jpg
+- Completed by: GitHub Copilot
