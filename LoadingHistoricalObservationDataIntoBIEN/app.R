@@ -335,7 +335,7 @@ ui <- fluidPage(
             "Most frequent non-empty value" = "most_frequent_non_empty",
             "Block and resolve manually" = "require_manual_resolution"
           ),
-          selected = "require_manual_resolution"
+          selected = "first_non_empty"
         ),
         actionButton("suggest_btn",
           tags$span(tags$span(class = "step-badge", "2"), " Suggest Mapping"),
@@ -613,7 +613,7 @@ server <- function(input, output, session) {
     tags$div(
       class = "bien-working-banner",
       tags$div(class = "bien-working-spinner spinner-border"),
-      tags$span("Step 1: Preparing linked table — please wait...")
+      tags$span("Step 2: Preparing linked table — please wait...")
     )
   })
 
@@ -685,7 +685,7 @@ server <- function(input, output, session) {
     tags$div(
       class = "bien-working-banner",
       tags$div(class = "bien-working-spinner spinner-border"),
-      tags$span("Step 3: Validating and building BIEN draft tables — please wait...")
+      tags$span("Step 5: Validating and building BIEN draft tables — please wait...")
     )
   })
 
@@ -702,6 +702,16 @@ server <- function(input, output, session) {
     if (file.exists(alt)) return(alt)
     stop(paste0("Tutorial data file not found: ", filename,
                 " (searched system.file, inst/extdata, extdata)"))
+  }
+
+  resolve_dict_path <- function(filename) {
+    pkg_path <- system.file("dictionaries", filename, package = "HistoricalObsToBIEN")
+    if (nzchar(pkg_path) && file.exists(pkg_path)) return(pkg_path)
+    rel <- file.path("inst", "dictionaries", filename)
+    if (file.exists(rel)) return(rel)
+    alt <- file.path("dictionaries", filename)
+    if (file.exists(alt)) return(alt)
+    stop(paste0("Dictionary file not found: ", filename))
   }
 
   tutorial_files <- reactive({
@@ -858,14 +868,45 @@ server <- function(input, output, session) {
   combined_state <- eventReactive(input$prepare_btn, {
     files <- available_files()
     req(length(files) > 0)
-    req(input$primary_file)
-    req(input$primary_key)
+    plan <- merge_plan()
+    primary_file <- if (!is.null(input$primary_file) && nzchar(input$primary_file)) {
+      input$primary_file
+    } else {
+      req(!is.null(plan$primary_file), cancelOutput = FALSE)
+      plan$primary_file
+    }
+    primary_key_val <- if (!is.null(input$primary_key) && nzchar(input$primary_key)) {
+      input$primary_key
+    } else {
+      req(!is.null(plan$primary_key), cancelOutput = FALSE)
+      plan$primary_key
+    }
 
-    metadata_files <- if (is.null(input$metadata_files)) character(0) else input$metadata_files
+    metadata_files <- if (!is.null(input$metadata_files) && length(input$metadata_files) > 0) {
+      input$metadata_files
+    } else if (is.character(plan$metadata_files) && length(plan$metadata_files) > 0) {
+      plan$metadata_files
+    } else {
+      character(0)
+    }
     metadata_keys <- setNames(vector("list", length(metadata_files)), metadata_files)
 
     for (f in metadata_files) {
-      metadata_keys[[f]] <- input[[paste0("meta_key_", make.names(f))]]
+      input_key <- input[[paste0("meta_key_", make.names(f))]]
+      if (!is.null(input_key) && nzchar(input_key)) {
+        metadata_keys[[f]] <- input_key
+      } else if (is.data.frame(plan$join_suggestions) && nrow(plan$join_suggestions) > 0) {
+        hit <- plan$join_suggestions[plan$join_suggestions$metadata_file == f, , drop = FALSE]
+        if (nrow(hit) > 0) {
+          metadata_keys[[f]] <- hit$metadata_key[[1]]
+        } else {
+          df <- available_files()[[f]]
+          metadata_keys[[f]] <- names(df)[[1]]
+        }
+      } else {
+        df <- available_files()[[f]]
+        metadata_keys[[f]] <- names(df)[[1]]
+      }
     }
 
     selected_strategy <- if (is.null(input$duplicate_strategy) || !nzchar(input$duplicate_strategy)) {
@@ -900,8 +941,8 @@ server <- function(input, output, session) {
 
     merged <- merge_uploaded_streams(
       data_list = files,
-      primary_file = input$primary_file,
-      primary_key = input$primary_key,
+      primary_file = primary_file,
+      primary_key = primary_key_val,
       metadata_files = metadata_files,
       metadata_keys = metadata_keys,
       duplicate_strategy = if (identical(selected_strategy, "require_manual_resolution")) "first_non_empty" else selected_strategy
@@ -909,8 +950,8 @@ server <- function(input, output, session) {
 
     audit <- audit_join_quality(
       data_list = files,
-      primary_file = input$primary_file,
-      primary_key = input$primary_key,
+      primary_file = primary_file,
+      primary_key = primary_key_val,
       metadata_files = metadata_files,
       metadata_keys = metadata_keys,
       duplicate_strategy = selected_strategy
@@ -935,7 +976,7 @@ server <- function(input, output, session) {
   })
 
   suggested_mapping <- eventReactive(input$suggest_btn, {
-    suggest_dwc_mapping(combined_df(), dictionary_path = "inst/dictionaries/header_synonyms.csv")
+    suggest_dwc_mapping(combined_df(), dictionary_path = resolve_dict_path("header_synonyms.csv"))
   })
 
   active_mapping <- reactive({

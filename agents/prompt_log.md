@@ -8,6 +8,8 @@
 
 Record each user prompt that led to creation, direction, or alteration of agent files/folder policy.
 
+2026-04-22 | Fix structural hang issues in LoadingHistoricalObservationDataIntoBIEN/app.R: (1) replaced req() race condition in combined_state with fallback logic using merge_plan(); (2) added resolve_dict_path() helper and used it in suggested_mapping eventReactive; (3) changed duplicate_strategy default to first_non_empty; (4) corrected spinner step labels (Step 1→2, Step 3→5).
+
 ## Entry Template
 - Date:
 - Prompt summary:
@@ -611,3 +613,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Redesign CSS and sidebar layout with full-width numbered .btn-step action buttons, prominent .bien-working-banner loading indicators for all 5 step spinners, .bien-sidebar-section card groupings for Upload/Actions/Downloads, solid blue global loading pill, remove duplicate troubleshooting sidebar block. Smoke tests and deployment to shinyapps.io (bundle 11891924).
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: The app does not appear to be working. It gets hung up on Step 2. @M take control of figuring out how to fix this.
+- Requested outcomes: (1) code-checker identified req() race condition in combined_state, hard-coded dictionary path in suggest_mapping, bad duplicate_strategy default, and spinner label misalignment; (2) optimizer fixed all four: merge_plan() fallback when input$primary_file/primary_key are NULL, resolve_dict_path() helper, duplicate_strategy default changed to first_non_empty, corrected spinner step labels; (3) smoke tests passed; (4) deployed to shinyapps.io (new bundle).
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot (M → code-checker → optimizer pipeline)

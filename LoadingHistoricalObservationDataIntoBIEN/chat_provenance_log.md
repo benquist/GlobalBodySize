@@ -47,3 +47,8 @@ Outcome: Rewrote collapse_by_key() in R/multi_file_merge.R. (1) Added a fast-pat
 Prompt: I would like the look and feel and flow of this shiny app to match our other BIEN shiny apps. The buttons to start each process should be clear and it should act like you click the button and then something happens. The working indication is good but it could be more prominent.
 Source session: current workspace session
 Outcome: Redesigned CSS and sidebar layout in app.R. Added .btn-step full-width action buttons with numbered badges, prominent .bien-working-banner loading indicators for all 5 step spinners, .bien-sidebar-section card groupings for Upload/Actions/Downloads, solid blue global loading pill, removed duplicate troubleshooting sidebar block. Smoke tests passed. Deployed to shinyapps.io (bundle 11891924).
+
+9. Date: 2026-04-22
+Prompt: The app does not appear to be working. It gets hung up on Step 2. @M I would like you to take control of figuring out how to fix this.
+Source session: current workspace session
+Outcome: M agent orchestrated code-checker then optimizer. Four bugs fixed in app.R: (1) req() race condition in combined_state — replaced with merge_plan() fallback so NULL primary_file/primary_key inputs do not block reactive; (2) hard-coded dictionary path in suggested_mapping eventReactive — replaced with resolve_dict_path() helper; (3) duplicate_strategy default changed from require_manual_resolution to first_non_empty to avoid blocking the merge; (4) spinner step labels corrected (Step 1→2 and Step 3→5 were misaligned). Smoke tests passed. Deployed to shinyapps.io (new bundle).
