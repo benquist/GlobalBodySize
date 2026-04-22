@@ -220,6 +220,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-22
+- Prompt summary: Review the Enquist Lab website task and return concise implementation guidance for Resources, Join, and a new Conservation Impacts page.
+- Requested outcomes: Recommend one visual strategy for Resources, one for Join, one content structure for a top-nav Conservation Impacts page, and key pitfalls to avoid; no code.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: BIEN-TraitsShinyApp trait-only query returning no results — when Query Rank is set to Trait only and a trait is selected, hitting Query BIEN returns nothing.
 - Requested outcomes: Fix the trait-only query path in BIEN-TraitsShinyApp so BIEN_trait_trait() is called directly without the redundant BIEN_trait_list() catalog validation that was blocking results.
@@ -563,3 +569,33 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Diagnose root cause (broken two-observer spinner pattern) and apply session$onFlushed + tryCatch fix so spinner always clears regardless of success, error, or silent req() failure.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot (commit 7d92514)
+
+- Date: 2026-04-22
+- Prompt summary: Add a Google Form → Google Sheet → GitHub Actions pipeline to keep enquistlab.github.io/people/ up to date; implement _data/people.yml, Liquid-based people.md, team-grid CSS, sync_people_sheet.py, and sync-people-sheet.yml workflow.
+- Requested outcomes: Create _data/people.yml with all current lab members in YAML; rewrite _pages/people.md using Liquid loops over site.data.people with .team-card grids; add .team-grid and .team-card SCSS components; add sync_people_sheet.py to read Google Sheet via Sheets v4 API and write people.yml; add sync-people-sheet.yml GitHub Actions workflow running daily and on manual trigger.
+- Files changed: enquistlab-site-migration/_data/people.yml; enquistlab-site-migration/_pages/people.md; enquistlab-site-migration/_sass/_lab-redesign.scss; enquistlab-site-migration/scripts/sync_people_sheet.py; enquistlab-site-migration/.github/workflows/sync-people-sheet.yml; agents/prompt_log.md; agents/agent_chat_provenance_log.txt; enquistlab-site-migration/chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Run the mandatory final pre-return gate for the LoadingHistoricalObservationDataIntoBIEN update question and return PASS/BLOCKED with concise reasons.
+- Requested outcomes: Validate prompt log status, Rmd compile trigger, R package build trigger, and git push status; append a minimal prompt-log entry if needed.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Apply the second Step 2 Link performance fix — rewrite collapse_by_key() in multi_file_merge.R for fast-path duplicate detection and column-wise processing.
+- Requested outcomes: Add O(1) fast-path when no duplicate keys exist; replace row-by-row do.call(rbind) with sapply column-by-column processing in the duplicate case. Smoke tests pass. Deploy to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Update enquistlab.github.io by replacing the single Resources hero with several distinct visuals, removing repeated Join-page people photos, and adding a Conservation Impacts nav page.
+- Requested outcomes: Use WordPress-sourced images to reduce repetition across Resources and Join, add a decision-oriented Conservation Impacts page covering conservation planning, extinction risk, and protected-area design/selection, and keep the visual direction restrained.
+- Files changed: enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/join.md; enquistlab-site-migration/_pages/conservation-impacts.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Refactor sync_people_sheet.py to use header-name column lookup for direct-edit Google Sheet; provide sheet header row template.
+- Requested outcomes: Replace fixed integer column indices with dynamic header-name lookup so the sync script works with a direct-edit Google Sheet (not a Google Form).
+- Files changed: enquistlab-site-migration/scripts/sync_people_sheet.py; agents/prompt_log.md
+- Completed by: GitHub Copilot
