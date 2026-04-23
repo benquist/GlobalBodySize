@@ -105,3 +105,16 @@
 
 **Commit:** f5ccf08  
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — Reduce in-app TNRS/GNRS total timeout 120s → 25s
+
+**Prompt:** User reported slow hang on TNRS/GNRS in-app buttons (app frozen for up to 120s when servers are reachable but slow).
+
+**Root cause:** `httr::connecttimeout` only covers TCP handshake; `httr::timeout` controls the total response time. Both TNRS and GNRS POST calls used `httr::timeout(120)`, causing long freezes when the server is reachable but slow.
+
+**Fix:** Reduced `httr::timeout` from 120 to 25 for both in-app TNRS and GNRS calls. Local R script download paths (for users running outside shinyapps.io) retain `httr::timeout(120)`. Updated Tab 3 UI note to say "~25s" so the user knows the expected wait.
+
+**Commit:** a69984f  
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/

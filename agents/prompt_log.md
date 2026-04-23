@@ -803,3 +803,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** "What happened to my year scroller on the publication page... Please put back"
 
 **Changes:** `_pages/publications.md` — restored right-rail year nav visibility on common laptop widths by changing hide breakpoint from `1280px` to `980px` and tightening right offset at narrower desktop (`max-width: 1200px`). Site commit `2cbf5ea` on `main`, pushed.
+
+- Date: 2026-04-23
+- Prompt summary: Fix slow hang on TNRS/GNRS in-app buttons in BIENDataLoader. Root cause: httr::timeout(120) controls total response time (not just TCP connect); if servers are reachable but slow, app was frozen up to 120s. Reduced httr::timeout to 25s for both in-app TNRS and GNRS calls. Local download scripts keep 120s. Updated UI note to say "~25s".
+- Requested outcomes: In-app TNRS and GNRS buttons fail within 25s max; local scripts unchanged at 120s; UI note updated; committed a69984f; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit a69984f)
