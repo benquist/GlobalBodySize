@@ -719,3 +719,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: (1) Identified root cause: return() inside downloadHandler content functions writes 0 bytes, causing silent browser download failures; (2) Moved download buttons to renderUI (dl_buttons_ui) rendered only after rv$staged is populated; (3) DWC button hidden if no terms mapped; (4) All four CSV download handlers (dl_staged, dl_dwc, dl_mapping, dl_qc) now write an informative error CSV instead of return() when data is missing; (5) Committed 1722cce and pushed to master; (6) Redeployed to shinyapps.io as bien-data-loader.
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit 1722cce)
+
+- Date: 2026-04-23
+- Prompt summary: Improve enquistlab.github.io UX by moving homepage hero text right, preserving both Enquist Lab and Macroecology Lab identity on About, adding per-page subsection jump links, and renaming Conservation Impacts nav tab to Impacts.
+- Requested outcomes: (1) Move home hero text block from left to right to avoid white-background overlap; (2) show both names on About by keeping Enquist Lab title and adding Macroecology Lab bridge label; (3) add top-of-page clickable subsection list (text row, not tabs) that jumps to in-page sections; (4) rename top navigation tab to Impacts while keeping page content context.
+- Files changed: enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/conservation-impacts.md; enquistlab-site-migration/_layouts/page.liquid; enquistlab-site-migration/_layouts/about.liquid; enquistlab-site-migration/_sass/_lab-redesign.scss; enquistlab-site-migration/assets/js/section-jump-nav.js; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
