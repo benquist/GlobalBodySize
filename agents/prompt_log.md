@@ -727,6 +727,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-23
+- Prompt summary: Improve the Publications Conservation Impacts tab coverage, keep per-page subsection links always visible while scrolling, and add direct Nature/TNRS publication links in the TNRS resource block.
+- Requested outcomes: (1) Make the Publications Conservation Impacts subject tab include missing papers already in the master publication list, including Jung et al. 2021, Brock et al. 2026, Enquist et al. 2019 rarity, and Boonman et al. 2024; (2) make subsection jump links sticky at the top while scrolling so users can always access other sections; (3) add the Nature 2011 and Boyle et al. 2013 TNRS publication links in the TNRS section.
+- Files changed: enquistlab-site-migration/_pages/publications.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_sass/_lab-redesign.scss; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-23
 - Prompt summary: User tested BIENDataLoader with real CSV files. Fixed 3 bugs: (1) date parsing crash on M/D/YY dates — fixed with tryFormats=c("%Y-%m-%d", "%m/%d/%y", "%m/%d/%Y", ...) with %m/%d/%y before %m/%d/%Y so 2-digit years parse as 2000s not 0000s; (2) blank/empty row filtering after CSV read to remove trailing blank lines in user files; (3) static download buttons moved back to UI (always registered) — only a status indicator uses renderUI — to fix re-binding failures after dynamic removal; (4) separate run_qc tryCatch so staging/DWC tables always saved even if QC errors.
 - Requested outcomes: All four bugs fixed in BIENDataLoader/app.R; committed c6a59d1; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/
 - Files changed: BIENDataLoader/app.R
