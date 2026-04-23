@@ -784,7 +784,11 @@ server <- function(input, output, session) {
 
   # ── TNRS ─────────────────────────────────────────────────────────────────
   observeEvent(input$btn_tnrs, {
-    req(rv$staged)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table found — complete Steps 1-3 (Upload, Map Fields, Apply Mapping) before running TNRS.",
+                       type="error", duration=10)
+      return()
+    }
     names_vec <- unique(trimws(as.character(rv$staged$scrubbed_species_binomial)))
     names_vec <- names_vec[!is.na(names_vec) & names_vec != ""]
     n_total <- length(names_vec)
@@ -924,7 +928,11 @@ server <- function(input, output, session) {
 
   # ── GNRS ─────────────────────────────────────────────────────────────────
   observeEvent(input$btn_gnrs, {
-    req(rv$staged)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table found — complete Steps 1-3 (Upload, Map Fields, Apply Mapping) before running GNRS.",
+                       type="error", duration=10)
+      return()
+    }
     geo_cols <- intersect(c("country","state_province","county"), names(rv$staged))
     if (length(geo_cols) == 0) {
       rv$gnrs_result <- data.frame(note="No geography columns (country/state_province/county) found in staging table.",
@@ -1034,7 +1042,11 @@ server <- function(input, output, session) {
 
   # ── GVS ──────────────────────────────────────────────────────────────────
   observeEvent(input$btn_gvs, {
-    req(rv$staged)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table found — complete Steps 1-3 (Upload, Map Fields, Apply Mapping) before running GVS.",
+                       type="error", duration=10)
+      return()
+    }
     coord_cols <- intersect(c("latitude","longitude"), names(rv$staged))
     if (length(coord_cols) < 2) {
       rv$gvs_result <- data.frame(
@@ -1204,7 +1216,11 @@ server <- function(input, output, session) {
 
   # ── NSR ──────────────────────────────────────────────────────────────────
   observeEvent(input$btn_nsr, {
-    req(rv$staged)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table found — complete Steps 1-3 (Upload, Map Fields, Apply Mapping) before running NSR.",
+                       type="error", duration=10)
+      return()
+    }
     # NSR requires: taxon, country, state_province (county_parish optional), user_id
     spp_col <- "scrubbed_species_binomial"
     if (!spp_col %in% names(rv$staged) ||
