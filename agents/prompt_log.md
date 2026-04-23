@@ -821,3 +821,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Root cause identified as duplicate `workflow_dispatch:` key in `.github/workflows/deploy.yml` in enquistlab-site-migration; removed duplicate key so Jekyll/Pages deploy workflow is syntactically valid; confirmed deploy succeeds and Connor Wilson, Gabriel Moulatlet, and Maria Rosati now appear in deployed gh-pages HTML.
 - Files changed: enquistlab-site-migration/.github/workflows/deploy.yml
 - Completed by: GitHub Copilot (commit e5ed062)
+
+- Date: 2026-04-23
+- Prompt summary: Set up automated daily CV-to-publications pipeline: new script `scripts/sync_publications_from_cv.py` extracts DOIs from synced CV text, fetches BibTeX from CrossRef API, appends new entries with `doi` field to `_bibliography/papers.bib` (title hotlinks via bib.liquid template); updated `.github/workflows/sync-google-doc-cv.yml` to run script daily at 06:17 UTC and trigger Jekyll deploy when changes detected. Tested locally: 24 new entries added. Pushed as commit `4c1c8c7` to enquistlab-site-migration.
+- Requested outcomes: Daily automated pipeline that extracts DOIs from the synced Google Docs CV, fetches BibTeX via CrossRef, deduplicates by DOI, and appends new entries to papers.bib; workflow extended to run script and trigger Jekyll deploy on changes.
+- Files changed: enquistlab-site-migration/scripts/sync_publications_from_cv.py; enquistlab-site-migration/.github/workflows/sync-google-doc-cv.yml; enquistlab-site-migration/_bibliography/papers.bib; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
