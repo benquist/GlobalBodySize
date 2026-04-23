@@ -159,15 +159,19 @@ run_qc <- function(staged) {
                stringsAsFactors=FALSE)
   }
 
-  # Date parseable
+  # Date parseable — try multiple common formats gracefully
   if ("date_collected" %in% names(staged)) {
     raw <- as.character(staged$date_collected)
-    parsed <- suppressWarnings(as.Date(raw))
+    parsed <- suppressWarnings(as.Date(raw, tryFormats = c(
+      "%Y-%m-%d", "%m/%d/%y", "%m/%d/%Y",
+      "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y",
+      "%d-%b-%Y", "%B %d, %Y", "%b %d, %Y"
+    )))
     n_pass <- sum(!is.na(parsed))
     n_fail <- sum(is.na(parsed) & !is.na(raw) & trimws(raw) != "")
     ex <- raw[which(is.na(parsed) & !is.na(raw) & trimws(raw) != "")][1]
     rows[["date"]] <- data.frame(
-      field="date_collected", check="Date parseable (ISO 8601)",
+      field="date_collected", check="Date parseable (common formats)",
       n_records=nrow(staged), n_pass=n_pass, n_fail=n_fail,
       severity=if(n_fail==0) "PASS" else "WARN",
       example_fail=if(is.na(ex)) NA_character_ else ex,
@@ -376,7 +380,18 @@ ui <- navbarPage(
           tags$span(class="step-badge", "4"),
           tags$strong("Download Outputs"),
           tags$hr(style="margin:8px 0"),
-          uiOutput("dl_buttons_ui")
+          downloadButton("dl_staged",  "BIEN Staging Table (.csv)",
+                         style="width:100%; margin-bottom:8px;"),
+          downloadButton("dl_dwc",     "Darwin Core Table (.csv)",
+                         style="width:100%; margin-bottom:8px;"),
+          downloadButton("dl_mapping", "Field Mapping (.csv)",
+                         style="width:100%; margin-bottom:8px;"),
+          downloadButton("dl_qc",      "QC Report (.csv)",
+                         style="width:100%; margin-bottom:8px;"),
+          downloadButton("dl_packet",  "Full Packet (.zip)",
+                         style="width:100%;"),
+          tags$br(),
+          uiOutput("dl_status_ui")
         )
       ),
       column(8,
@@ -439,6 +454,10 @@ server <- function(input, output, session) {
         "observations.csv"  = read.csv(obs_path,  stringsAsFactors=FALSE, check.names=FALSE),
         "plot_metadata.csv" = read.csv(meta_path, stringsAsFactors=FALSE, check.names=FALSE)
       )
+      # Strip completely blank rows from demo data
+      rv$raw_files <- lapply(rv$raw_files, function(df) {
+        df[rowSums(!is.na(df) & trimws(as.matrix(df)) != "") > 0, , drop=FALSE]
+      })
     } else if (!is.null(input$files)) {
       # Basic file size guard: warn if any file > 50 MB
       large <- input$files$name[input$files$size > 50 * 1024 * 1024]
@@ -449,7 +468,11 @@ server <- function(input, output, session) {
       }
       rv$raw_files <- setNames(
         lapply(input$files$datapath,
-               function(p) read.csv(p, stringsAsFactors=FALSE, check.names=FALSE)),
+               function(p) {
+                 df <- read.csv(p, stringsAsFactors=FALSE, check.names=FALSE)
+                 # Strip completely blank rows (e.g. trailing empty line in CSV)
+                 df[rowSums(!is.na(df) & trimws(as.matrix(df)) != "") > 0, , drop=FALSE]
+               }),
         input$files$name
       )
     }
@@ -596,23 +619,33 @@ server <- function(input, output, session) {
   observeEvent(input$btn_apply_mapping, {
     req(rv$mapping_draft)
     req(rv$merged)
+    # Build mapping, staging and DWC in one tryCatch
     tryCatch({
       mapping <- rv$mapping_draft
-      # Coerce any DT-edited values (may arrive as list columns) to plain character
       mapping$source_col  <- as.character(mapping$source_col)
       mapping$dwc_term    <- as.character(mapping$dwc_term)
       mapping$bien_field  <- as.character(mapping$bien_field)
       rv$mapping <- mapping
       rv$staged  <- build_staging(rv$merged, rv$mapping)
       rv$dwc     <- build_dwc(rv$merged, rv$mapping)
-      rv$qc      <- run_qc(rv$staged)
     }, error = function(e) {
       showNotification(
-        paste0("Apply Mapping failed: ", conditionMessage(e),
-               " — check that your column names do not contain special characters."),
+        paste0("Apply Mapping failed: ", conditionMessage(e)),
         type = "error", duration = 15
       )
     })
+    # Run QC in a separate tryCatch so staging is never lost if QC errors
+    if (!is.null(rv$staged)) {
+      tryCatch({
+        rv$qc <- run_qc(rv$staged)
+      }, error = function(e) {
+        showNotification(
+          paste0("QC check failed: ", conditionMessage(e),
+                 " — staging table is still available for download."),
+          type = "warning", duration = 15
+        )
+      })
+    }
   })
 
   output$step2_status_inline <- renderUI({
@@ -895,25 +928,15 @@ server <- function(input, output, session) {
     )
   })
 
-  # ── Tab 4 download buttons (only rendered when data is ready) ────────────
-  output$dl_buttons_ui <- renderUI({
+  # ── Tab 4 download status (replaces conditional button renderUI) ──────────
+  output$dl_status_ui <- renderUI({
     if (is.null(rv$staged)) {
-      return(tags$p(style="color:#888; font-size:0.85em;",
-        "Complete Steps 1\u20133 to unlock downloads."))
+      tags$p(style="color:#e6a817; font-size:0.82em; margin-top:8px;",
+        "\u26a0 Complete Steps 1\u20133 first. Downloads will contain a placeholder until staging is ready.")
+    } else {
+      tags$p(style="color:#27ae60; font-size:0.82em; margin-top:8px;",
+        paste0("\u2713 Ready \u2014 ", nrow(rv$staged), " records staged."))
     }
-    has_dwc  <- !is.null(rv$dwc)  && ncol(rv$dwc) > 0
-    tagList(
-      downloadButton("dl_staged",  "BIEN Staging Table (.csv)",
-                     style="width:100%; margin-bottom:8px;"),
-      if (has_dwc) downloadButton("dl_dwc", "Darwin Core Table (.csv)",
-                     style="width:100%; margin-bottom:8px;"),
-      downloadButton("dl_mapping", "Field Mapping (.csv)",
-                     style="width:100%; margin-bottom:8px;"),
-      downloadButton("dl_qc",      "QC Report (.csv)",
-                     style="width:100%; margin-bottom:8px;"),
-      downloadButton("dl_packet",  "Full Packet (.zip)",
-                     style="width:100%;")
-    )
   })
 
   # ── Download handlers ─────────────────────────────────────────────────────
