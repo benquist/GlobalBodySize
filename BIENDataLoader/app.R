@@ -954,7 +954,7 @@ server <- function(input, output, session) {
       }, character(1))
     }
     s <- as.character(x)
-    ifelse(!is.na(s) & grepl("^[=+\\-@]", s), paste0("'", s), s)
+    ifelse(!is.na(s) & grepl("^[=+@-]", s), paste0("'", s), s)
   }
   safe_write_csv <- function(df, file) {
     if (!is.data.frame(df)) {
