@@ -725,3 +725,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: (1) Move home hero text block from left to right to avoid white-background overlap; (2) show both names on About by keeping Enquist Lab title and adding Macroecology Lab bridge label; (3) add top-of-page clickable subsection list (text row, not tabs) that jumps to in-page sections; (4) rename top navigation tab to Impacts while keeping page content context.
 - Files changed: enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/conservation-impacts.md; enquistlab-site-migration/_layouts/page.liquid; enquistlab-site-migration/_layouts/about.liquid; enquistlab-site-migration/_sass/_lab-redesign.scss; enquistlab-site-migration/assets/js/section-jump-nav.js; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-23
+- Prompt summary: User tested BIENDataLoader with real CSV files. Fixed 3 bugs: (1) date parsing crash on M/D/YY dates — fixed with tryFormats=c("%Y-%m-%d", "%m/%d/%y", "%m/%d/%Y", ...) with %m/%d/%y before %m/%d/%Y so 2-digit years parse as 2000s not 0000s; (2) blank/empty row filtering after CSV read to remove trailing blank lines in user files; (3) static download buttons moved back to UI (always registered) — only a status indicator uses renderUI — to fix re-binding failures after dynamic removal; (4) separate run_qc tryCatch so staging/DWC tables always saved even if QC errors.
+- Requested outcomes: All four bugs fixed in BIENDataLoader/app.R; committed c6a59d1; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit c6a59d1)
