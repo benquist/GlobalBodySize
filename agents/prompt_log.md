@@ -671,3 +671,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: (1) Replaced row-by-row for loop with tryCatch(as.Date(x[[i]])) per row in R/qc_checks.R eventDate QC check with vectorized suppressWarnings(as.Date(raw_date)); (2) Replaced merge(out, tax_lookup, by="scientificName",...) in R/bien_pipeline_helpers.R with match() + column-wise lookup to avoid full data-frame copy; (3) Replaced for-loop column additions in R/bien_handoff.R with single batch dwc_df[missing] <- NA_character_. Deployed to shinyapps.io.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/R/qc_checks.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_handoff.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: GitHub Actions workflow for syncing Google Sheet to people page keeps failing with exit code 1. Debug and fix.
+- Requested outcomes: (1) sync_people_sheet.py: use `os.environ.get("PEOPLE_SHEET_ID") or "hardcoded-id"` so empty string falls through to default; (2) add HTML-response detection in fetch_csv_rows() with clear error; (3) print fetch URL in main() for debugging; (4) sync-people-sheet.yml: add `secrets.PEOPLE_SHEET_ID || 'hardcoded-id'` workflow env fallback; (5) add diagnostic step writing Python version, secret status, curl CSV test, and sync output to $GITHUB_STEP_SUMMARY. Workflow confirmed passing via GitHub Actions Summary.
+- Files changed: enquistlab-site-migration/scripts/sync_people_sheet.py; enquistlab-site-migration/.github/workflows/sync-people-sheet.yml; enquistlab-site-migration/_data/people.yml; enquistlab-site-migration/assets/img/team/michiel_mich_pillet.jpg
+- Completed by: GitHub Copilot
