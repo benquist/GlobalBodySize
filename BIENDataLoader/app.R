@@ -341,22 +341,25 @@ ui <- navbarPage(
           tags$p(style="font-size:0.85em; margin:4px 0 6px;",
             "TNRS checks taxonomy; GNRS validates geography."),
           tags$p(style="font-size:0.8em; color:#7f8c8d; margin:0 0 8px;",
-            HTML("<strong>Note:</strong> These calls may take 15\u201360s. ",
-                 "If you see a connection timeout, the external TNRS/GNRS servers may be temporarily slow or unreachable. ",
-                 "Use the \u2018Download script\u2019 buttons below to run validation locally in R instead.")),
+            HTML("<strong>Recommended:</strong> Download the validation scripts below and run them locally in R. ",
+                 "The in-app buttons contact external servers that may be unreachable from cloud hosting ",
+                 "(shinyapps.io runs on AWS; tnrsapi.xyz and gnrsapi.xyz may block cloud IPs). ",
+                 "If the in-app check times out, the local script is the reliable path.")),
 
           tags$hr(style="margin:6px 0;"),
-          actionButton("btn_tnrs", "Run TNRS in app (max 20 names)", class="btn-warning btn-sm",
+          downloadButton("dl_tnrs_script", "\u2b07 Download TNRS validation script (.R)",
+                         class="btn-success btn-sm",
+                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+          actionButton("btn_tnrs", "Try TNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
           uiOutput("tnrs_status_ui"),
-          downloadButton("dl_tnrs_script", "Download TNRS validation script (.R)",
-                         style="width:100%; margin-top:4px; margin-bottom:10px; font-size:0.8em;"),
           tags$hr(style="margin:6px 0;"),
-          actionButton("btn_gnrs", "Run GNRS in app (geography check)", class="btn-warning btn-sm",
+          downloadButton("dl_gnrs_script", "\u2b07 Download GNRS validation script (.R)",
+                         class="btn-success btn-sm",
+                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+          actionButton("btn_gnrs", "Try GNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
-          uiOutput("gnrs_status_ui"),
-          downloadButton("dl_gnrs_script", "Download GNRS validation script (.R)",
-                         style="width:100%; margin-top:4px; font-size:0.8em;")
+          uiOutput("gnrs_status_ui")
         )
       ),
       column(8,
@@ -761,7 +764,7 @@ server <- function(input, output, session) {
           "https://tnrsapi.xyz/tnrs_api.php",
           body = tnrs_body,
           httr::content_type("application/json"),
-          httr::config(connecttimeout = 60),
+          httr::config(connecttimeout = 15),
           httr::timeout(120)
         )
         setProgress(0.8)
@@ -841,7 +844,7 @@ server <- function(input, output, session) {
           "https://gnrsapi.xyz/gnrs_api.php",
           body = gnrs_body,
           httr::content_type("application/json"),
-          httr::config(connecttimeout = 60),
+          httr::config(connecttimeout = 15),
           httr::timeout(120)
         )
         setProgress(0.8)
