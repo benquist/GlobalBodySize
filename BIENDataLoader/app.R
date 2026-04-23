@@ -838,8 +838,8 @@ server <- function(input, output, session) {
           "https://tnrsapi.xyz/tnrs_api.php",
           body = tnrs_body,
           httr::content_type("application/json"),
-          httr::config(connecttimeout = 30),
-          httr::timeout(60)
+          httr::config(connecttimeout = 60),
+          httr::timeout(120)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
@@ -971,8 +971,8 @@ server <- function(input, output, session) {
           "https://gnrsapi.xyz/gnrs_api.php",
           body = gnrs_body,
           httr::content_type("application/json"),
-          httr::config(connecttimeout = 30),
-          httr::timeout(60)
+          httr::config(connecttimeout = 60),
+          httr::timeout(120)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
@@ -1091,8 +1091,8 @@ server <- function(input, output, session) {
           body = gvs_body,
           httr::content_type("application/json"),
           httr::add_headers(Accept="application/json", charset="UTF-8"),
-          httr::config(connecttimeout=15),
-          httr::timeout(25)
+          httr::config(connecttimeout=60),
+          httr::timeout(120)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
@@ -1275,8 +1275,8 @@ server <- function(input, output, session) {
           body = nsr_body,
           httr::content_type("application/json"),
           httr::add_headers(Accept="application/json", charset="UTF-8"),
-          httr::config(connecttimeout=15),
-          httr::timeout(25)
+          httr::config(connecttimeout=60),
+          httr::timeout(120)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
