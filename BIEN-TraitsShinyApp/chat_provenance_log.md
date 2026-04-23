@@ -109,3 +109,8 @@
 - Prompt summary: App startup failure reported by user with shinyapps.io message "The application failed to start. exit status 1".
 - Requested outcomes: Trace startup error via shinyapps logs, repair module definition/scoping so `distributionsUI` resolves at startup, redeploy, and verify remote instance boots.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Fix delayed Taxon/Trait autocomplete after changing Query Rank (Species/Genus/Family/Trait Only).
+- Requested outcomes: Remove duplicate rank-triggered suggestion refreshes and reduce BIEN suggestion payload sizes so selectize autofill becomes responsive immediately after rank switches.
+- Completed by: GitHub Copilot

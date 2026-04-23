@@ -1,4 +1,4 @@
-build_bien_loading_table <- function(dwc_df) {
+build_bien_loading_table <- function(dwc_df, taxonomy_cap = 50) {
   if (!is.data.frame(dwc_df) || nrow(dwc_df) == 0) {
     stop("dwc_df must be a non-empty data.frame")
   }
@@ -9,7 +9,7 @@ build_bien_loading_table <- function(dwc_df) {
     dwc_df[[m]] <- NA_character_
   }
 
-  dwc_df <- augment_bien_pipeline(dwc_df)
+  dwc_df <- augment_bien_pipeline(dwc_df, taxonomy_cap = taxonomy_cap)
   dwc_df$ready_for_bien <- !is.na(dwc_df$scientificName) &
     trimws(as.character(dwc_df$scientificName)) != "" &
     (is.na(dwc_df$coordinate_issue) | dwc_df$coordinate_issue %in% c("", "missing_coordinates"))
@@ -20,7 +20,7 @@ build_bien_loading_table <- function(dwc_df) {
   dwc_df$scientificName_matched <- as.character(dwc_df$bien_matched_name)
   dwc_df$taxonomy_match_status <- as.character(dwc_df$bien_taxonomy_status)
   dwc_df$coordinate_status <- ifelse(
-    isTRUE(dwc_df$coordinate_valid_basic),
+    !is.na(dwc_df$coordinate_valid_basic) & dwc_df$coordinate_valid_basic == TRUE,
     "basic_valid",
     ifelse(is.na(dwc_df$coordinate_issue) | as.character(dwc_df$coordinate_issue) == "", "unknown", as.character(dwc_df$coordinate_issue))
   )
@@ -29,7 +29,7 @@ build_bien_loading_table <- function(dwc_df) {
   dwc_df$gvs_status <- as.character(dwc_df$gvs_status)
   dwc_df$nsr_status <- as.character(dwc_df$nsr_status)
   dwc_df$staging_notes <- ifelse(
-    isTRUE(dwc_df$ready_for_bien),
+    !is.na(dwc_df$ready_for_bien) & dwc_df$ready_for_bien == TRUE,
     "record appears ready for BIEN staging after external handoff checks",
     "record needs review before BIEN staging"
   )

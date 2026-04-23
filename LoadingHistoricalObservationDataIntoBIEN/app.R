@@ -675,28 +675,12 @@ server <- function(input, output, session) {
   })
 
   # --- Step 4 Taxonomy spinner logic ---
+  # Local triage is instant — no forced onFlushed evaluation needed.
+  # taxonomy_loading reactiveVal is kept so global_loading_ui doesn't need rewiring.
   observeEvent(input$workflow_tabs, {
-    if (identical(input$workflow_tabs, "Step 4 Taxonomy")) {
-      taxonomy_loading(TRUE)
-      session$onFlushed(function() {
-        tryCatch(
-          taxonomy_view_state(),
-          error = function(e) NULL
-        )
-        taxonomy_loading(FALSE)
-      }, once = TRUE)
-    } else {
-      taxonomy_loading(FALSE)
-    }
+    taxonomy_loading(FALSE)
   }, ignoreInit = TRUE)
-  output$taxonomy_loading_ui <- renderUI({
-    if (!taxonomy_loading()) return(NULL)
-    tags$div(
-      class = "bien-working-banner",
-      tags$div(class = "bien-working-spinner spinner-border"),
-      tags$span("Step 4: Reconciling taxonomy — please wait...")
-    )
-  })
+  output$taxonomy_loading_ui <- renderUI(NULL)
 
   # --- Step 5 Validate spinner logic ---
   # Single observer: always clears spinner even if build_state() errors or req() fails silently.
@@ -1069,82 +1053,20 @@ server <- function(input, output, session) {
   taxonomy_df <- reactive({
     if (!is.null(build_state())) {
       df <- dwc_df()
-      if ("scientificName" %in% names(df)) {
-        names_vec <- unique(df$scientificName)
+      names_vec <- if ("scientificName" %in% names(df)) unique(df$scientificName) else character(0)
+    } else {
+      cs <- combined_state()
+      if (!is.null(cs) && "scientificName" %in% names(cs$merged)) {
+        names_vec <- unique(cs$merged$scientificName)
       } else {
         names_vec <- character(0)
       }
-    } else if (!is.null(combined_state()) && "scientificName" %in% names(combined_df())) {
-      names_vec <- unique(combined_df()$scientificName)
-    } else {
-      names_vec <- character(0)
     }
     reconcile_taxonomy_local(names_vec)
   })
 
-  # --- TNRS Query Cache ---
-  tnrs_cache <- reactiveVal(NULL)
-  tnrs_cache_key <- reactiveVal("")
-
-  observeEvent(taxonomy_df(), {
-    tx <- taxonomy_df()
-    if (!is.data.frame(tx) || !"scientificName" %in% names(tx)) {
-      tnrs_cache(NULL)
-      tnrs_cache_key("")
-      return()
-    }
-
-    unique_names <- sort(unique(trimws(as.character(tx$scientificName))))
-    unique_names <- unique_names[!is.na(unique_names) & unique_names != ""]
-    next_key <- paste(unique_names, collapse = "||")
-
-    if (!identical(next_key, tnrs_cache_key())) {
-      tnrs_cache(NULL)
-      tnrs_cache_key(next_key)
-    }
-  }, ignoreInit = FALSE)
-  
-  tnrs_results <- reactive({
-    req(taxonomy_df())
-    
-    # Check if cache is already populated
-    if (!is.null(tnrs_cache())) {
-      return(tnrs_cache())
-    }
-    
-    # Extract unique names with cap of 50
-    unique_names <- unique(trimws(as.character(taxonomy_df()$scientificName)))
-    unique_names <- unique_names[!is.na(unique_names) & unique_names != ""]
-    
-    if (length(unique_names) == 0) {
-      tnrs_cache(data.frame(
-        submitted_name = character(0),
-        tnrs_matched = character(0),
-        tnrs_confidence = numeric(0),
-        tnrs_acceptedname = character(0),
-        stringsAsFactors = FALSE
-      ))
-      return(tnrs_cache())
-    }
-    
-    # Cap queried names to maintain predictable response times.
-    names_to_query <- unique_names[seq_len(min(taxonomy_lookup_cap, length(unique_names)))]
-    
-    tryCatch({
-      results <- bien_tnrs_query(names_to_query)
-      tnrs_cache(results)
-      results
-    }, error = function(e) {
-      # Return empty results on error but don't cache so it can be retried
-      data.frame(
-        submitted_name = names_to_query,
-        tnrs_matched = NA_character_,
-        tnrs_confidence = NA_real_,
-        tnrs_acceptedname = NA_character_,
-        stringsAsFactors = FALSE
-      )
-    })
-  })
+  # TNRS queries run only from the explicit "D Run BIEN Service Checks" action in Step 6.
+  # No TNRS infrastructure is needed in Step 4 — local triage is instant.
 
   taxonomy_view_state <- reactive({
     tx <- taxonomy_df()

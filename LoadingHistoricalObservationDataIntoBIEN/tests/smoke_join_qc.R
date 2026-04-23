@@ -1,6 +1,5 @@
-source("R/multi_file_merge.R")
-source("R/dwc_mapping.R")
-source("R/qc_checks.R")
+pkg_root <- tryCatch(normalizePath(file.path(dirname(sys.frame(1)$ofile), ".."), mustWork = FALSE), error = function(e) normalizePath(".."))
+for (f in list.files(file.path(pkg_root, "R"), pattern = "\\.R$", full.names = TRUE)) source(f, local = FALSE)
 
 obs <- data.frame(
   species_name = c("Abies bracteata", ""),

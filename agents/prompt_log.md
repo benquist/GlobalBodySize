@@ -641,3 +641,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Correct instruction text so labels match lettered pipeline buttons (A–E); simplify taxonomy_view_state() to always use taxonomy_df() instead of staging_preview_df() so Step 4 no longer blocks on augment_bien_pipeline(); deploy updated app to shinyapps.io.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Step 4 Taxonomic Reconciliation Triage is taking a long time. Lets really speed this step up.
+- Requested outcomes: (1) removed eager observeEvent(taxonomy_df(), ignoreInit=FALSE) that fired on every button-A click and re-sorted/pasted all unique names then set tnrs_cache(NULL) propagating reactive invalidations; (2) removed tnrs_cache, tnrs_cache_key reactiveVals and tnrs_results dead reactive entirely; (3) simplified taxonomy_df() to use combined_state()$merged directly instead of calling combined_df() twice; (4) removed Step 4 spinner onFlushed forced evaluation that was racing with natural Shiny output rendering. Deployed to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot

@@ -1,6 +1,6 @@
 Package: HistoricalObsToBIEN
 Type: Package
-Title: Loading Historical Observation Data into BIEN
+Title: BIEN Observation Ingest and Reconciliation Tool
 Version: 0.1.0
 Authors@R: person(given = "BIEN", family = "Team", role = c("aut", "cre"), email = "bien@example.org")
 Author: BIEN Team [aut, cre]

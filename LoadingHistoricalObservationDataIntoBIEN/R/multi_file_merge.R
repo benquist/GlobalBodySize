@@ -371,50 +371,51 @@ find_duplicate_metadata_conflicts <- function(data_list, metadata_files, metadat
   conflicts <- list()
 
   for (f in metadata_files) {
-    if (!f %in% names(data_list)) {
-      next
-    }
+    if (!f %in% names(data_list)) next
 
     meta_key <- metadata_keys[[f]]
-    if (is.null(meta_key) || !nzchar(meta_key)) {
-      next
-    }
+    if (is.null(meta_key) || !nzchar(meta_key)) next
 
     meta_df <- data_list[[f]]
-    if (!meta_key %in% names(meta_df) || nrow(meta_df) == 0) {
-      next
-    }
+    if (!meta_key %in% names(meta_df) || nrow(meta_df) == 0) next
 
     key_vals <- normalize_join_key(meta_df[[meta_key]])
-    key_tab <- table(key_vals[!is.na(key_vals)], useNA = "no")
+    key_tab  <- table(key_vals[!is.na(key_vals)], useNA = "no")
     dup_keys <- names(key_tab[key_tab > 1])
+    if (length(dup_keys) == 0) next
 
-    if (length(dup_keys) == 0) {
-      next
-    }
+    cols <- setdiff(names(meta_df), meta_key)
 
-    for (k in dup_keys) {
-      idx <- which(key_vals == k)
-      chunk <- meta_df[idx, , drop = FALSE]
-      cols <- setdiff(names(chunk), meta_key)
+    # Build row-index lookup once per file (not once per column × dup-key pair).
+    split_idx <- split(seq_len(nrow(meta_df)), key_vals)[dup_keys]
 
-      for (col in cols) {
-        vals <- as.character(chunk[[col]])
-        vals <- trimws(vals)
-        vals <- vals[!is.na(vals) & vals != ""]
-        uniq <- unique(vals)
+    # Scan all columns with lapply; convert each column to character once.
+    file_conflicts <- do.call(rbind, lapply(cols, function(col) {
+      vals_chr <- trimws(as.character(meta_df[[col]]))
+      vals_chr[is.na(vals_chr)] <- NA_character_
 
+      rows <- do.call(rbind, lapply(names(split_idx), function(k) {
+        x <- vals_chr[split_idx[[k]]]
+        x <- x[!is.na(x) & nzchar(x)]
+        uniq <- unique(x)
         if (length(uniq) > 1) {
-          conflicts[[length(conflicts) + 1]] <- data.frame(
-            metadata_file = f,
-            metadata_key = meta_key,
-            key_value = k,
-            conflict_column = col,
+          data.frame(
+            metadata_file      = f,
+            metadata_key       = meta_key,
+            key_value          = k,
+            conflict_column    = col,
             conflicting_values = paste(uniq, collapse = " | "),
-            stringsAsFactors = FALSE
+            stringsAsFactors   = FALSE
           )
+        } else {
+          NULL
         }
-      }
+      }))
+      rows
+    }))
+
+    if (!is.null(file_conflicts) && nrow(file_conflicts) > 0) {
+      conflicts[[length(conflicts) + 1]] <- file_conflicts
     }
   }
 

@@ -548,31 +548,9 @@ queryServer <- function(id) {
     ) -> rv
 
     observeEvent(input$rank, {
+      # Trait-only mode must use trait suggestions to keep the control coherent.
       if (!is.null(input$rank) && identical(input$rank, "trait-only") && !identical(input$suggest_mode, "traits")) {
         updateRadioButtons(session, "suggest_mode", selected = "traits")
-      }
-
-      if (!is.null(input$rank) && identical(input$rank, "trait-only")) {
-        key <- "traits::traits"
-        choices <- rv$suggestion_cache[[key]]
-        if (is.null(choices)) {
-          choices <- load_trait_suggestions()
-          rv$suggestion_cache[[key]] <- choices
-        }
-
-        updateSelectizeInput(
-          session,
-          "taxon",
-          choices = choices,
-          selected = "",
-          server = FALSE,
-          options = list(
-            create = FALSE,
-            maxOptions = 2000,
-            openOnFocus = TRUE,
-            placeholder = "Type to find BIEN trait names (accepted list)."
-          )
-        )
       }
     }, ignoreInit = TRUE)
 
@@ -594,7 +572,8 @@ queryServer <- function(id) {
         choices <- if (identical(mode, "traits")) {
           load_trait_suggestions()
         } else {
-          cap <- if (identical(rank, "species")) 75000 else if (identical(rank, "genus")) 25000 else 5000
+          # Keep suggestion payloads smaller so rank switches do not block typing.
+          cap <- if (identical(rank, "species")) 15000 else if (identical(rank, "genus")) 5000 else 2000
           load_taxon_suggestions(rank = rank, max_choices = cap)
         }
         rv$suggestion_cache[[key]] <- choices
