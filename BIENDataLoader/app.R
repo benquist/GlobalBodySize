@@ -376,16 +376,7 @@ ui <- navbarPage(
           tags$span(class="step-badge", "4"),
           tags$strong("Download Outputs"),
           tags$hr(style="margin:8px 0"),
-          downloadButton("dl_staged",  "BIEN Staging Table (.csv)",
-                         style="width:100%; margin-bottom:8px;"),
-          downloadButton("dl_dwc",     "Darwin Core Table (.csv)",
-                         style="width:100%; margin-bottom:8px;"),
-          downloadButton("dl_mapping", "Field Mapping (.csv)",
-                         style="width:100%; margin-bottom:8px;"),
-          downloadButton("dl_qc",      "QC Report (.csv)",
-                         style="width:100%; margin-bottom:8px;"),
-          downloadButton("dl_packet",  "Full Packet (.zip)",
-                         style="width:100%;")
+          uiOutput("dl_buttons_ui")
         )
       ),
       column(8,
@@ -904,6 +895,27 @@ server <- function(input, output, session) {
     )
   })
 
+  # ── Tab 4 download buttons (only rendered when data is ready) ────────────
+  output$dl_buttons_ui <- renderUI({
+    if (is.null(rv$staged)) {
+      return(tags$p(style="color:#888; font-size:0.85em;",
+        "Complete Steps 1\u20133 to unlock downloads."))
+    }
+    has_dwc  <- !is.null(rv$dwc)  && ncol(rv$dwc) > 0
+    tagList(
+      downloadButton("dl_staged",  "BIEN Staging Table (.csv)",
+                     style="width:100%; margin-bottom:8px;"),
+      if (has_dwc) downloadButton("dl_dwc", "Darwin Core Table (.csv)",
+                     style="width:100%; margin-bottom:8px;"),
+      downloadButton("dl_mapping", "Field Mapping (.csv)",
+                     style="width:100%; margin-bottom:8px;"),
+      downloadButton("dl_qc",      "QC Report (.csv)",
+                     style="width:100%; margin-bottom:8px;"),
+      downloadButton("dl_packet",  "Full Packet (.zip)",
+                     style="width:100%;")
+    )
+  })
+
   # ── Download handlers ─────────────────────────────────────────────────────
   # CSV formula-injection sanitizer (OWASP: prevent Excel formula injection)
   sanitize_csv_col <- function(x) {
@@ -929,25 +941,49 @@ server <- function(input, output, session) {
   output$dl_staged <- downloadHandler(
     filename = function() paste0("bien_staging_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
-    content  = function(file) { if (is.null(rv$staged))  return(); safe_write_csv(rv$staged,  file) }
+    content  = function(file) {
+      if (is.null(rv$staged)) {
+        utils::write.csv(data.frame(error="No staging table — complete Steps 1-3 first."), file, row.names=FALSE)
+        return()
+      }
+      safe_write_csv(rv$staged, file)
+    }
   )
 
   output$dl_dwc <- downloadHandler(
     filename = function() paste0("dwc_table_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
-    content  = function(file) { if (is.null(rv$dwc))     return(); safe_write_csv(rv$dwc,     file) }
+    content  = function(file) {
+      if (is.null(rv$dwc) || ncol(rv$dwc) == 0) {
+        utils::write.csv(data.frame(error="No DWC terms were mapped — check field mapping in Step 2."), file, row.names=FALSE)
+        return()
+      }
+      safe_write_csv(rv$dwc, file)
+    }
   )
 
   output$dl_mapping <- downloadHandler(
     filename = function() paste0("field_mapping_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
-    content  = function(file) { if (is.null(rv$mapping)) return(); safe_write_csv(rv$mapping, file) }
+    content  = function(file) {
+      if (is.null(rv$mapping)) {
+        utils::write.csv(data.frame(error="No mapping applied yet — complete Step 2 first."), file, row.names=FALSE)
+        return()
+      }
+      safe_write_csv(rv$mapping, file)
+    }
   )
 
   output$dl_qc <- downloadHandler(
     filename = function() paste0("qc_report_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
-    content  = function(file) { if (is.null(rv$qc))      return(); safe_write_csv(rv$qc,      file) }
+    content  = function(file) {
+      if (is.null(rv$qc)) {
+        utils::write.csv(data.frame(error="No QC results — complete Steps 1-3 first."), file, row.names=FALSE)
+        return()
+      }
+      safe_write_csv(rv$qc, file)
+    }
   )
 
   output$dl_tnrs_script <- downloadHandler(
