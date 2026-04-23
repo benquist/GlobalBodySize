@@ -689,3 +689,21 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: New standalone BIENDataLoader/ Shiny app with no package dependencies; flat reactiveValues replacing nested reactive chains; vectorized DWC mapping and QC; optional TNRS/GNRS buttons (non-blocking); demo data for testing; code-checker and code-verifier sign-off.
 - Files changed: BIENDataLoader/app.R; BIENDataLoader/demo_data/demo_observations.csv; BIENDataLoader/demo_data/demo_metadata.csv; BIENDataLoader/README.md
 - Completed by: GitHub Copilot (commit 8e62da5)
+
+- Date: 2026-04-22
+- Prompt summary: TNRS and GNRS requests are failing (getting 'request failed or timed out' errors on Tab 3). Fix the API endpoints and request format.
+- Requested outcomes: (1) TNRS endpoint changed from https://tnrs.biendata.org/tnrs_api_r.php (form POST, CSV response) to https://tnrsapi.xyz/tnrs_api.php (JSON POST with {opts, data} body, JSON response); (2) GNRS endpoint changed from https://gnrs.biendata.org/api/ (raw JSON array) to https://gnrsapi.xyz/gnrs_api.php (JSON POST with {opts, data} body, JSON response, requires 4 columns including id); (3) Both APIs tested locally and confirmed working (200 OK with valid responses); (4) Redeployed to shinyapps.io as bien-data-loader.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit cc1c177)
+
+- Date: 2026-04-23
+- Prompt summary: TNRS and GNRS produce connection timeout errors on shinyapps.io (platform blocks outbound TCP to tnrsapi.xyz and gnrsapi.xyz). Diagnose problem and add local validation script download buttons as workaround.
+- Requested outcomes: (1) Diagnosed shinyapps.io blocks outbound TCP to external API hosts with a 10-second hard timeout; (2) Updated Tab 3 UI in BIENDataLoader/app.R to clearly explain the platform limitation; (3) Added two download handlers (dl_tnrs_script, dl_gnrs_script) that generate pre-populated R scripts users can run locally to call TNRS/GNRS.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit 20eacfa)
+
+- Date: 2026-04-23
+- Prompt summary: Corrected wrong diagnosis that shinyapps.io blocks outbound TCP — the real bug was httr's default CURLOPT_CONNECTTIMEOUT of 10 seconds (separate from httr::timeout() which only sets CURLOPT_TIMEOUT). Fixed by adding httr::config(connecttimeout=60) to both TNRS and GNRS POST calls. UI note in Tab 3 corrected to remove incorrect blame of shinyapps.io. Committed 97f0414 and pushed to master. Redeployed to shinyapps.io as bien-data-loader.
+- Requested outcomes: Add httr::config(connecttimeout=60) to TNRS and GNRS POST calls; remove shinyapps.io network restriction language from Tab 3 UI; push and redeploy.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit 97f0414)
