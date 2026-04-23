@@ -791,3 +791,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: All new aliases resolve correctly in Step 2 DWC field mapping; committed f5ccf08; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/.
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit f5ccf08)
+
+## 2026-04-23 — Fix On this page overlap and visual contrast
+
+**Prompt:** "For the 'On this page:' header... when I click a subsection, the block covers the subheader; move it up and make the block a slightly different color than the background."
+
+**Changes:** `_sass/_lab-redesign.scss` — adjusted sticky nav placement upward (`top: 3.7rem`, mobile `3.45rem`), increased heading anchor offsets (`scroll-margin-top: 10.5rem`, mobile `12rem`) so clicked headings are not hidden, and added stronger visual offset (tinted background, subtle border, rounded corners, shadow) for `.section-jump-nav`. Site commit `49ca576` on `main`, pushed.
+
+## 2026-04-23 — Restore publications year scroller visibility
+
+**Prompt:** "What happened to my year scroller on the publication page... Please put back"
+
+**Changes:** `_pages/publications.md` — restored right-rail year nav visibility on common laptop widths by changing hide breakpoint from `1280px` to `980px` and tightening right offset at narrower desktop (`max-width: 1200px`). Site commit `2cbf5ea` on `main`, pushed.
