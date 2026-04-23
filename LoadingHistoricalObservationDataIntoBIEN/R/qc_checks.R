@@ -28,14 +28,9 @@ run_dwc_qc <- function(dwc_df) {
     add_issue("eventDate missing", "WARN", nrow(dwc_df), "Include eventDate where possible for temporal analyses.")
   } else {
     raw_date <- as.character(dwc_df$eventDate)
-    parsed_dates <- suppressWarnings(as.Date(rep(NA_character_, length(raw_date))))
-    for (i in seq_along(raw_date)) {
-      parsed_dates[[i]] <- tryCatch(
-        suppressWarnings(as.Date(raw_date[[i]])),
-        error = function(e) as.Date(NA)
-      )
-    }
-    parse_ok <- !is.na(parsed_dates)
+    # Vectorized: as.Date handles NA and bad strings without a per-row tryCatch loop.
+    parsed_dates <- suppressWarnings(as.Date(raw_date))
+    parse_ok  <- !is.na(parsed_dates)
     non_blank <- !(is.na(raw_date) | trimws(raw_date) == "")
     bad <- non_blank & !parse_ok
     if (any(bad)) {

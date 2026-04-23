@@ -5,8 +5,8 @@ build_bien_loading_table <- function(dwc_df, taxonomy_cap = 50) {
 
   req <- required_dwc_terms()
   missing <- setdiff(req, names(dwc_df))
-  for (m in missing) {
-    dwc_df[[m]] <- NA_character_
+  if (length(missing) > 0) {
+    dwc_df[missing] <- NA_character_
   }
 
   dwc_df <- augment_bien_pipeline(dwc_df, taxonomy_cap = taxonomy_cap)

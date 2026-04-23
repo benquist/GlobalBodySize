@@ -373,7 +373,11 @@ augment_bien_pipeline <- function(dwc_df, taxonomy_cap = 50, use_external_taxono
     do.call(rbind, rows)
   }
 
-  out <- merge(out, tax_lookup, by = "scientificName", all.x = TRUE, sort = FALSE)
+  # Use match() instead of merge() to avoid a full data-frame copy for the taxonomy join.
+  name_idx <- match(out$scientificName, tax_lookup$scientificName)
+  out$bien_matched_name    <- tax_lookup$bien_matched_name[name_idx]
+  out$bien_taxonomy_status <- tax_lookup$bien_taxonomy_status[name_idx]
+  out$bien_family          <- tax_lookup$bien_family[name_idx]
   out$tnrs_status <- ifelse(
     is.na(out$scientificName) | trimws(as.character(out$scientificName)) == "",
     "missing_scientificName",

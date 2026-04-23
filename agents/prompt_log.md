@@ -665,3 +665,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Run the standard final gate checks for the enquistlab-site-migration repo; record this prompt with commit 5b9d668; skip Rmd compile because no Rmd files changed; skip R package build because no package files changed; confirm push with git -C /Users/brianjenquist/VSCode/enquistlab-site-migration log --oneline -2.
 - Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: The step with Taxonomy is taking a very very long time. Something is wrong. Please fix this step.
+- Requested outcomes: (1) Replaced row-by-row for loop with tryCatch(as.Date(x[[i]])) per row in R/qc_checks.R eventDate QC check with vectorized suppressWarnings(as.Date(raw_date)); (2) Replaced merge(out, tax_lookup, by="scientificName",...) in R/bien_pipeline_helpers.R with match() + column-wise lookup to avoid full data-frame copy; (3) Replaced for-loop column additions in R/bien_handoff.R with single batch dwc_df[missing] <- NA_character_. Deployed to shinyapps.io.
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/R/qc_checks.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/bien_handoff.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
