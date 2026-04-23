@@ -761,3 +761,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - `_pages/press-media.md`: "Press and Media" → "Press & Media"; "Selected Public-Facing Projects" → "Selected Public Projects"
 
 **Site commit:** 2d9fe8d on main, pushed.
+
+## 2026-04-23 — Add Trait-Based Ecology section to Research page
+
+**Prompt:** "For the https://enquistlab.github.io/research/ we are missing a section on Trait based ecology. Please fill in a forward looking summary of my trait-based ecology and research focus there."
+
+**Changes:** `_pages/research.md` — added new `### Trait-Based Ecology` section before the existing TDT stub. Covers: trait-to-prediction pipeline, TDT, ITV and traitstrap, remote sensing / spectral traits, OpenTraits/BIEN data standards, and a forward-looking paragraph on trait-based ecological forecasting. Also expanded the TDT section with additional application bullets. Site commit 09c496f on main, pushed.
