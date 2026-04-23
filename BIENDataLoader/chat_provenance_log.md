@@ -118,3 +118,20 @@
 
 **Commit:** a69984f  
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — Three bugs: primary file selection, negative coord sanitization, TNRS/GNRS writeback
+
+**Prompt:** User reported wrong row counts (Acer negundo missing, Pinus ponderosa only 1 row instead of 2, Cecropia only 3 of expected), negative longitude showing as '-105.78 with apostrophe, and all scrubbed_* fields NA after TNRS/GNRS calls.
+
+**Root causes and fixes:**
+
+1. **Primary file auto-selection** — `primary_file` was selected alphabetically (Plot_Test1 before Survey_Test1). When dedup ran, it operated on the observation file's rows but used the shorter Plot file as "primary", dropping Acer negundo and duplicate species rows. Fixed: `primary_file` now selected as the file with the most rows.
+
+2. **Negative coordinate sanitization** — `sanitize_csv_col()` regex `^[=+@-]` matched the leading `-` of negative numbers like `-105.78`, prepending an apostrophe. Fixed: skip values that parse as numeric (`suppressWarnings(!is.na(as.numeric(x)))`).
+
+3. **TNRS/GNRS writeback to staging** — After a successful TNRS call, `rv$staged` was not updated with the matched accepted names. Fixed: writeback loop updates `scrubbed_species_binomial`, `scrubbed_family`, `scrubbed_genus`, `scrubbed_author`, `scrubbed_taxonomic_status` from matched TNRS results. After successful GNRS call, `country`, `state_province`, `county` updated from matched values.
+
+**Commit:** 992433f  
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/

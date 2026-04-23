@@ -809,3 +809,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: In-app TNRS and GNRS buttons fail within 25s max; local scripts unchanged at 120s; UI note updated; committed a69984f; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/.
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit a69984f)
+
+- Date: 2026-04-23
+- Prompt summary: User reported wrong row counts (Acer negundo missing, Pinus ponderosa only 1 row instead of 2, Cecropia only 3 instead of expected), negative longitude showing as '-105.78 with apostrophe, and scrubbed_* fields all NA. Fixed: (1) primary file auto-selection by most rows; (2) numeric values exempt from formula injection guard; (3) TNRS results written back to staging scrubbed_* fields, GNRS results written back to country/state_province/county. Commit 992433f, deployed.
+- Requested outcomes: (1) Primary file auto-selection picks the file with the most rows (observation/survey file) rather than alphabetically first, so dedup runs on the correct file and no species rows are dropped; (2) sanitize_csv_col skips values that parse as numeric so negative coordinates like -105.78 are not prepended with an apostrophe; (3) after successful TNRS call rv$staged gets scrubbed_species_binomial, scrubbed_family, scrubbed_genus, scrubbed_author, scrubbed_taxonomic_status from matched results; after successful GNRS call country/state_province/county updated from matched values.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit 992433f)
