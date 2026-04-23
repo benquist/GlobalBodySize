@@ -76,3 +76,32 @@
 
 **Commit:** 90663c2
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — Regex bug in sanitize_csv_col (Linux TRE engine)
+
+**Prompt:** User got error CSV "Download failed: invalid regular expression ^[=+\-@], reason Invalid character range" — the tryCatch from the previous download fix exposed the internal R error message. Root cause: `^[=+\-@]` is an invalid character range on Linux TRE regex engine (shinyapps.io) because `\-` is treated as a literal hyphen forming a range `@-` backwards. Fixed by moving the hyphen to the end of the character class: `^[=+@-]`.
+
+**Summary:** Single-character fix in `sanitize_csv_col()`. All 5 download handlers now work on both macOS PCRE and Linux TRE. The escaping approach (`\-`) is not portable across regex engines; terminal placement is the correct POSIX form.
+
+**Commit:** 7110f84  
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — Expanded alias mapping tables (DWC_ALIASES and BIEN_ALIASES)
+
+**Prompt:** Expanded DWC_ALIASES and BIEN_ALIASES to cover more real-world column header synonyms that were previously unmapped.
+
+**New mappings added:**
+- `data_recorder`, `recorder`, `surveyor`, `field_crew`, `technician`, `investigator` → `recordedBy` / `dataowner`
+- `transect`, `station`, `quadrat` → `locality` / `plot_name`
+- `herbarium`, `herbarium_code` → `institutionCode`
+- `voucher`, `voucher_number`, `specimen_id`, `accession` → `catalogNumber` / `collection_code`
+- `project`, `study`, `survey` → `datasetName` / `dataset`
+- `alt`, `altitude`, `elev`, `elev_m` → elevation fields
+- `habitat_description` → `habitat`
+
+**Commit:** f5ccf08  
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/

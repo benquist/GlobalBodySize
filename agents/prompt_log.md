@@ -779,3 +779,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: All 5 downloadHandler content functions wrapped in tryCatch; safe_write_csv uses explicit file(path, open="w", encoding="UTF-8") connection; committed 90663c2; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/.
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit 90663c2)
+
+- Date: 2026-04-23
+- Prompt summary: BIENDataLoader CSV downloads returned "Download failed: invalid regular expression ^[=+\-@], reason Invalid character range" on shinyapps.io (Linux TRE regex engine). Fixed sanitize_csv_col regex by moving hyphen to end of character class: ^[=+\-@] → ^[=+@-].
+- Requested outcomes: Corrected POSIX-compliant regex in sanitize_csv_col so all 5 download handlers work on Linux TRE engine; committed 7110f84; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit 7110f84)
+
+- Date: 2026-04-23
+- Prompt summary: Expanded DWC_ALIASES and BIEN_ALIASES in BIENDataLoader/app.R to cover more real-world column header synonyms: data_recorder/recorder/surveyor/field_crew/technician/investigator → recordedBy/dataowner; transect/station/quadrat → locality/plot_name; herbarium/herbarium_code → institutionCode; voucher/voucher_number/specimen_id/accession → catalogNumber/collection_code; project/study/survey → datasetName/dataset; alt/altitude/elev/elev_m → elevation fields; habitat_description → habitat.
+- Requested outcomes: All new aliases resolve correctly in Step 2 DWC field mapping; committed f5ccf08; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit f5ccf08)
