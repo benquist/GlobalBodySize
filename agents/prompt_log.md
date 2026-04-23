@@ -683,3 +683,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Root cause identified as shinyapps.io free-tier cold-start sleep causing 15-30s blank screen. Fix: added cold-start loading overlay to LoadingHistoricalObservationDataIntoBIEN/app.R that shows a spinner while Shiny wakes up from sleep. Deployed to shinyapps.io (commit b63cae8).
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: User scrapped old LoadingHistoricalObservationDataIntoBIEN app as too slow/hung. Requested new lighter Shiny app from scratch. Built BIENDataLoader: flat reactiveValues design, vectorized mapping/QC, 0.05s pipeline on demo data, 4-tab workflow (Upload & Merge → Map Fields → Stage & Validate → Export), optional TNRS/GNRS buttons, demo data included, code-checker + code-verifier approved.
+- Requested outcomes: New standalone BIENDataLoader/ Shiny app with no package dependencies; flat reactiveValues replacing nested reactive chains; vectorized DWC mapping and QC; optional TNRS/GNRS buttons (non-blocking); demo data for testing; code-checker and code-verifier sign-off.
+- Files changed: BIENDataLoader/app.R; BIENDataLoader/demo_data/demo_observations.csv; BIENDataLoader/demo_data/demo_metadata.csv; BIENDataLoader/README.md
+- Completed by: GitHub Copilot (commit 8e62da5)
