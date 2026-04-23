@@ -361,7 +361,7 @@ ui <- navbarPage(
             HTML("<strong>Recommended:</strong> Download the validation scripts below and run them locally in R. ",
                  "The in-app buttons contact external servers that may be unreachable from cloud hosting ",
                  "(shinyapps.io runs on AWS; tnrsapi.xyz and gnrsapi.xyz may block cloud IPs). ",
-                 "If the in-app check times out, the local script is the reliable path.")),
+                 "If the in-app check times out after ~25s, the local script is the reliable path.")),
 
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_tnrs_script", "\u2b07 Download TNRS validation script (.R)",
@@ -782,7 +782,7 @@ server <- function(input, output, session) {
           body = tnrs_body,
           httr::content_type("application/json"),
           httr::config(connecttimeout = 15),
-          httr::timeout(120)
+          httr::timeout(25)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
@@ -862,7 +862,7 @@ server <- function(input, output, session) {
           body = gnrs_body,
           httr::content_type("application/json"),
           httr::config(connecttimeout = 15),
-          httr::timeout(120)
+          httr::timeout(25)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
