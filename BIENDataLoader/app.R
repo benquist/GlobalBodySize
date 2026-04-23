@@ -961,18 +961,24 @@ server <- function(input, output, session) {
       df <- as.data.frame(df, stringsAsFactors = FALSE)
     }
     df[] <- lapply(df, sanitize_csv_col)
-    utils::write.csv(df, file, row.names=FALSE, na = "", fileEncoding = "UTF-8")
+    con <- file(file, open = "w", encoding = "UTF-8")
+    on.exit(close(con), add = TRUE)
+    utils::write.csv(df, con, row.names = FALSE, na = "")
   }
 
   output$dl_staged <- downloadHandler(
     filename = function() paste0("bien_staging_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
     content  = function(file) {
-      if (is.null(rv$staged)) {
-        utils::write.csv(data.frame(error="No staging table — complete Steps 1-3 first."), file, row.names=FALSE)
-        return()
-      }
-      safe_write_csv(rv$staged, file)
+      tryCatch({
+        if (is.null(rv$staged)) {
+          utils::write.csv(data.frame(error="No staging table — complete Steps 1-3 first."), file, row.names=FALSE)
+          return()
+        }
+        safe_write_csv(rv$staged, file)
+      }, error = function(e) {
+        utils::write.csv(data.frame(error=paste0("Download failed: ", conditionMessage(e))), file, row.names=FALSE)
+      })
     }
   )
 
@@ -980,11 +986,15 @@ server <- function(input, output, session) {
     filename = function() paste0("dwc_table_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
     content  = function(file) {
-      if (is.null(rv$dwc) || ncol(rv$dwc) == 0) {
-        utils::write.csv(data.frame(error="No DWC terms were mapped — check field mapping in Step 2."), file, row.names=FALSE)
-        return()
-      }
-      safe_write_csv(rv$dwc, file)
+      tryCatch({
+        if (is.null(rv$dwc) || ncol(rv$dwc) == 0) {
+          utils::write.csv(data.frame(error="No DWC terms were mapped — check field mapping in Step 2."), file, row.names=FALSE)
+          return()
+        }
+        safe_write_csv(rv$dwc, file)
+      }, error = function(e) {
+        utils::write.csv(data.frame(error=paste0("Download failed: ", conditionMessage(e))), file, row.names=FALSE)
+      })
     }
   )
 
@@ -992,11 +1002,15 @@ server <- function(input, output, session) {
     filename = function() paste0("field_mapping_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
     content  = function(file) {
-      if (is.null(rv$mapping)) {
-        utils::write.csv(data.frame(error="No mapping applied yet — complete Step 2 first."), file, row.names=FALSE)
-        return()
-      }
-      safe_write_csv(rv$mapping, file)
+      tryCatch({
+        if (is.null(rv$mapping)) {
+          utils::write.csv(data.frame(error="No mapping applied yet — complete Step 2 first."), file, row.names=FALSE)
+          return()
+        }
+        safe_write_csv(rv$mapping, file)
+      }, error = function(e) {
+        utils::write.csv(data.frame(error=paste0("Download failed: ", conditionMessage(e))), file, row.names=FALSE)
+      })
     }
   )
 
@@ -1004,11 +1018,15 @@ server <- function(input, output, session) {
     filename = function() paste0("qc_report_", Sys.Date(), ".csv"),
     contentType = "text/csv; charset=UTF-8",
     content  = function(file) {
-      if (is.null(rv$qc)) {
-        utils::write.csv(data.frame(error="No QC results — complete Steps 1-3 first."), file, row.names=FALSE)
-        return()
-      }
-      safe_write_csv(rv$qc, file)
+      tryCatch({
+        if (is.null(rv$qc)) {
+          utils::write.csv(data.frame(error="No QC results — complete Steps 1-3 first."), file, row.names=FALSE)
+          return()
+        }
+        safe_write_csv(rv$qc, file)
+      }, error = function(e) {
+        utils::write.csv(data.frame(error=paste0("Download failed: ", conditionMessage(e))), file, row.names=FALSE)
+      })
     }
   )
 
@@ -1128,27 +1146,34 @@ server <- function(input, output, session) {
     filename = function() paste0("bien_data_packet_", Sys.Date(), ".zip"),
     contentType = "application/zip",
     content  = function(file) {
-      if (is.null(rv$staged)) return()
-      # Use tempfile() for guaranteed-unique path; clean up on exit
-      tmp <- tempfile(pattern="bien_packet_")
-      dir.create(tmp, recursive=TRUE, showWarnings=FALSE)
-      on.exit(unlink(tmp, recursive=TRUE), add=TRUE)
-
-      out_files <- character(0)
-      write_part <- function(df, fname) {
-        p <- file.path(tmp, fname)
-        safe_write_csv(df, p)
-        out_files <<- c(out_files, p)
+      if (is.null(rv$staged)) {
+        utils::write.csv(data.frame(error="No staging table — complete Steps 1-3 first."), file, row.names=FALSE)
+        return()
       }
-      if (!is.null(rv$staged))       write_part(rv$staged,       "bien_staging.csv")
-      if (!is.null(rv$dwc))          write_part(rv$dwc,          "dwc_table.csv")
-      if (!is.null(rv$mapping))      write_part(rv$mapping,      "field_mapping.csv")
-      if (!is.null(rv$qc))           write_part(rv$qc,           "qc_report.csv")
-      if (!is.null(rv$tnrs_result))  write_part(rv$tnrs_result,  "tnrs_results.csv")
-      if (!is.null(rv$gnrs_result))  write_part(rv$gnrs_result,  "gnrs_results.csv")
+      tryCatch({
+        # Use tempfile() for guaranteed-unique path; clean up on exit
+        tmp <- tempfile(pattern="bien_packet_")
+        dir.create(tmp, recursive=TRUE, showWarnings=FALSE)
+        on.exit(unlink(tmp, recursive=TRUE), add=TRUE)
 
-      # zip with full paths + junk-path flag (-j) to avoid setwd() race condition
-      utils::zip(zipfile=file, files=out_files, flags="-j")
+        out_files <- character(0)
+        write_part <- function(df, fname) {
+          p <- file.path(tmp, fname)
+          safe_write_csv(df, p)
+          out_files <<- c(out_files, p)
+        }
+        if (!is.null(rv$staged))       write_part(rv$staged,       "bien_staging.csv")
+        if (!is.null(rv$dwc))          write_part(rv$dwc,          "dwc_table.csv")
+        if (!is.null(rv$mapping))      write_part(rv$mapping,      "field_mapping.csv")
+        if (!is.null(rv$qc))           write_part(rv$qc,           "qc_report.csv")
+        if (!is.null(rv$tnrs_result))  write_part(rv$tnrs_result,  "tnrs_results.csv")
+        if (!is.null(rv$gnrs_result))  write_part(rv$gnrs_result,  "gnrs_results.csv")
+
+        # zip with full paths + junk-path flag (-j) to avoid setwd() race condition
+        utils::zip(zipfile=file, files=out_files, flags="-j")
+      }, error = function(e) {
+        utils::write.csv(data.frame(error=paste0("Packet build failed: ", conditionMessage(e))), file, row.names=FALSE)
+      })
     }
   )
 }
