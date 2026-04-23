@@ -681,17 +681,27 @@ server <- function(input, output, session) {
 
     withProgress(message="Submitting to TNRS\u2026", value=0.2, {
       result <- tryCatch({
+        tnrs_data <- data.frame(
+          id = seq_along(names_vec),
+          Name_submitted = names_vec,
+          stringsAsFactors = FALSE
+        )
+        tnrs_body <- jsonlite::toJSON(
+          list(opts = list(mode="resolve", matches="best", sources="wcvp,wfo", acc=1L),
+               data = tnrs_data),
+          auto_unbox = TRUE
+        )
         resp <- httr::POST(
-          "https://tnrs.biendata.org/tnrs_api_r.php",
-          body   = list(names=paste(names_vec, collapse="\n")),
-          encode = "form",
-          httr::timeout(20)
+          "https://tnrsapi.xyz/tnrs_api.php",
+          body = tnrs_body,
+          httr::content_type("application/json"),
+          httr::timeout(60)
         )
         setProgress(0.8)
         if (httr::status_code(resp) == 200) {
           txt <- httr::content(resp, "text", encoding="UTF-8")
-          df  <- tryCatch(read.csv(text=txt, stringsAsFactors=FALSE), error=function(e) NULL)
-          if (!is.null(df) && nrow(df) > 0) df else NULL
+          df  <- tryCatch(jsonlite::fromJSON(txt, flatten=TRUE), error=function(e) NULL)
+          if (is.data.frame(df) && nrow(df) > 0) df else NULL
         } else NULL
       }, error=function(e) NULL)
 
@@ -732,17 +742,23 @@ server <- function(input, output, session) {
 
     geo_tbl <- unique(rv$staged[, geo_cols, drop=FALSE])
     geo_tbl <- geo_tbl[rowSums(!is.na(geo_tbl) & geo_tbl != "") > 0, , drop=FALSE]
-    # GNRS expects DWC column names
+    # GNRS expects DWC column names: country, stateProvince, county (+ id)
     names(geo_tbl) <- gsub("state_province", "stateProvince", names(geo_tbl))
+    if (!"county" %in% names(geo_tbl)) geo_tbl$county <- ""
+    geo_tbl <- data.frame(id=seq_len(nrow(geo_tbl)), geo_tbl, stringsAsFactors=FALSE)
 
     withProgress(message="Submitting to GNRS\u2026", value=0.2, {
       result <- tryCatch({
-        body_json <- jsonlite::toJSON(geo_tbl, auto_unbox=FALSE)
+        gnrs_body <- jsonlite::toJSON(
+          list(opts = list(mode="resolve", sources="geonames,gadm"),
+               data = geo_tbl),
+          auto_unbox = TRUE
+        )
         resp <- httr::POST(
-          "https://gnrs.biendata.org/api/",
-          body = body_json,
+          "https://gnrsapi.xyz/gnrs_api.php",
+          body = gnrs_body,
           httr::content_type("application/json"),
-          httr::timeout(20)
+          httr::timeout(60)
         )
         setProgress(0.8)
         if (httr::status_code(resp) == 200) {
