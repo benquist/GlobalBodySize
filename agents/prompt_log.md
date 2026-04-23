@@ -6,6 +6,8 @@
 2026-04-16 | User requested retry of shinyapps.io deployment after timeout. Agent performed redeploy, confirmed success, and updated provenance.
 
 2026-04-22 | Performance audit of LoadingHistoricalObservationDataIntoBIEN pipeline (app.R, R/dwc_mapping.R, R/multi_file_merge.R, R/bien_pipeline_helpers.R). Identified and fixed 5 bottlenecks: (H1) cached load_header_synonyms CSV read; (H2) cached alias normalization in suggest_bien_field; (H3) batched TNRS HTTP requests with sequential fallback; (M1) vectorized find_duplicate_metadata_conflicts with pre-split indices; (M2) vectorized apply_dwc_mapping column assignment; (M3) capped join_conflicts_table display at 200 rows.
+2026-04-23 | BIENDataLoader app.R: Added upload-back CSV fileInput widgets (upload_tnrs, upload_gnrs, upload_gvs, upload_nsr) after each "Try in app" button in the Tab 3 web services card. Added 4 corresponding observeEvent server handlers that read uploaded CSVs, set rv$<service>_result, run the same writeback logic as the in-app buttons, and show notifications.
+
 # Prompt Log
 
 Record each user prompt that led to creation, direction, or alteration of agent files/folder policy.
@@ -24,6 +26,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-25 | BIENDataLoader: Fix staging table — align BIEN_STAGING_FIELDS to BIEN DB view_full_occurrence_individual (sourced from BIEN R package); add complete GVS writeback (is_centroid via lat/lon join + centroid flag aggregation); replace NSR writeback (3-key join species+country+state_province, 7 BIEN DB fields, defensive stateProvince fallback). Commit 48f7601, pushed, deployed.
 
 2026-04-23 | BIENDataLoader: Fix silent TNRS/GNRS/GVS/NSR button failures — replaced req(rv$staged) with explicit showNotification error guard in all 4 web service observers. Also raised TNRS/GNRS connecttimeout 15s→30s, total timeout 25s→60s. Commits 96c7a9e + c9083db, deployed.
+
+2026-04-23 | BIENDataLoader: Add upload-back CSV fileInput widgets + observeEvent handlers for all 4 web services (TNRS, GNRS, GVS, NSR). Enables full pipeline from shinyapps.io via download-script → run locally → upload CSV → writeback. Commit f4d8d2b, deployed.
 - Files changed:
 - Completed by:
 

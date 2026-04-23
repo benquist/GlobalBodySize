@@ -200,3 +200,14 @@
 
 **Commits:** 96c7a9e (timeout increase), c9083db (silent failure fix)
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — Add upload-back CSV inputs for all 4 web services
+
+**Prompt:** TNRS/GNRS in-app buttons time out from shinyapps.io. Users need to be able to run local scripts and feed results back into the app.
+
+**Summary:** Added `fileInput` widgets and `observeEvent` upload handlers for all 4 services (TNRS, GNRS, GVS, NSR). Each upload handler reads the CSV, sets `rv$<service>_result`, and runs the identical writeback logic to the in-app button observer. This makes the full pipeline completable from shinyapps.io via: download script → run locally → upload CSV → staging table updated.
+
+**Commit:** f4d8d2b
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/
