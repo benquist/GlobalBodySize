@@ -707,3 +707,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Add httr::config(connecttimeout=60) to TNRS and GNRS POST calls; remove shinyapps.io network restriction language from Tab 3 UI; push and redeploy.
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit 97f0414)
+
+- Date: 2026-04-23
+- Prompt summary: App crashes with 'Disconnected from Server' when uploading user files and clicking Apply Mapping. Fixed by wrapping btn_prepare and btn_apply_mapping observers in tryCatch, and switching large DT tables from server=FALSE to server=TRUE.
+- Requested outcomes: (1) Wrapped btn_prepare and btn_apply_mapping observers in tryCatch with showNotification to surface real error messages instead of crashing the session; (2) Switched staged_table, dwc_table, qc_table, tnrs_table, gnrs_table from server=FALSE to server=TRUE to prevent WebSocket buffer exhaustion with larger user files. Committed 77425c1 and pushed to master. Redeployed to shinyapps.io as bien-data-loader.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit 77425c1)
+
+- Date: 2026-04-23
+- Prompt summary: Tab 4 download buttons were not working. Fixed by replacing silent return() in downloadHandler content functions with informative CSV fallback, and rendering buttons conditionally via renderUI so they only appear once staging data exists.
+- Requested outcomes: (1) Identified root cause: return() inside downloadHandler content functions writes 0 bytes, causing silent browser download failures; (2) Moved download buttons to renderUI (dl_buttons_ui) rendered only after rv$staged is populated; (3) DWC button hidden if no terms mapped; (4) All four CSV download handlers (dl_staged, dl_dwc, dl_mapping, dl_qc) now write an informative error CSV instead of return() when data is missing; (5) Committed 1722cce and pushed to master; (6) Redeployed to shinyapps.io as bien-data-loader.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit 1722cce)
