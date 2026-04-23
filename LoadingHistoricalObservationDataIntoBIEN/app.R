@@ -273,7 +273,43 @@ ui <- fluidPage(
     ,
     tags$script(HTML(
       "$(document).on('shiny:connected', function() { Shiny.setInputValue('app_busy', false, {priority: 'event'}); });\n$(document).on('shiny:busy', function() { Shiny.setInputValue('app_busy', true, {priority: 'event'}); });\n$(document).on('shiny:idle', function() { Shiny.setInputValue('app_busy', false, {priority: 'event'}); });"
-    ))
+    )),
+    # Cold-start overlay: shows while shinyapps.io wakes the app from sleep.
+    # Hides automatically once Shiny establishes its WebSocket connection.
+    tags$style(HTML("
+      #cold-start-overlay {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(255,255,255,0.96);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        font-family: sans-serif;
+      }
+      #cold-start-overlay .cold-spinner {
+        width: 52px; height: 52px; border-radius: 50%;
+        border: 6px solid #d0e4f7;
+        border-top-color: #2f6fab;
+        animation: spin 0.8s linear infinite;
+        margin-bottom: 18px;
+      }
+      #cold-start-overlay p {
+        font-size: 1.1em; color: #2f6fab; font-weight: 600;
+        margin: 0 0 6px 0;
+      }
+      #cold-start-overlay small {
+        color: #666; font-size: 0.85em;
+      }
+    ")),
+    tags$div(id = "cold-start-overlay",
+      tags$div(class = "cold-spinner"),
+      tags$p("BIEN Ingest Tool is starting up…"),
+      tags$small("This may take 15–30 seconds after a period of inactivity.")
+    ),
+    tags$script(HTML("
+      $(document).on('shiny:connected', function() {
+        var ov = document.getElementById('cold-start-overlay');
+        if (ov) { ov.style.display = 'none'; }
+      });
+    "))
   ),
   titlePanel("BIEN Observation Ingest and Reconciliation Tool"),
   tags$div(
