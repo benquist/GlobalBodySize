@@ -767,3 +767,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** "For the https://enquistlab.github.io/research/ we are missing a section on Trait based ecology. Please fill in a forward looking summary of my trait-based ecology and research focus there."
 
 **Changes:** `_pages/research.md` — added new `### Trait-Based Ecology` section before the existing TDT stub. Covers: trait-to-prediction pipeline, TDT, ITV and traitstrap, remote sensing / spectral traits, OpenTraits/BIEN data standards, and a forward-looking paragraph on trait-based ecological forecasting. Also expanded the TDT section with additional application bullets. Site commit 09c496f on main, pushed.
+
+## 2026-04-23 — Link SPARC on Conservation Impacts page
+
+**Prompt:** "For https://enquistlab.github.io/conservation-impacts/#selected-examples for SPARC you can link to this page https://www.conservation-sparcle.org/"
+
+**Changes:** `_pages/conservation-impacts.md` — wrapped SPARC entry in Selected Examples with link to https://www.conservation-sparcle.org/. Site commit 718b2ae on main, pushed.
