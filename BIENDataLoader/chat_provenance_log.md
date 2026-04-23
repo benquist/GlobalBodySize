@@ -183,3 +183,20 @@
 
 **Commit:** 48f7601
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — Fix silent TNRS/GNRS/GVS/NSR button failures + raise timeouts
+
+**Prompt:** User reported TNRS button "does not happen" after redeploy — no spinner, no error.
+
+**Root cause:** All 4 web service observers used `req(rv$staged)` as their first line. After a redeploy, all Shiny server state resets to NULL. Clicking TNRS before running Apply Mapping in the new session caused `req()` to silently cancel the observer with no feedback to the user.
+
+**Fixes:**
+1. Replaced `req(rv$staged)` with explicit `if (is.null(rv$staged)) { showNotification(..., type="error"); return() }` in all 4 observers (TNRS, GNRS, GVS, NSR). Users now see a clear red error: "No staging table found — complete Steps 1-3 before running TNRS/GNRS/GVS/NSR."
+2. Raised TNRS and GNRS in-app `connecttimeout` 15s → 30s, total `timeout` 25s → 60s (separate commit 96c7a9e).
+
+**Note:** The underlying AWS IP block on tnrsapi.xyz/gnrsapi.xyz from shinyapps.io is unchanged — the longer timeout does not fix that. The local R script download buttons remain the primary path. The silent-failure fix (c9083db) is the more important change.
+
+**Commits:** 96c7a9e (timeout increase), c9083db (silent failure fix)
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/
