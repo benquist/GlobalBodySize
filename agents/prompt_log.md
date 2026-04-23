@@ -647,3 +647,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: (1) removed eager observeEvent(taxonomy_df(), ignoreInit=FALSE) that fired on every button-A click and re-sorted/pasted all unique names then set tnrs_cache(NULL) propagating reactive invalidations; (2) removed tnrs_cache, tnrs_cache_key reactiveVals and tnrs_results dead reactive entirely; (3) simplified taxonomy_df() to use combined_state()$merged directly instead of calling combined_df() twice; (4) removed Step 4 spinner onFlushed forced evaluation that was racing with natural Shiny output rendering. Deployed to shinyapps.io.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: Full design review and implementation of all improvements across enquistlab.github.io — navigation, content, visual system, and SCSS.
+- Requested outcomes: Review each page; implement all recommended changes: reorder Join and Field Sites in nav, rename Resources to Tools & Data, add What the Lab Actually Does section, framing intros, CTA buttons, hero height reduction, details styling, team card hover states, global link hover.
+- Files changed: enquistlab-site-migration/_pages/join.md; enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/home.md; enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/research.md; enquistlab-site-migration/_pages/conservation-impacts.md; enquistlab-site-migration/_sass/_lab-redesign.scss; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot (commit de8b44f)
+
+- Date: 2026-04-22
+- Prompt summary: Refresh Resources and Join imagery; add Conservation Impacts tab to publications
+- Requested outcomes: Run the standard final gate checks for the enquistlab-site-migration repo; record this prompt with commit 5b9d668; skip Rmd compile because no Rmd files changed; skip R package build because no package files changed; confirm push with git -C /Users/brianjenquist/VSCode/enquistlab-site-migration log --oneline -2.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
