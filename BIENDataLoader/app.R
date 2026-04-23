@@ -50,11 +50,20 @@ DWC_ALIASES <- c(
   occurrence_id = "occurrenceID", basis_of_record = "basisOfRecord",
   family_name = "family", genus_name = "genus",
   collector = "recordedBy", observer = "recordedBy", recorded_by = "recordedBy",
+  data_recorder = "recordedBy", recorder = "recordedBy", surveyor = "recordedBy",
+  field_crew = "recordedBy", technician = "recordedBy", investigator = "recordedBy",
   site = "locality", plot = "locality", plot_name = "locality", location = "locality",
+  transect = "locality", station = "locality", quadrat = "locality",
   institution = "institutionCode", collection = "collectionCode",
-  catalog_number = "catalogNumber", dataset = "datasetName", dataset_name = "datasetName",
-  habitat_notes = "habitat", notes = NA_character_, elevation = "minimumElevationInMeters",
-  elevation_m = "minimumElevationInMeters"
+  herbarium = "institutionCode", herbarium_code = "institutionCode",
+  catalog_number = "catalogNumber", voucher = "catalogNumber", voucher_number = "catalogNumber",
+  specimen_id = "catalogNumber", accession = "catalogNumber",
+  dataset = "datasetName", dataset_name = "datasetName", project = "datasetName",
+  study = "datasetName", survey = "datasetName",
+  habitat_notes = "habitat", notes = NA_character_, habitat_description = "habitat",
+  elevation = "minimumElevationInMeters", elevation_m = "minimumElevationInMeters",
+  alt = "minimumElevationInMeters", altitude = "minimumElevationInMeters",
+  elev_m = "minimumElevationInMeters", elev = "minimumElevationInMeters"
 )
 
 BIEN_LOOKUP <- setNames(BIEN_STAGING_FIELDS, canonicalize(BIEN_STAGING_FIELDS))
@@ -74,9 +83,17 @@ BIEN_ALIASES <- c(
   family_name = "scrubbed_family", family = "scrubbed_family",
   genus_name = "scrubbed_genus",  genus = "scrubbed_genus",
   observer = "dataowner", collector = "dataowner", recorded_by = "dataowner",
+  data_recorder = "dataowner", recorder = "dataowner", surveyor = "dataowner",
+  field_crew = "dataowner", technician = "dataowner", investigator = "dataowner",
   elevation_m = "elevation_min", elevation = "elevation_min",
+  alt = "elevation_min", altitude = "elevation_min",
+  elev_m = "elevation_min", elev = "elevation_min",
   dataset_name = "dataset", dataset = "dataset",
-  locality_description = "verbatimLocality"
+  project = "dataset", study = "dataset", survey = "dataset",
+  transect = "plot_name", station = "plot_name", quadrat = "plot_name",
+  voucher = "collection_code", voucher_number = "collection_code",
+  catalog_number = "collection_code", specimen_id = "collection_code",
+  locality_description = "verbatimLocality", habitat_notes = "verbatimLocality"
 )
 
 # ── Vectorized auto-suggest ───────────────────────────────────────────────────
