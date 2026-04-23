@@ -677,3 +677,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: (1) sync_people_sheet.py: use `os.environ.get("PEOPLE_SHEET_ID") or "hardcoded-id"` so empty string falls through to default; (2) add HTML-response detection in fetch_csv_rows() with clear error; (3) print fetch URL in main() for debugging; (4) sync-people-sheet.yml: add `secrets.PEOPLE_SHEET_ID || 'hardcoded-id'` workflow env fallback; (5) add diagnostic step writing Python version, secret status, curl CSV test, and sync output to $GITHUB_STEP_SUMMARY. Workflow confirmed passing via GitHub Actions Summary.
 - Files changed: enquistlab-site-migration/scripts/sync_people_sheet.py; enquistlab-site-migration/.github/workflows/sync-people-sheet.yml; enquistlab-site-migration/_data/people.yml; enquistlab-site-migration/assets/img/team/michiel_mich_pillet.jpg
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-22
+- Prompt summary: App is hung after last deploy — diagnose and fix.
+- Requested outcomes: Root cause identified as shinyapps.io free-tier cold-start sleep causing 15-30s blank screen. Fix: added cold-start loading overlay to LoadingHistoricalObservationDataIntoBIEN/app.R that shows a spinner while Shiny wakes up from sleep. Deployed to shinyapps.io (commit b63cae8).
+- Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
