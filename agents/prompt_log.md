@@ -815,3 +815,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: (1) Primary file auto-selection picks the file with the most rows (observation/survey file) rather than alphabetically first, so dedup runs on the correct file and no species rows are dropped; (2) sanitize_csv_col skips values that parse as numeric so negative coordinates like -105.78 are not prepended with an apostrophe; (3) after successful TNRS call rv$staged gets scrubbed_species_binomial, scrubbed_family, scrubbed_genus, scrubbed_author, scrubbed_taxonomic_status from matched results; after successful GNRS call country/state_province/county updated from matched values.
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit 992433f)
+
+- Date: 2026-04-23
+- Prompt summary: "Note, the new lab members STILL are not loaded on the team website. The issue is still not fixed." Diagnose and fix failing enquistlab.github.io team-page deploys.
+- Requested outcomes: Root cause identified as duplicate `workflow_dispatch:` key in `.github/workflows/deploy.yml` in enquistlab-site-migration; removed duplicate key so Jekyll/Pages deploy workflow is syntactically valid; confirmed deploy succeeds and Connor Wilson, Gabriel Moulatlet, and Maria Rosati now appear in deployed gh-pages HTML.
+- Files changed: enquistlab-site-migration/.github/workflows/deploy.yml
+- Completed by: GitHub Copilot (commit e5ed062)
