@@ -672,14 +672,25 @@ server <- function(input, output, session) {
     names_vec <- unique(trimws(as.character(rv$staged$scrubbed_species_binomial)))
     names_vec <- names_vec[!is.na(names_vec) & names_vec != ""]
     n_total <- length(names_vec)
-  if (n_total > 20) {
-    names_vec <- names_vec[seq_len(20)]
-    showNotification(paste0("TNRS capped to first 20 of ", n_total,
-      " unique names. Download mapping CSV to see which names were submitted."),
-      type="warning", duration=8)
-  }
+
+    if (n_total == 0) {
+      rv$tnrs_result <- data.frame(
+        note = paste0("No species names found in 'scrubbed_species_binomial'. ",
+                      "Check that your field mapping routes the species name column to scrubbed_species_binomial, ",
+                      "then re-apply mapping before running TNRS."),
+        stringsAsFactors = FALSE)
+      return()
+    }
+
+    if (n_total > 20) {
+      names_vec <- names_vec[seq_len(20)]
+      showNotification(paste0("TNRS capped to first 20 of ", n_total,
+        " unique names."),
+        type="warning", duration=8)
+    }
 
     withProgress(message="Submitting to TNRS\u2026", value=0.2, {
+      err_msg <- NULL
       result <- tryCatch({
         tnrs_data <- data.frame(
           id = seq_along(names_vec),
@@ -695,20 +706,35 @@ server <- function(input, output, session) {
           "https://tnrsapi.xyz/tnrs_api.php",
           body = tnrs_body,
           httr::content_type("application/json"),
-          httr::timeout(60)
+          httr::timeout(90)
         )
         setProgress(0.8)
-        if (httr::status_code(resp) == 200) {
+        code <- httr::status_code(resp)
+        if (code == 200) {
           txt <- httr::content(resp, "text", encoding="UTF-8")
-          df  <- tryCatch(jsonlite::fromJSON(txt, flatten=TRUE), error=function(e) NULL)
-          if (is.data.frame(df) && nrow(df) > 0) df else NULL
-        } else NULL
-      }, error=function(e) NULL)
+          df  <- tryCatch(jsonlite::fromJSON(txt, flatten=TRUE), error=function(e) {
+            err_msg <<- paste0("TNRS returned 200 but response could not be parsed: ", conditionMessage(e))
+            NULL
+          })
+          if (is.data.frame(df) && nrow(df) > 0) df else {
+            if (is.null(err_msg)) err_msg <<- "TNRS returned 200 but no rows in response."
+            NULL
+          }
+        } else {
+          body_txt <- tryCatch(httr::content(resp, "text", encoding="UTF-8"), error=function(e) "")
+          err_msg <<- paste0("TNRS HTTP ", code, ": ", substr(body_txt, 1, 200))
+          NULL
+        }
+      }, error=function(e) {
+        err_msg <<- paste0("TNRS connection error: ", conditionMessage(e))
+        NULL
+      })
 
       setProgress(1.0)
       rv$tnrs_result <- if (is.null(result)) {
-        data.frame(note="TNRS request failed or timed out. Check network and try again.",
-                   stringsAsFactors=FALSE)
+        data.frame(note = if (!is.null(err_msg)) err_msg else
+                         "TNRS request failed (unknown error).",
+                   stringsAsFactors = FALSE)
       } else result
     })
   })
@@ -748,6 +774,7 @@ server <- function(input, output, session) {
     geo_tbl <- data.frame(id=seq_len(nrow(geo_tbl)), geo_tbl, stringsAsFactors=FALSE)
 
     withProgress(message="Submitting to GNRS\u2026", value=0.2, {
+      err_msg <- NULL
       result <- tryCatch({
         gnrs_body <- jsonlite::toJSON(
           list(opts = list(mode="resolve", sources="geonames,gadm"),
@@ -758,20 +785,35 @@ server <- function(input, output, session) {
           "https://gnrsapi.xyz/gnrs_api.php",
           body = gnrs_body,
           httr::content_type("application/json"),
-          httr::timeout(60)
+          httr::timeout(90)
         )
         setProgress(0.8)
-        if (httr::status_code(resp) == 200) {
+        code <- httr::status_code(resp)
+        if (code == 200) {
           txt <- httr::content(resp, "text", encoding="UTF-8")
-          df  <- tryCatch(jsonlite::fromJSON(txt, flatten=TRUE), error=function(e) NULL)
-          if (is.data.frame(df) && nrow(df) > 0) df else NULL
-        } else NULL
-      }, error=function(e) NULL)
+          df  <- tryCatch(jsonlite::fromJSON(txt, flatten=TRUE), error=function(e) {
+            err_msg <<- paste0("GNRS returned 200 but response could not be parsed: ", conditionMessage(e))
+            NULL
+          })
+          if (is.data.frame(df) && nrow(df) > 0) df else {
+            if (is.null(err_msg)) err_msg <<- "GNRS returned 200 but no rows in response."
+            NULL
+          }
+        } else {
+          body_txt <- tryCatch(httr::content(resp, "text", encoding="UTF-8"), error=function(e) "")
+          err_msg <<- paste0("GNRS HTTP ", code, ": ", substr(body_txt, 1, 200))
+          NULL
+        }
+      }, error=function(e) {
+        err_msg <<- paste0("GNRS connection error: ", conditionMessage(e))
+        NULL
+      })
 
       setProgress(1.0)
       rv$gnrs_result <- if (is.null(result)) {
-        data.frame(note="GNRS request failed or timed out.",
-                   stringsAsFactors=FALSE)
+        data.frame(note = if (!is.null(err_msg)) err_msg else
+                         "GNRS request failed (unknown error).",
+                   stringsAsFactors = FALSE)
       } else result
     })
   })
