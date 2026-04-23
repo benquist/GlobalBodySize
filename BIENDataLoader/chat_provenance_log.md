@@ -52,3 +52,14 @@
 
 **Commit:** c6a59d1  
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — TNRS/GNRS AWS IP block diagnosis and UI update
+
+**Prompt:** User reported TNRS connection timeout error (60001 ms) from shinyapps.io. Root cause: tnrsapi.xyz and gnrsapi.xyz are unreachable from AWS IPs used by shinyapps.io.
+
+**Summary:** (1) Reduced `connecttimeout` from 60s to 15s so failure feedback is faster; (2) moved local-script download buttons above in-app TNRS/GNRS buttons and styled them green as the primary recommended path; (3) added UI note explaining cloud hosting / IP block situation; (4) relabeled in-app buttons to "Try ... in app (may timeout from cloud)" to set expectations.
+
+**Commit:** f655323  
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/

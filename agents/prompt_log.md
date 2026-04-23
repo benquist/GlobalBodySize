@@ -737,3 +737,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: All four bugs fixed in BIENDataLoader/app.R; committed c6a59d1; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit c6a59d1)
+
+- Date: 2026-04-23
+- Prompt summary: TNRS/GNRS connection timeout error on shinyapps.io — root cause identified as AWS IP block of tnrsapi.xyz and gnrsapi.xyz external servers. Fixed by (1) reducing connecttimeout from 60s to 15s for faster failure feedback; (2) moving download-script buttons above in-app buttons and styling them green as the primary path; (3) updating UI messaging to explain cloud hosting / IP block and recommend local scripts first; (4) relabeling in-app TNRS/GNRS buttons to "Try ... in app (may timeout from cloud)".
+- Requested outcomes: Faster failure feedback (15s not 60s), user-visible explanation of cloud IP limitation, local script workflow surfaced as primary download path. Committed f655323 and pushed to master. Redeployed to shinyapps.io as bien-data-loader.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit f655323)
