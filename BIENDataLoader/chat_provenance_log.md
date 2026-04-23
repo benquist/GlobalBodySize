@@ -135,3 +135,25 @@
 
 **Commit:** 992433f  
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-24 — Add GVS + NSR as steps 3 and 4 in BIEN web services pipeline
+
+**Prompt:** User requested GVS (Geocoordinate Validation Service) and NSR (Native Species Resolver) be added to the workflow as sequential steps after TNRS and GNRS.
+
+**API endpoints confirmed from GitHub (ojalaquellueva):**
+- **GVS**: `https://gvsapi.xyz/gvs_api.php` — POST with unkeyed 2-col coordinate array `[[lat,lon],...]`; `opts.mode="resolve"`
+- **NSR**: `https://nsrapi.xyz/nsr_wsb.php` — POST with 5-col data frame (`taxon, country, state_province, county_parish, user_id`); `opts.mode="resolve"`; returns transposed JSON (column names in `$id`, rows by numeric key)
+
+**Implementation:**
+- `rv$gvs_result` and `rv$nsr_result` added to reactiveValues; both cleared on source-switch and btn_prepare
+- GVS observer: builds unique lat/lon pairs from `rv$staged`, sends as unkeyed array, renders results in new "GVS Results" tab
+- NSR observer: builds unique taxon+location rows, sends to NSR, decodes transposed JSON, writes `native_status` back to `rv$staged`, renders results in new "NSR Results" tab
+- Green download-script buttons for both GVS and NSR (local execution path)
+- Tab 3 web services card description updated to explain all 4 steps (TNRS→GNRS→GVS→NSR)
+- Export summary shows GVS/NSR run status; zip packet includes gvs_results.csv and nsr_results.csv
+- GVS has TLS issue on macOS (packet length error) but works on Linux (shinyapps.io); local script also works on macOS when connected to gvsapi.xyz
+
+**Commit:** 3170b78
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/

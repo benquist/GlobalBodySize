@@ -18,6 +18,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date:
 - Prompt summary:
 - Requested outcomes:
+
+2026-04-24 | BIENDataLoader: Add GVS (Geocoordinate Validation Service) and NSR (Native Species Resolver) as steps 3 and 4 in the BIEN web services pipeline after TNRS and GNRS. Confirmed endpoints from ojalaquellueva GitHub: GVS at gvsapi.xyz/gvs_api.php (unkeyed lat/lon array), NSR at nsrapi.xyz/nsr_wsb.php (5-col taxon/country/state/county/user_id). Implemented observers, tab panels, download scripts, writeback (native_status), zip export inclusion. Commit 3170b78, pushed, deployed.
 - Files changed:
 - Completed by:
 
