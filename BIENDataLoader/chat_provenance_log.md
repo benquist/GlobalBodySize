@@ -182,4 +182,4 @@
 **is_centroid semantics:** BIEN DB filters `WHERE is_centroid IS NULL OR is_centroid = 0`; records flagged `is_centroid = "1"` would be excluded from standard BIEN queries — this flag is informational for the submitter.
 
 **Commit:** 48f7601
-**Deployed:** (pending this session)
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/
