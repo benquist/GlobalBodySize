@@ -508,33 +508,41 @@ server <- function(input, output, session) {
   # ── Step 1: Prepare (merge) ───────────────────────────────────────────────
   observeEvent(input$btn_prepare, {
     req(rv$raw_files)
-    primary <- if (!is.null(input$primary_file) && nzchar(input$primary_file)) {
-      input$primary_file
-    } else names(rv$raw_files)[[1]]
+    tryCatch({
+      primary <- if (!is.null(input$primary_file) && nzchar(input$primary_file)) {
+        input$primary_file
+      } else names(rv$raw_files)[[1]]
 
-    merged <- rv$raw_files[[primary]]
-    others <- setdiff(names(rv$raw_files), primary)
+      merged <- rv$raw_files[[primary]]
+      others <- setdiff(names(rv$raw_files), primary)
 
-    for (f in others) {
-      pk  <- input[[paste0("pk_", make.names(f))]]
-      fk  <- input[[paste0("fk_", make.names(f))]]
-      if (is.null(pk) || !nzchar(pk)) pk <- names(merged)[[1]]
-      if (is.null(fk) || !nzchar(fk)) fk <- names(rv$raw_files[[f]])[[1]]
+      for (f in others) {
+        pk  <- input[[paste0("pk_", make.names(f))]]
+        fk  <- input[[paste0("fk_", make.names(f))]]
+        if (is.null(pk) || !nzchar(pk)) pk <- names(merged)[[1]]
+        if (is.null(fk) || !nzchar(fk)) fk <- names(rv$raw_files[[f]])[[1]]
 
-      meta <- rv$raw_files[[f]]
-      meta <- meta[!duplicated(meta[[fk]]), , drop=FALSE]
-      merged <- merge(merged, meta, by.x=pk, by.y=fk, all.x=TRUE,
-                      suffixes=c("", paste0(".", make.names(f))))
-    }
+        meta <- rv$raw_files[[f]]
+        meta <- meta[!duplicated(meta[[fk]]), , drop=FALSE]
+        merged <- merge(merged, meta, by.x=pk, by.y=fk, all.x=TRUE,
+                        suffixes=c("", paste0(".", make.names(f))))
+      }
 
-    rv$merged        <- merged
-    rv$mapping_draft <- suggest_mapping(names(merged))
-    rv$mapping       <- NULL
-    rv$staged        <- NULL
-    rv$dwc           <- NULL
-    rv$qc            <- NULL
-    rv$tnrs_result   <- NULL
-    rv$gnrs_result   <- NULL
+      rv$merged        <- merged
+      rv$mapping_draft <- suggest_mapping(names(merged))
+      rv$mapping       <- NULL
+      rv$staged        <- NULL
+      rv$dwc           <- NULL
+      rv$qc            <- NULL
+      rv$tnrs_result   <- NULL
+      rv$gnrs_result   <- NULL
+    }, error = function(e) {
+      showNotification(
+        paste0("Prepare Dataset failed: ", conditionMessage(e),
+               " — check that your join key columns exist in both files."),
+        type = "error", duration = 15
+      )
+    })
   })
 
   output$step1_status <- renderUI({
@@ -597,10 +605,23 @@ server <- function(input, output, session) {
   observeEvent(input$btn_apply_mapping, {
     req(rv$mapping_draft)
     req(rv$merged)
-    rv$mapping <- rv$mapping_draft
-    rv$staged  <- build_staging(rv$merged, rv$mapping)
-    rv$dwc     <- build_dwc(rv$merged, rv$mapping)
-    rv$qc      <- run_qc(rv$staged)
+    tryCatch({
+      mapping <- rv$mapping_draft
+      # Coerce any DT-edited values (may arrive as list columns) to plain character
+      mapping$source_col  <- as.character(mapping$source_col)
+      mapping$dwc_term    <- as.character(mapping$dwc_term)
+      mapping$bien_field  <- as.character(mapping$bien_field)
+      rv$mapping <- mapping
+      rv$staged  <- build_staging(rv$merged, rv$mapping)
+      rv$dwc     <- build_dwc(rv$merged, rv$mapping)
+      rv$qc      <- run_qc(rv$staged)
+    }, error = function(e) {
+      showNotification(
+        paste0("Apply Mapping failed: ", conditionMessage(e),
+               " — check that your column names do not contain special characters."),
+        type = "error", duration = 15
+      )
+    })
   })
 
   output$step2_status_inline <- renderUI({
@@ -651,13 +672,13 @@ server <- function(input, output, session) {
     req(rv$staged)
     DT::datatable(rv$staged, rownames=FALSE,
       options=list(pageLength=10, scrollX=TRUE))
-  }, server=FALSE)
+  }, server=TRUE)
 
   output$dwc_table <- DT::renderDataTable({
     req(rv$dwc)
     DT::datatable(rv$dwc, rownames=FALSE,
       options=list(pageLength=10, scrollX=TRUE))
-  }, server=FALSE)
+  }, server=TRUE)
 
   output$qc_table <- DT::renderDataTable({
     req(rv$qc)
@@ -674,7 +695,7 @@ server <- function(input, output, session) {
         });
       ")
     )
-  }, server=FALSE)
+  }, server=TRUE)
 
   # ── TNRS ─────────────────────────────────────────────────────────────────
   observeEvent(input$btn_tnrs, {
@@ -765,7 +786,7 @@ server <- function(input, output, session) {
     req(rv$tnrs_result)
     DT::datatable(rv$tnrs_result, rownames=FALSE,
       options=list(pageLength=20, scrollX=TRUE))
-  }, server=FALSE)
+  }, server=TRUE)
 
   # ── GNRS ─────────────────────────────────────────────────────────────────
   observeEvent(input$btn_gnrs, {
@@ -845,7 +866,7 @@ server <- function(input, output, session) {
     req(rv$gnrs_result)
     DT::datatable(rv$gnrs_result, rownames=FALSE,
       options=list(pageLength=20, scrollX=TRUE))
-  }, server=FALSE)
+  }, server=TRUE)
 
   # ── Tab 4 gating ─────────────────────────────────────────────────────────
   output$tab4_gating <- renderUI({
