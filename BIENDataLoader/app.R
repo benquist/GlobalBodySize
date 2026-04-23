@@ -356,12 +356,13 @@ ui <- navbarPage(
         tags$div(class="bl-card bl-card-warn",
           tags$strong("Optional: BIEN Web Services"),
           tags$p(style="font-size:0.85em; margin:4px 0 6px;",
-            "TNRS checks taxonomy; GNRS validates geography."),
+            "TNRS standardizes taxonomy; GNRS validates geography; GVS validates coordinates; NSR resolves native/introduced status."),
           tags$p(style="font-size:0.8em; color:#7f8c8d; margin:0 0 8px;",
             HTML("<strong>Recommended:</strong> Download the validation scripts below and run them locally in R. ",
                  "The in-app buttons contact external servers that may be unreachable from cloud hosting ",
-                 "(shinyapps.io runs on AWS; tnrsapi.xyz and gnrsapi.xyz may block cloud IPs). ",
-                 "If the in-app check times out after ~25s, the local script is the reliable path.")),
+                 "(shinyapps.io runs on AWS; external APIs may block cloud IPs). ",
+                 "If an in-app check times out after ~25s, the local script is the reliable path. ",
+                 "Run TNRS and GNRS before GVS and NSR for best results.")),
 
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_tnrs_script", "\u2b07 Download TNRS validation script (.R)",
@@ -376,7 +377,21 @@ ui <- navbarPage(
                          style="width:100%; margin-bottom:6px; font-size:0.85em;"),
           actionButton("btn_gnrs", "Try GNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
-          uiOutput("gnrs_status_ui")
+          uiOutput("gnrs_status_ui"),
+          tags$hr(style="margin:6px 0;"),
+          downloadButton("dl_gvs_script", "\u2b07 Download GVS validation script (.R)",
+                         class="btn-success btn-sm",
+                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+          actionButton("btn_gvs", "Try GVS in app (may timeout from cloud)", class="btn-warning btn-sm",
+                       style="width:100%; margin-bottom:4px;"),
+          uiOutput("gvs_status_ui"),
+          tags$hr(style="margin:6px 0;"),
+          downloadButton("dl_nsr_script", "\u2b07 Download NSR validation script (.R)",
+                         class="btn-success btn-sm",
+                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+          actionButton("btn_nsr", "Try NSR in app (may timeout from cloud)", class="btn-warning btn-sm",
+                       style="width:100%; margin-bottom:4px;"),
+          uiOutput("nsr_status_ui")
         )
       ),
       column(8,
@@ -385,7 +400,9 @@ ui <- navbarPage(
           tabPanel("DWC Table",      DT::dataTableOutput("dwc_table")),
           tabPanel("QC Details",     DT::dataTableOutput("qc_table")),
           tabPanel("TNRS Results",   DT::dataTableOutput("tnrs_table")),
-          tabPanel("GNRS Results",   DT::dataTableOutput("gnrs_table"))
+          tabPanel("GNRS Results",   DT::dataTableOutput("gnrs_table")),
+          tabPanel("GVS Results",    DT::dataTableOutput("gvs_table")),
+          tabPanel("NSR Results",    DT::dataTableOutput("nsr_table"))
         )
       )
     )
@@ -438,7 +455,9 @@ server <- function(input, output, session) {
     dwc          = NULL,
     qc           = NULL,
     tnrs_result  = NULL,
-    gnrs_result  = NULL
+    gnrs_result  = NULL,
+    gvs_result   = NULL,
+    nsr_result   = NULL
   )
 
   # ── Resolve demo data path reliably regardless of working directory ──────────
@@ -461,6 +480,7 @@ server <- function(input, output, session) {
     rv$merged <- NULL; rv$mapping_draft <- NULL; rv$mapping <- NULL
     rv$staged <- NULL; rv$dwc <- NULL; rv$qc <- NULL
     rv$tnrs_result <- NULL; rv$gnrs_result <- NULL
+    rv$gvs_result  <- NULL; rv$nsr_result  <- NULL
 
     if (isTRUE(input$use_demo)) {
       obs_path  <- demo_data_path("observations.csv")
@@ -574,6 +594,8 @@ server <- function(input, output, session) {
       rv$qc            <- NULL
       rv$tnrs_result   <- NULL
       rv$gnrs_result   <- NULL
+      rv$gvs_result    <- NULL
+      rv$nsr_result    <- NULL
     }, error = function(e) {
       showNotification(
         paste0("Prepare Dataset failed: ", conditionMessage(e),
@@ -995,6 +1017,346 @@ server <- function(input, output, session) {
       options=list(pageLength=20, scrollX=TRUE))
   }, server=TRUE)
 
+  # ── GVS ──────────────────────────────────────────────────────────────────
+  observeEvent(input$btn_gvs, {
+    req(rv$staged)
+    coord_cols <- intersect(c("latitude","longitude"), names(rv$staged))
+    if (length(coord_cols) < 2) {
+      rv$gvs_result <- data.frame(
+        note="Staging table must have both 'latitude' and 'longitude' columns for GVS.",
+        stringsAsFactors=FALSE)
+      return()
+    }
+    coord_tbl <- unique(rv$staged[, c("latitude","longitude"), drop=FALSE])
+    coord_tbl <- coord_tbl[
+      !is.na(coord_tbl$latitude) & trimws(coord_tbl$latitude) != "" &
+      !is.na(coord_tbl$longitude) & trimws(coord_tbl$longitude) != "", , drop=FALSE]
+    if (nrow(coord_tbl) == 0) {
+      rv$gvs_result <- data.frame(
+        note="No valid coordinate pairs found in staging table.",
+        stringsAsFactors=FALSE)
+      return()
+    }
+    # GVS expects an unkeyed 2-column matrix [[lat,lon],[lat,lon],...]
+    gvs_data <- lapply(seq_len(nrow(coord_tbl)), function(i)
+      c(trimws(coord_tbl$latitude[i]), trimws(coord_tbl$longitude[i])))
+
+    withProgress(message="Submitting to GVS\u2026", value=0.2, {
+      err_msg <- NULL
+      result <- tryCatch({
+        opts_json <- '{"mode":"resolve"}'
+        data_json <- jsonlite::toJSON(gvs_data, auto_unbox=TRUE)
+        gvs_body  <- paste0('{"opts":', opts_json, ',"data":', data_json, '}')
+        resp <- httr::POST(
+          "https://gvsapi.xyz/gvs_api.php",
+          body = gvs_body,
+          httr::content_type("application/json"),
+          httr::add_headers(Accept="application/json", charset="UTF-8"),
+          httr::config(connecttimeout=15),
+          httr::timeout(25)
+        )
+        setProgress(0.8)
+        code <- httr::status_code(resp)
+        if (code == 200) {
+          txt <- httr::content(resp, "text", encoding="UTF-8")
+          df  <- tryCatch(jsonlite::fromJSON(txt, flatten=TRUE), error=function(e) {
+            err_msg <<- paste0("GVS returned 200 but response could not be parsed: ", conditionMessage(e))
+            NULL
+          })
+          if (is.data.frame(df) && nrow(df) > 0) df else {
+            if (is.null(err_msg)) err_msg <<- "GVS returned 200 but no rows in response."
+            NULL
+          }
+        } else {
+          body_txt <- tryCatch(httr::content(resp, "text", encoding="UTF-8"), error=function(e) "")
+          err_msg <<- paste0("GVS HTTP ", code, ": ", substr(body_txt, 1, 200))
+          NULL
+        }
+      }, error=function(e) {
+        err_msg <<- paste0("GVS connection error: ", conditionMessage(e))
+        NULL
+      })
+
+      setProgress(1.0)
+      rv$gvs_result <- if (is.null(result)) {
+        data.frame(note = if (!is.null(err_msg)) err_msg else
+                         "GVS request failed (unknown error).",
+                   stringsAsFactors=FALSE)
+      } else {
+        showNotification(
+          paste0("GVS complete: ", nrow(result), " coordinate pair(s) validated."),
+          type="message", duration=6)
+        result
+      }
+    })
+  })
+
+  output$gvs_status_ui <- renderUI({
+    if (is.null(rv$gvs_result)) return(NULL)
+    if ("note" %in% names(rv$gvs_result)) {
+      tags$p(style="color:#c0392b; font-size:0.85em; margin-top:4px;",
+             rv$gvs_result$note[1])
+    } else {
+      tags$p(style="color:#27ae60; font-size:0.85em; margin-top:4px;",
+             paste0("GVS complete: ", nrow(rv$gvs_result), " coordinate pair(s) checked"))
+    }
+  })
+
+  output$gvs_table <- DT::renderDataTable({
+    req(rv$gvs_result)
+    DT::datatable(rv$gvs_result, rownames=FALSE,
+      options=list(pageLength=20, scrollX=TRUE))
+  }, server=TRUE)
+
+  output$dl_gvs_script <- downloadHandler(
+    filename = function() paste0("gvs_validation_", Sys.Date(), ".R"),
+    contentType = "text/plain",
+    content = function(file) {
+      coord_tbl <- if (!is.null(rv$staged) &&
+                       all(c("latitude","longitude") %in% names(rv$staged))) {
+        u <- unique(rv$staged[, c("latitude","longitude"), drop=FALSE])
+        u <- u[!is.na(u$latitude) & trimws(u$latitude) != "" &
+               !is.na(u$longitude) & trimws(u$longitude) != "", , drop=FALSE]
+        u
+      } else NULL
+
+      data_r <- if (!is.null(coord_tbl) && nrow(coord_tbl) > 0) {
+        rows <- apply(coord_tbl, 1, function(r) paste0('  c("', r["latitude"], '","', r["longitude"], '")'))
+        paste0("list(\n", paste(rows, collapse=",\n"), "\n)")
+      } else {
+        'list(c("34.42","-119.7"), c("39.55","-105.78"))  # Replace with your coordinates'
+      }
+
+      script <- paste0(
+        "# GVS Coordinate Validation Script\n",
+        "# Generated by BIEN Data Loader on ", Sys.Date(), "\n",
+        "# Run this script locally where outbound HTTPS is available.\n",
+        "# Requires: httr, jsonlite\n\n",
+        "library(httr)\nlibrary(jsonlite)\n\n",
+        "# Each element is c(latitude, longitude) as character strings\n",
+        "gvs_data <- ", data_r, "\n\n",
+        'opts_json <- \'{"mode":"resolve"}\'\n',
+        "data_json <- jsonlite::toJSON(gvs_data, auto_unbox=TRUE)\n",
+        "body <- paste0('{\"opts\":', opts_json, ',\"data\":', data_json, '}')\n\n",
+        'message("Submitting ', if (!is.null(coord_tbl)) nrow(coord_tbl) else 0, ' coordinate pair(s) to GVS...")\n',
+        "resp <- httr::POST(\n",
+        '  "https://gvsapi.xyz/gvs_api.php",\n',
+        "  body = body,\n",
+        '  httr::content_type("application/json"),\n',
+        '  httr::add_headers(Accept="application/json"),\n',
+        "  httr::timeout(120)\n",
+        ")\n\n",
+        "if (httr::status_code(resp) != 200) stop(\"GVS returned HTTP \", httr::status_code(resp))\n\n",
+        'result <- jsonlite::fromJSON(httr::content(resp, "text", encoding="UTF-8"), flatten=TRUE)\n',
+        "print(result)\n\n",
+        'out_file <- paste0("gvs_results_", Sys.Date(), ".csv")\n',
+        "write.csv(result, out_file, row.names=FALSE)\n",
+        'message("Results saved to: ", out_file)\n'
+      )
+      writeLines(script, file)
+    }
+  )
+
+  # ── NSR ──────────────────────────────────────────────────────────────────
+  observeEvent(input$btn_nsr, {
+    req(rv$staged)
+    # NSR requires: taxon, country, state_province (county_parish optional), user_id
+    spp_col <- "scrubbed_species_binomial"
+    if (!spp_col %in% names(rv$staged) ||
+        all(is.na(rv$staged[[spp_col]]) | trimws(rv$staged[[spp_col]]) == "")) {
+      rv$nsr_result <- data.frame(
+        note=paste0("No species names in 'scrubbed_species_binomial'. Run TNRS first or check field mapping."),
+        stringsAsFactors=FALSE)
+      return()
+    }
+
+    nsr_tbl <- unique(rv$staged[, intersect(c(spp_col,"scrubbed_family","country","state_province","county"),
+                                            names(rv$staged)), drop=FALSE])
+    nsr_tbl <- nsr_tbl[!is.na(nsr_tbl[[spp_col]]) & trimws(nsr_tbl[[spp_col]]) != "", , drop=FALSE]
+
+    # NSR 5-col format: taxon, country, state_province, county_parish, user_id
+    nsr_send <- data.frame(
+      taxon          = trimws(nsr_tbl[[spp_col]]),
+      country        = if ("country"        %in% names(nsr_tbl)) trimws(nsr_tbl$country)        else "",
+      state_province = if ("state_province" %in% names(nsr_tbl)) trimws(nsr_tbl$state_province) else "",
+      county_parish  = if ("county"         %in% names(nsr_tbl)) trimws(nsr_tbl$county)         else "",
+      user_id        = seq_len(nrow(nsr_tbl)),
+      stringsAsFactors=FALSE
+    )
+
+    if (nrow(nsr_send) > 20) {
+      nsr_send <- nsr_send[seq_len(20), ]
+      showNotification(paste0("NSR capped to first 20 unique taxon/location combinations."),
+                       type="warning", duration=8)
+    }
+
+    withProgress(message="Submitting to NSR\u2026", value=0.2, {
+      err_msg <- NULL
+      result <- tryCatch({
+        nsr_body <- jsonlite::toJSON(
+          list(opts=list(mode="resolve"), data=nsr_send),
+          auto_unbox=TRUE
+        )
+        resp <- httr::POST(
+          "https://nsrapi.xyz/nsr_wsb.php",
+          body = nsr_body,
+          httr::content_type("application/json"),
+          httr::add_headers(Accept="application/json", charset="UTF-8"),
+          httr::config(connecttimeout=15),
+          httr::timeout(25)
+        )
+        setProgress(0.8)
+        code <- httr::status_code(resp)
+        if (code == 200) {
+          txt <- httr::content(resp, "text", encoding="UTF-8")
+          # NSR returns a transposed JSON object: first row is column names
+          raw <- tryCatch(jsonlite::fromJSON(txt), error=function(e) {
+            err_msg <<- paste0("NSR returned 200 but response could not be parsed: ", conditionMessage(e))
+            NULL
+          })
+          if (!is.null(raw)) {
+            df <- tryCatch({
+              # NSR response is {"id": [col_names], "rownum1": [vals], ...}
+              col_names <- raw$id
+              row_ids   <- setdiff(names(raw), "id")
+              rows      <- lapply(row_ids, function(k) setNames(as.list(raw[[k]]), col_names))
+              d         <- as.data.frame(do.call(rbind, lapply(rows, as.data.frame,
+                             stringsAsFactors=FALSE)), stringsAsFactors=FALSE)
+              d
+            }, error=function(e) {
+              err_msg <<- paste0("NSR response parse error: ", conditionMessage(e))
+              NULL
+            })
+            df
+          } else NULL
+        } else {
+          body_txt <- tryCatch(httr::content(resp, "text", encoding="UTF-8"), error=function(e) "")
+          err_msg <<- paste0("NSR HTTP ", code, ": ", substr(body_txt, 1, 200))
+          NULL
+        }
+      }, error=function(e) {
+        err_msg <<- paste0("NSR connection error: ", conditionMessage(e))
+        NULL
+      })
+
+      setProgress(1.0)
+      rv$nsr_result <- if (is.null(result)) {
+        data.frame(note = if (!is.null(err_msg)) err_msg else
+                         "NSR request failed (unknown error).",
+                   stringsAsFactors=FALSE)
+      } else result
+
+      # ── Write NSR native_status back to staging ──────────────────────────
+      if (!is.null(rv$staged) && is.data.frame(rv$nsr_result) &&
+          !"note" %in% names(rv$nsr_result) &&
+          "native_status" %in% names(rv$nsr_result)) {
+        nsr  <- rv$nsr_result
+        stg  <- rv$staged
+        sp_col <- if ("species" %in% names(nsr)) "species" else
+                  if ("taxon"   %in% names(nsr)) "taxon"   else NULL
+        if (!is.null(sp_col)) {
+          for (i in seq_len(nrow(nsr))) {
+            rows <- which(trimws(stg$scrubbed_species_binomial) == trimws(nsr[[sp_col]][i]))
+            if (length(rows) == 0) next
+            if (!is.na(nsr$native_status[i]) && nzchar(nsr$native_status[i]))
+              stg$native_status[rows] <- nsr$native_status[i]
+          }
+          rv$staged <- stg
+        }
+        showNotification(
+          paste0("NSR complete: native_status updated for ", nrow(nsr), " taxon/location combination(s)."),
+          type="message", duration=6)
+      }
+    })
+  })
+
+  output$nsr_status_ui <- renderUI({
+    if (is.null(rv$nsr_result)) return(NULL)
+    if ("note" %in% names(rv$nsr_result)) {
+      tags$p(style="color:#c0392b; font-size:0.85em; margin-top:4px;",
+             rv$nsr_result$note[1])
+    } else {
+      tags$p(style="color:#27ae60; font-size:0.85em; margin-top:4px;",
+             paste0("NSR complete: ", nrow(rv$nsr_result), " taxon/location combination(s) checked"))
+    }
+  })
+
+  output$nsr_table <- DT::renderDataTable({
+    req(rv$nsr_result)
+    DT::datatable(rv$nsr_result, rownames=FALSE,
+      options=list(pageLength=20, scrollX=TRUE))
+  }, server=TRUE)
+
+  output$dl_nsr_script <- downloadHandler(
+    filename = function() paste0("nsr_validation_", Sys.Date(), ".R"),
+    contentType = "text/plain",
+    content = function(file) {
+      nsr_tbl <- if (!is.null(rv$staged) && "scrubbed_species_binomial" %in% names(rv$staged)) {
+        u <- unique(rv$staged[, intersect(c("scrubbed_species_binomial","country","state_province","county"),
+                                         names(rv$staged)), drop=FALSE])
+        u <- u[!is.na(u$scrubbed_species_binomial) & trimws(u$scrubbed_species_binomial) != "", , drop=FALSE]
+        if (nrow(u) > 0) {
+          data.frame(
+            taxon          = trimws(u$scrubbed_species_binomial),
+            country        = if ("country"        %in% names(u)) trimws(u$country)        else "",
+            state_province = if ("state_province" %in% names(u)) trimws(u$state_province) else "",
+            county_parish  = if ("county"         %in% names(u)) trimws(u$county)         else "",
+            user_id        = seq_len(nrow(u)),
+            stringsAsFactors=FALSE)
+        } else NULL
+      } else NULL
+
+      data_r <- if (!is.null(nsr_tbl) && nrow(nsr_tbl) > 0) {
+        rows <- apply(nsr_tbl, 1, function(r)
+          paste0('  list(taxon=', shQuote(r["taxon"]), ', country=', shQuote(r["country"]),
+                 ', state_province=', shQuote(r["state_province"]),
+                 ', county_parish=', shQuote(r["county_parish"]),
+                 ', user_id=', r["user_id"], 'L)'))
+        paste0("dplyr::bind_rows(\n", paste(rows, collapse=",\n"), "\n)")
+      } else {
+        'data.frame(taxon="Pinus ponderosa", country="United States", state_province="California", county_parish="", user_id=1L, stringsAsFactors=FALSE)'
+      }
+
+      script <- paste0(
+        "# NSR Native Species Resolver Validation Script\n",
+        "# Generated by BIEN Data Loader on ", Sys.Date(), "\n",
+        "# Run this script locally where outbound HTTPS is available.\n",
+        "# Requires: httr, jsonlite, dplyr\n",
+        "# NSR endpoint: https://nsrapi.xyz/nsr_wsb.php\n",
+        "# Input columns required: taxon, country, state_province, county_parish, user_id\n\n",
+        "library(httr)\nlibrary(jsonlite)\nlibrary(dplyr)\n\n",
+        "nsr_tbl <- ", data_r, "\n\n",
+        "body <- jsonlite::toJSON(\n",
+        "  list(opts=list(mode=\"resolve\"), data=nsr_tbl),\n",
+        "  auto_unbox=TRUE\n",
+        ")\n\n",
+        'message("Submitting ', if (!is.null(nsr_tbl)) nrow(nsr_tbl) else 0,
+        ' taxon/location combination(s) to NSR...")\n',
+        "resp <- httr::POST(\n",
+        '  "https://nsrapi.xyz/nsr_wsb.php",\n',
+        "  body = body,\n",
+        '  httr::content_type("application/json"),\n',
+        '  httr::add_headers(Accept="application/json"),\n',
+        "  httr::timeout(120)\n",
+        ")\n\n",
+        "if (httr::status_code(resp) != 200) stop(\"NSR returned HTTP \", httr::status_code(resp))\n\n",
+        "# NSR returns a transposed JSON; decode it:\n",
+        'raw <- jsonlite::fromJSON(httr::content(resp, "text", encoding="UTF-8"))\n',
+        "col_names <- raw$id\n",
+        "row_ids   <- setdiff(names(raw), \"id\")\n",
+        "rows      <- lapply(row_ids, function(k) setNames(as.list(raw[[k]]), col_names))\n",
+        "result    <- as.data.frame(do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors=FALSE)),\n",
+        "             stringsAsFactors=FALSE)\n\n",
+        "print(result[, intersect(c('species','country','state_province','native_status',\n",
+        "  'native_status_reason','isIntroduced','isCultivatedNSR'), names(result))])\n\n",
+        'out_file <- paste0("nsr_results_", Sys.Date(), ".csv")\n',
+        "write.csv(result, out_file, row.names=FALSE)\n",
+        'message("Results saved to: ", out_file)\n'
+      )
+      writeLines(script, file)
+    }
+  )
+
   # ── Tab 4 gating ─────────────────────────────────────────────────────────
   output$tab4_gating <- renderUI({
     if (is.null(rv$staged)) {
@@ -1023,6 +1385,8 @@ server <- function(input, output, session) {
       paste0("QC WARN issues:            ", n_warn),
       paste0("TNRS run:                  ", if (!is.null(rv$tnrs_result)) "yes" else "no"),
       paste0("GNRS run:                  ", if (!is.null(rv$gnrs_result)) "yes" else "no"),
+      paste0("GVS run:                   ", if (!is.null(rv$gvs_result))  "yes" else "no"),
+      paste0("NSR run:                   ", if (!is.null(rv$nsr_result))  "yes" else "no"),
       "",
       "NOTE: This staging table reflects the field mapping and QC",
       "applied in this session. Authoritative taxonomic reconciliation",
@@ -1270,6 +1634,8 @@ server <- function(input, output, session) {
         if (!is.null(rv$qc))           write_part(rv$qc,           "qc_report.csv")
         if (!is.null(rv$tnrs_result))  write_part(rv$tnrs_result,  "tnrs_results.csv")
         if (!is.null(rv$gnrs_result))  write_part(rv$gnrs_result,  "gnrs_results.csv")
+        if (!is.null(rv$gvs_result))   write_part(rv$gvs_result,   "gvs_results.csv")
+        if (!is.null(rv$nsr_result))   write_part(rv$nsr_result,   "nsr_results.csv")
 
         # zip with full paths + junk-path flag (-j) to avoid setwd() race condition
         utils::zip(zipfile=file, files=out_files, flags="-j")
