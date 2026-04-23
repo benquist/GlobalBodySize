@@ -20,6 +20,16 @@
 
 ---
 
+## 2026-04-24 — Restore connecttimeout=60/timeout=120 for all 4 web services
+
+**Prompt:** TNRS in-app button showing "Connection timeout after 15001 ms". Root-cause analysis requested via @M agent.
+
+**Summary:** code-checker diagnosed root cause: commit f655323 had reduced connecttimeout from 60→15s to "prevent long hangs", breaking TNRS/GNRS/GVS/NSR for shinyapps.io→AWS deployments. The self-hosted APIs need up to 60s TCP handshake from AWS. The 15001ms error exactly confirmed connecttimeout=15 was active (stale deploy). Fix: restored connecttimeout=60, timeout=120 for all 4 POST calls (TNRS, GNRS, GVS, NSR) matching confirmed-working commit 97f0414.
+
+**Commits:** 00a4fc2
+
+---
+
 ## 2026-04-23 — Session crash fix and DT server-side rendering
 
 **Prompt:** App crashes with 'Disconnected from Server' when uploading user files and clicking Apply Mapping.

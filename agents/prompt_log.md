@@ -7,6 +7,7 @@
 
 2026-04-22 | Performance audit of LoadingHistoricalObservationDataIntoBIEN pipeline (app.R, R/dwc_mapping.R, R/multi_file_merge.R, R/bien_pipeline_helpers.R). Identified and fixed 5 bottlenecks: (H1) cached load_header_synonyms CSV read; (H2) cached alias normalization in suggest_bien_field; (H3) batched TNRS HTTP requests with sequential fallback; (M1) vectorized find_duplicate_metadata_conflicts with pre-split indices; (M2) vectorized apply_dwc_mapping column assignment; (M3) capped join_conflicts_table display at 200 rows.
 2026-04-23 | BIENDataLoader app.R: Added upload-back CSV fileInput widgets (upload_tnrs, upload_gnrs, upload_gvs, upload_nsr) after each "Try in app" button in the Tab 3 web services card. Added 4 corresponding observeEvent server handlers that read uploaded CSVs, set rv$<service>_result, run the same writeback logic as the in-app buttons, and show notifications.
+2026-04-24 | BIENDataLoader app.R: Root-cause diagnosis (via @M + code-checker) of TNRS "15001 ms" timeout. Commit f655323 had reduced connecttimeout from 60→15s; self-hosted APIs need ≥60s for TCP connect from AWS. Restored connecttimeout=60, timeout=120 for all 4 services (TNRS/GNRS/GVS/NSR) to match confirmed-working commit 97f0414. Committed 00a4fc2, deployed to benquist.shinyapps.io/bien-data-loader.
 
 # Prompt Log
 
