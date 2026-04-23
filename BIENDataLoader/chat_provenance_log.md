@@ -63,3 +63,16 @@
 
 **Commit:** f655323  
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-23 — Download "Site wasn't available" fix: tryCatch + UTF-8 connection
+
+**Prompt:** User reported "Site wasn't available" browser error page when downloading the BIEN staging table. Root cause: any unhandled error inside a `downloadHandler` content function crashes the HTTP connection; shinyapps.io proxy then shows a browser-level error instead of an R error message.
+
+**Summary:**
+1. Wrapped all 5 download content functions (`dl_staged`, `dl_dwc`, `dl_mapping`, `dl_qc`, `dl_packet`) in `tryCatch` — errors now write an error CSV so the connection completes cleanly.
+2. Replaced `write.csv(..., fileEncoding="UTF-8")` with explicit `file(path, open="w", encoding="UTF-8")` connection in `safe_write_csv` — more reliable on shinyapps.io Linux locale.
+
+**Commit:** 90663c2
+**Deployed:** https://benquist.shinyapps.io/bien-data-loader/

@@ -773,3 +773,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 **Prompt:** "For https://enquistlab.github.io/conservation-impacts/#selected-examples for SPARC you can link to this page https://www.conservation-sparcle.org/"
 
 **Changes:** `_pages/conservation-impacts.md` — wrapped SPARC entry in Selected Examples with link to https://www.conservation-sparcle.org/. Site commit 718b2ae on main, pushed.
+
+- Date: 2026-04-23
+- Prompt summary: "Site wasn't available" error on downloading BIEN staging table from BIENDataLoader. Root cause: unhandled errors inside downloadHandler content functions crash the HTTP connection; shinyapps.io proxy shows browser error page instead of an R error. Fixed with (1) tryCatch on all 5 download content functions (staged, dwc, mapping, qc, packet) so errors write error CSV instead of crashing; (2) replaced fileEncoding="UTF-8" in write.csv with explicit UTF-8 file() connection in safe_write_csv for reliability on shinyapps.io Linux locale.
+- Requested outcomes: All 5 downloadHandler content functions wrapped in tryCatch; safe_write_csv uses explicit file(path, open="w", encoding="UTF-8") connection; committed 90663c2; pushed to origin/master; deployed to https://benquist.shinyapps.io/bien-data-loader/.
+- Files changed: BIENDataLoader/app.R
+- Completed by: GitHub Copilot (commit 90663c2)
