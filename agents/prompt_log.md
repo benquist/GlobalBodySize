@@ -743,3 +743,21 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Faster failure feedback (15s not 60s), user-visible explanation of cloud IP limitation, local script workflow surfaced as primary download path. Committed f655323 and pushed to master. Redeployed to shinyapps.io as bien-data-loader.
 - Files changed: BIENDataLoader/app.R
 - Completed by: GitHub Copilot (commit f655323)
+
+## 2026-04-23 — Shorten section headings across site pages
+
+**Prompt:** Shorten long subsection heading names on the resources page — boil them down to their essence. Apply to other pages too (replace "and" with "&", remove verbose parenthetical expansions, strip tool-tag badges from headings).
+
+**Changes:**
+- `_pages/software.md`: removed all `<span class="tool-tags">` badges from H3s; shortened "Plant Functional Trait Course (PFTC) Resources" → "PFTC Resources"; "Hypervolumes R Package" → "Hypervolumes"; "netassoc/comclim R Package" → "netassoc/comclim"; "Additional Lab Resources" → "Lab Resources"; "Additional Tools & Datasets" → "Tools & Datasets"
+- `_pages/conservation-impacts.md`: "Protected Area Design And Selection" → "Protected Area Design & Selection"; "Data And Decision Support" → "Data & Decision Support"
+- `_pages/people.md`: "Lab Team and Technical Staff" → "Lab Team & Technical Staff"
+- `_pages/research.md`: "Metabolic Scaling and Functional Biology" → "Metabolic Scaling & Functional Biology"; "Trait Driver Theory and Functional Ecology" → "Trait Driver Theory & Functional Ecology"; "BIEN: Botanical Information and Ecology Network" → "BIEN: Botanical Information & Ecology Network"; "Theory and Equation Figures" → "Theory & Equation Figures"
+- `_pages/publications.md`: "Publications and CV" → "Publications & CV"
+- `_pages/teaching.md`: "Current and Recent Courses" → "Current & Recent Courses"; "International Plant Functional Trait Courses (PFTC)" → "Plant Functional Trait Courses (PFTC)"; "Workshops and Short Courses" → "Workshops & Short Courses"; "Online Lectures and Open Materials" → "Online Lectures & Open Materials"
+- `_pages/collaborators.md`: "Collaborations and Initiatives" → "Collaborations & Initiatives"; "SPARC: Spatial Priorities for Species in Response to Climate Change" → "SPARC: Spatial Priorities for Species & Climate"; "Functional Biodiversity and Synthesis Networks" → "Functional Biodiversity & Synthesis Networks"; "Team Science and Field Campaigns" → "Team Science & Field Campaigns"
+- `_pages/field-sites.md`: "Field Sites and Long-Term Research" → "Field Sites & Long-Term Research"; removed state/country suffixes from site headings; "ABERG / CHAMBASA" shortened; "The Forest MacroSystems Network" → "Forest MacroSystems Network"
+- `_pages/about.md`: "Biodiversity Informatics and Forecasting" → "Biodiversity Informatics & Forecasting"
+- `_pages/press-media.md`: "Press and Media" → "Press & Media"; "Selected Public-Facing Projects" → "Selected Public Projects"
+
+**Site commit:** 2d9fe8d on main, pushed.
