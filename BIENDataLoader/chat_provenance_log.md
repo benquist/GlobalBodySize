@@ -157,3 +157,29 @@
 
 **Commit:** 3170b78
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-25 — Align BIEN_STAGING_FIELDS to BIEN DB schema; complete GVS+NSR writebacks
+
+**Prompt:** User reported GVS and NSR results do not appear in the staging table. Requested that staging field names match the BIEN R package field names (from `view_full_occurrence_individual`).
+
+**Root causes:**
+1. **GVS writeback was absent** — GVS stored results in `rv$gvs_result` but never wrote to `rv$staged`.
+2. **NSR writeback was incomplete** — only `native_status` was written; 6 additional BIEN DB fields were missing; join was species-only (no location key).
+3. **`BIEN_STAGING_FIELDS` mismatched BIEN DB** — `is_cultivated` (wrong name); `is_centroid`, `native_status_reason`, `native_status_country`, `native_status_state_province`, `native_status_county_parish`, `is_introduced` all missing.
+
+**Schema source:** Inspected BIEN R package source (`BIEN_occurrence_species`, `.native_check`, `.cultivated_check`, `.political_check`).
+
+**Fixes applied (commit 48f7601):**
+1. `BIEN_STAGING_FIELDS` updated: `is_cultivated` → `is_cultivated_observation`; added `is_centroid`, `native_status_reason`, `native_status_country`, `native_status_state_province`, `native_status_county_parish`, `is_introduced`.
+2. **GVS writeback** added: matches staging rows by lat/lon (preferring `latitude_verbatim`), sets `is_centroid = "1"` if any of `is_country_centroid`/`is_state_centroid`/`is_county_centroid` is truthy; isolated in separate `tryCatch` block so `rv$gvs_result` always gets assigned even if writeback errors.
+3. **NSR writeback** expanded: 3-key join (species + country + state_province via `\u001f` separator); defensive `stateProvince`/`state_province` column fallback for the NSR response; writes all 7 BIEN DB fields: `native_status`, `native_status_reason`, `native_status_country`, `native_status_state_province`, `native_status_county_parish`, `is_introduced` (from `isIntroduced`), `is_cultivated_observation` (from `isCultivatedNSR`).
+4. Export summary note updated: references `view_full_occurrence_individual`.
+
+**GVS caveat:** GVS has TLS 1.3 mismatch on macOS; works on Linux (shinyapps.io). Local download script is primary path for macOS users.
+**NSR caveat:** Capped to 20 unique taxon/location combinations for in-app button. Requires TNRS + GNRS to run first for accurate results.
+**is_centroid semantics:** BIEN DB filters `WHERE is_centroid IS NULL OR is_centroid = 0`; records flagged `is_centroid = "1"` would be excluded from standard BIEN queries — this flag is informational for the submitter.
+
+**Commit:** 48f7601
+**Deployed:** (pending this session)
