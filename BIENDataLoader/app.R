@@ -502,7 +502,11 @@ server <- function(input, output, session) {
   output$primary_file_ui <- renderUI({
     req(rv$raw_files)
     fnames <- names(rv$raw_files)
-    selectInput("primary_file", "Primary observation file", choices=fnames, selected=fnames[[1]])
+    # Auto-select the file with the most rows (usually the observation/survey file)
+    best_primary <- fnames[which.max(sapply(rv$raw_files, nrow))]
+    selectInput("primary_file",
+      "Primary observation file (file with most rows auto-selected — adjust if needed)",
+      choices=fnames, selected=best_primary)
   })
 
   # ── Join key UI ───────────────────────────────────────────────────────────
@@ -812,6 +816,55 @@ server <- function(input, output, session) {
                          "TNRS request failed (unknown error).",
                    stringsAsFactors = FALSE)
       } else result
+
+      # ── Write TNRS results back to staging scrubbed_* fields ────────────
+      if (!is.null(rv$staged) && is.data.frame(rv$tnrs_result) &&
+          !"note" %in% names(rv$tnrs_result) &&
+          "Name_submitted" %in% names(rv$tnrs_result)) {
+        tnrs <- rv$tnrs_result
+        stg  <- rv$staged
+        for (i in seq_len(nrow(tnrs))) {
+          submitted <- tnrs$Name_submitted[i]
+          rows <- which(trimws(stg$scrubbed_species_binomial) == trimws(submitted))
+          if (length(rows) == 0) next
+          # Accepted name (prefer Accepted_name, fall back to Name_matched)
+          acc <- NA_character_
+          for (col in c("Accepted_name", "Name_matched")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              acc <- tnrs[[col]][i]; break
+            }
+          }
+          if (!is.na(acc)) stg$scrubbed_species_binomial[rows] <- acc
+          # Family
+          for (col in c("Accepted_family", "Family")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_family[rows] <- tnrs[[col]][i]; break
+            }
+          }
+          # Genus
+          for (col in c("Genus_matched", "Genus")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_genus[rows] <- tnrs[[col]][i]; break
+            }
+          }
+          # Author
+          for (col in c("Accepted_name_author", "Author_matched")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_author[rows] <- tnrs[[col]][i]; break
+            }
+          }
+          # Taxonomic status
+          for (col in c("Taxonomic_status", "Name_matched_status")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_taxonomic_status[rows] <- tnrs[[col]][i]; break
+            }
+          }
+        }
+        rv$staged <- stg
+        showNotification(
+          paste0("TNRS complete: scrubbed_* fields updated for ", nrow(tnrs), " name(s)."),
+          type="message", duration=6)
+      }
     })
   })
 
@@ -892,6 +945,36 @@ server <- function(input, output, session) {
                          "GNRS request failed (unknown error).",
                    stringsAsFactors = FALSE)
       } else result
+
+      # ── Write GNRS matched geography back to staging ─────────────────────
+      if (!is.null(rv$staged) && is.data.frame(rv$gnrs_result) &&
+          !"note" %in% names(rv$gnrs_result)) {
+        gnrs <- rv$gnrs_result
+        stg  <- rv$staged
+        # GNRS returns country_matched, stateProvince_matched, county_matched
+        # Join by submitted values to update staging rows
+        cty_col   <- intersect(c("Country_matched",   "country_matched",   "country"),   names(gnrs))[1]
+        state_col <- intersect(c("StateProvince_matched", "stateProvince_matched", "stateProvince"), names(gnrs))[1]
+        coun_col  <- intersect(c("County_matched",    "county_matched",    "county"),    names(gnrs))[1]
+        sub_cty   <- intersect(c("country"),   names(gnrs))[1]
+        sub_state <- intersect(c("stateProvince"), names(gnrs))[1]
+        if (!is.na(cty_col) && !is.na(sub_cty)) {
+          for (i in seq_len(nrow(gnrs))) {
+            rows <- which(
+              trimws(stg$country)        == trimws(gnrs[[sub_cty]][i]) &
+              (!is.na(stg$state_province) & trimws(stg$state_province) == trimws(gnrs[[sub_state]][i]))
+            )
+            if (length(rows) == 0) next
+            if (!is.na(cty_col)   && !is.na(gnrs[[cty_col]][i])   && nzchar(gnrs[[cty_col]][i]))   stg$country[rows]        <- gnrs[[cty_col]][i]
+            if (!is.na(state_col) && !is.na(gnrs[[state_col]][i]) && nzchar(gnrs[[state_col]][i])) stg$state_province[rows] <- gnrs[[state_col]][i]
+            if (!is.na(coun_col)  && !is.na(gnrs[[coun_col]][i])  && nzchar(gnrs[[coun_col]][i]))  stg$county[rows]         <- gnrs[[coun_col]][i]
+          }
+          rv$staged <- stg
+          showNotification(
+            paste0("GNRS complete: geography validated for ", nrow(gnrs), " location(s)."),
+            type="message", duration=6)
+        }
+      }
     })
   })
 
@@ -971,7 +1054,9 @@ server <- function(input, output, session) {
       }, character(1))
     }
     s <- as.character(x)
-    ifelse(!is.na(s) & grepl("^[=+@-]", s), paste0("'", s), s)
+    # Skip formula injection guard for numeric values (e.g. negative coordinates)
+    is_numeric_like <- !is.na(suppressWarnings(as.numeric(s)))
+    ifelse(!is.na(s) & !is_numeric_like & grepl("^[=+@-]", s), paste0("'", s), s)
   }
   safe_write_csv <- function(df, file) {
     if (!is.data.frame(df)) {
