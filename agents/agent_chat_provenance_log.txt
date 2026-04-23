@@ -807,6 +807,18 @@ Action taken:
 - Logged prompt and provenance updates required by workspace policy.
 Outcome: New design-focused agent is now available with consistent policy-compliant traceability.
 
+[23] Date: 2026-04-22
+Source: active chat request
+Request summary: Tune EcoInterface agent voice to studio-creative — more artful, directorial, and sensory in tone while preserving all ecological design modes and capabilities.
+Files affected:
+- agents/EcoInterface.agent.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Rewrote EcoInterface persona, core orientation, mode headers and descriptions, prompt templates, principles table, and avoidance list with studio/atelier voice.
+- Updated prompt log and appended this provenance record per workspace policy.
+Outcome: EcoInterface agent retains full ecological design capabilities with a studio-creative, compositional voice.
+
 ---
 [15] Date: 2026-04-21
 Prompt: BIEN-SpeciesShinyApp: misspelled species name "Pinus pinderosa" returns nothing even with Suggest closest match checked.
@@ -882,3 +894,14 @@ Action taken:
 - Switched sync_people_sheet.py from exact header matching to substring keyword matching.
 - Committed as "feat(people): move outdated listings to alumni; add Robert MacArthur test entry; header-name CSV sync" (6c964b7) and pushed to EnquistLab/enquistlab.github.io main (confirmed 0 ahead/0 behind).
 Outcome: People page now separates active and alumni members; sync script is header-variation-tolerant; all always-gate checks PASS.
+
+[25] Date: 2026-04-22
+Source: active chat request
+Request summary: Run the standard final gate checks for the enquistlab-site-migration repo after site changes were pushed in commit 5b9d668, and record the prompt in the central log.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the requested prompt entry to agents/prompt_log.md with the provided date, commit reference, and summary.
+- Appended this provenance entry because this chat updated files under agents/ during final-gate compliance.
+Outcome: Agent-folder traceability remains append-only and current for the enquistlab-site-migration final gate.

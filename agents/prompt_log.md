@@ -406,6 +406,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: agents/design-atelier.agent.md; .github/agents/design-atelier.agent.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt; chat_provenance_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-22
+- Prompt summary: Tune the EcoInterface agent voice to be more studio-creative in style and tone.
+- Requested outcomes: Rewrite EcoInterface agent body with studio/atelier voice while preserving all ecological design capabilities and mode structure.
+- Files changed: agents/EcoInterface.agent.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: Provide a repo status update after recent pushes and deployments.
 - Requested outcomes: Confirm current branch sync state, latest pushed commit, and whether any local changes remain unpushed.
