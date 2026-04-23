@@ -337,9 +337,10 @@ ui <- navbarPage(
           tags$p(style="font-size:0.85em; margin:4px 0 6px;",
             "TNRS checks taxonomy; GNRS validates geography."),
           tags$p(style="font-size:0.8em; color:#7f8c8d; margin:0 0 8px;",
-            HTML("<strong>Note:</strong> Outbound API calls are blocked by some cloud hosting providers ",
-                 "(including shinyapps.io free/standard tiers). If you see a connection timeout, ",
-                 "use the \u2018Download script\u2019 buttons below to run validation locally in R.")),
+            HTML("<strong>Note:</strong> These calls may take 15\u201360s. ",
+                 "If you see a connection timeout, the external TNRS/GNRS servers may be temporarily slow or unreachable. ",
+                 "Use the \u2018Download script\u2019 buttons below to run validation locally in R instead.")),
+
           tags$hr(style="margin:6px 0;"),
           actionButton("btn_tnrs", "Run TNRS in app (max 20 names)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
@@ -715,7 +716,8 @@ server <- function(input, output, session) {
           "https://tnrsapi.xyz/tnrs_api.php",
           body = tnrs_body,
           httr::content_type("application/json"),
-          httr::timeout(90)
+          httr::config(connecttimeout = 60),
+          httr::timeout(120)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
@@ -794,7 +796,8 @@ server <- function(input, output, session) {
           "https://gnrsapi.xyz/gnrs_api.php",
           body = gnrs_body,
           httr::content_type("application/json"),
-          httr::timeout(90)
+          httr::config(connecttimeout = 60),
+          httr::timeout(120)
         )
         setProgress(0.8)
         code <- httr::status_code(resp)
