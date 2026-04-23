@@ -385,6 +385,9 @@ ui <- navbarPage(
                          style="width:100%; margin-bottom:6px; font-size:0.85em;"),
           actionButton("btn_tnrs", "Try TNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
+          fileInput("upload_tnrs", "Upload TNRS results CSV",
+            accept=".csv", buttonLabel="Browse", placeholder="tnrs_results.csv",
+            width="100%"),
           uiOutput("tnrs_status_ui"),
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_gnrs_script", "\u2b07 Download GNRS validation script (.R)",
@@ -392,6 +395,9 @@ ui <- navbarPage(
                          style="width:100%; margin-bottom:6px; font-size:0.85em;"),
           actionButton("btn_gnrs", "Try GNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
+          fileInput("upload_gnrs", "Upload GNRS results CSV",
+            accept=".csv", buttonLabel="Browse", placeholder="gnrs_results.csv",
+            width="100%"),
           uiOutput("gnrs_status_ui"),
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_gvs_script", "\u2b07 Download GVS validation script (.R)",
@@ -399,6 +405,9 @@ ui <- navbarPage(
                          style="width:100%; margin-bottom:6px; font-size:0.85em;"),
           actionButton("btn_gvs", "Try GVS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
+          fileInput("upload_gvs", "Upload GVS results CSV",
+            accept=".csv", buttonLabel="Browse", placeholder="gvs_results.csv",
+            width="100%"),
           uiOutput("gvs_status_ui"),
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_nsr_script", "\u2b07 Download NSR validation script (.R)",
@@ -406,6 +415,9 @@ ui <- navbarPage(
                          style="width:100%; margin-bottom:6px; font-size:0.85em;"),
           actionButton("btn_nsr", "Try NSR in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
+          fileInput("upload_nsr", "Upload NSR results CSV",
+            accept=".csv", buttonLabel="Browse", placeholder="nsr_results.csv",
+            width="100%"),
           uiOutput("nsr_status_ui")
         )
       ),
@@ -1442,6 +1454,241 @@ server <- function(input, output, session) {
       writeLines(script, file)
     }
   )
+
+  # ── TNRS upload-back ──────────────────────────────────────────────────────
+  observeEvent(input$upload_tnrs, {
+    req(input$upload_tnrs)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table — complete Steps 1-3 before uploading TNRS results.",
+                       type="error", duration=10)
+      return()
+    }
+    tryCatch({
+      df <- utils::read.csv(input$upload_tnrs$datapath, stringsAsFactors=FALSE,
+                            check.names=FALSE)
+      if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
+      rv$tnrs_result <- df
+
+      if ("Name_submitted" %in% names(df) && !"note" %in% names(df)) {
+        tnrs <- df
+        stg  <- rv$staged
+        for (i in seq_len(nrow(tnrs))) {
+          submitted <- tnrs$Name_submitted[i]
+          rows <- which(trimws(stg$scrubbed_species_binomial) == trimws(submitted))
+          if (length(rows) == 0) next
+          for (col in c("Accepted_name","Name_matched")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_species_binomial[rows] <- tnrs[[col]][i]; break
+            }
+          }
+          for (col in c("Accepted_family","Family")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_family[rows] <- tnrs[[col]][i]; break
+            }
+          }
+          for (col in c("Genus_matched","Genus")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_genus[rows] <- tnrs[[col]][i]; break
+            }
+          }
+          for (col in c("Accepted_name_author","Author_matched")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_author[rows] <- tnrs[[col]][i]; break
+            }
+          }
+          for (col in c("Taxonomic_status","Name_matched_status")) {
+            if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
+              stg$scrubbed_taxonomic_status[rows] <- tnrs[[col]][i]; break
+            }
+          }
+        }
+        rv$staged <- stg
+        showNotification(
+          paste0("TNRS results loaded: scrubbed_* fields updated for ", nrow(tnrs), " name(s)."),
+          type="message", duration=6)
+      } else {
+        showNotification("TNRS CSV loaded (no writeback — missing 'Name_submitted' column or contains error note).",
+                         type="warning", duration=8)
+      }
+    }, error=function(e) {
+      showNotification(paste0("TNRS upload failed: ", conditionMessage(e)),
+                       type="error", duration=10)
+    })
+  })
+
+  # ── GNRS upload-back ──────────────────────────────────────────────────────
+  observeEvent(input$upload_gnrs, {
+    req(input$upload_gnrs)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table — complete Steps 1-3 before uploading GNRS results.",
+                       type="error", duration=10)
+      return()
+    }
+    tryCatch({
+      df <- utils::read.csv(input$upload_gnrs$datapath, stringsAsFactors=FALSE,
+                            check.names=FALSE)
+      if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
+      rv$gnrs_result <- df
+
+      if (!"note" %in% names(df)) {
+        gnrs <- df
+        stg  <- rv$staged
+        country_col  <- intersect(c("Country_matched","country_matched","Country","country"), names(gnrs))[1]
+        state_col    <- intersect(c("StateProvince_matched","stateProvince_matched","State_province_matched","state_province_matched"), names(gnrs))[1]
+        county_col   <- intersect(c("County_matched","county_matched","County","county"), names(gnrs))[1]
+        sub_country  <- intersect(c("Country_submitted","country_submitted","Country","country"), names(gnrs))[1]
+        sub_state    <- intersect(c("StateProvince_submitted","stateProvince_submitted","State_province","state_province"), names(gnrs))[1]
+
+        if (!is.na(sub_country) && !is.na(country_col)) {
+          stg_key  <- paste(trimws(tolower(stg$country)), trimws(tolower(stg$state_province)))
+          gnrs_sub <- paste(trimws(tolower(gnrs[[sub_country]])),
+                            trimws(tolower(if (!is.na(sub_state)) gnrs[[sub_state]] else "")))
+          for (i in seq_len(nrow(gnrs))) {
+            rows <- which(stg_key == gnrs_sub[i])
+            if (length(rows) == 0) next
+            if (!is.na(country_col) && !is.na(gnrs[[country_col]][i]) && nzchar(gnrs[[country_col]][i]))
+              stg$country[rows] <- gnrs[[country_col]][i]
+            if (!is.na(state_col) && !is.na(gnrs[[state_col]][i]) && nzchar(gnrs[[state_col]][i]))
+              stg$state_province[rows] <- gnrs[[state_col]][i]
+            if (!is.na(county_col) && !is.na(gnrs[[county_col]][i]) && nzchar(gnrs[[county_col]][i]))
+              stg$county[rows] <- gnrs[[county_col]][i]
+          }
+          rv$staged <- stg
+          showNotification(
+            paste0("GNRS results loaded: geography updated for ", nrow(gnrs), " location(s)."),
+            type="message", duration=6)
+        } else {
+          showNotification("GNRS CSV loaded (no writeback — column names not recognised).",
+                           type="warning", duration=8)
+        }
+      } else {
+        showNotification("GNRS CSV loaded (contains error note, no writeback).",
+                         type="warning", duration=8)
+      }
+    }, error=function(e) {
+      showNotification(paste0("GNRS upload failed: ", conditionMessage(e)),
+                       type="error", duration=10)
+    })
+  })
+
+  # ── GVS upload-back ───────────────────────────────────────────────────────
+  observeEvent(input$upload_gvs, {
+    req(input$upload_gvs)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table — complete Steps 1-3 before uploading GVS results.",
+                       type="error", duration=10)
+      return()
+    }
+    tryCatch({
+      df <- utils::read.csv(input$upload_gvs$datapath, stringsAsFactors=FALSE,
+                            check.names=FALSE)
+      if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
+      rv$gvs_result <- df
+
+      if (!"note" %in% names(df)) {
+        gvs <- df
+        stg <- rv$staged
+        lat_col <- intersect(c("latitude_verbatim","latitude"), names(gvs))[1]
+        lon_col <- intersect(c("longitude_verbatim","longitude"), names(gvs))[1]
+        if (!is.na(lat_col) && !is.na(lon_col) && "is_centroid" %in% names(stg)) {
+          for (i in seq_len(nrow(gvs))) {
+            rows <- which(
+              trimws(as.character(stg$latitude))  == trimws(as.character(gvs[[lat_col]][i])) &
+              trimws(as.character(stg$longitude)) == trimws(as.character(gvs[[lon_col]][i]))
+            )
+            if (length(rows) == 0) next
+            centroid_val <- "0"
+            for (cflag in c("is_country_centroid","is_state_centroid","is_county_centroid")) {
+              if (cflag %in% names(gvs) && !is.na(gvs[[cflag]][i]) &&
+                  as.character(gvs[[cflag]][i]) %in% c("1","TRUE","true")) {
+                centroid_val <- "1"; break
+              }
+            }
+            stg$is_centroid[rows] <- centroid_val
+          }
+          rv$staged <- stg
+          showNotification(
+            paste0("GVS results loaded: is_centroid updated for ", nrow(gvs), " coordinate pair(s)."),
+            type="message", duration=6)
+        } else {
+          showNotification("GVS CSV loaded (no writeback — lat/lon columns not found or is_centroid not in staging).",
+                           type="warning", duration=8)
+        }
+      } else {
+        showNotification("GVS CSV loaded (contains error note, no writeback).",
+                         type="warning", duration=8)
+      }
+    }, error=function(e) {
+      showNotification(paste0("GVS upload failed: ", conditionMessage(e)),
+                       type="error", duration=10)
+    })
+  })
+
+  # ── NSR upload-back ───────────────────────────────────────────────────────
+  observeEvent(input$upload_nsr, {
+    req(input$upload_nsr)
+    if (is.null(rv$staged)) {
+      showNotification("No staging table — complete Steps 1-3 before uploading NSR results.",
+                       type="error", duration=10)
+      return()
+    }
+    tryCatch({
+      df <- utils::read.csv(input$upload_nsr$datapath, stringsAsFactors=FALSE,
+                            check.names=FALSE)
+      if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
+      rv$nsr_result <- df
+
+      if (!"note" %in% names(df)) {
+        nsr <- df
+        stg <- rv$staged
+        sp_col <- intersect(c("species","taxon"), names(nsr))[1]
+        if (!is.na(sp_col)) {
+          nsr_state_col <- intersect(c("state_province","stateProvince"), names(nsr))[1]
+          nsr_key <- paste(trimws(nsr[[sp_col]]),
+                           trimws(if ("country" %in% names(nsr)) nsr$country else ""),
+                           trimws(if (!is.na(nsr_state_col)) nsr[[nsr_state_col]] else ""),
+                           sep="\u001f")
+          stg_key <- paste(trimws(stg$scrubbed_species_binomial),
+                           trimws(if ("country" %in% names(stg)) stg$country else ""),
+                           trimws(if ("state_province" %in% names(stg)) stg$state_province else ""),
+                           sep="\u001f")
+          write_if <- function(nsr_col, stg_col) {
+            if (nsr_col %in% names(nsr) && stg_col %in% names(stg)) {
+              val <- as.character(nsr[[nsr_col]][i])
+              if (!is.na(val) && nzchar(val)) stg[[stg_col]][rows] <<- val
+            }
+          }
+          n_written <- 0L
+          for (i in seq_len(nrow(nsr))) {
+            rows <- which(stg_key == nsr_key[i])
+            if (length(rows) == 0) next
+            n_written <- n_written + 1L
+            write_if("native_status",               "native_status")
+            write_if("native_status_reason",        "native_status_reason")
+            write_if("native_status_country",       "native_status_country")
+            write_if("native_status_state_province","native_status_state_province")
+            write_if("native_status_county_parish", "native_status_county_parish")
+            write_if("isIntroduced",                "is_introduced")
+            write_if("isCultivatedNSR",             "is_cultivated_observation")
+          }
+          rv$staged <- stg
+          showNotification(
+            paste0("NSR results loaded: native status + cultivated fields updated for ",
+                   n_written, " taxon/location combination(s)."),
+            type="message", duration=6)
+        } else {
+          showNotification("NSR CSV loaded (no writeback — 'species' or 'taxon' column not found).",
+                           type="warning", duration=8)
+        }
+      } else {
+        showNotification("NSR CSV loaded (contains error note, no writeback).",
+                         type="warning", duration=8)
+      }
+    }, error=function(e) {
+      showNotification(paste0("NSR upload failed: ", conditionMessage(e)),
+                       type="error", duration=10)
+    })
+  })
 
   # ── Tab 4 gating ─────────────────────────────────────────────────────────
   output$tab4_gating <- renderUI({
