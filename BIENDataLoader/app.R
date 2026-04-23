@@ -6,13 +6,28 @@ library(jsonlite)
 # ── Static field lists ────────────────────────────────────────────────────────
 
 BIEN_STAGING_FIELDS <- c(
+  # Taxonomy — populated by TNRS (scrubbed_* fields from BIEN DB view_full_occurrence_individual)
   "scrubbed_species_binomial", "scrubbed_family", "scrubbed_genus",
   "scrubbed_author", "scrubbed_taxonomic_status",
-  "latitude", "longitude", "date_collected",
+  # Coordinates
+  "latitude", "longitude",
+  # GVS coordinate QA — BIEN DB field is_centroid (filtered: WHERE is_centroid IS NULL OR is_centroid=0)
+  "is_centroid",
+  # Temporal
+  "date_collected",
+  # Dataset provenance
   "dataset", "datasource", "dataowner", "collection_code",
+  # Geography — populated by GNRS (BIEN DB: country, state_province, county)
   "locality", "country", "state_province", "county", "plot_name",
+  # Record identifiers
   "occurrenceID", "basisOfRecord",
-  "is_cultivated", "native_status",
+  # NSR native status — BIEN DB .native_check fields
+  "native_status", "native_status_reason",
+  "native_status_country", "native_status_state_province", "native_status_county_parish",
+  "is_introduced",
+  # NSR cultivated status — BIEN DB .cultivated_check: is_cultivated_observation
+  "is_cultivated_observation",
+  # Verbatim / elevation
   "verbatimLocality", "verbatimElevation",
   "elevation_min", "elevation_max"
 )
@@ -1082,11 +1097,41 @@ server <- function(input, output, session) {
         data.frame(note = if (!is.null(err_msg)) err_msg else
                          "GVS request failed (unknown error).",
                    stringsAsFactors=FALSE)
-      } else {
+      } else result
+
+      # ── Write GVS results back to staging (BIEN DB: is_centroid field) ───
+      if (!is.null(rv$staged) && is.data.frame(rv$gvs_result) &&
+          !"note" %in% names(rv$gvs_result) && nrow(rv$gvs_result) > 0) {
+        tryCatch({
+          gvs <- rv$gvs_result
+          stg <- rv$staged
+          lat_col <- intersect(c("latitude_verbatim","latitude"), names(gvs))[1]
+          lon_col <- intersect(c("longitude_verbatim","longitude"), names(gvs))[1]
+          if (!is.na(lat_col) && !is.na(lon_col) && "is_centroid" %in% names(stg)) {
+            for (i in seq_len(nrow(gvs))) {
+              rows <- which(
+                trimws(as.character(stg$latitude))  == trimws(as.character(gvs[[lat_col]][i])) &
+                trimws(as.character(stg$longitude)) == trimws(as.character(gvs[[lon_col]][i]))
+              )
+              if (length(rows) == 0) next
+              centroid_val <- "0"
+              for (cflag in c("is_country_centroid","is_state_centroid","is_county_centroid")) {
+                if (cflag %in% names(gvs) && !is.na(gvs[[cflag]][i]) &&
+                    as.character(gvs[[cflag]][i]) %in% c("1","TRUE","true")) {
+                  centroid_val <- "1"; break
+                }
+              }
+              stg$is_centroid[rows] <- centroid_val
+            }
+            rv$staged <- stg
+          }
+        }, error=function(e) {
+          showNotification(paste0("GVS writeback error: ", conditionMessage(e)),
+                           type="warning", duration=8)
+        })
         showNotification(
-          paste0("GVS complete: ", nrow(result), " coordinate pair(s) validated."),
+          paste0("GVS complete: ", nrow(rv$gvs_result), " coordinate pair(s) validated."),
           type="message", duration=6)
-        result
       }
     })
   })
@@ -1246,26 +1291,51 @@ server <- function(input, output, session) {
                    stringsAsFactors=FALSE)
       } else result
 
-      # ── Write NSR native_status back to staging ──────────────────────────
+      # ── Write NSR results back to staging (BIEN DB native status fields) ─
       if (!is.null(rv$staged) && is.data.frame(rv$nsr_result) &&
-          !"note" %in% names(rv$nsr_result) &&
-          "native_status" %in% names(rv$nsr_result)) {
+          !"note" %in% names(rv$nsr_result)) {
         nsr  <- rv$nsr_result
         stg  <- rv$staged
-        sp_col <- if ("species" %in% names(nsr)) "species" else
-                  if ("taxon"   %in% names(nsr)) "taxon"   else NULL
-        if (!is.null(sp_col)) {
+        sp_col <- intersect(c("species","taxon"), names(nsr))[1]
+        if (!is.na(sp_col)) {
+          # Join by species + country + state_province for location-specific native status
+          nsr_state_col <- intersect(c("state_province","stateProvince"), names(nsr))[1]
+          nsr_key <- paste(trimws(nsr[[sp_col]]),
+                           trimws(if ("country" %in% names(nsr)) nsr$country else ""),
+                           trimws(if (!is.na(nsr_state_col)) nsr[[nsr_state_col]] else ""),
+                           sep="\u001f")
+          stg_key <- paste(trimws(stg$scrubbed_species_binomial),
+                           trimws(if ("country"        %in% names(stg)) stg$country        else ""),
+                           trimws(if ("state_province"  %in% names(stg)) stg$state_province else ""),
+                           sep="\u001f")
+          write_if <- function(nsr_col, stg_col) {
+            if (nsr_col %in% names(nsr) && stg_col %in% names(stg)) {
+              val <- as.character(nsr[[nsr_col]][i])
+              if (!is.na(val) && nzchar(val)) stg[[stg_col]][rows] <<- val
+            }
+          }
+          n_written <- 0L
           for (i in seq_len(nrow(nsr))) {
-            rows <- which(trimws(stg$scrubbed_species_binomial) == trimws(nsr[[sp_col]][i]))
+            rows <- which(stg_key == nsr_key[i])
             if (length(rows) == 0) next
-            if (!is.na(nsr$native_status[i]) && nzchar(nsr$native_status[i]))
-              stg$native_status[rows] <- nsr$native_status[i]
+            n_written <- n_written + 1L
+            # BIEN DB .native_check fields
+            write_if("native_status",               "native_status")
+            write_if("native_status_reason",        "native_status_reason")
+            write_if("native_status_country",       "native_status_country")
+            write_if("native_status_state_province","native_status_state_province")
+            write_if("native_status_county_parish", "native_status_county_parish")
+            # BIEN DB is_introduced
+            write_if("isIntroduced",                "is_introduced")
+            # BIEN DB is_cultivated_observation
+            write_if("isCultivatedNSR",             "is_cultivated_observation")
           }
           rv$staged <- stg
+          showNotification(
+            paste0("NSR complete: native status + cultivated fields updated for ",
+                   n_written, " taxon/location combination(s)."),
+            type="message", duration=6)
         }
-        showNotification(
-          paste0("NSR complete: native_status updated for ", nrow(nsr), " taxon/location combination(s)."),
-          type="message", duration=6)
       }
     })
   })
@@ -1388,7 +1458,7 @@ server <- function(input, output, session) {
       paste0("GVS run:                   ", if (!is.null(rv$gvs_result))  "yes" else "no"),
       paste0("NSR run:                   ", if (!is.null(rv$nsr_result))  "yes" else "no"),
       "",
-      "NOTE: This staging table reflects the field mapping and QC",
+      "NOTE: Field names match BIEN DB (view_full_occurrence_individual)",
       "applied in this session. Authoritative taxonomic reconciliation",
       "requires downstream expert and service review before BIEN DB append.",
       sep="\n"
