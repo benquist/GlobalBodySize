@@ -882,3 +882,15 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-24 | Review BIEN Data Loader AWS IP block issue; produced 3 creative automated relay plans (Render.com Plumber, GitHub Actions queue, Cloudflare Workers). Research/planning task only — no code or files changed.
 
 2026-04-24 | Plan 3 Cloudflare Workers proxy for BIEN Data Loader: created 8 CF Worker files (tnrs/gnrs/gvs/nsr index.js + wrangler.toml), fixed BUG C1 (GVS hand-rolled JSON), fixed BUG C2 (GNRS country-only writeback), added 4 CF URL constants to app.R, replaced 4 hardcoded API URLs with constants, changed connecttimeout from 60 to 10.
+
+- Date: 2026-04-24
+- Prompt summary: Perform the standard always-agent checks for this session after BIENDataLoader Help tab work.
+- Requested outcomes: Verify prompt log entry, confirm no changed .Rmd files and no changed R packages for this session scope, confirm commit c28ccdf is pushed to origin/master, and report whether BIENDataLoader/chat_provenance_log.md includes a corresponding session entry.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Minor BIENDataLoader UI refinements for clarity and upload guidance.
+- Requested outcomes: Clarify DWC acronym in the UI (DWC = Darwin Core) and add explicit instructions next to "Upload CSV file(s)" explaining how to select multiple files (Command on macOS, Ctrl on Windows/Linux).
+- Files changed: BIENDataLoader/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
