@@ -787,7 +787,8 @@ server <- function(input, output, session) {
     tnrs_result  = NULL,
     gnrs_result  = NULL,
     gvs_result   = NULL,
-    nsr_result   = NULL
+    nsr_result   = NULL,
+    completion_modal_shown = FALSE
   )
 
   # ── Resolve demo data path reliably regardless of working directory ──────────
@@ -811,6 +812,7 @@ server <- function(input, output, session) {
     rv$staged <- NULL; rv$dwc <- NULL; rv$qc <- NULL
     rv$tnrs_result <- NULL; rv$gnrs_result <- NULL
     rv$gvs_result  <- NULL; rv$nsr_result  <- NULL
+  rv$completion_modal_shown <- FALSE
 
     if (isTRUE(input$use_demo)) {
       obs_path  <- demo_data_path("observations.csv")
@@ -1690,6 +1692,94 @@ server <- function(input, output, session) {
     DT::datatable(rv$nsr_result, rownames=FALSE,
       options=list(pageLength=20, scrollX=TRUE))
   }, server=TRUE)
+
+  # ── All-services-complete modal ────────────────────────────────────────────
+  observe({
+    # Fire only when all four results exist and none carries the error sentinel
+    all_done <- !is.null(rv$tnrs_result) && !"note" %in% names(rv$tnrs_result) &&
+                !is.null(rv$gnrs_result) && !"note" %in% names(rv$gnrs_result) &&
+                !is.null(rv$gvs_result)  && !"note" %in% names(rv$gvs_result)  &&
+                !is.null(rv$nsr_result)  && !"note" %in% names(rv$nsr_result)
+    if (rv$completion_modal_shown || !all_done) return()
+    rv$completion_modal_shown <- TRUE
+
+    run_ts <- format(Sys.time(), "%Y-%m-%d %H:%M %Z")
+
+    showModal(modalDialog(
+      title = tags$span(
+        style = "font-size:1.15rem; font-weight:700; color:#2f6fab;",
+        "\u2713 BIEN Service Processing Complete"
+      ),
+      easyClose = TRUE,
+      size = "m",
+      footer = tagList(
+        actionButton("modal_go_export", "Go to Export (Tab 4) \u2192",
+          class = "btn btn-primary",
+          style = "background:#2f6fab; border-color:#1a4980; color:#fff;"),
+        modalButton("Close")
+      ),
+
+      # Service checklist
+      tags$div(class = "bl-card bl-card-pass", style = "margin-bottom:12px;",
+        tags$p(style = "font-weight:600; margin:0 0 8px 0; color:#1a5c35;",
+          "All 4 BIEN services completed successfully:"),
+        tags$table(style = "width:100%; font-size:0.88rem; border-collapse:collapse;",
+          tags$tr(
+            tags$td(style="padding:3px 8px 3px 0; font-weight:700; white-space:nowrap;", "\u2713 TNRS"),
+            tags$td(style="padding:3px 0; color:#2c2c2c;",
+              "Scientific names resolved/scrubbed against WCVP + WFO; ", tags$code("scrubbed_*"), " fields populated.")
+          ),
+          tags$tr(
+            tags$td(style="padding:3px 8px 3px 0; font-weight:700; white-space:nowrap;", "\u2713 GNRS"),
+            tags$td(style="padding:3px 0; color:#2c2c2c;",
+              "Political geography (country/state/county) standardized.")
+          ),
+          tags$tr(
+            tags$td(style="padding:3px 8px 3px 0; font-weight:700; white-space:nowrap;", "\u2713 GVS"),
+            tags$td(style="padding:3px 0; color:#2c2c2c;",
+              "Coordinate centroid flags assigned; precision issues identified.")
+          ),
+          tags$tr(
+            tags$td(style="padding:3px 8px 3px 0; font-weight:700; white-space:nowrap;", "\u2713 NSR"),
+            tags$td(style="padding:3px 0; color:#2c2c2c;",
+              "Native/introduced/cultivated status assigned by taxon and region.")
+          )
+        )
+      ),
+
+      # Staging table ready
+      tags$div(class = "bl-card bl-card-pass", style = "margin-bottom:12px;",
+        tags$p(style = "margin:0; font-size:0.9rem; color:#1a5c35;",
+          tags$strong("The BIEN Staging Table is ready for export."),
+          " It contains the original columns alongside reconciled BIEN schema fields.")
+      ),
+
+      # Science review reminder
+      tags$div(class = "bl-card bl-card-warn",
+        tags$p(style = "font-weight:600; margin:0 0 6px 0; color:#7a4800;",
+          "\u26a0 Review results before treating outputs as analysis-ready:"),
+        tags$ul(style = "margin:0; padding-left:18px; font-size:0.87rem; line-height:1.8; color:#3a2800;",
+          tags$li(tags$strong("TNRS:"), " check for ambiguous or low-confidence name matches. ",
+            "Genus-only or multi-match records have lower inferential value."),
+          tags$li(tags$strong("GNRS:"), " review unmatched or low-confidence political units; ",
+            "country/state/county consistency depends on input spelling quality."),
+          tags$li(tags$strong("GVS:"), " inspect centroid-flagged records \u2014 ",
+            tags$code("is_centroid = 1"), " indicates potential positional imprecision."),
+          tags$li(tags$strong("NSR:"), " native/introduced/cultivated status is ",
+            "interpretation-dependent and should be reviewed for your study scope and region.")
+        ),
+        tags$p(style = "margin:8px 0 0 0; font-size:0.8rem; color:#555;",
+          "Services run: ", tags$code(run_ts), ". ",
+          "Endpoints: TNRS (tnrsapi.xyz), GNRS (gnrsapi.xyz), GVS (gvsapi.xyz), NSR (nsrapi.xyz).")
+      )
+    ))
+  }) |> bindEvent(rv$nsr_result, rv$tnrs_result, rv$gnrs_result, rv$gvs_result,
+                  ignoreInit = TRUE, ignoreNULL = FALSE)
+
+  observeEvent(input$modal_go_export, {
+    removeModal()
+    updateNavbarPage(session, "tabs", selected = "4 \u2022 Export")
+  })
 
   output$dl_nsr_script <- downloadHandler(
     filename = function() paste0("nsr_validation_", Sys.Date(), ".R"),
