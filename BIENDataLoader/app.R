@@ -329,8 +329,16 @@ ui <- navbarPage(
           tags$hr(style="margin:8px 0"),
           checkboxInput("use_demo", "Use built-in demo data (12 obs + 6 plots)", value=TRUE),
           conditionalPanel("!input.use_demo",
-            fileInput("files", "Upload CSV files", multiple=TRUE, accept=".csv",
-                      placeholder="Select one or more .csv files")
+            tags$div(
+              fileInput("files", "Upload CSV files", multiple=TRUE, accept=".csv",
+                        placeholder="Select one or more .csv files"),
+              tags$small(
+                tags$a(href="#", onclick="$(\"[data-value='? \\u2022 Help']\").tab('show'); return false;",
+                  style="color:#2f6fab; text-decoration:underline; cursor:pointer;",
+                  "What format should my CSV files be?"
+                )
+              )
+            )
           ),
           tags$hr(style="margin:8px 0"),
           uiOutput("primary_file_ui"),
@@ -477,7 +485,279 @@ ui <- navbarPage(
         )
       )
     )
-  )
+  ),
+
+  # ── Tab 5: Help ───────────────────────────────────────────────────────────
+  tabPanel(
+    "? \u2022 Help",
+    fluidRow(
+      column(
+        width = 10, offset = 1,
+        style = "padding-top:32px; padding-bottom:48px;",
+
+        # Title
+        tags$h2("BIEN Data Loader \u2014 Help & About",
+          style = "font-size:1.6rem; font-weight:600; color:#1a1a2e; margin-bottom:4px;"),
+        tags$p(
+          "A guided tool for uploading, standardizing, validating, and exporting
+           field observation data into the BIEN database.",
+          style = "color:#555; font-size:0.95rem; margin-bottom:28px;"),
+        tags$hr(style = "border-color:#d0dce8; margin-bottom:28px;"),
+
+        # CSV File Format
+        tags$h3("CSV File Format",
+          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
+        tags$p(style = "font-size:0.9rem; color:#555; margin-bottom:12px;",
+          "The app accepts one or two CSV files. Only one file is required. Each file should
+           have column headers in the first row."),
+
+        fluidRow(
+          column(6,
+            tags$div(class = "bl-card", style = "margin-bottom:16px;",
+              tags$strong("File 1 \u2014 Observation Records (required)",
+                style = "font-size:0.93rem; color:#1a1a2e;"),
+              tags$p(style = "margin:8px 0 6px 0; font-size:0.88rem; color:#3a3a3a; line-height:1.6;",
+                "One row per observation. Must include at minimum a species name column.
+                 Any other columns are optional but will be auto-mapped if recognized."),
+              tags$p(style = "margin:4px 0 4px 0; font-size:0.82rem; color:#555;",
+                tags$strong("Example columns:")),
+              tags$ul(
+                style = "margin:0; padding-left:18px; font-size:0.83rem; color:#3a3a3a; line-height:1.9;",
+                tags$li(tags$code("species"), " or ", tags$code("scientificName"),
+                  " \u2014 species binomial, e.g. ", tags$em("Quercus robur")),
+                tags$li(tags$code("lat"), ", ", tags$code("lon"),
+                  " \u2014 decimal latitude and longitude"),
+                tags$li(tags$code("date"), " or ", tags$code("date_collected"),
+                  " \u2014 collection date"),
+                tags$li(tags$code("country"), ", ", tags$code("state"), ", ",
+                  tags$code("county"), " \u2014 political geography"),
+                tags$li(tags$code("plot_name"), " or ", tags$code("site"),
+                  " \u2014 plot or site identifier"),
+                tags$li(tags$code("collector"), ", ", tags$code("dataset"),
+                  ", ", tags$code("notes"), " \u2014 provenance fields")
+              )
+            )
+          ),
+          column(6,
+            tags$div(class = "bl-card", style = "margin-bottom:16px;",
+              tags$strong("File 2 \u2014 Metadata or Plot Data (optional)",
+                style = "font-size:0.93rem; color:#1a1a2e;"),
+              tags$p(style = "margin:8px 0 6px 0; font-size:0.88rem; color:#3a3a3a; line-height:1.6;",
+                "Any supplementary table you want joined to the observation records \u2014
+                 plot metadata, site attributes, survey details, etc. The two files are
+                 joined on a shared key column you select."),
+              tags$p(style = "margin:4px 0 4px 0; font-size:0.82rem; color:#555;",
+                tags$strong("Example use cases:")),
+              tags$ul(
+                style = "margin:0; padding-left:18px; font-size:0.83rem; color:#3a3a3a; line-height:1.9;",
+                tags$li("Plot metadata table keyed by ", tags$code("plot_name"),
+                  " (elevation, habitat type, area surveyed)"),
+                tags$li("Site coordinates table when lat/lon are stored separately"),
+                tags$li("Observer or institution details linked by ", tags$code("dataset")),
+                tags$li("Voucher or specimen records joined by ", tags$code("occurrenceID"))
+              ),
+              tags$div(
+                style = "margin-top:10px; padding:8px 10px; background:#f0fff4;
+                         border-left:3px solid #27ae60; border-radius:3px;",
+                tags$small(style = "color:#1a5c35; font-size:0.82rem;",
+                  tags$strong("Not required."),
+                  " If you only have one file, simply upload it and leave File 2 blank."
+                )
+              )
+            )
+          )
+        ),
+
+        tags$div(
+          style = "background:#f4f6f8; border-radius:6px; padding:12px 18px; margin-bottom:24px;",
+          tags$p(style = "margin:0; font-size:0.85rem; color:#555; line-height:1.7;",
+            tags$strong("Column name flexibility: "),
+            "The app recognizes common variants automatically \u2014 ",
+            tags$code("lat"), ", ", tags$code("latitude"), ", ",
+            tags$code("decimal_latitude"), ", ", tags$code("decimalLatitude"),
+            " all map to the same field. You can also correct or override any
+             auto-suggested mapping in the Map Fields step."
+          )
+        ),
+
+        tags$hr(style = "border-color:#d0dce8; margin-bottom:24px;"),
+
+        # What This App Does
+        tags$h3("What This App Does",
+          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
+        tags$div(class = "bl-card", style = "margin-bottom:24px;",
+          tags$p(style = "margin:0; font-size:0.93rem; line-height:1.65; color:#2c2c2c;",
+            "Upload one or two CSV files of field observation records, map your column names
+             to Darwin Core and BIEN staging schema fields, run automated taxonomy and
+             geography validation via BIEN web services (TNRS, GNRS, GVS, NSR), and
+             download a clean, validated dataset ready to load into the BIEN database."
+          )
+        ),
+
+        # Four-Step Workflow
+        tags$h3("Four-Step Workflow",
+          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:16px;"),
+        fluidRow(
+          column(6,
+            tags$div(class = "bl-card", style = "margin-bottom:16px; min-height:110px;",
+              tags$span(class = "step-badge", "1"),
+              tags$strong(" Upload & Merge",
+                style = "font-size:0.97rem; color:#1a1a2e; margin-left:6px;"),
+              tags$p(style = "margin:10px 0 0 0; font-size:0.88rem; line-height:1.6; color:#3a3a3a;",
+                "Upload 1\u20132 CSV files. Optionally join them on a shared key column
+                 to merge observation and plot metadata before processing.")
+            )
+          ),
+          column(6,
+            tags$div(class = "bl-card", style = "margin-bottom:16px; min-height:110px;",
+              tags$span(class = "step-badge", "2"),
+              tags$strong(" Map Fields",
+                style = "font-size:0.97rem; color:#1a1a2e; margin-left:6px;"),
+              tags$p(style = "margin:10px 0 0 0; font-size:0.88rem; line-height:1.6; color:#3a3a3a;",
+                "Auto-suggest mappings from your column names to Darwin Core terms and
+                 BIEN staging fields using column name aliases \u2014 e.g., ",
+                tags$code("lat"), " \u2192 ", tags$code("decimalLatitude"), ", ",
+                tags$code("species"), " \u2192 ", tags$code("scientificName"), ".")
+            )
+          )
+        ),
+        fluidRow(
+          column(6,
+            tags$div(class = "bl-card", style = "margin-bottom:16px; min-height:200px;",
+              tags$span(class = "step-badge", "3"),
+              tags$strong(" Stage & Validate",
+                style = "font-size:0.97rem; color:#1a1a2e; margin-left:6px;"),
+              tags$p(style = "margin:10px 0 0 0; font-size:0.88rem; line-height:1.6; color:#3a3a3a;",
+                "Builds DwC + BIEN staging tables, then runs four validation services:"),
+              tags$ul(
+                style = "margin:6px 0 0 0; padding-left:18px; font-size:0.86rem; color:#3a3a3a; line-height:1.8;",
+                tags$li(tags$strong("TNRS"), " \u2014 Resolves/scrubs scientific names against WCVP + WFO"),
+                tags$li(tags$strong("GNRS"), " \u2014 Standardizes country / state / county"),
+                tags$li(tags$strong("GVS"),  " \u2014 Flags coordinate-level political centroids"),
+                tags$li(tags$strong("NSR"),  " \u2014 Assigns native / introduced / cultivated status per region")
+              )
+            )
+          ),
+          column(6,
+            tags$div(class = "bl-card", style = "margin-bottom:16px; min-height:200px;",
+              tags$span(class = "step-badge", "4"),
+              tags$strong(" Export",
+                style = "font-size:0.97rem; color:#1a1a2e; margin-left:6px;"),
+              tags$p(style = "margin:10px 0 0 0; font-size:0.88rem; line-height:1.6; color:#3a3a3a;",
+                "Download the validated output as a BIEN staging CSV or a Darwin Core CSV,
+                 ready for database ingestion or archival. QC report and field mapping are
+                 also available for provenance documentation.")
+            )
+          )
+        ),
+
+        tags$hr(style = "border-color:#d0dce8; margin:8px 0 24px 0;"),
+
+        # Scientific Caveats
+        tags$h3("Scientific Caveats",
+          style = "font-size:1.1rem; font-weight:600; color:#8a6000; margin-bottom:12px;"),
+        tags$div(class = "bl-card-warn", style = "margin-bottom:24px;",
+          tags$ul(
+            style = "margin:0; padding-left:20px; font-size:0.88rem; line-height:1.8; color:#3a2800;",
+            tags$li(
+              tags$strong("Name scrubbing collapses synonyms to accepted names."),
+              " Review TNRS results carefully for ambiguous or multi-match cases before
+               accepting scrubbed names. Inspect the ", tags$code("match_score"),
+              " and ", tags$code("taxon_rank"), " fields \u2014 genus-only matches have
+               lower inferential value than full species matches."
+            ),
+            tags$li(
+              tags$strong("GNRS standardizes to political units."),
+              " Sub-national precision depends on the spelling quality of your submitted
+               locality strings."
+            ),
+            tags$li(
+              tags$strong("Native, introduced, and cultivated status from NSR is region-specific"),
+              " and may carry uncertainty for species near distributional boundaries or with
+               complex histories. Cultivated records in particular should generally be excluded
+               from range and SDM analyses."
+            ),
+            tags$li(
+              tags$strong("Centroid flags do not remove records \u2014 they are informational."),
+              " ", tags$code("is_centroid = 1"), " means the coordinate matches a known political
+               centroid. ", tags$code("is_centroid = 0"), " means it was evaluated and is not a
+               centroid. ", tags$code("is_centroid = NULL"), " means the check was not performed
+               (e.g., missing coordinates or out-of-scope geography). Apply downstream QA rules
+               based on your project\u2019s tolerance for positional imprecision."
+            ),
+            tags$li(
+              tags$strong("scientificName authorship."),
+              " The ", tags$code("species"), " column name alias maps to ",
+              tags$code("scientificName"), " without authorship. Per Darwin Core, ",
+              tags$code("scientificName"), " ideally includes authorship (e.g., ",
+              tags$em("Quercus robur"), " L.). TNRS will parse bare binomials
+               correctly, but authorship will be absent from output unless provided."
+            )
+          )
+        ),
+
+        # Technical Notes
+        tags$h3("Technical Notes",
+          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
+        tags$div(
+          style = "background:#f4f6f8; border-radius:6px; padding:16px 20px; margin-bottom:24px;",
+          tags$ul(
+            style = "margin:0; padding-left:20px; font-size:0.87rem; line-height:1.8; color:#444;",
+            tags$li(
+              "Validation API calls are routed through Cloudflare Worker relays (",
+              tags$code("bien-relay-*.benquist.workers.dev"),
+              ") to bypass network restrictions on the hosting platform."
+            ),
+            tags$li(
+              "Taxonomy scrubbing writes results to ", tags$code("scrubbed_*"),
+              " fields; original submitted names are always preserved."
+            ),
+            tags$li(
+              "TNRS uses WCVP + WFO as name-matching backbones. These taxonomic
+               backbones are versioned and updated periodically. For reproducibility,
+               record the TNRS query date and note the backbone versions in your
+               methods documentation."
+            ),
+            tags$li(
+              "All API calls use a 10-second connect timeout. Records that fail due to
+               timeout or upstream unavailability are returned with NULL validation fields \u2014
+               check your results tabs for missing rows before treating the dataset as fully validated."
+            ),
+            tags$li(
+              "NSR native/introduced/cultivated status is context-dependent \u2014 the same
+               species may be native in one political region and introduced in another."
+            )
+          )
+        ),
+
+        tags$hr(style = "border-color:#d0dce8; margin-bottom:24px;"),
+
+        # About / Credits
+        tags$h3("About",
+          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
+        tags$div(class = "bl-card", style = "margin-bottom:40px;",
+          tags$p(style = "margin:0 0 8px 0; font-size:0.9rem; line-height:1.65; color:#2c2c2c;",
+            "Built for the ",
+            tags$strong("BIEN (Botanical Information and Ecology Network)"), " project."),
+          tags$p(style = "margin:0 0 8px 0; font-size:0.88rem; line-height:1.65; color:#444;",
+            "TNRS, GNRS, GVS, and NSR validation services are maintained by the
+             BIEN team at the University of Arizona."),
+          tags$p(style = "margin:0; font-size:0.85rem; color:#777;",
+            "Validation API documentation: ",
+            tags$a(href="https://tnrsapi.xyz", target="_blank", rel="noopener noreferrer", "tnrsapi.xyz",
+              style="color:#2f6fab;"), " \u00b7 ",
+            tags$a(href="https://gnrsapi.xyz", target="_blank", rel="noopener noreferrer", "gnrsapi.xyz",
+              style="color:#2f6fab;"), " \u00b7 ",
+            tags$a(href="https://gvsapi.xyz",  target="_blank", rel="noopener noreferrer", "gvsapi.xyz",
+              style="color:#2f6fab;"), " \u00b7 ",
+            tags$a(href="https://nsrapi.xyz",  target="_blank", rel="noopener noreferrer", "nsrapi.xyz",
+              style="color:#2f6fab;")
+          )
+        )
+      ) # /column
+    )   # /fluidRow
+  )     # /tabPanel Help
+
 )
 
 # ── Server ────────────────────────────────────────────────────────────────────
