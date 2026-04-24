@@ -1996,6 +1996,115 @@ server <- function(input, output, session) {
     })
   })
 
+  # ── Validation-complete modal (fires when all 4 services succeed) ─────────
+  observe({
+    t <- rv$tnrs_result; g <- rv$gnrs_result
+    v <- rv$gvs_result;  n <- rv$nsr_result
+    all_ran <- !is.null(t) && !is.null(g) && !is.null(v) && !is.null(n)
+    all_ok  <- all_ran &&
+      !"note" %in% names(t) &&
+      !"note" %in% names(g) &&
+      !"note" %in% names(v) &&
+      !"note" %in% names(n)
+    if (!all_ok) return()
+
+    showModal(modalDialog(
+      title = tags$span(
+        style = "color:#27ae60; font-size:1.25em; font-weight:700;",
+        "\u2713  BIEN Validation Complete"
+      ),
+
+      # ── Service checklist ──────────────────────────────────────────────────
+      tags$div(class = "bl-card bl-card-pass",
+        style = "margin-bottom:16px;",
+        tags$p(
+          style = "margin:0 0 10px 0; font-weight:600; color:#1a6640;",
+          "All four BIEN web services completed successfully:"
+        ),
+        tags$table(
+          style = "width:100%; border-collapse:collapse; font-size:0.9em;",
+          tags$tr(
+            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
+                    tags$strong("TNRS")),
+            tags$td(style="color:#555;",
+                    "Taxonomic Name Resolution Service — scientific names resolved against WCVP / WFO")
+          ),
+          tags$tr(
+            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
+                    tags$strong("GNRS")),
+            tags$td(style="color:#555;",
+                    "Geographic Name Resolution Service — country, state, and county names standardized")
+          ),
+          tags$tr(
+            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
+                    tags$strong("GVS")),
+            tags$td(style="color:#555;",
+                    "Geographic Validation Service — coordinate centroid precision issues flagged")
+          ),
+          tags$tr(
+            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
+                    tags$strong("NSR")),
+            tags$td(style="color:#555;",
+                    "Native Species Resolver — native, introduced, and cultivated status assigned per region")
+          )
+        )
+      ),
+
+      # ── Staging table ready ────────────────────────────────────────────────
+      tags$div(class = "bl-card bl-card-pass",
+        style = "margin-bottom:16px;",
+        tags$p(
+          style = "margin:0; font-weight:600; color:#1a6640;",
+          "BIEN Staging Table is built and ready to export."
+        )
+      ),
+
+      # ── Review reminder ────────────────────────────────────────────────────
+      tags$div(class = "bl-card bl-card-warn",
+        style = "margin-bottom:4px;",
+        tags$p(
+          style = "margin:0 0 6px 0; font-weight:600;",
+          "\u26a0\ufe0f  Before exporting, review each service\u2019s results tab:"
+        ),
+        tags$ul(
+          style = "margin:0; padding-left:20px; color:#555; font-size:0.9em;",
+          tags$li(
+            tags$strong("TNRS Results:"),
+            " check for ambiguous or low-confidence name matches that may require manual curation."
+          ),
+          tags$li(
+            tags$strong("NSR Results:"),
+            " native / introduced / cultivated interpretations are region-specific and should be ",
+            "reviewed in the context of your collection method and intended use."
+          )
+        )
+      ),
+
+      footer = tagList(
+        actionButton(
+          "modal_go_export",
+          label   = tags$span(
+            tags$strong("Go to Export (Tab 4)"),
+            style = "font-size:0.95em;"
+          ),
+          style   = paste(
+            "background-color:#2f6fab; color:#fff; border:none;",
+            "padding:8px 20px; border-radius:4px; cursor:pointer;"
+          )
+        ),
+        tags$span(style = "display:inline-block; width:8px;"),
+        modalButton("Close")
+      ),
+      easyClose = TRUE,
+      size      = "m"
+    ))
+  }) |> bindEvent(rv$nsr_result, ignoreNULL = TRUE, ignoreInit = TRUE)
+
+  observeEvent(input$modal_go_export, {
+    removeModal()
+    updateNavbarPage(session, "tabs", selected = "4 \u2022 Export")
+  })
+
   # ── Tab 4 gating ─────────────────────────────────────────────────────────
   output$tab4_gating <- renderUI({
     if (is.null(rv$staged)) {
