@@ -633,7 +633,7 @@ ui <- navbarPage(
               tags$strong(" Stage & Validate",
                 style = "font-size:0.97rem; color:#1a1a2e; margin-left:6px;"),
               tags$p(style = "margin:10px 0 0 0; font-size:0.88rem; line-height:1.6; color:#3a3a3a;",
-                "Builds DwC + BIEN staging tables, then runs four validation services:"),
+                "Builds Darwin Core (DwC) + BIEN staging tables, then runs four validation services:"),
               tags$ul(
                 style = "margin:6px 0 0 0; padding-left:18px; font-size:0.86rem; color:#3a3a3a; line-height:1.8;",
                 tags$li(tags$strong("TNRS"), " \u2014 Resolves/scrubs scientific names against WCVP + WFO"),
