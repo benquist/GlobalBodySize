@@ -905,3 +905,48 @@ Action taken:
 - Appended the requested prompt entry to agents/prompt_log.md with the provided date, commit reference, and summary.
 - Appended this provenance entry because this chat updated files under agents/ during final-gate compliance.
 Outcome: Agent-folder traceability remains append-only and current for the enquistlab-site-migration final gate.
+
+[26] Date: 2026-04-23
+Source: active chat request
+Request summary: Run the standard final gate checks for the enquistlab-site-migration repo after the Alumni redesign was pushed in commit 1cfb0c6, and record the prompt in the central log.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the requested prompt entry to agents/prompt_log.md with the provided date, commit reference, and summary.
+- Appended this provenance entry because this chat updated files under agents/ during final-gate compliance.
+Outcome: Agent-folder traceability remains append-only and current for the enquistlab-site-migration final gate.
+
+[27] Date: 2026-04-23
+Source: active chat request
+Request summary: Run the standard final gate checks for the enquistlab-site-migration repo after refining alumni Google Scholar link visibility in commit e9db3f9, and record the prompt in the central log.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the requested prompt entry to agents/prompt_log.md with the provided date, commit reference, and summary.
+- Appended this provenance entry because this chat updated files under agents/ during final-gate compliance.
+Outcome: Agent-folder traceability remains append-only and current for the enquistlab-site-migration final gate.
+
+[28] Date: 2026-04-23
+Source: active chat request
+Request summary: Run the standard final gate checks for the enquistlab-site-migration repo after syncing Cesar Hinojo Hinojo's updated Google Scholar link from the alumni source sheet in commit 1be355c.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the requested prompt entry to agents/prompt_log.md with date 2026-04-23, commit 1be355c context, and the requested summary.
+- Appended this provenance entry because this chat updated files under agents/ during final-gate compliance.
+Outcome: Agent-folder traceability remains append-only and current for this enquistlab-site-migration final gate.
+
+[5] Date: 2026-04-23
+Source: active chat request
+Request summary: Run the standard final gate for enquistlab-site-migration after verifying whether alumni duplicate names were removed from the deployed people page.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Verified the target repo is clean and at the same commit as upstream.
+- Confirmed there is no branch diff, so Rmd compile and R package build checks are not applicable for this gate.
+- Appended the matching prompt/provenance records required by workspace policy.
+Outcome: Final gate evidence for enquistlab-site-migration is recorded with prompt provenance and synced git state.

@@ -838,3 +838,47 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Daily automated pipeline that extracts DOIs from the synced Google Docs CV, fetches BibTeX via CrossRef, deduplicates by DOI, and appends new entries to papers.bib; workflow extended to run script and trigger Jekyll deploy on changes.
 - Files changed: enquistlab-site-migration/scripts/sync_publications_from_cv.py; enquistlab-site-migration/.github/workflows/sync-google-doc-cv.yml; enquistlab-site-migration/_bibliography/papers.bib; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-23
+- Prompt summary: Design recommendations for organizing Alumni section aesthetically instead of a long list
+- Requested outcomes: Assess the current Alumni section design in enquistlab-site-migration and provide implementation-ready design recommendations only, with no site code or content changes.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-23
+- Prompt summary: Redesign alumni section as grouped directory cards with cohort grouping
+- Requested outcomes: Run the standard final gate checks for enquistlab-site-migration after the People page Alumni redesign was completed and pushed in commit 1cfb0c6; confirm no Rmd or R package build checks are needed; verify git push status from the repo log.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (commit 1cfb0c6)
+
+- Date: 2026-04-23
+- Prompt summary: Refine alumni Google Scholar link visibility while preserving card design
+- Requested outcomes: Run the standard final gate checks for the enquistlab-site-migration repo after keeping alumni names linked to Google Scholar and making those links more visibly clickable while preserving the alumni card design; log the prompt in agents/prompt_log.md with date 2026-04-23, commit e9db3f9, and this summary; skip Rmd compile and R package build checks because no such files changed; confirm git push with git -C /Users/brianjenquist/VSCode/enquistlab-site-migration log --oneline -2.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot (commit e9db3f9)
+
+- Date: 2026-04-23
+- Prompt summary: Sync Cesar Hinojo Hinojo alumni Google Scholar link from sheet
+- Requested outcomes: Log this prompt with date 2026-04-23 and commit 1be355c; run the standard final gate checks for enquistlab-site-migration; skip Rmd compile because no .Rmd files changed; skip R package build because no package files changed; confirm git push with `git -C /Users/brianjenquist/VSCode/enquistlab-site-migration log --oneline -2`.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-23
+- Prompt summary: Run the standard final gate for enquistlab-site-migration after verifying alumni duplicate-name behavior on the people page.
+- Requested outcomes: Ensure this prompt is recorded, treat Rmd/package checks as not applicable because no repo files changed, and confirm enquistlab-site-migration is synced with origin/main at HEAD 1be355c.
+- Files changed: agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-23
+- Prompt summary: Investigate why the live Enquist Lab People page still shows duplicate alumni names even though the repo source is fixed.
+- Requested outcomes: Perform a read-only deployment-path investigation in enquistlab-site-migration; distinguish verified facts from assumptions; assess likely root cause; check GitHub Pages and Actions deployment paths, generated artifacts, and branch/source mismatch; recommend the smallest reliable next step.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+2026-04-23 | Review enquistlab.github.io for accessibility and scientific impact improvements. Coordinated design-atelier and biodiversity-science-guard agents.
+
+2026-04-23 | Implemented accessibility and scientific accuracy improvements to enquistlab-site-migration/ site: skip link, focus indicators, hero scrim, card img elements, stats labels, color-mix fallbacks, nav rename, join page fix, BIEN accuracy, Hannah/Pillet fixes.
+
+2026-04-24 | Review BIEN Data Loader AWS IP block issue; produced 3 creative automated relay plans (Render.com Plumber, GitHub Actions queue, Cloudflare Workers). Research/planning task only — no code or files changed.
+
+2026-04-24 | Plan 3 Cloudflare Workers proxy for BIEN Data Loader: created 8 CF Worker files (tnrs/gnrs/gvs/nsr index.js + wrangler.toml), fixed BUG C1 (GVS hand-rolled JSON), fixed BUG C2 (GNRS country-only writeback), added 4 CF URL constants to app.R, replaced 4 hardcoded API URLs with constants, changed connecttimeout from 60 to 10.

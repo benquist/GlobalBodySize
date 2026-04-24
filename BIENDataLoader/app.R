@@ -3,6 +3,17 @@ library(DT)
 library(httr)
 library(jsonlite)
 
+# ── Cloudflare Worker relay URLs (replace YOUR_SUBDOMAIN with your workers.dev account name) ──
+TNRS_URL <- "https://bien-relay-tnrs.YOUR_SUBDOMAIN.workers.dev"
+GNRS_URL <- "https://bien-relay-gnrs.YOUR_SUBDOMAIN.workers.dev"
+GVS_URL  <- "https://bien-relay-gvs.YOUR_SUBDOMAIN.workers.dev"
+NSR_URL  <- "https://bien-relay-nsr.YOUR_SUBDOMAIN.workers.dev"
+
+if (any(grepl("YOUR_SUBDOMAIN", c(TNRS_URL, GNRS_URL, GVS_URL, NSR_URL)))) {
+  warning("[BIEN Data Loader] CF Worker URLs still contain 'YOUR_SUBDOMAIN' placeholder. ",
+          "Edit the *_URL constants at the top of app.R before deploying.")
+}
+
 # ── Static field lists ────────────────────────────────────────────────────────
 
 BIEN_STAGING_FIELDS <- c(
@@ -835,10 +846,10 @@ server <- function(input, output, session) {
           auto_unbox = TRUE
         )
         resp <- httr::POST(
-          "https://tnrsapi.xyz/tnrs_api.php",
+          TNRS_URL,
           body = tnrs_body,
           httr::content_type("application/json"),
-          httr::config(connecttimeout = 60),
+          httr::config(connecttimeout = 10),
           httr::timeout(120)
         )
         setProgress(0.8)
@@ -968,10 +979,10 @@ server <- function(input, output, session) {
           auto_unbox = TRUE
         )
         resp <- httr::POST(
-          "https://gnrsapi.xyz/gnrs_api.php",
+          GNRS_URL,
           body = gnrs_body,
           httr::content_type("application/json"),
-          httr::config(connecttimeout = 60),
+          httr::config(connecttimeout = 10),
           httr::timeout(120)
         )
         setProgress(0.8)
@@ -1015,12 +1026,14 @@ server <- function(input, output, session) {
         coun_col  <- intersect(c("County_matched",    "county_matched",    "county"),    names(gnrs))[1]
         sub_cty   <- intersect(c("country"),   names(gnrs))[1]
         sub_state <- intersect(c("stateProvince"), names(gnrs))[1]
-        if (!is.na(cty_col) && !is.na(sub_cty)) {
+        if (!is.na(cty_col) && !is.na(sub_cty) && !is.na(sub_state)) {
           for (i in seq_len(nrow(gnrs))) {
-            rows <- which(
-              trimws(stg$country)        == trimws(gnrs[[sub_cty]][i]) &
-              (!is.na(stg$state_province) & trimws(stg$state_province) == trimws(gnrs[[sub_state]][i]))
-            )
+            cty_match   <- trimws(stg$country) == trimws(gnrs[[sub_cty]][i])
+            state_submitted <- trimws(gnrs[[sub_state]][i])
+            state_match <- is.na(stg$state_province) | trimws(stg$state_province) == "" |
+                           state_submitted == "" |
+                           trimws(stg$state_province) == state_submitted
+            rows <- which(cty_match & state_match)
             if (length(rows) == 0) next
             if (!is.na(cty_col)   && !is.na(gnrs[[cty_col]][i])   && nzchar(gnrs[[cty_col]][i]))   stg$country[rows]        <- gnrs[[cty_col]][i]
             if (!is.na(state_col) && !is.na(gnrs[[state_col]][i]) && nzchar(gnrs[[state_col]][i])) stg$state_province[rows] <- gnrs[[state_col]][i]
@@ -1076,22 +1089,23 @@ server <- function(input, output, session) {
         stringsAsFactors=FALSE)
       return()
     }
-    # GVS expects an unkeyed 2-column matrix [[lat,lon],[lat,lon],...]
+    # GVS expects an unkeyed 2-column matrix [[lat,lon],[lat,lon],...] with numeric values
     gvs_data <- lapply(seq_len(nrow(coord_tbl)), function(i)
-      c(trimws(coord_tbl$latitude[i]), trimws(coord_tbl$longitude[i])))
+      c(as.numeric(trimws(coord_tbl$latitude[i])), as.numeric(trimws(coord_tbl$longitude[i]))))
 
     withProgress(message="Submitting to GVS\u2026", value=0.2, {
       err_msg <- NULL
       result <- tryCatch({
-        opts_json <- '{"mode":"resolve"}'
-        data_json <- jsonlite::toJSON(gvs_data, auto_unbox=TRUE)
-        gvs_body  <- paste0('{"opts":', opts_json, ',"data":', data_json, '}')
+        gvs_body <- jsonlite::toJSON(
+          list(opts = list(mode = "resolve"), data = gvs_data),
+          auto_unbox = TRUE
+        )
         resp <- httr::POST(
-          "https://gvsapi.xyz/gvs_api.php",
+          GVS_URL,
           body = gvs_body,
           httr::content_type("application/json"),
           httr::add_headers(Accept="application/json", charset="UTF-8"),
-          httr::config(connecttimeout=60),
+          httr::config(connecttimeout=10),
           httr::timeout(120)
         )
         setProgress(0.8)
@@ -1271,11 +1285,11 @@ server <- function(input, output, session) {
           auto_unbox=TRUE
         )
         resp <- httr::POST(
-          "https://nsrapi.xyz/nsr_wsb.php",
+          NSR_URL,
           body = nsr_body,
           httr::content_type("application/json"),
           httr::add_headers(Accept="application/json", charset="UTF-8"),
-          httr::config(connecttimeout=60),
+          httr::config(connecttimeout=10),
           httr::timeout(120)
         )
         setProgress(0.8)

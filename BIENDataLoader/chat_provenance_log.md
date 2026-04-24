@@ -1,5 +1,23 @@
 # BIENDataLoader Chat Provenance Log
 
+## 2026-04-24 — Plan 3 Cloudflare Workers relay: bug fixes + CF proxy implementation
+
+**Prompt:** @M review BIEN Data Loader AWS IP block issue and implement Plan 3 — four CF Workers + 4 URL constant changes in app.R + fixes for two CRITICAL bugs (C1 GVS JSON, C2 GNRS writeback).
+
+**Summary:**
+- Root cause confirmed by code-checker: shinyapps.io/AWS IPs are blocked at TCP level by tnrsapi.xyz/gnrsapi.xyz etc. Not a code bug — a firewall rule on the API server side. Solution: Cloudflare Workers relay (Plan 3) routes all 4 API calls through CF's non-AWS IP space.
+- **8 CF Worker files created** in `BIENDataLoader/cf-workers/{tnrs,gnrs,gvs,nsr}/`: `index.js` + `wrangler.toml` per service. Workers forward raw `arrayBuffer` POST bodies verbatim to upstream BIEN APIs; return raw upstream responses with CORS headers. Try/catch wraps upstream fetch → 502 on outage. OPTIONS preflight handled.
+- **BUG C1 fixed**: GVS body construction replaced hand-rolled `paste0('{"opts":...}')` with `jsonlite::toJSON(list(opts=..., data=...), auto_unbox=TRUE)` — eliminates malformed JSON risk.
+- **BUG C2 fixed**: GNRS writeback now matches country-only records. Previous `&` join required both country AND state to match; records with `NA` state_province were silently dropped. New `state_match` logic accepts rows where either side is blank/NA.
+- **GVS coords fixed**: `as.numeric(trimws(...))` instead of `c(trimws(...), trimws(...))` — GVS API expects numeric coordinates, not quoted strings.
+- **4 URL constants** added to top of `app.R` (TNRS_URL, GNRS_URL, GVS_URL, NSR_URL) with placeholder validation `warning()` if `YOUR_SUBDOMAIN` not yet replaced.
+- **connecttimeout** reduced from 60→10s in all 4 POST calls (TCP connection either completes in ms or is blocked; 60s just made users wait longer for the same failure).
+- code-checker: initially FAIL (4 warnings found). All 4 resolved. code-verifier: **APPROVED**.
+
+**Next step for user:** Run `wrangler login` then `wrangler deploy` in each of the 4 cf-workers subdirectories, then replace `YOUR_SUBDOMAIN` in the 4 URL constants at the top of `app.R` with the actual workers.dev account subdomain shown by Wrangler, then redeploy to shinyapps.io.
+
+---
+
 ## 2026-04-22 — Initial build
 
 **Prompt:** User scrapped LoadingHistoricalObservationDataIntoBIEN as too slow/hung. Requested a new lighter Shiny app from scratch.
