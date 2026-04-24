@@ -1,3 +1,15 @@
+2026-04-24 | papers.bib: added Vasseur et al. 2025 (From organism traits to ecosystem processes) — missing bib entry was preventing Metabolic Scaling tab classification.
+
+2026-04-24 | publications.md: added Metabolic Scaling matchers for Vasseur 2025, Cruz 2025, Enquist 2024, Castorena 2022, Brummer 2021. conservation-impacts.md: added Krieger et al. 2022. research.md: linked Gallagher et al. 2020.
+
+2026-04-25 | BIENDataLoader/app.R layout reorder: move page-header (logo+title+subtitle) above the blue navbar tab bar using jQuery DOM detach/reinsert on document.ready; hide navbar brand text (title repeated in header); improve tab link padding/font; remove body padding and page-header negative-margin hacks. Syntax OK, committed eefa203, pushed, deployed bundle 11902299 to benquist.shinyapps.io/bien-data-loader/.
+
+2026-04-25 | BIENDataLoader/app.R body+header parity fix: replace 3-layer radial-gradient body background with simple linear-gradient matching BIEN Traits (#f7fbff→#fbfef9); add body padding:20px 0; set .page-header h1 to font-size:2em/weight:700; .page-header p to font-size:1.05em/line-height:1.4; add mobile breakpoint rules for logo and h1. Syntax checked, committed af781d6, pushed, deployed to benquist.shinyapps.io/bien-data-loader/.
+
+2026-04-24 | BIENDataLoader/app.R header parity request: match BIEN-TraitsShinyApp header styling exactly (color scheme, logo size, typography), remove divergent header font overrides, keep non-header/server logic unchanged, and run parse(file='app.R').
+
+2026-04-24 | BIENDataLoader/app.R UI branding alignment: replace navbar title branding container with plain text title, add dedicated page-header block with BIEN logo + h1/subtitle, and update CSS to BIEN Traits header sizing/typography (.bien-logo 62px, .bien-header-brand gap 16px, mobile .bien-logo 44px and h1 1.35em). Keep server/non-UI behavior unchanged and run parse(file='app.R') syntax check.
+
 2026-04-24 | BIENDataLoader UI-only style refresh: add BIEN logo asset under BIENDataLoader/www, replace navbar title text with logo+title+subtitle branding container, and update only the existing CSS style block to BIEN palette/gradient navbar/active tab/card/button/focus/mobile styles. Explicitly no server/reactive/API/data/pipeline logic changes.
 
 2026-04-24 | BIEN-SpeciesShinyApp app.R: (1) Fixed matched_status classification in build_reconciliation_table() — added has_real_error() helper, set query_has_error, updated case_when to matched/error/no_records. (2) Removed all ingest helper functions (get_dwc_aliases, get_bien_reference_fields, lookup_alias_term, build_column_mapping, suggest_merge_key, standardize_table_columns, merge_standardized_tables, augment_tnrs_and_coordinates, build_staging_table). Syntax OK confirmed.
@@ -958,3 +970,5 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Deliver prioritized P0/P1/P2 recommendations; list exact BIENDataLoader/app.R UI/CSS touchpoints; define safe-change boundaries (no data/service/performance logic changes); propose compact style tokens mirroring Species palette; specify left-aligned BIEN logo placement in navbarPage; include accessibility and responsive checks per recommendation; no code edits.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+2026-04-24 | papers.bib: added 5 missing entries — Cruz 2025, Enquist scaling 2024, Castorena 2022, Brummer 2021, Enquist megabiota 2020 — so Metabolic Scaling tab matchers can now find them.
