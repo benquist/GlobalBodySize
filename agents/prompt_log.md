@@ -26,6 +26,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 2026-04-25 | BIENDataLoader: Fix staging table — align BIEN_STAGING_FIELDS to BIEN DB view_full_occurrence_individual (sourced from BIEN R package); add complete GVS writeback (is_centroid via lat/lon join + centroid flag aggregation); replace NSR writeback (3-key join species+country+state_province, 7 BIEN DB fields, defensive stateProvince fallback). Commit 48f7601, pushed, deployed.
 
+2026-04-24 | BIEN-SpeciesShinyApp optimizer audit. Reviewed app.R (~5100 lines) for query speed, network round-trips, and Shiny reactivity. Identified H1: load_accepted_species_suggestions() per-session DB scan (fix: process-level cache); H2: renderLeaflet full re-render on map_color_by change (fix: leafletProxy); H3: categorize_observation_records() called 2-3x per pipeline (fix: column-presence guard); M1: drop_empty_rows() row-wise apply() (fix: column-wise vapply); M2: vapply date parse (fix: vectorize with substr); M3: prepare_trait_visual_data group_modify (fix: summarise+join); M4: get_bien_reference_fields() live API on each ingest (fix: memoize); M5: AsianPlant readLines blocking render (fix: pre-warm async). Confirmed Cloudflare Worker relay does NOT apply (raw TCP/PostgreSQL cannot be proxied through Workers). Top 5 ROI: H1 > H2 > H3 > M2 > M1. Analysis only, no files changed.
+
 2026-04-23 | BIENDataLoader: Fix silent TNRS/GNRS/GVS/NSR button failures — replaced req(rv$staged) with explicit showNotification error guard in all 4 web service observers. Also raised TNRS/GNRS connecttimeout 15s→30s, total timeout 25s→60s. Commits 96c7a9e + c9083db, deployed.
 
 2026-04-23 | BIENDataLoader: Add upload-back CSV fileInput widgets + observeEvent handlers for all 4 web services (TNRS, GNRS, GVS, NSR). Enables full pipeline from shinyapps.io via download-script → run locally → upload CSV → writeback. Commit f4d8d2b, deployed.
@@ -519,6 +521,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: enquistlab-site-migration/_pages/publications.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-24
+- Prompt summary: Add concise per-service guidance text in BIENDataLoader Step 3 (Stage & Validate) under TNRS, GNRS, GVS, and NSR controls.
+- Requested outcomes: Keep existing control order/style; add small explanatory paragraph below each service upload/status controls; run parse check on BIENDataLoader/app.R.
+- Files changed: BIENDataLoader/app.R; BIENDataLoader/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: Publications titles are not clickable; retry so each paper title uses the Google Doc's embedded hyperlink.
 - Requested outcomes: Regenerate publications content from the shared Google Doc preserving embedded anchors, and update publications page behavior to keep full-list search/filter working.
@@ -898,5 +906,23 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-04-24
 - Prompt summary: Approve parenthetical multi-file upload instruction wording refinement.
 - Requested outcomes: Update upload helper text to concise parenthetical format for faster scanning (macOS Command-click, Windows/Linux Ctrl-click), keep behavior unchanged, and redeploy.
+- Files changed: BIENDataLoader/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Review BIEN Species Shiny App (https://benquist.shinyapps.io/bien-species-shinyapp/) — analyze use cases, problems solved, and ecological insights using ecology-user and biodiversity-science-guard agents.
+- Requested outcomes: Structured analysis of app purpose, primary use cases (8 identified), ecological insights, 6 expansion opportunities, and biodiversity-science-guard critical/likely issues with validation plan. No code changes.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Update BIENDataLoader Tab 3 yellow BIEN Web Services card to make BIEN schema-mapping requirement explicit.
+- Requested outcomes: Rename heading to required framing; replace guidance copy to require sequential TNRS -> GNRS -> GVS -> NSR before final BIEN staging export; keep existing download/action buttons; retain cloud-timeout context without optional framing; run parse check.
+- Files changed: BIENDataLoader/app.R; BIENDataLoader/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Clarify Tab 3 BIEN Web Services are required (not optional) for BIEN schema mapping.
+- Requested outcomes: Update Tab 3 wording to clearly require sequential TNRS -> GNRS -> GVS -> NSR workflow before BIEN staging export.
 - Files changed: BIENDataLoader/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
