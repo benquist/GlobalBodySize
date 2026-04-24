@@ -894,3 +894,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Clarify DWC acronym in the UI (DWC = Darwin Core) and add explicit instructions next to "Upload CSV file(s)" explaining how to select multiple files (Command on macOS, Ctrl on Windows/Linux).
 - Files changed: BIENDataLoader/app.R; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Approve parenthetical multi-file upload instruction wording refinement.
+- Requested outcomes: Update upload helper text to concise parenthetical format for faster scanning (macOS Command-click, Windows/Linux Ctrl-click), keep behavior unchanged, and redeploy.
+- Files changed: BIENDataLoader/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot

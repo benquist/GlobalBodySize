@@ -334,8 +334,7 @@ ui <- navbarPage(
                         placeholder="Select one or more .csv files"),
               tags$small(
                 style="display:block; margin-top:-6px; margin-bottom:6px; color:#555;",
-                "To select multiple files: hold ", tags$strong("Command"),
-                " on macOS or ", tags$strong("Ctrl"), " on Windows/Linux while clicking files."
+                "To select multiple files: macOS (Command-click), Windows/Linux (Ctrl-click)."
               ),
               tags$small(
                 tags$a(href="#", onclick="$(\"[data-value='? \\u2022 Help']\").tab('show'); return false;",
