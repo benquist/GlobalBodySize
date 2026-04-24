@@ -1,5 +1,17 @@
 # BIENDataLoader Chat Provenance Log
 
+## 2026-04-24 — UI-only BIEN branding refresh (no server logic changes)
+
+**Prompt:** Implement a UI-only style update in BIENDataLoader/app.R and add BIEN logo asset for navbar branding, with strict constraint to avoid any server/reactive/API/data/pipeline/performance logic edits.
+
+**Summary:**
+- Added static BIEN logo asset at `BIENDataLoader/www/bien.png` (copied from `BIEN-TraitsShinyApp/www/bien.png`).
+- Updated `navbarPage(...)` title branding in `app.R` from plain text to a left-aligned brand container with logo image, app title, and short subtitle; kept `id = "tabs"` unchanged.
+- Reworked only the existing `tags$style(HTML("..."))` CSS block with BIEN palette variables, BIEN-like body gradient, gradient navbar + active-tab state, enhanced `.bl-card` styling, preserved `.bl-card-warn/.bl-card-block/.bl-card-pass`, BIEN gradient skins for `.btn-primary/.btn-success`, keyboard-visible focus styles, and mobile brand/logo responsiveness.
+- No server logic, reactives, API endpoints, data functions, validation/mapping logic, or performance code was changed.
+
+---
+
 ## 2026-04-24 — Plan 3 Cloudflare Workers relay: bug fixes + CF proxy implementation
 
 **Prompt:** @M review BIEN Data Loader AWS IP block issue and implement Plan 3 — four CF Workers + 4 URL constant changes in app.R + fixes for two CRITICAL bugs (C1 GVS JSON, C2 GNRS writeback).
@@ -239,3 +251,32 @@
 
 **Commit:** f4d8d2b
 **Deployed:** https://benquist.shinyapps.io/bien-data-loader/
+
+---
+
+## 2026-04-24 — Step 3 service guidance copy under TNRS/GNRS/GVS/NSR controls
+
+**Prompt:** Add short, practical user guidance under each BIEN web service block in Tab 3 (Stage & Validate), keeping current control ordering and style.
+
+**Summary:** Added four small `tags$p` guidance lines directly below each service's upload/status controls in the yellow "Optional: BIEN Web Services" card:
+- TNRS: accepted-name matching (WCVP/WFO), spelling/authorship standardization, scrubbed taxonomy fields
+- GNRS: country/state/county standardization and misspelling/inconsistency checks
+- GVS: centroid-flag QA for coordinate precision (non-destructive)
+- NSR: native/introduced/cultivated status estimation by taxon + region for downstream filtering
+
+**Validation:** `Rscript -e "parse(file='app.R'); cat('SYNTAX OK\\n')"` returned `SYNTAX OK`.
+
+---
+
+## 2026-04-24 — Tab 3 BIEN Web Services card requirement wording update
+
+**Prompt:** In BIENDataLoader Tab 3 yellow BIEN Web Services card, remove optional framing and make requirement explicit for BIEN schema mapping.
+
+**Summary:** Updated only the heading and guidance text in the existing yellow card:
+- Heading changed from "Optional: BIEN Web Services" to "BIEN Web Services (Required for BIEN Schema Mapping)"
+- Guidance now explicitly requires sequential execution for BIEN-schema-ready outputs: TNRS -> GNRS -> GVS -> NSR
+- Guidance now states these steps populate/standardize BIEN fields and should be completed before final export to the BIEN staging table
+- Cloud-timeout context retained and reworded without optional framing
+- Existing download buttons, in-app action buttons, upload inputs, and status outputs kept unchanged
+
+**Validation:** `Rscript -e "parse(file='app.R'); cat('SYNTAX OK\\n')"` returned `SYNTAX OK`.

@@ -1,3 +1,10 @@
+2026-04-24 | BIENDataLoader UI-only style refresh: add BIEN logo asset under BIENDataLoader/www, replace navbar title text with logo+title+subtitle branding container, and update only the existing CSS style block to BIEN palette/gradient navbar/active tab/card/button/focus/mobile styles. Explicitly no server/reactive/API/data/pipeline logic changes.
+
+2026-04-24 | BIEN-SpeciesShinyApp app.R: (1) Fixed matched_status classification in build_reconciliation_table() — added has_real_error() helper, set query_has_error, updated case_when to matched/error/no_records. (2) Removed all ingest helper functions (get_dwc_aliases, get_bien_reference_fields, lookup_alias_term, build_column_mapping, suggest_merge_key, standardize_table_columns, merge_standardized_tables, augment_tnrs_and_coordinates, build_staging_table). Syntax OK confirmed.
+2026-04-24 | BIENDataLoader design-only request: propose look-and-feel updates to align with BIEN Species app style; place BIEN logo on the left; mirror blue/green BIEN palette; recommend changes first; explicitly avoid core code and performance-impacting logic changes.
+2026-04-24 | BIENDataLoader app.R: Fixed modal re-fire bug. Added completion_modal_shown reactive flag to reactiveValues; guarded modal observe() with one-shot latch (if rv$completion_modal_shown || !all_done return()); set flag TRUE before showModal(); reset flag FALSE when service results are cleared on re-upload. code-verifier APPROVED.
+2026-04-24 | BIENDataLoader modal review request: Assess completion-modal wording after TNRS/GNRS/GVS/NSR succeed, focusing on scientific caveats, review completeness (including GNRS/GVS), staging/export readiness language, and scrubbed fields/schema references.
+2026-04-24 | BIENDataLoader app.R: Designed and implemented BIEN Validation Complete modal dialog. Added observe() triggered by rv$nsr_result (bindEvent) that fires showModal() when all 4 services (TNRS/GNRS/GVS/NSR) have non-error results. Modal includes green service checklist, staging-table-ready confirmation, amber review-before-export reminder (TNRS ambiguous matches, NSR native/introduced), and a "Go to Export (Tab 4)" actionButton backed by observeEvent calling removeModal + updateNavbarPage. No new CSS required.
 - Date: 2026-04-21
 - Prompt summary: Consult design-atelier for full photo-forward redesign of Enquist Lab website
 - Requested outcomes: Hero image on homepage, editorial field photos per site, Scandinavian-minimal CSS components, WordPress CDN image sourcing
@@ -8,6 +15,7 @@
 2026-04-22 | Performance audit of LoadingHistoricalObservationDataIntoBIEN pipeline (app.R, R/dwc_mapping.R, R/multi_file_merge.R, R/bien_pipeline_helpers.R). Identified and fixed 5 bottlenecks: (H1) cached load_header_synonyms CSV read; (H2) cached alias normalization in suggest_bien_field; (H3) batched TNRS HTTP requests with sequential fallback; (M1) vectorized find_duplicate_metadata_conflicts with pre-split indices; (M2) vectorized apply_dwc_mapping column assignment; (M3) capped join_conflicts_table display at 200 rows.
 2026-04-23 | BIENDataLoader app.R: Added upload-back CSV fileInput widgets (upload_tnrs, upload_gnrs, upload_gvs, upload_nsr) after each "Try in app" button in the Tab 3 web services card. Added 4 corresponding observeEvent server handlers that read uploaded CSVs, set rv$<service>_result, run the same writeback logic as the in-app buttons, and show notifications.
 2026-04-24 | BIENDataLoader app.R: Root-cause diagnosis (via @M + code-checker) of TNRS "15001 ms" timeout. Commit f655323 had reduced connecttimeout from 60→15s; self-hosted APIs need ≥60s for TCP connect from AWS. Restored connecttimeout=60, timeout=120 for all 4 services (TNRS/GNRS/GVS/NSR) to match confirmed-working commit 97f0414. Committed 00a4fc2, deployed to benquist.shinyapps.io/bien-data-loader.
+2026-04-24 | BIEN-SpeciesShinyApp/app.R: Applied 6 bug fixes — (C1) removed dead fast-pick block in find_lucky_species_with_mappable_points(); (C2) fixed broken year regex (quadruple→single backslash escapes); (W8) HTML-escaped res$species, family_name, res$occ_strategy in HTML() info block; (W9) replaced O(N²) vector-grow loop with pre-allocated buffer in sample_occurrence_rows(); (W6) added on.exit(unlink()) cleanup in has_verified_range(); (W5) tightened ORDER BY random() guard to limit > 500 && limit <= 10000.
 
 # Prompt Log
 
@@ -45,6 +53,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Apply targeted fixes from code-checker review in LoadingHistoricalObservationDataIntoBIEN.
 - Requested outcomes: Align Help copy with current stage labels and conservative BIEN service messaging; update README worked example; enforce join-blocker gating in key download handlers; fix coordinate-ready count logic; improve small-screen persistent Help button responsiveness; run smoke checks.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/tests/smoke_join_blocker_service_state.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Implement targeted BIEN-SpeciesShinyApp app.R changes for random-species responsiveness, post-query non-blocking behavior, and ingest tab/handler removal.
+- Requested outcomes: Add guaranteed starter-pool fast fallback in find_lucky_species_with_mappable_points; remove taxonomy_species_exists blocking lookup from zero-mappable notification gate; remove Ingest to BIEN tab and active ingest server handlers/outputs; keep unrelated logic unchanged; verify app.R parse.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; BIEN-SpeciesShinyApp/chat_provenance_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-03-28
@@ -509,6 +523,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Files changed: none (diagnostic-only turn)
 - Completed by: GitHub Copilot
 
+- Date: 2026-04-24
+- Prompt summary: Edit BIEN-SpeciesShinyApp app.R with two targeted changes.
+- Requested outcomes: Make random species starter-pool selection immediate by returning a fast random pick without precheck loop; remove leftover run_ingest_workflow function block; parse-check app.R syntax.
+- Files changed: BIEN-SpeciesShinyApp/app.R; BIEN-SpeciesShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-21
 - Prompt summary: Fix publications page bug where complete list rendered as one long text string by markdownifying included publication content.
 - Requested outcomes: Append prompt log entry, verify git push status for site repo commit 1e3ec2f, and run standard always-agent final gate PASS/FAIL.
@@ -925,4 +945,16 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Clarify Tab 3 BIEN Web Services are required (not optional) for BIEN schema mapping.
 - Requested outcomes: Update Tab 3 wording to clearly require sequential TNRS -> GNRS -> GVS -> NSR workflow before BIEN staging export.
 - Files changed: BIENDataLoader/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Edit BIEN-SpeciesShinyApp/app.R to fix lucky verification wording, neutralize zero-mappable taxonomy text, and remove dead taxonomy cache/helper.
+- Requested outcomes: Make lucky notification conditional on precheck state; replace zero-mappable message opener with neutral wording; delete taxonomy_presence_cache and taxonomy_species_exists; run app.R parse check.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; BIEN-SpeciesShinyApp/chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Provide a design-only recommendation plan for BIENDataLoader/app.R to align visual style with BIEN-SpeciesShinyApp/app.R.
+- Requested outcomes: Deliver prioritized P0/P1/P2 recommendations; list exact BIENDataLoader/app.R UI/CSS touchpoints; define safe-change boundaries (no data/service/performance logic changes); propose compact style tokens mirroring Species palette; specify left-aligned BIEN logo placement in navbarPage; include accessibility and responsive checks per recommendation; no code edits.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
