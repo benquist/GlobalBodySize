@@ -4,10 +4,10 @@ library(httr)
 library(jsonlite)
 
 # ── Cloudflare Worker relay URLs (replace YOUR_SUBDOMAIN with your workers.dev account name) ──
-TNRS_URL <- "https://bien-relay-tnrs.YOUR_SUBDOMAIN.workers.dev"
-GNRS_URL <- "https://bien-relay-gnrs.YOUR_SUBDOMAIN.workers.dev"
-GVS_URL  <- "https://bien-relay-gvs.YOUR_SUBDOMAIN.workers.dev"
-NSR_URL  <- "https://bien-relay-nsr.YOUR_SUBDOMAIN.workers.dev"
+TNRS_URL <- "https://bien-relay-tnrs.benquist.workers.dev"
+GNRS_URL <- "https://bien-relay-gnrs.benquist.workers.dev"
+GVS_URL  <- "https://bien-relay-gvs.benquist.workers.dev"
+NSR_URL  <- "https://bien-relay-nsr.benquist.workers.dev"
 
 if (any(grepl("YOUR_SUBDOMAIN", c(TNRS_URL, GNRS_URL, GVS_URL, NSR_URL)))) {
   warning("[BIEN Data Loader] CF Worker URLs still contain 'YOUR_SUBDOMAIN' placeholder. ",
