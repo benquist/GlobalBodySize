@@ -254,15 +254,7 @@ run_qc <- function(staged) {
 # ── UI ────────────────────────────────────────────────────────────────────────
 
 ui <- navbarPage(
-  title = tags$div(
-    class = "bl-brand",
-    tags$img(src = "bien.png", class = "bl-logo", alt = "BIEN logo"),
-    tags$div(
-      class = "bl-brand-text",
-      tags$span(class = "bl-brand-title", "BIEN Data Loader"),
-      tags$span(class = "bl-brand-subtitle", "Upload, validate, and export BIEN-ready records")
-    )
-  ),
+  title = "BIEN Data Loader",
   id    = "tabs",
   header = tagList(
     tags$head(
@@ -279,13 +271,10 @@ ui <- navbarPage(
         }
 
         body {
+          padding: 20px 0;
           font-family: 'Segoe UI', Arial, sans-serif;
           color: var(--text-ink);
-          background:
-            radial-gradient(1200px 420px at 15% -5%, rgba(233, 244, 255, 0.85), rgba(233, 244, 255, 0) 60%),
-            radial-gradient(1100px 380px at 90% 0%, rgba(238, 249, 232, 0.8), rgba(238, 249, 232, 0) 62%),
-            linear-gradient(180deg, #f8fcff 0%, #ffffff 42%, #f7fbff 100%);
-          min-height: 100vh;
+          background: linear-gradient(180deg, #f7fbff 0%, #fbfef9 100%);
         }
 
         .navbar {
@@ -298,34 +287,38 @@ ui <- navbarPage(
           padding-top: 7px;
           padding-bottom: 7px;
         }
-        .bl-brand {
+        .page-header {
+          padding: 20px;
+          background: linear-gradient(180deg, #ffffff 0%, #f2f9ff 100%);
+          border-bottom: 1px solid var(--panel-border);
+          margin: -20px 0 20px 0;
+          box-shadow: 0 3px 12px rgba(31, 91, 143, 0.08);
+        }
+        .bien-header-brand {
           display: flex;
           align-items: center;
-          gap: 10px;
-          min-height: 36px;
+          gap: 16px;
+          flex-wrap: wrap;
         }
-        .bl-logo {
-          height: 32px;
+        .bien-logo {
+          height: 62px;
           width: auto;
-          display: block;
-          flex-shrink: 0;
+          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
         }
-        .bl-brand-text {
-          display: flex;
-          flex-direction: column;
-          line-height: 1.06;
-        }
-        .bl-brand-title {
-          color: #ffffff;
-          font-size: 1.02em;
+        .page-header h1 {
+          color: var(--bien-blue-deep);
+          font-size: 2em;
           font-weight: 700;
-          letter-spacing: 0.01em;
+          line-height: 1.2;
+          margin-top: 0;
+          margin-bottom: 8px;
         }
-        .bl-brand-subtitle {
-          color: rgba(255, 255, 255, 0.88);
-          font-size: 0.74em;
-          font-weight: 500;
-          margin-top: 1px;
+        .page-header p {
+          color: #426988;
+          font-size: 1.05em;
+          line-height: 1.4;
+          margin-bottom: 0;
+          max-width: 920px;
         }
         .navbar-brand, .navbar-nav > li > a {
           color: #ffffff !important;
@@ -429,15 +422,8 @@ ui <- navbarPage(
             max-width: calc(100vw - 92px);
             overflow: hidden;
           }
-          .bl-logo {
-            height: 28px;
-          }
-          .bl-brand-title {
-            font-size: 0.95em;
-          }
-          .bl-brand-subtitle {
-            display: none;
-          }
+          .bien-logo { height: 44px; }
+          .page-header h1 { font-size: 1.4em; }
         }
       ")),
       tags$script(HTML("
@@ -446,6 +432,15 @@ ui <- navbarPage(
           if (ov) ov.style.display = 'none';
         });
       "))
+    ),
+    tags$div(class = "page-header",
+      tags$div(class = "bien-header-brand",
+        tags$img(src="bien.png", alt="BIEN logo", class="bien-logo"),
+        tags$div(
+          tags$h1("BIEN Data Loader"),
+          tags$p("Upload, validate, and export BIEN-ready records")
+        )
+      )
     ),
     tags$div(id="cold-overlay",
       tags$div(class="cold-spin"),
