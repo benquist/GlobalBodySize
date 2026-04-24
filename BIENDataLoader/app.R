@@ -254,7 +254,7 @@ run_qc <- function(staged) {
 # ── UI ────────────────────────────────────────────────────────────────────────
 
 ui <- navbarPage(
-  title = "BIEN Data Loader",
+  title = tags$span(class="navbar-brand-hidden"),
   id    = "tabs",
   header = tagList(
     tags$head(
@@ -271,7 +271,7 @@ ui <- navbarPage(
         }
 
         body {
-          padding: 20px 0;
+          padding: 0;
           font-family: 'Segoe UI', Arial, sans-serif;
           color: var(--text-ink);
           background: linear-gradient(180deg, #f7fbff 0%, #fbfef9 100%);
@@ -282,17 +282,35 @@ ui <- navbarPage(
           border-color: #1a4a72 !important;
           box-shadow: 0 2px 12px rgba(22, 67, 108, 0.22);
         }
-        .navbar-brand {
-          height: auto;
-          padding-top: 7px;
-          padding-bottom: 7px;
+        /* Brand hidden — title lives in page-header above the navbar */
+        .navbar-brand, .navbar-brand-hidden {
+          display: none !important;
+          width: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        /* Tabs fill the full navbar width */
+        .navbar-nav {
+          margin: 0 !important;
+          float: none !important;
+          display: flex !important;
+          flex-wrap: wrap;
+        }
+        .navbar-nav > li {
+          flex: 0 0 auto;
+        }
+        .navbar-nav > li > a {
+          padding: 14px 20px !important;
+          font-size: 0.95em !important;
+          font-weight: 500 !important;
+          letter-spacing: 0.02em;
         }
         .page-header {
-          padding: 20px;
+          padding: 20px 24px;
           background: linear-gradient(180deg, #ffffff 0%, #f2f9ff 100%);
           border-bottom: 1px solid var(--panel-border);
-          margin: -20px 0 20px 0;
-          box-shadow: 0 3px 12px rgba(31, 91, 143, 0.08);
+          margin: 0;
+          box-shadow: none;
         }
         .bien-header-brand {
           display: flex;
@@ -418,18 +436,20 @@ ui <- navbarPage(
         .shiny-input-container { margin-bottom:8px; }
 
         @media (max-width: 768px) {
-          .navbar-brand {
-            max-width: calc(100vw - 92px);
-            overflow: hidden;
-          }
           .bien-logo { height: 44px; }
           .page-header h1 { font-size: 1.4em; }
+          .navbar-nav > li > a { padding: 12px 10px !important; font-size: 0.82em !important; }
         }
       ")),
       tags$script(HTML("
         $(document).on('shiny:connected', function() {
           var ov = document.getElementById('cold-overlay');
           if (ov) ov.style.display = 'none';
+        });
+        /* Move page-header above the navbar so it sits at top of page */
+        $(document).ready(function() {
+          var ph = $('.page-header').detach();
+          $('.navbar').before(ph);
         });
       "))
     ),
