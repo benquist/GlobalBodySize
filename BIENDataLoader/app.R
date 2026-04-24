@@ -330,8 +330,13 @@ ui <- navbarPage(
           checkboxInput("use_demo", "Use built-in demo data (12 obs + 6 plots)", value=TRUE),
           conditionalPanel("!input.use_demo",
             tags$div(
-              fileInput("files", "Upload CSV files", multiple=TRUE, accept=".csv",
+              fileInput("files", "Upload CSV file(s)", multiple=TRUE, accept=".csv",
                         placeholder="Select one or more .csv files"),
+              tags$small(
+                style="display:block; margin-top:-6px; margin-bottom:6px; color:#555;",
+                "To select multiple files: hold ", tags$strong("Command"),
+                " on macOS or ", tags$strong("Ctrl"), " on Windows/Linux while clicking files."
+              ),
               tags$small(
                 tags$a(href="#", onclick="$(\"[data-value='? \\u2022 Help']\").tab('show'); return false;",
                   style="color:#2f6fab; text-decoration:underline; cursor:pointer;",
@@ -443,7 +448,7 @@ ui <- navbarPage(
       column(8,
         tabsetPanel(id="stage_tabs",
           tabPanel("Staging Table",  DT::dataTableOutput("staged_table")),
-          tabPanel("DWC Table",      DT::dataTableOutput("dwc_table")),
+          tabPanel("DWC (Darwin Core) Table", DT::dataTableOutput("dwc_table")),
           tabPanel("QC Details",     DT::dataTableOutput("qc_table")),
           tabPanel("TNRS Results",   DT::dataTableOutput("tnrs_table")),
           tabPanel("GNRS Results",   DT::dataTableOutput("gnrs_table")),
