@@ -412,6 +412,8 @@ ui <- navbarPage(
             accept=".csv", buttonLabel="Browse", placeholder="tnrs_results.csv",
             width="100%"),
           uiOutput("tnrs_status_ui"),
+          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 8px;",
+            "TNRS matches submitted scientific names to accepted names (WCVP/WFO), standardizes spelling/authorship where possible, and writes scrubbed taxonomy fields."),
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_gnrs_script", "\u2b07 Download GNRS validation script (.R)",
                          class="btn-success btn-sm",
@@ -422,6 +424,8 @@ ui <- navbarPage(
             accept=".csv", buttonLabel="Browse", placeholder="gnrs_results.csv",
             width="100%"),
           uiOutput("gnrs_status_ui"),
+          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 8px;",
+            "GNRS standardizes political geography (country/state/county) and helps catch misspellings and inconsistent region strings."),
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_gvs_script", "\u2b07 Download GVS validation script (.R)",
                          class="btn-success btn-sm",
@@ -432,6 +436,8 @@ ui <- navbarPage(
             accept=".csv", buttonLabel="Browse", placeholder="gvs_results.csv",
             width="100%"),
           uiOutput("gvs_status_ui"),
+          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 8px;",
+            "GVS checks whether lat/lon appear to be political centroids and flags potential georeferencing precision issues; it does not delete records."),
           tags$hr(style="margin:6px 0;"),
           downloadButton("dl_nsr_script", "\u2b07 Download NSR validation script (.R)",
                          class="btn-success btn-sm",
@@ -441,7 +447,9 @@ ui <- navbarPage(
           fileInput("upload_nsr", "Upload NSR results CSV",
             accept=".csv", buttonLabel="Browse", placeholder="nsr_results.csv",
             width="100%"),
-          uiOutput("nsr_status_ui")
+          uiOutput("nsr_status_ui"),
+          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 0;",
+            "NSR estimates native/introduced/cultivated status by taxon plus region, useful for filtering non-native or cultivated observations in downstream analyses.")
         )
       ),
       column(8,
