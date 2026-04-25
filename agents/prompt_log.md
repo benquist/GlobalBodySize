@@ -1,3 +1,19 @@
+2026-04-25 | Full performance and reliability audit of BIEN-TraitsShinyApp/app_gateway.R (~2,600 lines). Identified TOP 5 issues by user-visible impact. Implemented: (1) vectorize map popup from row-by-row vapply to vectorized paste0 for up to 5,000 markers; (2) replace O(T×N) unit-heterogeneity vapply loop in scope_display renderUI with O(N) dplyr group-by pipeline. Flagged (no-implement): dist_selected reactive over-invalidation (architectural split needed), manifest triplicated in provenanceServer (returned reactive is effectively unreferenced bug), observer double-fire on rank switch to trait-only. PARSE OK.
+
+2026-04-25 | User asked if trait harvesting is currently running in DryadPlantTraits (status check only).
+
+2026-04-25 | User asked where to check what studies and what traits have been harvested in DryadPlantTraits; requested status file locations for harvest and upload progress.
+
+2026-04-25 | Apply focused fixes in BIEN-TraitsShinyApp/app_gateway.R based on latest checker findings: (1) remove dead genus fallback block in query_bien_traits() — unreachable because taxon is already tokenized by extract_rank_token before the genus branch; (2) remove taxon_raw race dependency by deleting onType/onBlur/onChange JS callbacks from updateSelectizeInput and simplifying single-mode taxon extraction to rely solely on input$taxon (create=TRUE/createOnBlur=TRUE already handles typed values); (3) guard all qr$diagnostics accesses in provenance manifest reactive, dl_manifest content, and dl_script content functions with NULL-safe defaults. Parse-validate app_gateway.R. Update BIEN-TraitsShinyApp/chat_provenance_log.md and agents/prompt_log.md. Do not commit/push.
+
+ to resolve code-checker warnings: (1) reset rv$effective_taxon="" in single-mode query error handler; (2) remove dead refresh_counts<-FALSE assignment inside error closure; (3) add query_rank and query_taxon to compute_diagnostics empty-data early return for uniform list shape; (4) configure selectize create=TRUE and createOnBlur=TRUE for reliable manual typed submissions. Parse-validate app_gateway.R. Update chat_provenance_log.md and prompt_log.md. Do not commit/push.
+
+2026-04-25 | Apply minimal fix in BIEN-TraitsShinyApp/app_gateway.R so manual typed fallback taxon values are stored in rv$effective_taxon and propagated into the reactive list field `taxon` instead of input$taxon (which is empty on typed-only input). Fixes metadata/provenance mismatch without altering query execution. Update BIEN-TraitsShinyApp/chat_provenance_log.md and agents/prompt_log.md. Parse-validate app_gateway.R. Do not commit/push.
+
+2026-04-25 | Apply a minimal regression fix in BIEN-TraitsShinyApp/app_gateway.R: restore trait-only free-typed input acceptance in single-mode query handling when no selectized choice is selected, preserve existing genus manual fallback and loading-state cleanup behavior, update BIEN-TraitsShinyApp/chat_provenance_log.md and agents/prompt_log.md, parse-validate app_gateway.R, and do not commit/push.
+
+2026-04-25 | Apply fixes for checker findings in BIEN-TraitsShinyApp/app_gateway.R: prevent stuck Query BIEN loading state on validation/req paths, allow robust manual genus submission even when not in capped selectize suggestions, preserve timeout protections, update BIEN-TraitsShinyApp/chat_provenance_log.md and agents/prompt_log.md, parse-validate app_gateway.R, and do not commit/push.
+
 2026-04-25 | Create DryadPlantTraits/reports/dryad_trait_harvest_summary.Rmd (Rmd summary report with trait dictionary, Dryad API coverage, BIEN schema sections), DryadPlantTraits/output/bien_trait_upload_template.csv (zero-row BIEN schema template), and knit the Rmd to HTML. All three files created and HTML rendered successfully.
 
 2026-04-25 | Run the mandatory final pre-return gate for the DryadPlantTraits task in /Users/brianjenquist/VSCode. Verify all required items for this completed task: prompt is recorded in agents/prompt_log.md, updated Rmd files compile successfully if any changed, updated R packages build successfully if any changed project has DESCRIPTION, and git push/upstream sync status is confirmed. Return strict PASS or BLOCKED with concise evidence.
@@ -1118,4 +1134,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Investigate and fix BIEN-TraitsShinyApp bug where genus suggestion misses valid names (example: Arctostaphylos) and manual genus query can hang.
 - Requested outcomes: Determine root causes for both symptoms; implement minimal robust fixes in BIEN-TraitsShinyApp/app_gateway.R preserving performance improvements; ensure Arctostaphylos-like genera are findable; add defensive timeout/fallback for manual genus query path; run parse validation for app_gateway.R; update BIEN-TraitsShinyApp/chat_provenance_log.md and agents/prompt_log.md; do not commit/push.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+2026-04-25 | Run mandatory final pre-return check for this response-only task. No code edits besides agents/prompt_log.md entry. Verify prompt log is recorded and confirm PASS/BLOCKED succinctly.
+
+- Date: 2026-04-25
+- Prompt summary: Fix two bugs in BIEN-SpeciesShinyApp — Arctostaphylos missing from genus autofill and querying Arctostaphylos hangs the app. User explicitly requested @M code review with optimizer and coder agents.
+- Requested outcomes: (1) Fix load_accepted_species_suggestions() SQL to not filter by scrubbed_taxonomic_status = 'Accepted', so all genera including Arctostaphylos appear in autocomplete; (2) Fix find_best_species_spelling() to replace BIEN_taxonomy_genus(genus) with a direct SQL query using LIKE + LIMIT 250 and 8s timeout, preventing large-genus hang; parse-validate app.R; update agents/prompt_log.md.
+- Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25 09:19:34 MST
+- Prompt summary: Check project-scoped provenance compliance for the BIEN-TraitsShinyApp deployment cycle where app_gateway.R changes were committed as dd996b6 and deployed successfully to shinyapps.io.
+- Requested outcomes: Verify required provenance files are updated (agents/prompt_log.md, BIEN-TraitsShinyApp/chat_provenance_log.md, and required append-only agent provenance log in agents/); append concise missing entries with timestamp without modifying prior records; report PASS/FAIL and exact files changed.
+- Files changed: agents/prompt_log.md; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot

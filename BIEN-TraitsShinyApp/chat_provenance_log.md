@@ -1,5 +1,35 @@
 # Chat Provenance Log
 
+- Date: 2026-04-25
+- Prompt summary: Apply focused fixes in BIEN-TraitsShinyApp/app_gateway.R based on latest checker findings: (1) remove dead genus fallback block in query_bien_traits() that was unreachable because taxon was already tokenized before the branch; (2) remove taxon_raw race dependency and JS onType/onBlur/onChange callbacks from updateSelectizeInput, relying solely on input$taxon (create=TRUE/createOnBlur=TRUE already guarantees typed values land there); (3) guard all qr$diagnostics accesses in provenance manifest and script download handlers against NULL using safe defaults.
+- Requested outcomes: All three fixes applied; parse-validate app_gateway.R; update provenance logs; no commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Apply targeted code-checker fixes in BIEN-TraitsShinyApp/app_gateway.R: reset rv$effective_taxon on single-mode error, remove dead refresh_counts in error closure, add query_rank/query_taxon to compute_diagnostics empty-data early return, configure selectize create=TRUE and createOnBlur=TRUE for reliable manual typed submissions.
+- Requested outcomes: Four targeted fixes applied; parse-validate app_gateway.R; update provenance logs; no commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Apply minimal fix so manual typed fallback taxon values are reflected in query metadata and downstream provenance/script outputs.
+- Requested outcomes: Store effective query taxon (selected or typed fallback) in rv$effective_taxon; propagate it into reactive list field `taxon` instead of input$taxon; no change to query execution behavior; parse-validate app_gateway.R; update logs; no commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Apply minimal regression fix in BIEN-TraitsShinyApp/app_gateway.R so trait-only free-typed input is accepted in single-mode when no selectized choice is selected.
+- Requested outcomes: Restore trait-only typed-input fallback in single-mode query handling while preserving existing genus manual-entry fallback and loading-state cleanup fixes; update required provenance logs; parse-validate app_gateway.R; no commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Apply checker-requested fixes in BIEN-TraitsShinyApp/app_gateway.R for stuck query loading state and manual genus submission outside capped suggestions.
+- Requested outcomes: Ensure Query BIEN observer cannot leave spinner/button stuck on invalid input or validation abort paths; add robust single-mode non-trait fallback so typed taxon text (including valid genus not present in loaded suggestions) is used for query; preserve existing timeout protections; parse-validate app_gateway.R; update required provenance logs; no commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
 - Date: 2026-04-17
 - Prompt summary: Create a new BIEN trait-focused Shiny app similar to BIEN-SpeciesShinyApp with map, help, available traits/counts, citations, and reproducible BIEN query code.
 - Requested outcomes: Build BIEN-TraitsShinyApp scaffold and core trait-query workflows for deployment to shinyapps.io.
@@ -171,4 +201,21 @@
 - Prompt summary: Fix Step 1 Query rank-switch bug where trait-only search leaves Taxon / Trait Name selectize in trait mode after switching back to taxon ranks.
 - Requested outcomes: In app_gateway.R, ensure species/genus/family rank changes force suggest_mode back to taxa so placeholder and choices switch to accepted BIEN taxon names, while keeping trait-only behavior and existing rank-switch performance fixes intact.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Record explicit deployment-output evidence artifact for the latest BIEN-TraitsShinyApp deploy.
+- Requested outcomes: Capture successful deploy evidence in tracked provenance with shinyapps bundle id 11905445, deploy URL https://benquist.shinyapps.io/bien-traits-shinyapp/, and a note that deployment completed successfully from terminal output.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Investigate and fix BIEN-TraitsShinyApp genus-query bug where valid genus suggestions (example: Arctostaphylos) are missing and manual genus query can hang.
+- Requested outcomes: Determine root causes for missing genus suggestion and hang on manual genus query; apply minimal robust fixes in app_gateway.R preserving responsiveness; add defensive timeout/fallback behavior for manual genus path; parse-validate app_gateway.R; update required provenance logs; no commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25 09:19:34 MST
+- Prompt summary: Provenance compliance reconciliation for BIEN-TraitsShinyApp cycle tied to commit dd996b6 (app_gateway.R updates) and successful shinyapps.io deployment.
+- Requested outcomes: Ensure project-scoped chat provenance explicitly records the cycle and deployment status; append-only update with timestamp and concise summary.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R (cycle target); BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
