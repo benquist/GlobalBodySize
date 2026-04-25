@@ -4,7 +4,7 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "dplyr", "stringr", "DT", "jsonlite")
+  required_packages <- c("shiny", "BIEN", "dplyr", "tidyr", "stringr", "DT", "jsonlite")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
@@ -13,6 +13,7 @@ suppressPackageStartupMessages({
   library(shiny)
   library(BIEN)
   library(dplyr)
+  library(tidyr)
   library(stringr)
   library(DT)
   library(jsonlite)
@@ -1270,22 +1271,28 @@ traitSelectServer <- function(id, query_result) {
       sp <- as.character(dat[[species_col]])
       tr <- as.character(dat[[trait_col]])
       keep <- !is.na(sp) & nzchar(sp) & !is.na(tr) & nzchar(tr)
-      sp <- sp[keep]
-      tr <- tr[keep]
-      if (length(sp) == 0) return(data.frame())
+      if (sum(keep) == 0) return(data.frame())
 
-      mat <- table(sp, tr)
-      if (nrow(mat) == 0 || ncol(mat) == 0) return(data.frame())
+      counts <- data.frame(sp = sp[keep], tr = tr[keep], stringsAsFactors = FALSE)
+      counts <- counts |>
+        dplyr::count(sp, tr, name = "n")
 
-      # Keep matrix compact for UI performance/readability.
-      top_idx <- order(rowSums(mat), decreasing = TRUE)
-      top_idx <- head(top_idx, 50)
-      mat_top <- mat[top_idx, , drop = FALSE]
+      sp_totals <- counts |>
+        dplyr::group_by(sp) |>
+        dplyr::summarise(total_records = sum(n), .groups = "drop") |>
+        dplyr::slice_max(total_records, n = 50, with_ties = FALSE)
 
-      out <- as.data.frame.matrix(mat_top)
-      out$species <- rownames(out)
-      out$total_records <- rowSums(mat_top)
-      out <- out[, c("species", "total_records", setdiff(names(out), c("species", "total_records"))), drop = FALSE]
+      top_counts <- counts |>
+        dplyr::filter(sp %in% sp_totals$sp)
+
+      wide <- top_counts |>
+        tidyr::pivot_wider(names_from = tr, values_from = n, values_fill = 0L)
+
+      out <- sp_totals |>
+        dplyr::left_join(wide, by = "sp") |>
+        dplyr::rename(species = sp) |>
+        dplyr::arrange(dplyr::desc(total_records))
+
       rownames(out) <- NULL
       out
     })
@@ -1302,6 +1309,15 @@ traitSelectServer <- function(id, query_result) {
         ),
         rownames = FALSE
       )
+    })
+
+    base_diagnostics <- reactive({
+      req(query_result())
+      base <- query_result()
+      dat <- base$data
+      base_rank <- if (!is.null(base$rank)) base$rank else "species"
+      base_taxon <- if (!is.null(base$taxon)) base$taxon else ""
+      compute_diagnostics(dat, base_rank, base_taxon)
     })
 
     reactive({
@@ -1337,7 +1353,7 @@ traitSelectServer <- function(id, query_result) {
           rank = base_rank,
           taxon = base_taxon,
           max_records = base$max_records,
-          diagnostics = compute_diagnostics(dat, base_rank, base_taxon),
+          diagnostics = compute_diagnostics(data.frame(), base_rank, base_taxon),
           is_loading = isTRUE(base$is_loading),
           base = base
         ))
@@ -1378,7 +1394,7 @@ traitSelectServer <- function(id, query_result) {
         rank = base_rank,
         taxon = base_taxon,
         max_records = base$max_records,
-        diagnostics = compute_diagnostics(filtered, base_rank, base_taxon),
+        diagnostics = base_diagnostics(),
         is_loading = isTRUE(base$is_loading),
         base = base
       )

@@ -1,3 +1,5 @@
+2026-04-24 | BIEN-TraitsShinyApp/app_gateway.R Phase 3 refactors: P3-A replace dense table(sp,tr) matrix with sparse dplyr::count + tidyr::pivot_wider aggregation (top 50 species); add tidyr to required_packages and library block. P3-B isolate diagnostics recomputation via base_diagnostics reactive so compute_diagnostics only reruns on query_result() change, not on trait-selection changes. tidyr ok, parse OK.
+
 2026-04-24 | papers.bib: added Vasseur et al. 2025 (From organism traits to ecosystem processes) — missing bib entry was preventing Metabolic Scaling tab classification.
 
 2026-04-24 | publications.md: added Metabolic Scaling matchers for Vasseur 2025, Cruz 2025, Enquist 2024, Castorena 2022, Brummer 2021. conservation-impacts.md: added Krieger et al. 2022. research.md: linked Gallagher et al. 2020.
