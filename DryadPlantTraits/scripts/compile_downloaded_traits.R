@@ -85,9 +85,7 @@ select_candidate_files <- function(file_table, max_datasets, max_files) {
 source_project_files()
 
 args <- parse_named_args(commandArgs(trailingOnly = TRUE))
-output_dir <- args$output_dir %||% {
-  if (basename(getwd()) == "DryadPlantTraits") file.path("output") else file.path("DryadPlantTraits", "output")
-}
+output_dir <- args$output_dir %||% file.path(find_project_root(), "output")
 candidate_files_path <- args$`candidate-files` %||% file.path(output_dir, "candidate_files.csv")
 max_datasets <- as.integer(args$`max-datasets` %||% "3")
 max_files <- as.integer(args$`max-files` %||% "5")

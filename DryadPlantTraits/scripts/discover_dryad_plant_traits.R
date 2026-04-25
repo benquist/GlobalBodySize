@@ -64,9 +64,7 @@ merge_query_terms <- function(dataset_table) {
 source_project_files()
 
 args <- parse_named_args(commandArgs(trailingOnly = TRUE))
-output_dir <- args$output_dir %||% {
-  if (basename(getwd()) == "DryadPlantTraits") file.path("output") else file.path("DryadPlantTraits", "output")
-}
+output_dir <- args$output_dir %||% file.path(find_project_root(), "output")
 pages_per_term <- as.integer(args$`pages-per-term` %||% "1")
 per_page <- as.integer(args$`per-page` %||% "25")
 
@@ -97,38 +95,54 @@ dataset_table <- dataset_table[order(-dataset_table$candidate_score, dataset_tab
 candidate_rows <- dataset_table[dataset_table$candidate_keep, , drop = FALSE]
 file_rows <- list()
 
+dataset_errors <- character(0)
+
 if (nrow(candidate_rows)) {
   for (row_index in seq_len(nrow(candidate_rows))) {
     dataset_identifier <- candidate_rows$dryad_dataset_doi[[row_index]]
-    version_payload <- dryad_get_dataset_versions(dataset_identifier, per_page = 5)
-    version_table <- dryad_flatten_versions(version_payload, dataset_identifier = dataset_identifier)
-    if (!nrow(version_table)) {
-      next
-    }
+    tryCatch({
+      version_payload <- dryad_get_dataset_versions(dataset_identifier, per_page = 5)
+      version_table <- dryad_flatten_versions(version_payload, dataset_identifier = dataset_identifier)
+      if (!nrow(version_table)) {
+        next
+      }
 
-    version_table <- version_table[order(-version_table$dryad_version_id), , drop = FALSE]
-    latest_version <- version_table[1, , drop = FALSE]
-    file_payload <- dryad_get_version_files(latest_version$dryad_version_id[[1]], per_page = 100)
-    file_table <- dryad_flatten_files(
-      file_payload,
-      dryad_dataset_doi = dataset_identifier,
-      dryad_version_id = latest_version$dryad_version_id[[1]]
-    )
+      version_table <- version_table[order(-version_table$dryad_version_id), , drop = FALSE]
+      latest_version <- version_table[1, , drop = FALSE]
+      version_id <- latest_version$dryad_version_id[[1]]
 
-    if (!nrow(file_table)) {
-      next
-    }
+      if (is.na(version_id) || !nzchar(as.character(version_id))) {
+        warning(sprintf("Dataset %s: skipping file inventory — version ID is NA or empty.", dataset_identifier))
+        dataset_errors[[length(dataset_errors) + 1L]] <- sprintf("%s: NA/malformed version ID", dataset_identifier)
+        next
+      }
 
-    file_table$candidate_score <- candidate_rows$candidate_score[[row_index]]
-    file_table$candidate_keep <- candidate_rows$candidate_keep[[row_index]]
-    file_table$query_term <- candidate_rows$query_term[[row_index]]
-    file_table$source_title <- latest_version$title[[1]]
-    file_table$source_authors <- latest_version$authors[[1]]
-    file_table$source_subjects <- latest_version$source_subjects[[1]]
-    file_table$source_abstract <- latest_version$abstract[[1]]
-    file_table$file_supported_tabular <- vapply(file_table$file_path, dryad_is_supported_tabular_path, logical(1))
-    file_table$file_supported_container <- vapply(file_table$file_path, dryad_is_supported_archive_path, logical(1))
-    file_rows[[length(file_rows) + 1L]] <- file_table
+      file_payload <- dryad_get_version_files(version_id, per_page = 100)
+      file_table <- dryad_flatten_files(
+        file_payload,
+        dryad_dataset_doi = dataset_identifier,
+        dryad_version_id = version_id
+      )
+
+      if (!nrow(file_table)) {
+        next
+      }
+
+      file_table$candidate_score <- candidate_rows$candidate_score[[row_index]]
+      file_table$candidate_keep <- candidate_rows$candidate_keep[[row_index]]
+      file_table$query_term <- candidate_rows$query_term[[row_index]]
+      file_table$source_title <- latest_version$title[[1]]
+      file_table$source_authors <- latest_version$authors[[1]]
+      file_table$source_subjects <- latest_version$source_subjects[[1]]
+      file_table$source_abstract <- latest_version$abstract[[1]]
+      file_table$file_supported_tabular <- vapply(file_table$file_path, dryad_is_supported_tabular_path, logical(1))
+      file_table$file_supported_container <- vapply(file_table$file_path, dryad_is_supported_archive_path, logical(1))
+      file_rows[[length(file_rows) + 1L]] <- file_table
+    }, error = function(e) {
+      msg <- sprintf("%s: %s", dataset_identifier, conditionMessage(e))
+      warning(sprintf("Dataset %s: skipping due to error — %s", dataset_identifier, conditionMessage(e)))
+      dataset_errors[[length(dataset_errors) + 1L]] <<- msg
+    })
   }
 }
 
@@ -136,5 +150,12 @@ file_table <- if (length(file_rows)) do.call(rbind, file_rows) else data.frame(s
 
 utils::write.csv(dataset_table, file.path(output_dir, "candidate_datasets.csv"), row.names = FALSE, na = "")
 utils::write.csv(file_table, file.path(output_dir, "candidate_files.csv"), row.names = FALSE, na = "")
+
+if (length(dataset_errors)) {
+  error_log <- data.frame(error_message = dataset_errors, stringsAsFactors = FALSE)
+  utils::write.csv(error_log, file.path(output_dir, "discovery_errors.csv"), row.names = FALSE, na = "")
+  message(sprintf("%d dataset(s) had errors during file inventory — see %s",
+    length(dataset_errors), file.path(output_dir, "discovery_errors.csv")))
+}
 
 message(sprintf("Wrote %s dataset candidates and %s candidate files to %s", nrow(dataset_table), nrow(file_table), output_dir))
