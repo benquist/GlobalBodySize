@@ -1,3 +1,5 @@
+2026-04-25 | Run the mandatory final pre-return gate for the DryadPlantTraits task in /Users/brianjenquist/VSCode. Verify all required items for this completed task: prompt is recorded in agents/prompt_log.md, updated Rmd files compile successfully if any changed, updated R packages build successfully if any changed project has DESCRIPTION, and git push/upstream sync status is confirmed. Return strict PASS or BLOCKED with concise evidence.
+
 2026-04-25 | Final mandatory always gate for BIEN-TraitsShinyApp bug-fix request: confirm PASS for prompt log completeness, Rmd compile trigger check, package build trigger check, and git push sync with concise PASS/BLOCKED evidence.
 
 2026-04-25 | Make a minimal procedural fix in /Users/brianjenquist/VSCode:
@@ -1088,4 +1090,18 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Fix BIEN-TraitsShinyApp Step 1 rank-switch bug where Taxon / Trait Name stays in trait-mode after switching Query Rank from trait-only back to genus/species/family.
 - Requested outcomes: Apply minimal safe fix in BIEN-TraitsShinyApp/app_gateway.R so taxon ranks force taxa suggestion mode and selectize placeholder/choices return to taxon mode; preserve trait-only behavior and performance improvements; update required provenance logs; parse-validate app_gateway.R; do not commit/push.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Add explicit deployment-output evidence artifact for the latest BIEN-TraitsShinyApp deploy so compliance checker can verify it.
+- Requested outcomes: Append BIEN-TraitsShinyApp/chat_provenance_log.md with bundle id 11905445, successful deploy URL https://benquist.shinyapps.io/bien-traits-shinyapp/, and terminal-confirmed deployment success note; append this prompt action to agents/prompt_log.md; optionally update agents/.final_gate_check.txt if present; do not commit/push.
+- Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+2026-04-25 | "Run final mandatory always gate for the current BIEN-TraitsShinyApp bug-fix request (trait-only -> genus suggestion reset issue). Verify: prompt log, Rmd compile trigger, package build trigger, git push status."
+
+- Date: 2026-04-25
+- Prompt summary: Re-run final mandatory always gate for the current BIEN-TraitsShinyApp bug-fix request (trait-only -> genus suggestion reset issue). Verify: 1) Prompt log recorded (including this exact prompt). 2) Rmd compile trigger status. 3) Package build trigger status. 4) Git push status. Return strict PASS/BLOCKED with concise evidence.
+- Requested outcomes: Always gate verification only; no code changes.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
