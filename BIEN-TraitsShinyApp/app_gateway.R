@@ -4,7 +4,7 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "dplyr", "tidyr", "stringr", "DT", "jsonlite")
+  required_packages <- c("shiny", "BIEN", "dplyr", "tidyr", "stringr", "DT", "jsonlite", "leaflet")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
@@ -17,6 +17,7 @@ suppressPackageStartupMessages({
   library(stringr)
   library(DT)
   library(jsonlite)
+  library(leaflet)
 })
 
 .bien_trait_catalog_cache <- NULL
@@ -524,34 +525,70 @@ queryUI <- function(id) {
               selected = "species", width = "100%")
           )
         ),
-        div(class = "col-sm-6",
-          div(class = "form-group",
-            tags$label("Taxon / Trait Name:", `for` = ns("taxon")),
-            radioButtons(
-              ns("suggest_mode"), NULL,
-              choices = c("Suggest taxa" = "taxa", "Suggest traits" = "traits"),
-              selected = "taxa",
-              inline = TRUE
-            ),
-            selectizeInput(
-              ns("taxon"), NULL,
-              choices = NULL,
-              selected = "",
-              options = list(
-                placeholder = "Start typing to search BIEN suggestions...",
-                create = FALSE,
-                maxOptions = 2000
+        conditionalPanel(
+          condition = sprintf("input['%s'] == 'single'", ns("input_mode")),
+          div(class = "col-sm-6",
+            div(class = "form-group",
+              tags$label("Taxon / Trait Name:", `for` = ns("taxon")),
+              radioButtons(
+                ns("suggest_mode"), NULL,
+                choices = c("Suggest taxa" = "taxa", "Suggest traits" = "traits"),
+                selected = "taxa",
+                inline = TRUE
               ),
-              width = "100%"
-            ),
-            p(
-              class = "text-muted",
-              style = "margin-top: 6px;",
-              "Autocomplete uses BIEN-backed suggestions. You can still type custom values."
+              selectizeInput(
+                ns("taxon"), NULL,
+                choices = NULL,
+                selected = "",
+                options = list(
+                  placeholder = "Start typing to search BIEN suggestions...",
+                  create = FALSE,
+                  maxOptions = 2000
+                ),
+                width = "100%"
+              ),
+              p(
+                class = "text-muted",
+                style = "margin-top: 6px;",
+                "Autocomplete uses BIEN-backed suggestions. You can still type custom values."
+              )
             )
           )
         )
       ),
+      div(class = "row",
+        div(class = "col-sm-12",
+          div(class = "form-group",
+            radioButtons(ns("input_mode"), "Input mode:",
+              choices = c("Single taxon (autocomplete)" = "single",
+                         "Batch species list (paste or upload CSV)" = "batch"),
+              selected = "single", inline = TRUE)
+          )
+        )
+      ),
+      conditionalPanel(
+        condition = sprintf("input['%s'] == 'batch'", ns("input_mode")),
+        div(class = "row",
+          div(class = "col-sm-6",
+            div(class = "form-group",
+              tags$label("Paste species names (one per line, comma, or semicolon):"),
+              tags$textarea(id = ns("batch_text"),
+                class = "form-control", rows = "6",
+                placeholder = "Pinus ponderosa\nAbies concolor\nQuercus agrifolia"
+              )
+            )
+          ),
+          div(class = "col-sm-6",
+            div(class = "form-group",
+              tags$label("Or upload a CSV (one column, species names):"),
+              fileInput(ns("batch_csv"), NULL, accept = ".csv", width = "100%"),
+              p(class = "text-muted",
+                "CSV should have one species name per row. First row treated as header if it contains no spaces.")
+            )
+          )
+        )
+      ),
+      uiOutput(ns("trait_scope_preview")),
       div(class = "row",
         div(class = "col-sm-6",
           div(class = "form-group",
@@ -585,7 +622,8 @@ queryServer <- function(id) {
       is_querying = FALSE,
       error_msg = "",
       suggestion_cache = list(),
-      needs_count_refresh = FALSE
+      needs_count_refresh = FALSE,
+      batch_species = character(0)
     ) -> rv
 
     observeEvent(input$rank, {
@@ -644,9 +682,31 @@ queryServer <- function(id) {
       )
     }, ignoreInit = FALSE)
     
-    observeEvent(input$query_btn, {
-      req(input$taxon, nzchar(str_trim(input$taxon)))
+    batch_species_list <- reactive({
+      mode <- input$input_mode
+      if (!identical(mode, "batch")) return(character(0))
+      
+      # CSV upload takes precedence over pasted text
+      csv_path <- input$batch_csv$datapath
+      if (!is.null(csv_path) && file.exists(csv_path)) {
+        tbl <- tryCatch(read.csv(csv_path, stringsAsFactors = FALSE, header = TRUE), error = function(e) NULL)
+        if (!is.null(tbl) && ncol(tbl) >= 1) {
+          vals <- as.character(tbl[[1]])
+          vals <- vals[!is.na(vals) & nzchar(str_squish(vals))]
+          return(normalize_taxon_name(vals))
+        }
+      }
+      
+      # Pasted text
+      txt <- input$batch_text
+      if (is.null(txt) || !nzchar(str_squish(txt))) return(character(0))
+      parts <- unlist(strsplit(txt, "[,;\n]+"))
+      parts <- str_squish(parts)
+      parts <- parts[nzchar(parts)]
+      normalize_taxon_name(parts)
+    })
 
+    observeEvent(input$query_btn, {
       rv$is_querying <- TRUE
       rv$error_msg <- ""
 
@@ -656,6 +716,51 @@ queryServer <- function(id) {
         spinnerId = session$ns("query_btn_spinner"),
         loading  = TRUE
       ))
+
+      mode <- if (is.null(input$input_mode)) "single" else input$input_mode
+      
+      if (identical(mode, "batch")) {
+        species_vec <- batch_species_list()
+        if (length(species_vec) == 0) {
+          rv$error_msg <- "Batch mode: enter at least one species name or upload a CSV."
+          session$sendCustomMessage("queryBtnState", list(
+            btnId = session$ns("query_btn"), spinnerId = session$ns("query_btn_spinner"), loading = FALSE))
+          rv$is_querying <- FALSE
+          return()
+        }
+        # Query each species and bind rows
+        max_records <- suppressWarnings(as.integer(input$max_records))
+        if (is.na(max_records) || max_records < 100) max_records <- 5000
+        max_records <- min(max_records, 50000)
+        per_species_limit <- max(100L, as.integer(max_records / length(species_vec)))
+        
+        all_results <- list()
+        withProgress(message = "Querying BIEN (batch)...", value = 0, {
+          for (i in seq_along(species_vec)) {
+            sp <- species_vec[[i]]
+            incProgress(1 / length(species_vec), detail = sp)
+            res <- query_bien_traits(rank = "species", taxon = sp,
+                                     max_records = per_species_limit, timeout_sec = 120)
+            if (is.data.frame(res) && nrow(res) > 0) {
+              all_results[[sp]] <- res
+            }
+          }
+        })
+        
+        dat <- if (length(all_results) > 0) dplyr::bind_rows(all_results) else data.frame()
+        dat <- ensure_unique_names(dat)
+        rv$query_data <- dat
+        rv$diagnostics <- compute_diagnostics(dat, "species", paste(species_vec, collapse = "; "),
+                                              total_available = NA_integer_, max_records = max_records)
+        rv$error_msg <- if (nrow(dat) == 0) "No records returned for any of the provided species." else ""
+        rv$needs_count_refresh <- FALSE
+        session$sendCustomMessage("queryBtnState", list(
+          btnId = session$ns("query_btn"), spinnerId = session$ns("query_btn_spinner"), loading = FALSE))
+        rv$is_querying <- FALSE
+        return()
+      }
+
+      req(input$taxon, nzchar(str_trim(input$taxon)))
 
       tryCatch({
         taxon_clean <- if (identical(input$rank, "trait-only")) {
@@ -747,6 +852,26 @@ queryServer <- function(id) {
         ""
       }
     })
+
+    output$trait_scope_preview <- renderUI({
+      req(input$rank, input$suggest_mode)
+      if (!identical(input$rank, "trait-only")) return(NULL)
+      taxon_val <- input$taxon
+      if (is.null(taxon_val) || !nzchar(str_squish(as.character(taxon_val)))) return(NULL)
+      
+      expanded <- expand_trait_name(str_squish(as.character(taxon_val)))
+      if (length(expanded) == 0) return(NULL)
+      
+      if (length(expanded) == 1 && identical(expanded, taxon_val)) {
+        return(div(class = "alert alert-info", style = "margin-top: 8px;",
+          strong("Trait query: "), expanded[[1]]))
+      }
+      
+      div(class = "alert alert-info", style = "margin-top: 8px;",
+        strong(sprintf("Trait-only query will expand to %d exact BIEN trait names:", length(expanded))),
+        tags$ul(lapply(expanded, function(t) tags$li(t)))
+      )
+    })
     
     reactive({
       list(
@@ -820,6 +945,70 @@ scopeServer <- function(id, query_result) {
             tags$ul(lapply(diag$warnings, function(w) tags$li(w)))
           )
         }
+        ,
+        div(class = "panel panel-default",
+          div(class = "panel-heading", strong("Quick Insights")),
+          div(class = "panel-body",
+            {
+              trait_col_i <- first_existing_col(qr$data, c("trait_name", "trait", "measurementType"))
+              source_col_i <- first_existing_col(qr$data, c("source_citation", "datasource", "dataset"))
+              unit_col_i <- first_existing_col(qr$data, c("trait_unit", "unit", "units", "measurement_unit"))
+              
+              # Top 3 traits
+              top_traits_ui <- if (!is.null(trait_col_i)) {
+                top3 <- diag$coverage_by_trait
+                if (is.data.frame(top3) && nrow(top3) > 0) {
+                  top3 <- head(top3, 3)
+                  tags$p(strong("Top traits: "),
+                    paste(apply(top3, 1, function(r) paste0(r[[1]], " (", r[[2]], " records)")),
+                          collapse = "; "))
+                }
+              }
+              
+              # Source concentration
+              source_conc_ui <- if (!is.null(source_col_i)) {
+                src_counts <- sort(table(as.character(qr$data[[source_col_i]])), decreasing = TRUE)
+                src_counts <- src_counts[names(src_counts) != "" & !is.na(names(src_counts))]
+                if (length(src_counts) > 0) {
+                  top_src <- names(src_counts)[[1]]
+                  top_pct <- round(100 * src_counts[[1]] / sum(src_counts), 1)
+                  tags$p(strong("Source concentration: "),
+                    sprintf("Top source accounts for %.1f%% of records.", top_pct),
+                    if (top_pct > 60) tags$span(class = "label label-warning", "Dominated by one source"))
+                }
+              }
+              
+              # Unit heterogeneity
+              unit_het_ui <- if (!is.null(trait_col_i) && !is.null(unit_col_i)) {
+                n_mixed <- sum(vapply(unique(as.character(qr$data[[trait_col_i]])), function(tr) {
+                  sub <- qr$data[as.character(qr$data[[trait_col_i]]) == tr, ]
+                  u <- unique(tolower(str_squish(as.character(sub[[unit_col_i]]))))
+                  u <- u[!is.na(u) & nzchar(u)]
+                  length(u) > 1
+                }, logical(1)))
+                if (n_mixed > 0) {
+                  tags$p(strong("Unit heterogeneity: "),
+                    sprintf("%d trait(s) have mixed units \u2014 check before pooling values.", n_mixed),
+                    tags$span(class = "label label-danger", "Review units"))
+                } else {
+                  tags$p(strong("Unit heterogeneity: "), "All traits appear to use consistent units.")
+                }
+              }
+              
+              # Truncation risk
+              trunc_ui <- if (!is.null(diag$records_not_returned) && !is.na(diag$records_not_returned) &&
+                               diag$records_not_returned > 0) {
+                pct_missing <- round(100 * diag$records_not_returned /
+                                      max(diag$total_available_records, 1), 1)
+                tags$p(strong("Truncation risk: "),
+                  sprintf("%.1f%% of matching BIEN records were not returned (increase limit in Step 1 or use the R script to fetch all).", pct_missing),
+                  if (pct_missing > 50) tags$span(class = "label label-danger", "High truncation"))
+              }
+              
+              tagList(top_traits_ui, source_conc_ui, unit_het_ui, trunc_ui)
+            }
+          )
+        )
       )
     })
 
@@ -1827,6 +2016,188 @@ downloadGateServer <- function(id, query_result) {
 }
 
 # ============================================================================
+# SHINY MODULE: MapUI & MapServer
+# ============================================================================
+
+mapUI <- function(id) {
+  ns <- NS(id)
+  div(
+    class = "panel panel-info",
+    div(class = "panel-heading", h3("Map: Trait Observations")),
+    div(class = "panel-body",
+      uiOutput(ns("map_controls")),
+      leaflet::leafletOutput(ns("map_plot"), height = "500px"),
+      uiOutput(ns("map_summary"))
+    )
+  )
+}
+
+mapServer <- function(id, query_result) {
+  moduleServer(id, function(input, output, session) {
+    
+    map_data <- reactive({
+      req(query_result())
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) return(NULL)
+      
+      lat_col <- first_existing_col(dat, c("latitude", "lat", "decimalLatitude"))
+      lon_col <- first_existing_col(dat, c("longitude", "lon", "long", "decimalLongitude"))
+      trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      value_col <- first_existing_col(dat, c("trait_value", "value", "measurement"))
+      species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+      cite_col <- first_existing_col(dat, c("source_citation", "datasource"))
+      
+      if (is.null(lat_col) || is.null(lon_col)) return(NULL)
+      
+      mapped <- dat
+      mapped$.lat <- suppressWarnings(as.numeric(as.character(mapped[[lat_col]])))
+      mapped$.lon <- suppressWarnings(as.numeric(as.character(mapped[[lon_col]])))
+      mapped <- mapped[!is.na(mapped$.lat) & !is.na(mapped$.lon), , drop = FALSE]
+      mapped <- mapped[mapped$.lat >= -90 & mapped$.lat <= 90 &
+                       mapped$.lon >= -180 & mapped$.lon <= 180, , drop = FALSE]
+      if (nrow(mapped) == 0) return(NULL)
+      
+      list(dat = mapped, trait_col = trait_col, value_col = value_col,
+           species_col = species_col, cite_col = cite_col)
+    })
+    
+    output$map_controls <- renderUI({
+      md <- map_data()
+      if (is.null(md)) {
+        return(div(class = "alert alert-warning",
+          "No coordinate data available for this query. Latitude/longitude columns were not found or all values are missing."))
+      }
+      trait_choices <- if (!is.null(md$trait_col)) {
+        sort(unique(as.character(md$dat[[md$trait_col]])))
+      } else character(0)
+      
+      tagList(
+        div(class = "alert alert-info",
+          sprintf("Mapping %d observations with valid coordinates.", nrow(md$dat))),
+        if (length(trait_choices) > 1) {
+          selectInput(session$ns("map_trait"), "Color by trait:",
+            choices = c("All traits" = "", trait_choices), selected = "", width = "320px")
+        }
+      )
+    })
+    
+    output$map_plot <- leaflet::renderLeaflet({
+      md <- map_data()
+      if (is.null(md)) {
+        return(leaflet::leaflet() |>
+          leaflet::addTiles() |>
+          leaflet::setView(lng = -100, lat = 20, zoom = 2))
+      }
+      
+      dat <- md$dat
+      
+      # Filter to selected trait if chosen
+      trait_filter <- input$map_trait
+      if (!is.null(trait_filter) && nzchar(trait_filter) && !is.null(md$trait_col)) {
+        dat <- dat[as.character(dat[[md$trait_col]]) == trait_filter, , drop = FALSE]
+      }
+      
+      if (nrow(dat) == 0) {
+        return(leaflet::leaflet() |> leaflet::addTiles() |> leaflet::setView(-100, 20, 2))
+      }
+      
+      # Build popup text
+      popup_txt <- vapply(seq_len(nrow(dat)), function(i) {
+        row <- dat[i, , drop = FALSE]
+        sp <- if (!is.null(md$species_col)) as.character(row[[md$species_col]]) else "unknown"
+        tr <- if (!is.null(md$trait_col)) as.character(row[[md$trait_col]]) else ""
+        vl <- if (!is.null(md$value_col)) as.character(row[[md$value_col]]) else ""
+        ct <- if (!is.null(md$cite_col)) as.character(row[[md$cite_col]]) else ""
+        paste0("<b>", htmltools::htmlEscape(sp), "</b><br/>",
+               if (nzchar(tr)) paste0("Trait: ", htmltools::htmlEscape(tr), "<br/>") else "",
+               if (nzchar(vl)) paste0("Value: ", htmltools::htmlEscape(vl), "<br/>") else "",
+               if (nzchar(ct)) paste0("<small>", htmltools::htmlEscape(ct), "</small>") else "")
+      }, character(1))
+      
+      leaflet::leaflet(dat) |>
+        leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+        leaflet::addCircleMarkers(
+          lng = ~.lon, lat = ~.lat,
+          radius = 5,
+          color = "#2f79b7",
+          fillColor = "#2f79b7",
+          fillOpacity = 0.65,
+          stroke = TRUE,
+          weight = 1,
+          popup = popup_txt
+        )
+    })
+    
+    output$map_summary <- renderUI({
+      md <- map_data()
+      if (is.null(md)) return(NULL)
+      total_obs <- nrow(query_result()$data)
+      mapped_obs <- nrow(md$dat)
+      pct <- round(100 * mapped_obs / total_obs, 1)
+      div(class = "alert alert-info", style = "margin-top: 10px;",
+        sprintf("%d of %d observations (%s%%) have valid coordinates and are shown on the map.",
+                mapped_obs, total_obs, pct))
+    })
+    
+    reactive(list(ok = TRUE))
+  })
+}
+
+# ============================================================================
+# SHINY MODULE: HelpUI & HelpServer
+# ============================================================================
+
+helpUI <- function(id) {
+  ns <- NS(id)
+  div(
+    class = "panel panel-default",
+    div(class = "panel-heading", h3("Help & Ecological Caveats")),
+    div(class = "panel-body",
+      h4("About This App"),
+      p("This app queries the Botanical Information and Ecology Network (BIEN) trait database and guides you through data inspection, quality assessment, and reproducible export. Each workflow step corresponds to a tab above."),
+      tags$ol(
+        tags$li(tags$b("Query:"), " Select a query rank (species, genus, family, or trait type) and enter a name. Use batch mode to query multiple species at once."),
+        tags$li(tags$b("Scope:"), " Review how many records BIEN contains vs. how many were returned given your record limit."),
+        tags$li(tags$b("Traits:"), " Choose which traits to include in your download. The species-by-trait matrix shows data coverage at a glance."),
+        tags$li(tags$b("Distributions:"), " Explore numeric trait distributions. Use the unit filter when multiple units are present."),
+        tags$li(tags$b("Map:"), " View coordinate-bearing observations on an interactive map."),
+        tags$li(tags$b("Diagnostics:"), " Summary statistics for the returned dataset."),
+        tags$li(tags$b("Records:"), " Browse the complete record set."),
+        tags$li(tags$b("Provenance:"), " Download a query manifest and reproducible R script."),
+        tags$li(tags$b("Download:"), " Review the data-use acknowledgement and export your CSV.")
+      ),
+      hr(),
+      h4("Key Ecological Caveats"),
+      tags$ul(
+        tags$li(tags$b("Availability \u2260 Abundance: "), "BIEN records reflect which species and traits have been measured and submitted to the database \u2014 not the ecological prevalence or abundance of those traits in nature."),
+        tags$li(tags$b("Sampling Bias: "), "Coverage is uneven across taxa, geographic regions, and trait types. Well-studied clades and traits are over-represented."),
+        tags$li(tags$b("Taxonomic Scope: "), "Queries are matched against BIEN's taxonomic scrubbing layer. Results are filtered to accepted names where possible, but ambiguous or synonym cases may affect completeness."),
+        tags$li(tags$b("Mixed Units: "), "Trait values from different studies may use different units. The Distributions tab warns you when this occurs and provides a unit filter. Do not pool values across units."),
+        tags$li(tags$b("Genus and Family Queries: "), "These return data across many species and may combine heterogeneous measurement methods. Interpret distributions cautiously."),
+        tags$li(tags$b("Record Limits: "), "The app imposes a cap on returned records. If total available records exceed your limit, the Scope tab will warn you. Increase the limit in Step 1 or use the reproducible R script to fetch the full dataset locally.")
+      ),
+      hr(),
+      h4("How to Cite"),
+      p("When using BIEN trait data in publications:"),
+      tags$ol(
+        tags$li("Cite the BIEN R package: Maitner et al. (2018). The bien r package: A tool to access the Botanical Information and Ecology Network (BIEN) database. Methods in Ecology and Evolution, 9(2), 373\u2013379."),
+        tags$li("Cite individual data sources using the ", tags$code("source_citation"), " and ", tags$code("url_source"), " columns in your downloaded CSV."),
+        tags$li("Include the query manifest (downloaded from the Provenance tab) as a supplementary data file to document your exact query parameters.")
+      ),
+      hr(),
+      p(class = "text-muted",
+        "Learn more about BIEN at ", tags$a(href = "https://biendata.org", target = "_blank", "biendata.org"), ".")
+    )
+  )
+}
+
+helpServer <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    reactive(list(ok = TRUE))
+  })
+}
+
+# ============================================================================
 # MAIN UI
 # ============================================================================
 
@@ -1868,10 +2239,12 @@ ui <- fluidPage(
       tabPanel("Step 2: Scope", scopeUI("scope")),
       tabPanel("Step 3: Traits", traitSelectUI("traitSelect")),
       tabPanel("Step 4: Distributions", distributionsUI("distributions")),
+      tabPanel("Map", mapUI("map")),
       tabPanel("Step 5: Diagnostics", diagnosticsUI("diagnostics")),
       tabPanel("Step 6: Records", recordsUI("records")),
       tabPanel("Step 7: Provenance", provenanceUI("provenance")),
-      tabPanel("Step 8: Download", downloadGateUI("downloadGate"))
+      tabPanel("Step 8: Download", downloadGateUI("downloadGate")),
+      tabPanel("Help", helpUI("help"))
     ),
     
     hr(),
@@ -2069,6 +2442,8 @@ server <- function(input, output, session) {
   records_result <- recordsServer("records", trait_result)
   prov_result <- provenanceServer("provenance", trait_result)
   download_result <- downloadGateServer("downloadGate", trait_result)
+  map_result <- mapServer("map", trait_result)
+  help_result <- helpServer("help")
 }
 
 # ============================================================================
