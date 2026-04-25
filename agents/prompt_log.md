@@ -8,6 +8,8 @@
 
 2026-04-24 | BIENDataLoader/app.R header parity request: match BIEN-TraitsShinyApp header styling exactly (color scheme, logo size, typography), remove divergent header font overrides, keep non-header/server logic unchanged, and run parse(file='app.R').
 
+2026-04-24 | BIEN-TraitsShinyApp/app_gateway.R Phase 1 speed quick wins + Phase 2 correctness fixes: P1-A records DT server-side rendering (server=TRUE, deferRender=TRUE); P1-B decouple total-count query from critical path via needs_count_refresh flag + separate observe(); P1-C process-level cache for BIEN_trait_list (.bien_trait_catalog_cache); P1-D reduce suggestion payload caps (8k/3k/1.5k) and add minChars=2; P2-A trait-only early-return in query_bien_total_records expanding partial names and summing counts; P2-B unit filter selectInput above histogram with filtering in dist_selected(); P2-C fix UTC timestamp labeling with as.POSIXct(tz="UTC"); P2-D fix provenance citation wording to reference source_citation/url_source columns. Parse OK.
+
 2026-04-24 | BIENDataLoader/app.R UI branding alignment: replace navbar title branding container with plain text title, add dedicated page-header block with BIEN logo + h1/subtitle, and update CSS to BIEN Traits header sizing/typography (.bien-logo 62px, .bien-header-brand gap 16px, mobile .bien-logo 44px and h1 1.35em). Keep server/non-UI behavior unchanged and run parse(file='app.R') syntax check.
 
 2026-04-24 | BIENDataLoader UI-only style refresh: add BIEN logo asset under BIENDataLoader/www, replace navbar title text with logo+title+subtitle branding container, and update only the existing CSS style block to BIEN palette/gradient navbar/active tab/card/button/focus/mobile styles. Explicitly no server/reactive/API/data/pipeline logic changes.

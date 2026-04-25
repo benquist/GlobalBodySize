@@ -18,6 +18,8 @@ suppressPackageStartupMessages({
   library(jsonlite)
 })
 
+.bien_trait_catalog_cache <- NULL
+
 # ============================================================================
 # HELPER FUNCTIONS - DATA COLLECTION & NORMALIZATION
 # ============================================================================
@@ -92,9 +94,16 @@ ensure_unique_names <- function(df) {
 }
 
 load_trait_suggestions <- function(timeout_sec = 120) {
-  trait_catalog <- safe_bien_retry(function() {
-    BIEN_trait_list()
-  }, timeout_sec = timeout_sec, attempts = 2)
+  if (is.null(.bien_trait_catalog_cache)) {
+    trait_catalog <- safe_bien_retry(function() {
+      BIEN_trait_list()
+    }, timeout_sec = timeout_sec, attempts = 2)
+    if (!inherits(trait_catalog, "bien_error") && is.data.frame(trait_catalog) && nrow(trait_catalog) > 0) {
+      .bien_trait_catalog_cache <<- trait_catalog
+    }
+  } else {
+    trait_catalog <- .bien_trait_catalog_cache
+  }
 
   if (inherits(trait_catalog, "bien_error") || !is.data.frame(trait_catalog) || nrow(trait_catalog) == 0) {
     return(character(0))
@@ -112,9 +121,16 @@ load_trait_suggestions <- function(timeout_sec = 120) {
 expand_trait_name <- function(partial_trait, timeout_sec = 120) {
   if (!nzchar(partial_trait)) return(character(0))
   
-  trait_catalog <- safe_bien_retry(function() {
-    BIEN_trait_list()
-  }, timeout_sec = timeout_sec, attempts = 2)
+  if (is.null(.bien_trait_catalog_cache)) {
+    trait_catalog <- safe_bien_retry(function() {
+      BIEN_trait_list()
+    }, timeout_sec = timeout_sec, attempts = 2)
+    if (!inherits(trait_catalog, "bien_error") && is.data.frame(trait_catalog) && nrow(trait_catalog) > 0) {
+      .bien_trait_catalog_cache <<- trait_catalog
+    }
+  } else {
+    trait_catalog <- .bien_trait_catalog_cache
+  }
   
   if (inherits(trait_catalog, "bien_error") || !is.data.frame(trait_catalog) || nrow(trait_catalog) == 0) {
     return(partial_trait)
@@ -352,6 +368,29 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
 query_bien_total_records <- function(rank, taxon, timeout_sec = 120) {
   taxon <- extract_rank_token(rank, taxon)
 
+  if (identical(rank, "trait-only")) {
+    trait_names <- expand_trait_name(taxon, timeout_sec = timeout_sec)
+    if (length(trait_names) == 0) trait_names <- taxon
+    total <- 0L
+    for (tn in trait_names) {
+      sql_fn <- tryCatch(
+        BIEN_trait_trait(trait = tn, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE),
+        error = function(e) NULL
+      )
+      if (!is.character(sql_fn) || !nzchar(sql_fn)) next
+      sql_clean <- gsub(";\\s*$", "", sql_fn)
+      count_sql <- sprintf("SELECT COUNT(*) AS total_records FROM (%s) t", sql_clean)
+      bien_sql <- get(".BIEN_sql", envir = asNamespace("BIEN"))
+      cnt <- safe_bien_retry(function() {
+        bien_sql(query = count_sql, fetch.query = FALSE)
+      }, timeout_sec = timeout_sec, attempts = 2)
+      if (!inherits(cnt, "bien_error") && is.data.frame(cnt) && nrow(cnt) > 0 && "total_records" %in% names(cnt)) {
+        total <- total + as.integer(cnt$total_records[[1]])
+      }
+    }
+    return(total)
+  }
+
   build_sql <- function() {
     if (rank == "species") {
       BIEN_trait_species(species = taxon, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE)
@@ -544,7 +583,8 @@ queryServer <- function(id) {
       diagnostics = NULL,
       is_querying = FALSE,
       error_msg = "",
-      suggestion_cache = list()
+      suggestion_cache = list(),
+      needs_count_refresh = FALSE
     ) -> rv
 
     observeEvent(input$rank, {
@@ -573,7 +613,7 @@ queryServer <- function(id) {
           load_trait_suggestions()
         } else {
           # Keep suggestion payloads smaller so rank switches do not block typing.
-          cap <- if (identical(rank, "species")) 15000 else if (identical(rank, "genus")) 5000 else 2000
+          cap <- if (identical(rank, "species")) 8000 else if (identical(rank, "genus")) 3000 else 1500
           load_taxon_suggestions(rank = rank, max_choices = cap)
         }
         rv$suggestion_cache[[key]] <- choices
@@ -597,6 +637,7 @@ queryServer <- function(id) {
           create = FALSE,
           maxOptions = 2000,
           openOnFocus = TRUE,
+          minChars = 2,
           placeholder = placeholder
         )
       )
@@ -630,8 +671,6 @@ queryServer <- function(id) {
                      value = 0.3, {
           dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
                                    max_records = max_records, timeout_sec = 120)
-          total_available <- query_bien_total_records(rank = input$rank, taxon = taxon_clean,
-                                                     timeout_sec = 120)
           bien_err <- attr(dat, "bien_error", exact = TRUE)
           incProgress(0.7, message = "Processing results...")
           rv$query_data <- dat
@@ -639,7 +678,7 @@ queryServer <- function(id) {
             dat,
             input$rank,
             taxon_clean,
-            total_available = total_available,
+            total_available = NA_integer_,
             max_records = max_records
           )
           rv$error_msg <- if (is.character(bien_err) && nzchar(bien_err)) {
@@ -663,6 +702,27 @@ queryServer <- function(id) {
         loading  = FALSE
       ))
       rv$is_querying <- FALSE
+      rv$needs_count_refresh <- TRUE
+    })
+
+    observe({
+      req(rv$needs_count_refresh)
+      rv$needs_count_refresh <- FALSE
+      qr <- rv$query_data
+      diag <- rv$diagnostics
+      if (!is.data.frame(qr) || nrow(qr) == 0 || is.null(diag)) return()
+      total_available <- query_bien_total_records(
+        rank = diag$query_rank,
+        taxon = diag$query_taxon,
+        timeout_sec = 120
+      )
+      rv$diagnostics <- compute_diagnostics(
+        qr,
+        diag$query_rank,
+        diag$query_taxon,
+        total_available = total_available,
+        max_records = diag$limit_used
+      )
     })
     
     output$query_status <- renderText({
@@ -886,10 +946,10 @@ recordsServer <- function(id, query_result) {
       req(query_result())
       dat <- query_result()$data
       req(nrow(dat) > 0)
-      datatable(dat, options = list(
+      datatable(dat, server = TRUE, options = list(
         scrollX = TRUE,
         pageLength = 10,
-        columnDefs = list(list(width = "100px", targets = "_all")),
+        deferRender = TRUE,
         dom = "frtip"
       ), rownames = FALSE)
     })
@@ -926,7 +986,7 @@ provenanceServer <- function(id, query_result) {
         query_rank = qr$rank,
         query_taxon = qr$taxon,
         max_records = qr$max_records,
-        timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
+        timestamp_utc = format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC"),
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(qr$data),
         total_available_records = qr$diagnostics$total_available_records,
@@ -956,7 +1016,7 @@ provenanceServer <- function(id, query_result) {
         query_rank = query_result()$rank,
         query_taxon = query_result()$taxon,
         max_records = query_result()$max_records,
-        timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
+        timestamp_utc = format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC"),
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(query_result()$data),
         total_available_records = query_result()$diagnostics$total_available_records,
@@ -977,7 +1037,7 @@ provenanceServer <- function(id, query_result) {
           query_rank = query_result()$rank,
           query_taxon = query_result()$taxon,
           max_records = query_result()$max_records,
-          timestamp_utc = format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"),
+          timestamp_utc = format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC"),
           app_version = "BIEN Trait Gateway v1.0",
           records = nrow(query_result()$data),
           total_available_records = query_result()$diagnostics$total_available_records,
@@ -1027,7 +1087,7 @@ provenanceServer <- function(id, query_result) {
 
         script <- c(
           "# Reproducible BIEN query script generated by BIEN Trait Data Gateway",
-          sprintf("# Generated: %s", format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC")),
+          sprintf("# Generated: %s", format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")),
           "library(BIEN)",
           "library(dplyr)",
           "",
@@ -1420,7 +1480,26 @@ distributionsServer <- function(id, query_result) {
           width = "100%"
         ),
         checkboxInput(session$ns("dist_show_density"), "Show density overlay", value = TRUE),
-        checkboxInput(session$ns("dist_log10"), "Use log10 scale (positive values only)", value = FALSE)
+        checkboxInput(session$ns("dist_log10"), "Use log10 scale (positive values only)", value = FALSE),
+        if (length(payload$trait_choices) > 0 && !is.null(input$dist_trait) && nzchar(input$dist_trait)) {
+          sub_units <- {
+            dat <- payload$dat
+            sub <- dat[as.character(dat[[payload$trait_col]]) == input$dist_trait, , drop = FALSE]
+            if (!is.null(payload$unit_col)) {
+              u <- tolower(str_squish(as.character(sub[[payload$unit_col]])))
+              sort(unique(u[!is.na(u) & nzchar(u)]))
+            } else character(0)
+          }
+          if (length(sub_units) > 1) {
+            selectInput(
+              session$ns("dist_unit_filter"),
+              "Filter to unit:",
+              choices = sub_units,
+              selected = sub_units[[1]],
+              width = "100%"
+            )
+          }
+        }
       )
     })
 
@@ -1436,6 +1515,13 @@ distributionsServer <- function(id, query_result) {
       source_col <- payload$source_col
 
       sub <- dat[as.character(dat[[trait_col]]) == input$dist_trait, , drop = FALSE]
+      # Apply unit filter when multiple units are present and user has selected one
+      unit_filter_val <- if (!is.null(input$dist_unit_filter) && nzchar(input$dist_unit_filter) &&
+                              !is.null(unit_col)) input$dist_unit_filter else NULL
+      if (!is.null(unit_filter_val) && !is.null(unit_col)) {
+        unit_vals_sub <- tolower(str_squish(as.character(sub[[unit_col]])))
+        sub <- sub[!is.na(unit_vals_sub) & unit_vals_sub == unit_filter_val, , drop = FALSE]
+      }
       raw_vals <- suppressWarnings(as.numeric(as.character(sub[[value_col]])))
       keep <- !is.na(raw_vals) & is.finite(raw_vals)
       vals <- raw_vals[keep]
@@ -1667,7 +1753,7 @@ downloadGateServer <- function(id, query_result) {
             tags$li("You have checked for missing data and small sample sizes before interpretation."),
             tags$li(
               tags$strong("You will cite the original data sources"),
-              " using the provenance manifest provided in Step 6."
+              " using the source_citation and url_source columns in your downloaded CSV to trace each observation back to its original data source."
             )
           ),
           div(class = "checkbox", style = "margin-top: 10px; font-weight: 600;",
@@ -1775,7 +1861,7 @@ ui <- fluidPage(
     hr(),
     p(class = "text-muted", 
       "Built with BIEN R package. All data subject to BIEN terms of use.",
-      " | Query timestamp: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC"))
+      " | Query timestamp: ", format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC"))
   ),
   tags$head(tags$style(HTML("
     :root {
