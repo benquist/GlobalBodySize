@@ -45,37 +45,63 @@ dryad_non_empty_string <- function(x) {
 # Normalize a raw string into a proper "Genus species" binomial.
 # Handles: lowercase (abies_concolor), ALL CAPS (ABIES_CONCOLOR), mixed case,
 # underscore or space separators, and infraspecific epithets (var./ssp./subsp.).
-# Returns NA_character_ if the string cannot be parsed as a binomial.
+# Returns a list:
+#   $binomial           - "Genus species" or NA_character_ if not parseable
+#   $infraspecific_rank - rank keyword ("var", "subsp", "f", etc.) or NA_character_
+#   $infraspecific_epithet - infraspecific epithet token or NA_character_
 dryad_normalize_binomial <- function(x) {
-  if (is.na(x) || !nzchar(trimws(x))) return(NA_character_)
+  NA_result <- list(binomial = NA_character_,
+                    infraspecific_rank = NA_character_,
+                    infraspecific_epithet = NA_character_)
+  if (is.na(x) || !nzchar(trimws(x))) return(NA_result)
   x <- trimws(x)
   # Replace underscores and hybrid markers with spaces
-  x <- gsub("[_×]", " ", x)
+  x <- gsub("[_\u00d7]", " ", x)
   x <- gsub("\\s+", " ", x)
   parts <- strsplit(x, " ")[[1]]
-  if (length(parts) < 2L) return(NA_character_)
+  if (length(parts) < 2L) return(NA_result)
   genus   <- parts[[1]]
   epithet <- parts[[2]]
-  
-  # Check if epithet is a rank keyword (var, var., ssp, ssp., f, f., etc.) BEFORE length checks
-  # This ensures "Genus f infraspecific" → "Genus infraspecific" (not rejected for short epithet)
+
+  # Rank keywords checked BEFORE length guards so short epithets like 'f' are handled
   rank_keywords <- c("var", "var.", "ssp", "ssp.", "subsp", "subsp.",
                      "subvar", "subvar.", "f", "f.", "cf", "cf.", "aff", "aff.",
                      "sp", "sp.", "spp", "spp.", "nov", "x", "x.")
+  # Unresolved-taxon markers: reject entirely (no true epithet can follow)
+  unresolved_markers <- c("sp", "sp.", "spp", "spp.")
+
+  infra_rank    <- NA_character_
+  infra_epithet <- NA_character_
+
   if (tolower(epithet) %in% tolower(rank_keywords)) {
-    if (length(parts) < 3L) return(NA_character_)  # Not enough parts for a true epithet
-    epithet <- parts[[3]]
+    if (tolower(epithet) %in% tolower(unresolved_markers)) return(NA_result)
+    if (length(parts) < 3L) return(NA_result)
+    infra_rank <- tolower(gsub("\\.", "", epithet))  # normalise: "var." -> "var"
+    epithet    <- parts[[3]]
+    # Capture any following infraspecific epithet (parts[4] onwards are authorship — ignored)
+    infra_epithet <- tolower(epithet)
+  } else {
+    # Check if parts[3] is a rank keyword → capture as infraspecific
+    if (length(parts) >= 4L && tolower(parts[[3]]) %in% tolower(rank_keywords) &&
+        !tolower(parts[[3]]) %in% tolower(unresolved_markers)) {
+      infra_rank    <- tolower(gsub("\\.", "", parts[[3]]))
+      infra_epithet <- tolower(parts[[4]])
+    }
   }
-  
-  # Now check length: genus >= 3 chars, epithet >= 2 chars
-  if (nchar(genus) < 3L || nchar(epithet) < 2L) return(NA_character_)
-  # Reject if either contains digits
-  if (grepl("[0-9]", genus) || grepl("[0-9]", epithet)) return(NA_character_)
-  
+
+  # Length and digit guards
+  if (nchar(genus) < 3L || nchar(epithet) < 2L) return(NA_result)
+  if (grepl("[0-9]", genus) || grepl("[0-9]", epithet)) return(NA_result)
+
   # Title-case genus, lowercase epithet
   genus   <- paste0(toupper(substr(genus, 1, 1)), tolower(substr(genus, 2, nchar(genus))))
   epithet <- tolower(epithet)
-  paste(genus, epithet)
+
+  list(
+    binomial           = paste(genus, epithet),
+    infraspecific_rank = infra_rank,
+    infraspecific_epithet = infra_epithet
+  )
 }
 
 # Heuristic scan: find a column in df where most values look like binomials.
@@ -347,7 +373,11 @@ dryad_make_observation_table <- function(size) {
     raw_stateProvince = rep(NA_character_, size),
     raw_county = rep(NA_character_, size),
     raw_locality = rep(NA_character_, size),
-    raw_date_collected = rep(NA_character_, size),    input_name_verbatim = rep(NA_character_, size),    source_column_taxon = rep(NA_character_, size),
+    raw_date_collected = rep(NA_character_, size),
+    input_name_verbatim = rep(NA_character_, size),
+    infraspecific_rank = rep(NA_character_, size),
+    infraspecific_epithet = rep(NA_character_, size),
+    source_column_taxon = rep(NA_character_, size),
     source_column_trait_name = rep(NA_character_, size),
     source_column_trait_value = rep(NA_character_, size),
     source_column_unit = rep(NA_character_, size),
@@ -380,57 +410,65 @@ dryad_fill_common_fields <- function(output, base_df, row_index, guesses, proven
   # Step 1: get the raw candidate value from the alias-matched column
   raw_binomial_candidate <- input_name_verbatim
 
+  # Helper: call normalizer and test if it succeeded
+  .norm <- function(s) dryad_normalize_binomial(s)
+  .binomial <- function(parsed) parsed$binomial
+
   # Step 1b: normalize via dryad_normalize_binomial (handles lowercase, ALL CAPS,
   # underscore separators, and infraspecific epithets like var./ssp.)
-  normalized <- dryad_normalize_binomial(raw_binomial_candidate)
-  if (!is.na(normalized)) {
-    raw_binomial_candidate <- normalized
+  parsed <- .norm(raw_binomial_candidate)
+  if (!is.na(.binomial(parsed))) {
+    raw_binomial_candidate <- .binomial(parsed)
   }
 
   # Step 2: if still no valid binomial, try prepending genus from separate genus column
-  if (is.na(normalized)) {
+  if (is.na(.binomial(parsed))) {
     genus_val <- .col_val(guesses$genus)
     if (!is.na(genus_val) && nzchar(genus_val)) {
-      candidate2 <- dryad_normalize_binomial(paste(genus_val, raw_binomial_candidate))
-      if (!is.na(candidate2)) {
-        raw_binomial_candidate <- candidate2
-        resolved_source_column <- "genus_prepend"  # Mark that we used genus column
+      parsed2 <- .norm(paste(genus_val, raw_binomial_candidate))
+      if (!is.na(.binomial(parsed2))) {
+        parsed <- parsed2
+        raw_binomial_candidate <- .binomial(parsed2)
+        resolved_source_column <- "genus_prepend"
       }
     }
   }
 
   # Step 2b: try constructing from separate genus + epithet columns
-  if (is.na(dryad_normalize_binomial(raw_binomial_candidate))) {
+  if (is.na(.binomial(parsed))) {
     genus_val   <- .col_val(guesses$genus)
     epithet_val <- .col_val(guesses$epithet)
     if (!is.na(genus_val) && nzchar(genus_val) &&
         !is.na(epithet_val) && nzchar(epithet_val)) {
-      candidate3 <- dryad_normalize_binomial(paste(genus_val, epithet_val))
-      if (!is.na(candidate3)) {
-        raw_binomial_candidate <- candidate3
-        resolved_source_column <- paste(guesses$genus, "+", guesses$epithet, sep="")  # Mark columns used
+      parsed3 <- .norm(paste(genus_val, epithet_val))
+      if (!is.na(.binomial(parsed3))) {
+        parsed <- parsed3
+        raw_binomial_candidate <- .binomial(parsed3)
+        resolved_source_column <- paste(guesses$genus, "+", guesses$epithet, sep="")
       }
     }
   }
 
   # Step 2c: heuristic fallback — scan character columns for one that looks like
   # a species name column (>50% of values match binomial pattern)
-  if (is.na(dryad_normalize_binomial(raw_binomial_candidate))) {
+  if (is.na(.binomial(parsed))) {
     already_mapped <- unlist(guesses[!is.na(guesses)])
     fallback_col <- dryad_find_species_column(base_df, exclude_cols = already_mapped)
     if (!is.na(fallback_col)) {
       fallback_val <- dryad_non_empty_string(base_df[[fallback_col]])[[1]]
-      candidate4 <- dryad_normalize_binomial(fallback_val)
-      if (!is.na(candidate4)) {
-        raw_binomial_candidate <- candidate4
-        resolved_source_column <- fallback_col  # Update to the fallback column
+      parsed4 <- .norm(fallback_val)
+      if (!is.na(.binomial(parsed4))) {
+        parsed <- parsed4
+        raw_binomial_candidate <- .binomial(parsed4)
+        resolved_source_column <- fallback_col
       }
     }
   }
 
-  # Step 3: final validation — resolve to normalized form or NA
-  resolved_binomial <- dryad_normalize_binomial(raw_binomial_candidate)
-  output$scrubbed_species_binomial[[row_index]] <- resolved_binomial
+  # Step 3: write resolved fields
+  output$scrubbed_species_binomial[[row_index]] <- .binomial(parsed)
+  output$infraspecific_rank[[row_index]]        <- parsed$infraspecific_rank
+  output$infraspecific_epithet[[row_index]]     <- parsed$infraspecific_epithet
   output$latitude[[row_index]] <- suppressWarnings(as.numeric(if (!is.na(guesses$latitude)) base_df[[guesses$latitude]][[1]] else NA))
   output$longitude[[row_index]] <- suppressWarnings(as.numeric(if (!is.na(guesses$longitude)) base_df[[guesses$longitude]][[1]] else NA))
   output$date_collected[[row_index]] <- if (!is.na(guesses$date_collected)) dryad_non_empty_string(base_df[[guesses$date_collected]])[[1]] else NA_character_
