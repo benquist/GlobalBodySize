@@ -12,11 +12,18 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
-# Detect project root from Rmd location
-proj_root <- normalizePath(
-  file.path(dirname(knitr::current_input(dir = TRUE)), ".."),
-  mustWork = FALSE
-)
+# Detect project root by walking up until R/dryad_api.R is found
+find_dryad_root <- function(start = getwd()) {
+  path <- normalizePath(start, mustWork = FALSE)
+  for (i in seq_len(10)) {
+    if (file.exists(file.path(path, "R", "dryad_api.R"))) return(path)
+    parent <- dirname(path)
+    if (parent == path) break
+    path <- parent
+  }
+  stop("Could not locate DryadPlantTraits project root from: ", start)
+}
+proj_root <- find_dryad_root()
 
 source(file.path(proj_root, "R", "dryad_api.R"))
 source(file.path(proj_root, "R", "search_terms.R"))
@@ -70,6 +77,24 @@ if (nrow(trait_dict) > 0) {
 ## Harvestable Traits by Functional Category
 
 ```{r traits-by-category}
+# Query Dryad once per trait-specific search term to get dataset counts
+seed_terms <- dryad_search_seed_terms()
+
+counts <- vapply(seed_terms$query_term, function(term) {
+  result <- tryCatch({
+    parsed <- dryad_search_datasets(q = term, per_page = 1L, page = 1L)
+    total <- parsed[["total"]]
+    if (is.null(total)) NA_integer_ else as.integer(total)
+  }, error = function(e) NA_integer_)
+  Sys.sleep(0.5)
+  result
+}, integer(1))
+
+seed_terms$count <- counts
+
+# Map trait_focus -> count for the trait categories table
+trait_focus_counts <- setNames(seed_terms$count, seed_terms$trait_focus)
+
 trait_categories <- data.frame(
   `Functional Category` = c(
     "leaf_economics", "leaf_economics",
@@ -99,8 +124,14 @@ trait_categories <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Add estimated counts from API (populated in next chunk; placeholder here)
-trait_categories$`Estimated Dryad Dataset Count` <- NA_integer_
+trait_categories$`Estimated Dryad Dataset Count` <- vapply(
+  trait_categories$`Trait Name`,
+  function(tn) {
+    v <- trait_focus_counts[tn]   # single-bracket: returns NA_integer_ for missing keys
+    if (is.na(v)) NA_integer_ else as.integer(v)
+  },
+  integer(1)
+)
 
 kable_styled(trait_categories, caption = "Harvestable traits by functional category")
 ```
@@ -110,23 +141,12 @@ kable_styled(trait_categories, caption = "Harvestable traits by functional categ
 ## Dryad Search Coverage
 
 ```{r dryad-search-coverage}
-seed_terms <- dryad_search_seed_terms()
-
-counts <- vapply(seed_terms$query_term, function(term) {
-  result <- tryCatch({
-    parsed <- dryad_search_datasets(q = term, per_page = 1L, page = 1L)
-    total <- parsed[["total"]]
-    if (is.null(total)) NA_integer_ else as.integer(total)
-  }, error = function(e) NA_integer_)
-  Sys.sleep(0.5)
-  result
-}, integer(1))
-
+# Reuse seed_terms with counts fetched in the traits-by-category chunk above
 coverage <- data.frame(
   `Query Term`              = seed_terms$query_term,
   `Theme`                   = seed_terms$theme,
   `Trait Focus`             = seed_terms$trait_focus,
-  `Estimated Dataset Count` = counts,
+  `Estimated Dataset Count` = seed_terms$count,
   check.names = FALSE,
   stringsAsFactors = FALSE
 )
@@ -134,7 +154,7 @@ coverage <- data.frame(
 na_count <- sum(is.na(coverage$`Estimated Dataset Count`))
 if (na_count > 0) {
   cat(sprintf(
-    "_Note: %d of %d API queries returned NA — likely a network timeout or rate-limit; counts will populate when run with connectivity._\n\n",
+    "_Note: %d of %d API queries returned NA — check network connectivity or Dryad API availability._\n\n",
     na_count, nrow(coverage)
   ))
 }
