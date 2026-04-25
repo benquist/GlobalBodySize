@@ -1,6 +1,12 @@
 # Chat Provenance Log
 
 - Date: 2026-04-25
+- Prompt summary: Improve BIEN connection-capacity resilience in app_gateway.R with a minimal safe_bien_retry-only change.
+- Requested outcomes: In safe_bien_retry, stop immediate break on capacity errors; add capacity-specific backoff schedule c(8, 20, 40); for capacity errors retry with schedule until attempts exhausted then return last; preserve non-capacity sleep_sec * i behavior; run parse validation; report exact before/after snippet.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
 - Prompt summary: Narrow capacity-outage classifier in BIEN-TraitsShinyApp/app_gateway.R to avoid generic connection-text misclassification.
 - Requested outcomes: In is_bien_connection_slot_error(), keep only high-confidence capacity signatures (remaining connection slots are reserved; too many connections; too many clients already), leave safe_bien_retry early-break usage unchanged, modify no other logic, and parse-validate app_gateway.R.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
@@ -242,4 +248,14 @@
 - Prompt summary: Append strict compliance evidence entries for the BIEN-TraitsShinyApp cycle with commit association, final review verdicts, and deployment artifact details.
 - Requested outcomes: Record commit association dd996b6 (app fixes) and cb5ab0f (provenance logs); code-checker final verdict PASS (after C1/W1 and warning/perf fixes); code-verifier final verdict APPROVED; deployment artifact bundle id 11905671 and deployment task id 1683639244; terminal-confirmed success URL https://benquist.shinyapps.io/bien-traits-shinyapp/.
 - Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Fix Query Builder returning BIEN connection capacity message instead of trait results.
+- Root cause: safe_bien_retry() did not distinguish capacity errors; retried too quickly and exhausted slot budget before data returned.
+- Code change: Rewrote safe_bien_retry() with capacity-aware backoff schedule 8/20/40 s controlled by a separate capacity_attempts counter; non-capacity errors remain bounded by the attempts parameter; detection uses grepl("capacity", ..., ignore.case=TRUE) on the error message.
+- Review results: code-checker PASS; code-verifier APPROVED.
+- Commit: b998464 pushed to origin/master.
+- Deployment: bundle 11906242, task 1683698374, URL https://benquist.shinyapps.io/bien-traits-shinyapp/ (successful).
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R
 - Completed by: GitHub Copilot

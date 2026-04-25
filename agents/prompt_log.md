@@ -1,3 +1,7 @@
+2026-04-25 | Update only BIEN-TraitsShinyApp/app_gateway.R safe_bien_retry so capacity backoff c(8,20,40) is fully reachable even with default attempts=3: keep signature unchanged, add attempts safety guard max(1L, as.integer(attempts)), compute capacity_attempts=max(attempts, length(capacity_backoff)+1L), iterate i over capacity_attempts with capacity-specific retry/sleep/return behavior and preserve non-capacity retries bounded by attempts using sleep_sec*i; run parse check and report snippet plus result.
+
+2026-04-25 | Edit /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp/app_gateway.R to improve resilience when BIEN is at DB connection capacity by making a minimal targeted change in safe_bien_retry only: stop immediate break on capacity error, add capacity_backoff <- c(8, 20, 40), retry capacity errors with capacity-specific backoff until final attempt, preserve existing non-capacity behavior, run parse check, and report exact before/after safe_bien_retry snippet plus parse result.
+
 2026-04-25 | Patch /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp/app_gateway.R to narrow is_bien_connection_slot_error() to high-confidence capacity signatures only (keep remaining connection slots reserved / too many connections / too many clients already), keep safe_bien_retry early-break wiring unchanged, modify no other logic, run parse check, and report exact diff summary.
 
 2026-04-25 | Implement focused reliability patch in BIEN-TraitsShinyApp/app_gateway.R for BIEN PostgreSQL connection-slot exhaustion handling: add slot-error detector helper, add context-aware BIEN error formatter, add taxon suggestion fallback cache + built-in fallback lists (genus/species/family), use friendly formatted query error message in query status path, optionally short-circuit retries on slot errors, and parse-validate app_gateway.R.
@@ -1172,3 +1176,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-25 | DryadPlantTraits download fix session: User requested continuation from conversation summary - resolve HTTP 401 authentication failure that blocked file downloads from Dryad. Pivoted to public /stash/files/{id}/{filename} URL pattern. Modified dryad_download_file() and compile_downloaded_traits.R.
 2026-04-25 | Run final pre-return gate for current cycle in /Users/brianjenquist/VSCode. Validate: prompt recorded in agents/prompt_log.md, updated Rmd compile status, updated package build status, and git push status for the genus autofill + BIEN connection-slot error cycle.
 2026-04-25 | Run final pre-return gate for this cycle in /Users/brianjenquist/VSCode; validate prompt logging, Rmd compile requirement, R package build requirement, and git push status after live verification redeploy (bundle 11906194, task 1683692660).
+
+- Date: 2026-04-25
+- Prompt summary: Fix BIEN-TraitsShinyApp Query Builder returning BIEN connection capacity message instead of results.
+- Requested outcomes: Implement capacity-aware backoff in safe_bien_retry() with schedule 8/20/40 s and separate capacity_attempts counter; non-capacity errors remain bounded by attempts; run code-checker and code-verifier reviews; commit and push; deploy to shinyapps.io; append provenance entries to agents/prompt_log.md and BIEN-TraitsShinyApp/chat_provenance_log.md.
+- Review results: code-checker PASS; code-verifier APPROVED.
+- Commit: b998464 pushed to origin/master.
+- Deployment: bundle 11906242, task 1683698374, URL https://benquist.shinyapps.io/bien-traits-shinyapp/ (successful).
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
