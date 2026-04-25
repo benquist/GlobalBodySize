@@ -1,4 +1,12 @@
+2026-04-25 | Apply focused DryadPlantTraits cleanup: accept both --output-dir and --output_dir in discovery/compile scripts, eliminate unresolved helper-symbol diagnostics in R/dryad_api.R, R/candidate_filter.R, and R/standardize_records.R with minimal non-package-safe shims, then run DryadPlantTraits/scripts/smoke_test.R and report validation.
+
+2026-04-25 | Final verification/compliance prompt for DryadPlantTraits task: "Make the minimal procedural update needed for the DryadPlantTraits task in /Users/brianjenquist/VSCode: 1. Append a concise entry to agents/prompt_log.md that records this exact final verification/compliance prompt for the DryadPlantTraits task, consistent with the existing log style. 2. If workspace policy or your normal practice requires project provenance for this procedural update, update DryadPlantTraits/chat_provenance_log.md as well. 3. Commit and push the minimal change so upstream sync is explicit. 4. Return the commit hash and a concise note confirming push status."
+
+2026-04-25 | DryadPlantTraits final narrow polish: (1) in scripts/smoke_test.R guard latest_version_id before dryad_get_version_files() and emit NA/malformed-ID diagnostic instead of generic network issue messaging; (2) in R/trait_dictionary.R make trait dictionary path resolution explicitly track project-root logic with a minimal self-contained helper; rerun smoke test from workspace root.
+
 2026-04-25 | DryadPlantTraits hardening pass: (1) fix output_dir default in discover_dryad_plant_traits.R and compile_downloaded_traits.R to derive from find_project_root() instead of basename(getwd()), ensuring correct output folder when running from scripts/; (2) wrap per-dataset version/file inventory loop body in tryCatch so one failed dataset does not abort the full discovery run — partial results are preserved and errors logged to discovery_errors.csv; (3) guard against NA/malformed version IDs before calling dryad_get_version_files(), skipping and recording failures. Smoke test PASS from workspace root.
+
+2026-04-25 | Resolve step-compliance BLOCKED items for the latest BIEN-TraitsShinyApp bug-fix cycle in /Users/brianjenquist/VSCode: append prompt_log entry for final-gate/compliance pass prompt, run verifiable package build/check for BIEN-TraitsShinyApp with clear PASS/FAIL output, append BIEN-TraitsShinyApp/chat_provenance_log.md compliance note if needed, and do not commit/push.
 
 2026-04-25 | Apply narrow repair to DryadPlantTraits: (1) fix dryad_trait_dictionary_path() to probe candidates in order (data/, DryadPlantTraits/data/, ../data/) instead of hardcoding workspace-root path; (2) centralize root detection in find_project_root() helper added to all three scripts (handles project root, workspace root, and scripts/ cwd); (3) extend smoke_test.R to exercise dryad_get_version_files/dryad_flatten_files with a narrow live file-inventory check. Smoke test PASS from both workspace root and project root.
 
@@ -254,6 +262,7 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-17
+
 - Prompt summary: Design an ecology-first blueprint for a new BIEN Traits ShinyApp modeled on BIEN-SpeciesShinyApp UX, including specialist biodiversity/statistics/documentation/taxonomy perspectives.
 - Requested outcomes: Provide one consolidated implementation-ready recommendation covering personas, IA, UX flow, data model, ecological safeguards, MVP vs phase-2, BIEN query strategy, outputs, and acceptance criteria.
 - Files changed: agents/prompt_log.md
@@ -1055,4 +1064,14 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Make a minimal follow-up app_gateway.R change to reduce Step 1 rank-switch delay risk.
 - Requested outcomes: Prewarm species, genus, and family suggestion caches at startup (keeping suggestion_cap_for_rank logic), append BIEN-TraitsShinyApp and agent prompt provenance entries, and run parse validation for BIEN-TraitsShinyApp/app_gateway.R.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: rerun final compliance after remediation for BIEN-TraitsShinyApp bug-fix cycle (including deployment evidence, commit/push confirmation, and final gates requirement).
+- Requested outcomes: Append this prompt entry only; no commit/push.
+
+- Date: 2026-04-25
+- Prompt summary: Add explicit evidence artifacts for the BIEN-TraitsShinyApp bug-fix cycle so compliance checker can verify them from tracked files.
+- Requested outcomes: (1) Append BIEN-TraitsShinyApp/chat_provenance_log.md entry with commit hash 54270b4, pushed to origin/master, successful deploy URL https://benquist.shinyapps.io/bien-traits-shinyapp/, successful bundle id 11905323, and Step 6 records fix + Step 1 rank-switch latency fix-cycle note; (2) write/update agents/.final_gate_check.txt with concise Status PASS summary line for latest always PASS checks; (3) append agents/prompt_log.md with this evidence-recording prompt; (4) do not commit/push.
+- Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/.final_gate_check.txt; agents/prompt_log.md
 - Completed by: GitHub Copilot

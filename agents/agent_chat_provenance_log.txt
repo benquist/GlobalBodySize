@@ -99,6 +99,17 @@ Files affected:
 - agents/m.agent.md
 - .github/agents/m.agent.md
 - agents/prompt_log.md
+
+[13] Date: 2026-04-24
+Source: active chat request
+Request summary: Review planned BIEN Data Loader completion modal content (after TNRS/GNRS/GVS/NSR succeed) for biodiversity-science and informatics caveats.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Added an explicit prompt-log entry for this modal-review request to satisfy mandatory final-gate logging requirements.
+- Appended this provenance entry because an agent-folder file was updated during final-gate compliance.
+Outcome: Agent-folder provenance remains append-only and current for this review turn.
 - AGENTS.md
 Action taken:
 - Created a new always agent in both agent registries.
@@ -106,6 +117,31 @@ Action taken:
 - Added a dedicated prompt log file that always checks.
 - Added workspace policy in AGENTS.md to require always as final gate before return.
 Outcome: Always-run final gate established for operational checks before returning to user.
+
+[14] Date: 2026-04-24
+Source: active chat request
+Request summary: Product+code review request for BIEN-TraitsShinyApp (central goal, use cases, solved problems, gaps, prioritized recommendations) using README, app_gateway.R, and deployed URL evidence.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the user prompt to agents/prompt_log.md to satisfy mandatory final-gate prompt logging.
+- Appended this provenance entry because an agent-folder file was updated in this turn.
+Outcome: Agent-folder provenance remains current and append-only for this chat.
+
+[14] Date: 2026-04-24
+Source: active chat request
+Request summary: Apply two targeted edits in BIEN-SpeciesShinyApp/app.R (fast random starter-pool pick and remove leftover ingest function) and run parse validation.
+Files affected:
+- BIEN-SpeciesShinyApp/app.R
+- BIEN-SpeciesShinyApp/chat_provenance_log.md
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Replaced starter-pool verification loop with immediate fast random pick return (`starter_pool_fast_pick`, attempts=1).
+- Removed full `run_ingest_workflow <- function(file_info) { ... }` block from app.R.
+- Ran `parse(file='app.R')` syntax check and final-gate checks; updated required provenance logs.
+Outcome: Requested app edits completed with syntax verification and append-only agent provenance preserved.
 
 [4] Date: 2026-03-28
 Source: active chat request
@@ -233,6 +269,19 @@ Outcome: Agent-folder traceability remains append-only and current for this webs
 Source: active chat request
 Request summary: Add accepted BIEN species-name autocomplete to BIEN-SpeciesShinyApp and complete mandatory final gate checks.
 Files affected:
+[15] Date: 2026-04-24
+Source: active chat request
+Request summary: Review BIEN-TraitsShinyApp for speed optimization opportunities and bottlenecks, with focus on responsiveness, BIEN query latency handling, reactive inefficiencies, DT rendering cost, and large suggestion loading.
+Files affected:
+- /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp/README.md (read)
+- /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp/app_gateway.R (read)
+- /Users/brianjenquist/VSCode/agents/prompt_log.md (updated)
+- /Users/brianjenquist/VSCode/agents/agent_chat_provenance_log.txt (updated)
+Action taken:
+- Performed a line-by-line performance review of app_gateway.R for BIEN query latency, Shiny reactive invalidation patterns, DT rendering cost, and suggestion-loading overhead.
+- Logged the prompt in agents/prompt_log.md for mandatory final-gate compliance.
+- Appended this provenance entry because an agents file was updated during final-gate checks.
+Outcome: Agent-folder provenance remains append-only and current for this optimization review turn.
 - BIEN-SpeciesShinyApp/app.R
 - BIEN-SpeciesShinyApp/chat_provenance_log.md
 - agents/prompt_log.md
@@ -950,3 +999,6 @@ Action taken:
 - Confirmed there is no branch diff, so Rmd compile and R package build checks are not applicable for this gate.
 - Appended the matching prompt/provenance records required by workspace policy.
 Outcome: Final gate evidence for enquistlab-site-migration is recorded with prompt provenance and synced git state.
+2026-04-24 | always-agent session check run: added latest user prompt entry to agents/prompt_log.md; verified c28ccdf push state and session-scoped gate checks.
+2026-04-24 | BIENDataLoader wording update session: appended prompt record in agents/prompt_log.md for Tab 3 BIEN Web Services required-sequence copy change and parse validation.
+2026-04-25 | DryadPlantTraits final verification/compliance session: appended exact prompt record to agents/prompt_log.md, added minimal DryadPlantTraits/chat_provenance_log.md entry per project provenance convention, and prepared minimal commit/push for explicit upstream sync.
