@@ -1,3 +1,11 @@
+2026-04-25 | Final mandatory always gate for BIEN-TraitsShinyApp bug-fix request: confirm PASS for prompt log completeness, Rmd compile trigger check, package build trigger check, and git push sync with concise PASS/BLOCKED evidence.
+
+2026-04-25 | Make a minimal procedural fix in /Users/brianjenquist/VSCode:
+1. Append a new entry to agents/prompt_log.md containing the exact text of this latest always-gate prompt request for the DryadPlantTraits task.
+2. Update DryadPlantTraits/chat_provenance_log.md with a matching procedural entry if needed for consistency.
+3. Commit and push.
+4. Return commit hash and push confirmation.
+
 2026-04-25 | Apply focused DryadPlantTraits cleanup: accept both --output-dir and --output_dir in discovery/compile scripts, eliminate unresolved helper-symbol diagnostics in R/dryad_api.R, R/candidate_filter.R, and R/standardize_records.R with minimal non-package-safe shims, then run DryadPlantTraits/scripts/smoke_test.R and report validation.
 
 2026-04-25 | Final verification/compliance prompt for DryadPlantTraits task: "Make the minimal procedural update needed for the DryadPlantTraits task in /Users/brianjenquist/VSCode: 1. Append a concise entry to agents/prompt_log.md that records this exact final verification/compliance prompt for the DryadPlantTraits task, consistent with the existing log style. 2. If workspace policy or your normal practice requires project provenance for this procedural update, update DryadPlantTraits/chat_provenance_log.md as well. 3. Commit and push the minimal change so upstream sync is explicit. 4. Return the commit hash and a concise note confirming push status."
@@ -1074,4 +1082,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Add explicit evidence artifacts for the BIEN-TraitsShinyApp bug-fix cycle so compliance checker can verify them from tracked files.
 - Requested outcomes: (1) Append BIEN-TraitsShinyApp/chat_provenance_log.md entry with commit hash 54270b4, pushed to origin/master, successful deploy URL https://benquist.shinyapps.io/bien-traits-shinyapp/, successful bundle id 11905323, and Step 6 records fix + Step 1 rank-switch latency fix-cycle note; (2) write/update agents/.final_gate_check.txt with concise Status PASS summary line for latest always PASS checks; (3) append agents/prompt_log.md with this evidence-recording prompt; (4) do not commit/push.
 - Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/.final_gate_check.txt; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Fix BIEN-TraitsShinyApp Step 1 rank-switch bug where Taxon / Trait Name stays in trait-mode after switching Query Rank from trait-only back to genus/species/family.
+- Requested outcomes: Apply minimal safe fix in BIEN-TraitsShinyApp/app_gateway.R so taxon ranks force taxa suggestion mode and selectize placeholder/choices return to taxon mode; preserve trait-only behavior and performance improvements; update required provenance logs; parse-validate app_gateway.R; do not commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
 - Completed by: GitHub Copilot

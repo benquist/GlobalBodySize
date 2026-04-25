@@ -5,6 +5,15 @@ Tracks prompts that created or changed work under this project folder.
 ## Entries
 
 1. Date: 2026-04-25
+Prompt: Make a minimal procedural fix in /Users/brianjenquist/VSCode:
+1. Append a new entry to agents/prompt_log.md containing the exact text of this latest always-gate prompt request for the DryadPlantTraits task.
+2. Update DryadPlantTraits/chat_provenance_log.md with a matching procedural entry if needed for consistency.
+3. Commit and push.
+4. Return commit hash and push confirmation.
+Source session: current workspace session
+Outcome: Appended matching procedural provenance entries to agents/prompt_log.md and DryadPlantTraits/chat_provenance_log.md, then committed and pushed.
+
+1. Date: 2026-04-25
 Prompt: Make the minimal procedural update needed for the DryadPlantTraits task in /Users/brianjenquist/VSCode: record this final verification/compliance prompt in agents/prompt_log.md, update DryadPlantTraits/chat_provenance_log.md if required, commit and push, and return commit hash with push confirmation.
 Source session: current workspace session
 Outcome: Added minimal procedural provenance entries to agents/prompt_log.md and DryadPlantTraits/chat_provenance_log.md, then committed and pushed the change set.
