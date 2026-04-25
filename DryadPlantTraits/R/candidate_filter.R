@@ -1,3 +1,12 @@
+dryad_candidate_signal_terms_fallback <- function() {
+  list(
+    plant = character(0),
+    trait = character(0),
+    measurement = character(0),
+    exclude = character(0)
+  )
+}
+
 dryad_count_term_hits <- function(text, terms) {
   if (!length(terms) || !nzchar(text)) {
     return(0L)
@@ -5,7 +14,15 @@ dryad_count_term_hits <- function(text, terms) {
   sum(vapply(terms, function(term) grepl(term, text, fixed = TRUE), logical(1)))
 }
 
-dryad_score_candidate_dataset <- function(title, abstract, source_subjects, signal_terms = dryad_candidate_signal_terms()) {
+dryad_score_candidate_dataset <- function(title, abstract, source_subjects, signal_terms = NULL) {
+  if (is.null(signal_terms)) {
+    signal_terms <- if (exists("dryad_candidate_signal_terms", mode = "function", inherits = TRUE)) {
+      get("dryad_candidate_signal_terms", mode = "function", inherits = TRUE)()
+    } else {
+      dryad_candidate_signal_terms_fallback()
+    }
+  }
+
   text_blob <- paste(title, abstract, source_subjects, sep = " ")
   text_blob <- tolower(gsub("\\s+", " ", text_blob))
 

@@ -64,7 +64,7 @@ merge_query_terms <- function(dataset_table) {
 source_project_files()
 
 args <- parse_named_args(commandArgs(trailingOnly = TRUE))
-output_dir <- args$output_dir %||% file.path(find_project_root(), "output")
+output_dir <- args$`output-dir` %||% args$output_dir %||% file.path(find_project_root(), "output")
 pages_per_term <- as.integer(args$`pages-per-term` %||% "1")
 per_page <- as.integer(args$`per-page` %||% "25")
 

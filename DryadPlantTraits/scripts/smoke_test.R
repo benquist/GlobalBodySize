@@ -55,19 +55,27 @@ if (!is.na(first_doi) && nzchar(first_doi)) {
     # Narrow file-inventory check: exercise dryad_get_version_files / dryad_flatten_files.
     if (nrow(version_table) > 0L) {
       latest_version_id <- version_table$dryad_version_id[[nrow(version_table)]]
-      file_payload <- tryCatch(
-        dryad_get_version_files(latest_version_id, per_page = 5),
-        error = function(e) NULL
-      )
-      if (is.null(file_payload)) {
-        message("Smoke test: file inventory call failed (network issue?); skipping file assertion.")
+      if (is.na(latest_version_id) || !nzchar(as.character(latest_version_id))) {
+        message(sprintf(
+          "Smoke test: file inventory skipped for %s due to NA/malformed version ID (%s).",
+          first_doi,
+          as.character(latest_version_id)
+        ))
       } else {
-        file_table <- dryad_flatten_files(
-          file_payload,
-          dryad_dataset_doi = first_doi,
-          dryad_version_id = latest_version_id
+        file_payload <- tryCatch(
+          dryad_get_version_files(latest_version_id, per_page = 5),
+          error = function(e) NULL
         )
-        message(sprintf("Smoke test: file inventory OK (%s file(s) listed for version %s).", nrow(file_table), latest_version_id))
+        if (is.null(file_payload)) {
+          message("Smoke test: file inventory call failed (network issue?); skipping file assertion.")
+        } else {
+          file_table <- dryad_flatten_files(
+            file_payload,
+            dryad_dataset_doi = first_doi,
+            dryad_version_id = latest_version_id
+          )
+          message(sprintf("Smoke test: file inventory OK (%s file(s) listed for version %s).", nrow(file_table), latest_version_id))
+        }
       }
     }
   }

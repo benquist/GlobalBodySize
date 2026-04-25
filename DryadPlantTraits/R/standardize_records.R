@@ -1,3 +1,41 @@
+dryad_or <- function(x, y) {
+  if (is.null(x) || !length(x)) y else x
+}
+
+dryad_get_required_function <- function(name) {
+  if (!exists(name, mode = "function", inherits = TRUE)) {
+    stop(sprintf("%s() is not available. Source R/trait_dictionary.R and R/dryad_api.R first.", name), call. = FALSE)
+  }
+  get(name, mode = "function", inherits = TRUE)
+}
+
+dryad_canonical_name_local <- function(x) {
+  dryad_get_required_function("dryad_canonical_name")(x)
+}
+
+dryad_trait_dictionary_lookup_local <- function(dictionary = NULL) {
+  if (is.null(dictionary)) {
+    dryad_get_required_function("dryad_trait_dictionary_lookup")()
+  } else {
+    dryad_get_required_function("dryad_trait_dictionary_lookup")(dictionary)
+  }
+}
+
+dryad_now_utc_local <- function() {
+  if (exists("dryad_now_utc", mode = "function", inherits = TRUE)) {
+    return(get("dryad_now_utc", mode = "function", inherits = TRUE)())
+  }
+  format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+}
+
+dryad_standardize_trait_label_local <- function(raw_trait_name, lookup) {
+  dryad_get_required_function("dryad_standardize_trait_label")(raw_trait_name, lookup = lookup)
+}
+
+dryad_read_trait_dictionary_local <- function() {
+  dryad_get_required_function("dryad_read_trait_dictionary")()
+}
+
 dryad_non_empty_string <- function(x) {
   values <- trimws(as.character(x))
   values[!nzchar(values)] <- NA_character_
@@ -26,8 +64,8 @@ dryad_alias_map <- function() {
 }
 
 dryad_find_alias_column <- function(column_names, aliases) {
-  column_keys <- dryad_canonical_name(column_names)
-  alias_keys <- dryad_canonical_name(aliases)
+  column_keys <- dryad_canonical_name_local(column_names)
+  alias_keys <- dryad_canonical_name_local(aliases)
   match_index <- match(alias_keys, column_keys, nomatch = 0L)
   match_index <- match_index[match_index > 0L]
   if (!length(match_index)) {
@@ -43,9 +81,12 @@ dryad_guess_columns <- function(df) {
   as.list(guesses)
 }
 
-dryad_dictionary_trait_columns <- function(df, lookup = dryad_trait_dictionary_lookup()) {
+dryad_dictionary_trait_columns <- function(df, lookup = NULL) {
+  if (is.null(lookup)) {
+    lookup <- dryad_trait_dictionary_lookup_local()
+  }
   column_names <- names(df)
-  column_keys <- dryad_canonical_name(column_names)
+  column_keys <- dryad_canonical_name_local(column_names)
   matched <- vapply(column_keys, function(key) !is.null(lookup[[key]]), logical(1))
   column_names[matched]
 }
@@ -113,9 +154,9 @@ dryad_fill_common_fields <- function(output, base_df, row_index, guesses, proven
   output$latitude[[row_index]] <- suppressWarnings(as.numeric(if (!is.na(guesses$latitude)) base_df[[guesses$latitude]][[1]] else NA))
   output$longitude[[row_index]] <- suppressWarnings(as.numeric(if (!is.na(guesses$longitude)) base_df[[guesses$longitude]][[1]] else NA))
   output$date_collected[[row_index]] <- if (!is.na(guesses$date_collected)) dryad_non_empty_string(base_df[[guesses$date_collected]])[[1]] else NA_character_
-  output$dataset[[row_index]] <- if (!is.na(guesses$dataset)) dryad_non_empty_string(base_df[[guesses$dataset]])[[1]] else provenance$dryad_dataset_doi %||% provenance$source_title %||% NA_character_
+  output$dataset[[row_index]] <- if (!is.na(guesses$dataset)) dryad_non_empty_string(base_df[[guesses$dataset]])[[1]] else dryad_or(provenance$dryad_dataset_doi, dryad_or(provenance$source_title, NA_character_))
   output$datasource[[row_index]] <- if (!is.na(guesses$datasource)) dryad_non_empty_string(base_df[[guesses$datasource]])[[1]] else "Dryad"
-  output$dataowner[[row_index]] <- if (!is.na(guesses$dataowner)) dryad_non_empty_string(base_df[[guesses$dataowner]])[[1]] else provenance$source_authors %||% NA_character_
+  output$dataowner[[row_index]] <- if (!is.na(guesses$dataowner)) dryad_non_empty_string(base_df[[guesses$dataowner]])[[1]] else dryad_or(provenance$source_authors, NA_character_)
   output$collection_code[[row_index]] <- if (!is.na(guesses$collection_code)) dryad_non_empty_string(base_df[[guesses$collection_code]])[[1]] else NA_character_
   output$method[[row_index]] <- if (!is.na(guesses$method)) dryad_non_empty_string(base_df[[guesses$method]])[[1]] else NA_character_
   output$country[[row_index]] <- if (!is.na(guesses$country)) dryad_non_empty_string(base_df[[guesses$country]])[[1]] else NA_character_
@@ -129,15 +170,15 @@ dryad_fill_common_fields <- function(output, base_df, row_index, guesses, proven
   output$value_type[[row_index]] <- trait_match$value_type
   output$standard_unit[[row_index]] <- trait_match$standard_unit
   output$trait_dictionary_notes[[row_index]] <- trait_match$notes
-  output$dryad_dataset_doi[[row_index]] <- provenance$dryad_dataset_doi %||% NA_character_
-  output$dryad_version_id[[row_index]] <- suppressWarnings(as.integer(provenance$dryad_version_id %||% NA_integer_))
-  output$dryad_file_id[[row_index]] <- suppressWarnings(as.integer(provenance$dryad_file_id %||% NA_integer_))
-  output$source_title[[row_index]] <- provenance$source_title %||% NA_character_
-  output$source_authors[[row_index]] <- provenance$source_authors %||% NA_character_
-  output$source_subjects[[row_index]] <- provenance$source_subjects %||% NA_character_
-  output$source_abstract[[row_index]] <- provenance$source_abstract %||% NA_character_
-  output$download_timestamp_utc[[row_index]] <- provenance$download_timestamp_utc %||% dryad_now_utc()
-  output$source_file_path[[row_index]] <- provenance$source_file_path %||% NA_character_
+  output$dryad_dataset_doi[[row_index]] <- dryad_or(provenance$dryad_dataset_doi, NA_character_)
+  output$dryad_version_id[[row_index]] <- suppressWarnings(as.integer(dryad_or(provenance$dryad_version_id, NA_integer_)))
+  output$dryad_file_id[[row_index]] <- suppressWarnings(as.integer(dryad_or(provenance$dryad_file_id, NA_integer_)))
+  output$source_title[[row_index]] <- dryad_or(provenance$source_title, NA_character_)
+  output$source_authors[[row_index]] <- dryad_or(provenance$source_authors, NA_character_)
+  output$source_subjects[[row_index]] <- dryad_or(provenance$source_subjects, NA_character_)
+  output$source_abstract[[row_index]] <- dryad_or(provenance$source_abstract, NA_character_)
+  output$download_timestamp_utc[[row_index]] <- dryad_or(provenance$download_timestamp_utc, dryad_now_utc_local())
+  output$source_file_path[[row_index]] <- dryad_or(provenance$source_file_path, NA_character_)
   output$original_row_number[[row_index]] <- suppressWarnings(as.integer(base_df$.dryad_original_row_number[[1]]))
   output$raw_taxon[[row_index]] <- if (!is.na(guesses$scrubbed_species_binomial)) dryad_non_empty_string(base_df[[guesses$scrubbed_species_binomial]])[[1]] else NA_character_
   output$raw_trait_name[[row_index]] <- dryad_non_empty_string(raw_trait_name)
@@ -151,9 +192,9 @@ dryad_fill_common_fields <- function(output, base_df, row_index, guesses, proven
   output$raw_locality[[row_index]] <- if (!is.na(guesses$locality)) dryad_non_empty_string(base_df[[guesses$locality]])[[1]] else NA_character_
   output$raw_date_collected[[row_index]] <- if (!is.na(guesses$date_collected)) dryad_non_empty_string(base_df[[guesses$date_collected]])[[1]] else NA_character_
   output$source_column_taxon[[row_index]] <- guesses$scrubbed_species_binomial
-  output$source_column_trait_name[[row_index]] <- provenance$source_column_trait_name %||% raw_trait_name
-  output$source_column_trait_value[[row_index]] <- provenance$source_column_trait_value %||% guesses$trait_value
-  output$source_column_unit[[row_index]] <- provenance$source_column_unit %||% guesses$unit
+  output$source_column_trait_name[[row_index]] <- dryad_or(provenance$source_column_trait_name, raw_trait_name)
+  output$source_column_trait_value[[row_index]] <- dryad_or(provenance$source_column_trait_value, guesses$trait_value)
+  output$source_column_unit[[row_index]] <- dryad_or(provenance$source_column_unit, guesses$unit)
   output
 }
 
@@ -173,7 +214,7 @@ dryad_standardize_long_records <- function(df, guesses, provenance, trait_lookup
     raw_trait_name <- as.character(base_row[[trait_name_col]][[1]])
     raw_trait_value <- as.character(base_row[[trait_value_col]][[1]])
     raw_unit <- if (!is.na(unit_col)) as.character(base_row[[unit_col]][[1]]) else NA_character_
-    trait_match <- dryad_standardize_trait_label(raw_trait_name, lookup = trait_lookup)
+    trait_match <- dryad_standardize_trait_label_local(raw_trait_name, lookup = trait_lookup)
     row_provenance <- c(provenance, list(
       source_column_trait_name = trait_name_col,
       source_column_trait_value = trait_value_col,
@@ -197,7 +238,7 @@ dryad_standardize_wide_records <- function(df, guesses, provenance, trait_lookup
   out_index <- 1L
 
   for (trait_column in trait_columns) {
-    trait_match <- dryad_standardize_trait_label(trait_column, lookup = trait_lookup)
+    trait_match <- dryad_standardize_trait_label_local(trait_column, lookup = trait_lookup)
     for (row_index in seq_len(nrow(df))) {
       raw_trait_value <- as.character(df[[trait_column]][[row_index]])
       if (!nzchar(trimws(raw_trait_value)) || identical(raw_trait_value, "NA")) {
@@ -214,15 +255,19 @@ dryad_standardize_wide_records <- function(df, guesses, provenance, trait_lookup
   output[seq_len(max(out_index - 1L, 0L)), , drop = FALSE]
 }
 
-dryad_standardize_records <- function(df, provenance = list(), dictionary = dryad_read_trait_dictionary()) {
+dryad_standardize_records <- function(df, provenance = list(), dictionary = NULL) {
   if (!is.data.frame(df) || !nrow(df) || !ncol(df)) {
     return(dryad_make_observation_table(0L))
+  }
+
+  if (is.null(dictionary)) {
+    dictionary <- dryad_read_trait_dictionary_local()
   }
 
   working_df <- df
   working_df$.dryad_original_row_number <- seq_len(nrow(working_df))
   guesses <- dryad_guess_columns(working_df)
-  trait_lookup <- dryad_trait_dictionary_lookup(dictionary)
+  trait_lookup <- dryad_trait_dictionary_lookup_local(dictionary)
 
   long_result <- dryad_standardize_long_records(working_df, guesses, provenance, trait_lookup)
   if (!is.null(long_result) && nrow(long_result)) {

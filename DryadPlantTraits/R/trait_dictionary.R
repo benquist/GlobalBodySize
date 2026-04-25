@@ -1,5 +1,31 @@
+dryad_project_root <- function() {
+  cwd <- getwd()
+
+  if (basename(cwd) == "DryadPlantTraits") {
+    return(cwd)
+  }
+  if (basename(cwd) == "scripts" && basename(dirname(cwd)) == "DryadPlantTraits") {
+    return(dirname(cwd))
+  }
+
+  workspace_candidate <- file.path(cwd, "DryadPlantTraits")
+  if (dir.exists(workspace_candidate)) {
+    return(workspace_candidate)
+  }
+
+  NULL
+}
+
 dryad_trait_dictionary_path <- function() {
+  project_root <- dryad_project_root()
+  root_candidate <- if (!is.null(project_root)) {
+    file.path(project_root, "data", "trait_dictionary_starter.csv")
+  } else {
+    character(0)
+  }
+
   candidates <- c(
+    root_candidate,
     file.path("data", "trait_dictionary_starter.csv"),
     file.path("DryadPlantTraits", "data", "trait_dictionary_starter.csv"),
     file.path("..", "data", "trait_dictionary_starter.csv")

@@ -1,3 +1,12 @@
+`%||%` <- function(x, y) {
+  if (is.null(x) || !length(x)) y else x
+}
+
+dryad_or <- function(x, y) {
+  if (is.null(x) || !length(x)) y else x
+}
+
+
 dryad_api_base_url <- function() {
   "https://datadryad.org/api/v2"
 }
@@ -249,15 +258,15 @@ dryad_flatten_search_results <- function(payload, query_term = NA_character_) {
   rows <- lapply(datasets, function(dataset) {
     data.frame(
       query_term = query_term,
-      dryad_dataset_doi = dataset$identifier %||% NA_character_,
-      dryad_dataset_id = dataset$id %||% NA_integer_,
+      dryad_dataset_doi = dryad_or(dataset$identifier, NA_character_),
+      dryad_dataset_id = dryad_or(dataset$id, NA_integer_),
       title = dryad_compact_text(dataset$title),
       authors = dryad_author_string(dataset$authors),
       abstract = dryad_compact_text(dataset$abstract),
       source_subjects = dryad_compact_text(c(dataset$subjects, dataset$subject, dataset$fieldOfScience, dataset$keywords)),
       field_of_science = dryad_compact_text(dataset$fieldOfScience),
-      storage_size = suppressWarnings(as.numeric(dataset$storageSize %||% NA_real_)),
-      latest_version_id = dryad_extract_id_from_href(dataset$`_links`$`stash:version`$href %||% ""),
+      storage_size = suppressWarnings(as.numeric(dryad_or(dataset$storageSize, NA_real_))),
+      latest_version_id = dryad_extract_id_from_href(dryad_or(dataset$`_links`$`stash:version`$href, "")),
       stringsAsFactors = FALSE
     )
   })
@@ -274,7 +283,7 @@ dryad_flatten_versions <- function(payload, dataset_identifier = NA_character_) 
   rows <- lapply(versions, function(version) {
     data.frame(
       dryad_dataset_doi = dataset_identifier,
-      dryad_version_id = dryad_extract_id_from_href(version$`_links`$self$href %||% ""),
+      dryad_version_id = dryad_extract_id_from_href(dryad_or(version$`_links`$self$href, "")),
       title = dryad_compact_text(version$title),
       authors = dryad_author_string(version$authors),
       abstract = dryad_compact_text(version$abstract),
@@ -296,19 +305,15 @@ dryad_flatten_files <- function(payload, dryad_dataset_doi = NA_character_, drya
     data.frame(
       dryad_dataset_doi = dryad_dataset_doi,
       dryad_version_id = dryad_version_id,
-      dryad_file_id = dryad_extract_id_from_href(file_entry$`_links`$self$href %||% ""),
-      file_path = file_entry$path %||% NA_character_,
-      file_size = suppressWarnings(as.numeric(file_entry$size %||% NA_real_)),
-      mime_type = file_entry$mimeType %||% NA_character_,
-      file_status = file_entry$status %||% NA_character_,
-      download_href = file_entry$`_links`$`stash:download`$href %||% NA_character_,
+      dryad_file_id = dryad_extract_id_from_href(dryad_or(file_entry$`_links`$self$href, "")),
+      file_path = dryad_or(file_entry$path, NA_character_),
+      file_size = suppressWarnings(as.numeric(dryad_or(file_entry$size, NA_real_))),
+      mime_type = dryad_or(file_entry$mimeType, NA_character_),
+      file_status = dryad_or(file_entry$status, NA_character_),
+      download_href = dryad_or(file_entry$`_links`$`stash:download`$href, NA_character_),
       stringsAsFactors = FALSE
     )
   })
 
   do.call(rbind, rows)
-}
-
-`%||%` <- function(x, y) {
-  if (is.null(x) || !length(x)) y else x
 }
