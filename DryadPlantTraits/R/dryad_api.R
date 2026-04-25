@@ -207,16 +207,24 @@ dryad_get_version_files <- function(version_id, page = 1L, per_page = 100L) {
   result
 }
 
-dryad_download_file <- function(file_id, destfile, token = Sys.getenv("DRYAD_API_TOKEN", "")) {
-  if (!nzchar(token)) {
-    return(list(success = FALSE, status = 401L, message = "DRYAD_API_TOKEN is not set.", destfile = destfile))
+dryad_download_file <- function(file_id = NULL, filename = NULL, destfile, download_url = NULL) {
+  if (is.null(download_url) && (is.null(file_id) || is.null(filename))) {
+    return(list(success = FALSE, status = 0L, message = "Either download_url or both file_id and filename must be provided.", destfile = destfile))
   }
 
-  response <- dryad_run_curl(
-    dryad_build_url(sprintf("files/%s/download", as.integer(file_id))),
-    headers = c(sprintf("Authorization: Bearer %s", token)),
-    destfile = destfile
-  )
+  url <- if (!is.null(download_url)) {
+    if (!grepl("^https?://", download_url)) {
+      paste0("https://datadryad.org", download_url)
+    } else {
+      download_url
+    }
+  } else {
+    # Construct public download URL from file_id and filename
+    # Pattern: /stash/files/{file_id}/{filename}
+    sprintf("https://datadryad.org/stash/files/%d/%s", as.integer(file_id), basename(filename))
+  }
+
+  response <- dryad_run_curl(url, destfile = destfile)
 
   if (response$http_code %in% c(401L, 403L)) {
     if (file.exists(destfile)) {
@@ -225,10 +233,7 @@ dryad_download_file <- function(file_id, destfile, token = Sys.getenv("DRYAD_API
     return(list(
       success = FALSE,
       status = response$http_code,
-      message = sprintf(
-        "Dryad rejected the file download request (HTTP %s). Set DRYAD_API_TOKEN to a valid bearer token.",
-        response$http_code
-      ),
+      message = sprintf("Dryad rejected the file download request (HTTP %s).", response$http_code),
       destfile = destfile
     ))
   }

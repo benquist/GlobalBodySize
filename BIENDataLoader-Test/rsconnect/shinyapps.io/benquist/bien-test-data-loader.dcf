@@ -1,0 +1,10 @@
+name: bien-test-data-loader
+title:
+username: benquist
+account: benquist
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17216402
+bundleId: 11897620
+url: https://benquist.shinyapps.io/bien-test-data-loader/
+version: 1

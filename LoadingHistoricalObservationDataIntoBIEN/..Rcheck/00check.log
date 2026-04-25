@@ -1,0 +1,201 @@
+* using log directory ‘/Users/brianjenquist/VSCode/LoadingHistoricalObservationDataIntoBIEN/..Rcheck’
+* using R version 4.3.3 (2024-02-29)
+* using platform: aarch64-apple-darwin20 (64-bit)
+* R was compiled by
+    Apple clang version 14.0.0 (clang-1400.0.29.202)
+    GNU Fortran (GCC) 12.2.0
+* running under: macOS 15.5
+* using session charset: UTF-8
+* checking for file ‘./DESCRIPTION’ ... OK
+* checking extension type ... Package
+* this is package ‘HistoricalObsToBIEN’ version ‘0.1.0’
+* package encoding: UTF-8
+* checking package namespace information ... OK
+* checking package dependencies ... OK
+* checking if this is a source package ... NOTE
+Subdirectory ‘HistoricalObsToBIEN.Rcheck/HistoricalObsToBIEN’ seems to contain an installed version of the package.
+* checking if there is a namespace ... OK
+* checking for executable files ... OK
+* checking for hidden files and directories ... NOTE
+Found the following hidden files and directories:
+  ..Rcheck
+  BIEN_Historical_Data_ShinyApp/.git
+These were most likely included in error. See section ‘Package
+structure’ in the ‘Writing R Extensions’ manual.
+* checking for portable file names ... NOTE
+Found the following non-portable file paths:
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/01/bb0aca2cfe501b1e84fa1d5307c5db05426357
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/02/3f253f87798e643fcb713fa41efe1418f07402
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/07/c3121c93f6fce25313663927a525e6e5f938c0
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/0b/c73586d0ac2a33faf0fec464c509e898fd3a00
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/0b/f10061006f3acb2c9618098409d496e1669e32
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/0c/bb2e033ad190329441657c4483a1216c89dbed
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/0f/1f91c0b48b73d7e2d4399a235cd57326eaa632
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/0f/c47678e310098b4e89d1d76aea9f017b1000fd
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/18/958f43b3d96a3ef01cf4c0c6db80b3ec669f6b
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/24/5deb90547bcb143e710bc64cf297506bdb8342
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/27/2708c55ee4866ce4faeb0bf19b17b83c497e5b
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/29/5e2e7aad2605b5a648bfe4e1c569b5f1ec64cc
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/2e/4770b4e79b2643630351309dd751a42a850ec9
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/34/ac4b0fc1b074f27862e306bf4b3ab3187e0844
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/44/24197147c6610c0c2357424c38fb893fd4b05f
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/46/f63dc6f9bce90218f0f09ac1fc767c32a2f8bb
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/48/52aba7a32e802e650e2ab97e45b153c7f86e37
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/4b/ba7d0f3fb26aa7970f8dff0c0dfb35b974601a
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/55/32500a5f2973bd3aad7d1dea4dab917a96ca7d
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/5a/2e7b4dfbc53d639a2267e93e58901110f7d499
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/5d/0ecbce5e3b0eb3049ce2dcad0a8e2686b9d29c
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/5e/6327a2fbabca754f18cd053740cea62bdebc98
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/62/0594d67265c10cd674ee4e8ffd1c3c2ef6f284
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/62/cd5e0ab2c58f7921695f4bc6237b46f1768a48
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/66/401c9e3bf37886bc2fe426778b4468851e2554
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/6e/575015faabffcbfe0462a4a9ad467f6cc933f7
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/76/0721966e16c2f75620587a522d94ceae27b700
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/78/bf1ca6668225830ceecd3b9f52f41e85f87a56
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/79/f397f9f33f257b31cf5c4bcd695ecb18e5a42a
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/7d/9ee32ecbf0546a7b32f68f7bc8e68a627aec72
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/7e/f2785e7c8ed2a760bbf74183d5746cff32a764
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/84/1f99688dd008fd8601ab16283bfa9724925b1e
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/86/ff88582b05a80b84a48c8fe68cb447c36248f1
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/8a/6e24b39bb7b2d10c39bc2c03afeccef19aab88
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/8d/b724c5ea87b8b760647f62b948e90fdf8f7f12
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/90/896bbb1ea0f0be92882ad18c05c53e5665a9f0
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/9a/e8e2942a1dbcaec60477b47ab17555815e4668
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/9b/d6e65d9e392d08c306450d32e46872d047929f
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/9d/0a7446bac305344f9ac575e17b819a640fa61a
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/9d/2a6a1e965e5099eb7089d26326f4794391f51a
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/9d/51f5cf37280423e2e807be1bbe315b630ce7fe
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/9e/e037b6f069e7102b2a98932c583adc965afdcf
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/9f/640e2ba98990f2dbded6ba5238b2726f30d67b
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/a0/d1b9b5a60fd5b2b2164e0893f5bcc2b3c906e6
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/a3/46e50c6e9597c2f81d7b838cbaf77718fba2af
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/b2/150fa4905a99899d67bf65a1122099281d693b
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/b8/185dc113ea07dfbefad7c6672a7e765a2e2048
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/bb/1d1d3b91a1faf2c274e1d9a6b2ce2ec98ff309
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/bb/a1b83d5be12722a1c4720bcdf83f12b84b0c25
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/c7/55cfb47b3ab70b2874547c90040c5e17479bb0
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/cc/e6cc4179c5892ebc2fedf6484690fa2b041df4
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/cf/8918c5f406218f54e8031862cf149344524df4
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/d5/352e9968249b07a4c2ea6f32b781eebf67e084
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/d5/4c551b8e2fb47c3a4267030e4c1bcfc573140f
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/d6/d4445adb2cdcb80cab3d6ab17a4a3bc36392c3
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/dc/2ce16e5bfd515f963e76565055581a98bcb350
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/e6/80086ed9030deaf23c00d52fb63c177b785fa8
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/e7/a4df1f122d3ed74379ddb96724fb99aadf38a1
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/e7/fad39c98d70318f44149275cc6f71a6d343ae8
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/e8/0df49324bebf2f3f50875d87e72640b30a8b60
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/ea/6d38ce063053221868c9418a0e5b059e705b61
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/ea/f226e3a6e6b663044d1a93fa42c0176216681f
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/f0/5d17142a596b7b96dd06738fbb9ea106ca60d9
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/f4/ee4fede18ac48cf31f6cd4cfd414be6f0d0503
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/f9/56b899279ddfae66cbdf99abae3b191ccd1d62
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/f9/769cb0f5d0b49ae465230fc6bdb6d06c8db753
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/.git/objects/fa/4ae626e934ce9a44f50418d6cff5c893682f73
+  HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/rsconnect/shinyapps.io/benquist/historical-obs-to-bien.dcf
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/DESCRIPTION
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/HistoricalObsToBIEN_0.1.0.tar.gz
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/LICENSE
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/NAMESPACE
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R/app_launch.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R/bien_handoff.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R/bien_pipeline_helpers.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R/dwc_mapping.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R/io_ingest.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R/multi_file_merge.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R/qc_checks.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/README.md
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/app.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/inst/dictionaries/header_synonyms.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/inst/extdata/sample_historical_observations.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/inst/extdata/sample_plot_metadata.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/inst/extdata/tutorial_observations.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/rsconnect/shinyapps.io/benquist/historical-obs-to-bien.dcf
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/tests/smoke_join_qc.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/R/bien_pipeline_helpers.R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/inst/dictionaries/header_synonyms.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/inst/extdata/sample_historical_observations.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/inst/extdata/sample_plot_metadata.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/inst/extdata/tutorial_observations.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/rsconnect/shinyapps.io/benquist/LoadingHistoricalObservationDataIntoBIEN.dcf
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/rsconnect/shinyapps.io/benquist/historical-obs-to-bien.dcf
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/HistoricalObsToBIEN/extdata/sample_historical_observations.csv
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/R
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/inst/dictionaries
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/inst/extdata
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/rsconnect/shinyapps.io/benquist
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/BIEN_Historical_Data_ShinyApp/tests
+  HistoricalObsToBIEN/HistoricalObsToBIEN.Rcheck/00_pkg_src/HistoricalObsToBIEN/rsconnect/shinyapps.io/benquist
+
+Tarballs are only required to store paths of up to 100 bytes and cannot
+store those of more than 256 bytes, with restrictions including to 100
+bytes for the final component.
+See section ‘Package structure’ in the ‘Writing R Extensions’ manual.
+* checking for sufficient/correct file permissions ... OK
+* checking whether package ‘HistoricalObsToBIEN’ can be installed ... OK
+* checking installed package size ... OK
+* checking package directory ... OK
+* checking DESCRIPTION meta-information ... NOTE
+Checking should be performed on sources prepared by ‘R CMD build’.
+* checking top-level files ... OK
+* checking for left-over files ... OK
+* checking index information ... OK
+* checking package subdirectories ... WARNING
+Found the following directories with names of check directories:
+  ./..Rcheck
+  ./HistoricalObsToBIEN.Rcheck
+Most likely, these were included erroneously.
+* checking R files for non-ASCII characters ... OK
+* checking R files for syntax errors ... OK
+* checking whether the package can be loaded ... OK
+* checking whether the package can be loaded with stated dependencies ... OK
+* checking whether the package can be unloaded cleanly ... OK
+* checking whether the namespace can be loaded with stated dependencies ... OK
+* checking whether the namespace can be unloaded cleanly ... OK
+* checking loading without being on the library search path ... OK
+* checking dependencies in R code ... WARNING
+'::' or ':::' imports not declared from:
+  ‘BIEN’ ‘httr’
+'loadNamespace' or 'requireNamespace' call not declared from: ‘BIEN’
+* checking S3 generic/method consistency ... OK
+* checking replacement functions ... OK
+* checking foreign function calls ... OK
+* checking R code for possible problems ... NOTE
+bien_tnrs_query: no visible global function definition for ‘read.csv’
+Undefined global functions or variables:
+  read.csv
+Consider adding
+  importFrom("utils", "read.csv")
+to your NAMESPACE file.
+* checking for missing documentation entries ... WARNING
+Undocumented code objects:
+  ‘apply_dwc_mapping’ ‘audit_join_quality’ ‘build_bien_handoff_tables’
+  ‘build_bien_loading_table’ ‘canonicalize_header’
+  ‘find_duplicate_metadata_conflicts’ ‘merge_uploaded_streams’
+  ‘qc_has_blockers’ ‘read_historical_csv’ ‘read_uploaded_csv_list’
+  ‘required_dwc_terms’ ‘run_dwc_qc’ ‘run_histbien_app’
+  ‘suggest_dwc_mapping’
+All user-level objects in a package should have documentation entries.
+See chapter ‘Writing R documentation files’ in the ‘Writing R
+Extensions’ manual.
+* checking LazyData ... NOTE
+  'LazyData' is specified without a 'data' directory
+* checking examples ... NONE
+* checking for unstated dependencies in ‘tests’ ... OK
+* checking tests ... ERROR
+  Running ‘smoke_join_blocker_service_state.R’
+Running the tests in ‘tests/smoke_join_blocker_service_state.R’ failed.
+Complete output:
+  > if (!requireNamespace("LoadingHistoricalObservationDataIntoBIEN", quietly = TRUE)) {
+  +   .libPaths(c(normalizePath("../..")), .libPaths())
+  + }
+  Error in if (include.site) .Library.site : the condition has length > 1
+  Calls: .libPaths
+  Execution halted
+* checking PDF version of manual ... WARNING
+LaTeX errors when creating PDF version.
+This typically indicates Rd problems.
+* checking PDF version of manual without index ... ERROR
+Re-running with no redirection of stdout/stderr.
+* DONE
+Status: 2 ERRORs, 4 WARNINGs, 6 NOTEs

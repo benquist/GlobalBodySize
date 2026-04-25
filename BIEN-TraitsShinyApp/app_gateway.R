@@ -21,6 +21,13 @@ suppressPackageStartupMessages({
 })
 
 .bien_trait_catalog_cache <- NULL
+.bien_taxon_suggestion_cache <- list()
+
+.bien_taxon_suggestion_fallback <- list(
+  genus = c("Pinus", "Quercus", "Abies", "Picea", "Populus", "Salix", "Acer", "Arctostaphylos"),
+  species = c("Pinus ponderosa", "Quercus agrifolia", "Populus tremuloides"),
+  family = c("Pinaceae", "Fagaceae", "Salicaceae")
+)
 
 # ============================================================================
 # HELPER FUNCTIONS - DATA COLLECTION & NORMALIZATION
@@ -74,12 +81,40 @@ safe_bien_call <- function(expr, timeout_sec = 120) {
   })
 }
 
+is_bien_connection_slot_error <- function(msg) {
+  if (is.null(msg) || !length(msg)) return(FALSE)
+  msg <- paste(as.character(msg), collapse = " ")
+  if (!nzchar(msg)) return(FALSE)
+
+  patterns <- c(
+    "remaining connection slots are reserved",
+    "too many connections",
+    "too many clients already"
+  )
+
+  any(vapply(patterns, function(p) grepl(p, msg, ignore.case = TRUE), logical(1)))
+}
+
+format_bien_error <- function(err_msg, context = c("query", "suggestions")) {
+  context <- match.arg(context)
+  if (is_bien_connection_slot_error(err_msg)) {
+    if (identical(context, "query")) {
+      return("BIEN database is temporarily at connection capacity. Please retry in 1-2 minutes.")
+    }
+    return("Taxon suggestions are temporarily unavailable (BIEN database is busy). You can still type and submit a taxon name directly.")
+  }
+  as.character(err_msg)
+}
+
 safe_bien_retry <- function(call_fn, timeout_sec = 120, attempts = 3, sleep_sec = 1) {
   last <- NULL
   for (i in seq_len(attempts)) {
     last <- safe_bien_call(call_fn(), timeout_sec = timeout_sec)
     if (!inherits(last, "bien_error")) {
       return(last)
+    }
+    if (is_bien_connection_slot_error(last$error)) {
+      break
     }
     if (i < attempts) Sys.sleep(sleep_sec * i)
   }
@@ -251,13 +286,31 @@ load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120)
     bien_sql(query = sql, fetch.query = FALSE)
   }, timeout_sec = timeout_sec, attempts = 2)
 
+  fallback_vals <- .bien_taxon_suggestion_fallback[[rank]]
+  if (is.null(fallback_vals)) fallback_vals <- character(0)
+
+  cached_vals <- .bien_taxon_suggestion_cache[[rank]]
+  if (is.null(cached_vals)) cached_vals <- character(0)
+
   if (inherits(out, "bien_error") || !is.data.frame(out) || nrow(out) == 0 || !"taxon" %in% names(out)) {
-    return(character(0))
+    if (length(cached_vals) > 0) {
+      return(cached_vals)
+    }
+    return(fallback_vals)
   }
 
   vals <- unique(as.character(out$taxon))
   vals <- vals[!is.na(vals) & nzchar(vals)]
-  vals
+  if (length(vals) > 0) {
+    .bien_taxon_suggestion_cache[[rank]] <<- vals
+    return(vals)
+  }
+
+  if (length(cached_vals) > 0) {
+    return(cached_vals)
+  }
+
+  fallback_vals
 }
 
 suggestion_cap_for_rank <- function(rank) {
@@ -852,7 +905,7 @@ queryServer <- function(id) {
             max_records = max_records
           )
           rv$error_msg <- if (is.character(bien_err) && nzchar(bien_err)) {
-            paste("BIEN query error:", bien_err)
+            paste("BIEN query error:", format_bien_error(bien_err, context = "query"))
           } else if (nrow(dat) == 0) {
             "No trait records found for this query. For genus/family mode, try a plain name (for example: Prunus)."
           } else {

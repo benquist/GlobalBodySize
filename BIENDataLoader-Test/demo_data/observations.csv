@@ -1,0 +1,13 @@
+occurrenceID,Plot_Name,scientificName,Date_Collected,Observer,decimalLatitude,decimalLongitude,Family,Notes
+hist-001,Plot_A,Abies bracteata,1912-06-10,H.L. Mason,35.321,-120.123,Pinaceae,Mature tree at ridgeline
+hist-002,Plot_A,Pinus ponderosa,1912-06-11,H.L. Mason,35.322,-120.124,Pinaceae,Large specimen
+hist-003,Plot_B,Quercus agrifolia,1910-08-05,H.L. Mason,35.456,-120.334,Fagaceae,Dense stand near creek
+hist-004,Plot_B,Platanus racemosa,1910-08-06,H.L. Mason,35.457,-120.335,Platanaceae,Riparian corridor
+hist-005,Plot_C,Adenostoma fasciculatum,1911-05-14,H.L. Mason,34.888,-119.712,Rosaceae,Chaparral dominant
+hist-006,Plot_C,Arctostaphylos glauca,1911-05-15,H.L. Mason,34.889,-119.713,Ericaceae,Associated with chamise
+hist-007,Plot_D,Ceanothus cuneatus,1912-04-22,H.L. Mason,36.102,-121.445,Rhamnaceae,Early season bloom
+hist-008,Plot_D,Salvia apiana,1912-04-23,H.L. Mason,36.103,-121.446,Lamiaceae,White sage scrub
+hist-009,Plot_E,Sambucus nigra,1910-09-30,H.L. Mason,35.678,-120.891,Adoxaceae,Elderberry thicket
+hist-010,Plot_E,Prunus ilicifolia,1910-10-01,H.L. Mason,35.679,-120.892,Rosaceae,Holly-leaved cherry
+hist-011,Plot_F,Heteromeles arbutifolia,1911-07-18,H.L. Mason,34.210,-119.445,Rosaceae,Toyon in full fruit
+hist-012,Plot_F,Rhamnus californica,1911-07-19,H.L. Mason,34.211,-119.446,Rhamnaceae,Coffeeberry understory

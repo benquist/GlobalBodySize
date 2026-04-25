@@ -1,0 +1,34 @@
+\nonstopmode{}
+\documentclass[a4paper]{book}
+\usepackage[times,inconsolata,hyper]{Rd}
+\usepackage{makeidx}
+\usepackage[utf8]{inputenc} % @SET ENCODING@
+% \usepackage{graphicx} % @USE GRAPHICX@
+\makeindex{}
+\begin{document}
+\chapter*{}
+\begin{center}
+{\textbf{\huge Package `HistoricalObsToBIEN'}}
+\par\bigskip{\large \today}
+\end{center}
+\inputencoding{utf8}
+\ifthenelse{\boolean{Rd@use@hyper}}{\hypersetup{pdftitle = {HistoricalObsToBIEN: BIEN Observation Ingest and Reconciliation Tool}}}{}
+\ifthenelse{\boolean{Rd@use@hyper}}{\hypersetup{pdfauthor = {BIEN Team}}}{}
+\begin{description}
+\raggedright{}
+\item[Type]\AsIs{Package}
+\item[Title]\AsIs{BIEN Observation Ingest and Reconciliation Tool}
+\item[Version]\AsIs{0.1.0}
+\item[Author]\AsIs{BIEN Team [aut, cre]}
+\item[Maintainer]\AsIs{BIEN Team }\email{bien@example.org}\AsIs{}
+\item[Description]\AsIs{Tools and a Shiny interface to map historical observation CSV files to Darwin Core and generate BIEN-ready handoff tables for TNRS, GNRS, GVS, and NSR workflows.}
+\item[License]\AsIs{MIT + file LICENSE}
+\item[Encoding]\AsIs{UTF-8}
+\item[LazyData]\AsIs{true}
+\item[Imports]\AsIs{shiny}
+\item[Suggests]\AsIs{testthat}
+\item[RoxygenNote]\AsIs{7.3.2}
+\end{description}
+\Rdcontents{\R{} topics documented:}
+\printindex{}
+\end{document}

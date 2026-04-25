@@ -1,0 +1,15 @@
+Package: HistoricalObsToBIEN
+Type: Package
+Title: BIEN Observation Ingest and Reconciliation Tool
+Version: 0.1.0
+Authors@R: person(given = "BIEN", family = "Team", role = c("aut", "cre"), email = "bien@example.org")
+Author: BIEN Team [aut, cre]
+Maintainer: BIEN Team <bien@example.org>
+Description: Tools and a Shiny interface to map historical observation CSV files to Darwin Core and generate BIEN-ready handoff tables for TNRS, GNRS, GVS, and NSR workflows.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports: shiny
+Suggests: testthat
+RoxygenNote: 7.3.2
+Built: R 4.3.3; ; 2026-04-22 13:55:22 UTC; unix

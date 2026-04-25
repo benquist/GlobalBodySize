@@ -165,7 +165,22 @@ find_best_species_spelling <- function(species_name, timeout_sec = 20) {
   }
 
   genus <- parts[1]
-  genus_rows <- safe_bien_call(BIEN_taxonomy_genus(genus), timeout_sec = min(timeout_sec, 20))
+  # Use a direct SQL query with LIMIT instead of BIEN_taxonomy_genus(genus).
+  # BIEN_taxonomy_genus() for large genera (e.g. Arctostaphylos, 60+ spp) can
+  # return very slowly and exceed R's setTimeLimit interrupt window, hanging
+  # the app. Querying bien_taxonomy directly with a LIKE prefix and LIMIT 250
+  # is fast and returns more than enough candidates for edit-distance ranking.
+  genus_sql <- paste0(
+    "SELECT DISTINCT scrubbed_species_binomial FROM bien_taxonomy ",
+    "WHERE scrubbed_species_binomial LIKE ", sql_quote_literal(paste0(genus, " %")),
+    " AND scrubbed_species_binomial IS NOT NULL",
+    " AND scrubbed_species_binomial <> ''",
+    " LIMIT 250;"
+  )
+  genus_rows <- safe_bien_call(
+    BIEN:::.BIEN_sql(genus_sql, fetch.query = FALSE),
+    timeout_sec = min(timeout_sec, 8)
+  )
 
   if (inherits(genus_rows, "error")) {
     return(list(status = "lookup_error", message = conditionMessage(genus_rows)))
@@ -223,11 +238,16 @@ find_best_species_spelling <- function(species_name, timeout_sec = 20) {
 }
 
 load_accepted_species_suggestions <- function(timeout_sec = 60) {
+  # NOTE: scrubbed_taxonomic_status = 'Accepted' filter intentionally removed.
+  # BIEN taxonomy stores many species (e.g. Arctostaphylos) with status values
+  # other than 'Accepted' (e.g. lowercase, NULL, or alternate strings), causing
+  # those genera to silently disappear from the autofill. We include all species
+  # with a non-null binomial; the occurrence query itself is the ground truth for
+  # whether a species has BIEN data.
   sql <- paste0(
     "SELECT DISTINCT b.scrubbed_species_binomial AS taxon ",
     "FROM bien_taxonomy b ",
-    "WHERE b.scrubbed_taxonomic_status = 'Accepted' ",
-    "AND b.scrubbed_species_binomial IS NOT NULL ",
+    "WHERE b.scrubbed_species_binomial IS NOT NULL ",
     "AND b.scrubbed_species_binomial <> '' ",
     "ORDER BY b.scrubbed_species_binomial;"
   )

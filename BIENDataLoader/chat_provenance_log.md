@@ -1,5 +1,29 @@
 # BIENDataLoader Chat Provenance Log
 
+## 2026-04-24 — Match top header styling to BIEN-TraitsShinyApp exactly
+
+**Prompt:** Update `BIENDataLoader/app.R` so the top header matches `BIEN-TraitsShinyApp/app_gateway.R` exactly for color scheme, logo size, and header typography.
+
+**Summary:**
+- Updated header CSS rules to exact Traits values for `.page-header`, `.bien-header-brand`, `.bien-logo`, `.page-header h1`, and `.page-header p`.
+- Set `.page-header` margin to `-20px 0 20px 0` to match Traits.
+- Removed divergent header typography overrides (`font-size`, `font-weight`, `line-height`) and removed mobile header/logo size overrides that diverged from Traits behavior.
+- Kept required header markup structure for logo + title + subtitle and left all non-header/server logic unchanged.
+- Requested syntax check run: `Rscript -e "parse(file='app.R')"`.
+
+## 2026-04-24 — Header branding aligned to BIEN Traits sizing/typography
+
+**Prompt:** Edit `BIENDataLoader/app.R` so top branding header (logo + text) matches BIEN-Traits header sizing and hierarchy, while keeping all server and non-UI behavior unchanged.
+
+**Summary:**
+- Replaced `navbarPage` title container with plain text: `title = "BIEN Data Loader"`.
+- Added dedicated UI header block inside `header = tagList(...)` after `tags$head(...)` using `.page-header > .bien-header-brand` with `bien.png`, `h1`, and subtitle paragraph.
+- Removed old navbar-brand CSS selectors (`.bl-brand`, `.bl-logo`, `.bl-brand-text`, `.bl-brand-title`, `.bl-brand-subtitle`).
+- Added BIEN Traits-style header rules: `.page-header`, `.bien-header-brand`, `.bien-logo` (62px), `.page-header h1`, `.page-header p`.
+- Updated mobile media query to `.bien-logo { height: 44px; }` and `.page-header h1 { font-size: 1.35em; }`.
+- Kept existing navbar gradient and non-conflicting style rules unchanged.
+- Syntax check run: `Rscript -e "parse(file='app.R')"` with explicit `PARSE_OK` confirmation.
+
 ## 2026-04-24 — UI-only BIEN branding refresh (no server logic changes)
 
 **Prompt:** Implement a UI-only style update in BIENDataLoader/app.R and add BIEN logo asset for navbar branding, with strict constraint to avoid any server/reactive/API/data/pipeline/performance logic edits.

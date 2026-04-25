@@ -1,6 +1,18 @@
 # Chat Provenance Log
 
 - Date: 2026-04-25
+- Prompt summary: Narrow capacity-outage classifier in BIEN-TraitsShinyApp/app_gateway.R to avoid generic connection-text misclassification.
+- Requested outcomes: In is_bien_connection_slot_error(), keep only high-confidence capacity signatures (remaining connection slots are reserved; too many connections; too many clients already), leave safe_bien_retry early-break usage unchanged, modify no other logic, and parse-validate app_gateway.R.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Implement focused reliability patch in BIEN-TraitsShinyApp/app_gateway.R to handle BIEN PostgreSQL connection-slot exhaustion gracefully.
+- Requested outcomes: Add robust slot-exhaustion error detector and context-aware BIEN error formatter; add global taxon suggestion cache and built-in rank fallback lists (genus/species/family); make load_taxon_suggestions return successful BIEN results with cache write-through or fall back to cached/fallback values on BIEN failure/empty result; format query error status with friendly message while keeping BIEN query error prefix; short-circuit safe_bien_retry on slot errors; parse-validate app_gateway.R.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
 - Prompt summary: Apply focused fixes in BIEN-TraitsShinyApp/app_gateway.R based on latest checker findings: (1) remove dead genus fallback block in query_bien_traits() that was unreachable because taxon was already tokenized before the branch; (2) remove taxon_raw race dependency and JS onType/onBlur/onChange callbacks from updateSelectizeInput, relying solely on input$taxon (create=TRUE/createOnBlur=TRUE already guarantees typed values land there); (3) guard all qr$diagnostics accesses in provenance manifest and script download handlers against NULL using safe defaults.
 - Requested outcomes: All three fixes applied; parse-validate app_gateway.R; update provenance logs; no commit/push.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md

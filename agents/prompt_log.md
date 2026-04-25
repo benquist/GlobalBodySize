@@ -1,3 +1,7 @@
+2026-04-25 | Patch /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp/app_gateway.R to narrow is_bien_connection_slot_error() to high-confidence capacity signatures only (keep remaining connection slots reserved / too many connections / too many clients already), keep safe_bien_retry early-break wiring unchanged, modify no other logic, run parse check, and report exact diff summary.
+
+2026-04-25 | Implement focused reliability patch in BIEN-TraitsShinyApp/app_gateway.R for BIEN PostgreSQL connection-slot exhaustion handling: add slot-error detector helper, add context-aware BIEN error formatter, add taxon suggestion fallback cache + built-in fallback lists (genus/species/family), use friendly formatted query error message in query status path, optionally short-circuit retries on slot errors, and parse-validate app_gateway.R.
+
 2026-04-25 | Full performance and reliability audit of BIEN-TraitsShinyApp/app_gateway.R (~2,600 lines). Identified TOP 5 issues by user-visible impact. Implemented: (1) vectorize map popup from row-by-row vapply to vectorized paste0 for up to 5,000 markers; (2) replace O(T×N) unit-heterogeneity vapply loop in scope_display renderUI with O(N) dplyr group-by pipeline. Flagged (no-implement): dist_selected reactive over-invalidation (architectural split needed), manifest triplicated in provenanceServer (returned reactive is effectively unreferenced bug), observer double-fire on rank switch to trait-only. PARSE OK.
 
 2026-04-25 | User asked if trait harvesting is currently running in DryadPlantTraits (status check only).

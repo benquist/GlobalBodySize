@@ -1,0 +1,6 @@
+"dryad_dataset_doi","dryad_version_id","dryad_file_id","file_path","action","status","message","rows_in","rows_out","timestamp_utc"
+"doi:10.5061/dryad.h9w0vt4fn",64263,298252,"Kleinschmidt_FuncEcol_2020_Table_S1.csv","download","failed","Dryad download failed with HTTP status 404.",0,0,"2026-04-25T18:24:56Z"
+"doi:10.5061/dryad.0000000f8",353423,3966461,"data_files_for_ecography_UPDATED_03.20.25.zip","download","failed","Dryad download failed with HTTP status 404.",0,0,"2026-04-25T18:24:56Z"
+"doi:10.5061/dryad.0000000f8",353423,3966450,"output_maps-20250313T182354Z-001.zip","download","failed","Dryad download failed with HTTP status 404.",0,0,"2026-04-25T18:24:56Z"
+"doi:10.5061/dryad.0000000f8",353423,3966460,"rasterstacks.zip","download","failed","Dryad download failed with HTTP status 404.",0,0,"2026-04-25T18:24:57Z"
+"doi:10.5061/dryad.kh18932gb",305922,3336178,"Data.zip","download","failed","Dryad download failed with HTTP status 404.",0,0,"2026-04-25T18:24:57Z"

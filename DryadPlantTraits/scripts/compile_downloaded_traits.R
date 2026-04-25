@@ -89,7 +89,6 @@ output_dir <- args$`output-dir` %||% args$output_dir %||% file.path(find_project
 candidate_files_path <- args$`candidate-files` %||% file.path(output_dir, "candidate_files.csv")
 max_datasets <- as.integer(args$`max-datasets` %||% "3")
 max_files <- as.integer(args$`max-files` %||% "5")
-token <- Sys.getenv("DRYAD_API_TOKEN", "")
 
 dryad_make_dir(output_dir)
 
@@ -103,23 +102,6 @@ processing_log_list <- list()
 compiled_rows <- list()
 first_compiled_write <- TRUE
 
-if (!nzchar(token)) {
-  processing_log_list[[length(processing_log_list) + 1L]] <- list(
-    dryad_dataset_doi = NA_character_,
-    dryad_version_id = NA_integer_,
-    dryad_file_id = NA_integer_,
-    file_path = NA_character_,
-    action = "authenticate",
-    status = "failed",
-    message = "DRYAD_API_TOKEN is not set.",
-    rows_in = 0L,
-    rows_out = 0L,
-    timestamp_utc = dryad_now_utc()
-  )
-  utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
-  stop("Dryad file downloads require DRYAD_API_TOKEN. Set a valid bearer token and rerun.", call. = FALSE)
-}
-
 download_dir <- file.path(output_dir, "downloads")
 dryad_make_dir(download_dir)
 
@@ -128,7 +110,11 @@ for (row_index in seq_len(nrow(selected_files))) {
   local_name <- sprintf("%s_%s_%s", row$dryad_file_id[[1]], row$dryad_version_id[[1]], basename(row$file_path[[1]]))
   destfile <- file.path(download_dir, local_name)
   download_timestamp <- dryad_now_utc()
-  download_result <- dryad_download_file(row$dryad_file_id[[1]], destfile, token = token)
+  download_result <- dryad_download_file(
+    file_id = row$dryad_file_id[[1]],
+    filename = row$file_path[[1]],
+    destfile = destfile
+  )
 
   if (!isTRUE(download_result$success)) {
     processing_log_list[[length(processing_log_list) + 1L]] <- list(
@@ -146,9 +132,6 @@ for (row_index in seq_len(nrow(selected_files))) {
 
     utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
 
-    if (download_result$status %in% c(401L, 403L)) {
-      stop(download_result$message, call. = FALSE)
-    }
     next
   }
 
