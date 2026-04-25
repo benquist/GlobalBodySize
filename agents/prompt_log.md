@@ -1,3 +1,9 @@
+2026-04-25 | Re-run mandatory always gate for /Users/brianjenquist/VSCode after prompt log update and package build. Verify prompt log, Rmd trigger, package build trigger, and git push sync status.
+
+2026-04-25 | User asked whether likely out-of-bounds trait values are flagged when units are assumed/inferred. Verified current QA behavior in DryadPlantTraits/R/qa_checks.R: P1_UNIT_INFERRED[standard_unit_used] is emitted when inferred_unit=TRUE, and P2_VALUE_OUT_OF_RANGE[cited_range:min_to_max,got:value] remains active for numeric traits against cited bounds in standard units.
+
+2026-04-25 | User asked how trait units are handled when units are missing in DryadPlantTraits. Performed read-only code-path audit across standardize_records.R and qa_checks.R: unit column aliases are detected, raw_unit is preserved, output unit falls back to trait_dictionary standard_unit when raw unit is absent, expected_unit_class/standard_unit are populated from dictionary, and P1_UNIT_MISMATCH is only raised when a non-empty unit is present and incompatible. Missing/blank unit currently passes compatibility check (no explicit P1 missing-unit flag).
+
 2026-04-25 | Phase 2 taxonomy hardening in DryadPlantTraits/R/standardize_records.R: dryad_normalize_binomial() refactored to return a named list (binomial, infraspecific_rank, infraspecific_epithet) instead of a plain string. Two new schema columns (infraspecific_rank, infraspecific_epithet) added to dryad_make_observation_table(). fill_common_fields() updated to consume the new return type and populate both fields. All four fallback resolution steps (alias, genus_prepend, genus+epithet, heuristic_scan) updated to use the new list return. 10 unit tests pass covering simple binomials, var./subsp./f., unresolved sp/spp., and ALL CAPS inputs.
 
 2026-04-25 | Phase 1 taxonomy hardening in DryadPlantTraits/R/standardize_records.R: (1) Expand rank keywords from 9 to 18 items (add var./ssp./subsp./subvar./subvar./cf./aff./sp./spp./nov/x/x.), reorder to check rank BEFORE nchar guard to enable forma handling. (2) Replace underscores and × hybrid markers with spaces in normalizer. (3) Fix heuristic column pattern from ^[A-Za-z]{3,}[_ ][a-z]{2,} to ^[A-Za-z]{3,}[_ ][A-Za-z]{2,} to support title-case epithet matching. (4) Prune aliases from 62 to 53 (remove taxon_id, label, Name, names, otu, organism_id, id_species, sp, sp. to avoid false matches). (5) Add input_name_verbatim schema field to capture raw cell before normalization. (6) Track resolution_source_column through all 4 fallback steps (alias→genus_prepend→genus+epithet→heuristic_scan), not just guesses. All changes parse-validated and comprehensive unit tests pass (rank keywords, inference, title-case heuristic). Ready for compile validation.
@@ -216,6 +222,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-03-28
 - Prompt summary: Execute a full Merow-style ecology-first overhaul of california_poppy_sdm.Rmd.
 - Requested outcomes: Reframe the inferential target, define and justify M, clean occurrences, use bias-aware background, reduce predictor redundancy, constrain complexity, add spatial validation, uncertainty, novelty diagnostics, sensitivity analyses, and rewrite interpretation and future-projection language.
+
+2026-04-25 | DryadPlantTraits unit-transparency enhancement: add inferred_unit output field in standardization, set TRUE when standard_unit backfills missing raw unit, add additive P1_UNIT_INFERRED[standard_unit_used] QA flag without changing existing mismatch/range logic, parse-check updated R files, and run a quick reproducible test row showing inferred_unit=TRUE.
 - Files changed: california_poppy_sdm.Rmd; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
@@ -1191,3 +1199,5 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Deployment: bundle 11906242, task 1683698374, URL https://benquist.shinyapps.io/bien-traits-shinyapp/ (successful).
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+2026-04-25 | Re-run mandatory always gate for /Users/brianjenquist/VSCode after adding latest prompt entry. This turn is read-only analysis plus prompt log update only. Verify prompt log, Rmd trigger, R package trigger, and git push status context; return PASS or BLOCKED.

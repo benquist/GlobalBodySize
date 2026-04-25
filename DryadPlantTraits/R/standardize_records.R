@@ -55,8 +55,9 @@ dryad_normalize_binomial <- function(x) {
                     infraspecific_epithet = NA_character_)
   if (is.na(x) || !nzchar(trimws(x))) return(NA_result)
   x <- trimws(x)
-  # Replace underscores and hybrid markers with spaces
-  x <- gsub("[_\u00d7]", " ", x)
+  # Replace common separators and hybrid markers with spaces
+  # (many Dryad files use dot-separated names like "Gustavia.superba")
+  x <- gsub("[._\u00d7]", " ", x)
   x <- gsub("\\s+", " ", x)
   parts <- strsplit(x, " ")[[1]]
   if (length(parts) < 2L) return(NA_result)
@@ -109,7 +110,7 @@ dryad_normalize_binomial <- function(x) {
 # Returns the column name or NA_character_.
 dryad_find_species_column <- function(df, exclude_cols = character(0)) {
   # Pattern allows title-case both genus and epithet: "Quercus Robur" or "quercus robur"
-  binomial_pattern <- "^[A-Za-z]{3,}[_ ][A-Za-z]{2,}"
+  binomial_pattern <- "^[A-Za-z]{3,}[_ .][A-Za-z]{2,}"
   candidate_cols <- setdiff(names(df)[vapply(df, is.character, logical(1))], exclude_cols)
   best_col <- NA_character_
   best_frac <- 0.5  # require at least 50% of non-NA values to match
@@ -152,6 +153,7 @@ dryad_alias_map <- function() {
       # Organism / plant naming
       "organism", "organism_name",
       "plant_name", "plant_species", "plant_taxon",
+      "plantspp", "old.plantspp", "old_plantspp", "oldplantspp",
       "full_name", "fullname",
       # AusTraits / TRY style
       "AccSpeciesName", "SpeciesName", "species_binom"
@@ -377,6 +379,7 @@ dryad_make_observation_table <- function(size) {
     trait_name = rep(NA_character_, size),
     trait_value = rep(NA_character_, size),
     unit = rep(NA_character_, size),
+    inferred_unit = rep(FALSE, size),
     method = rep(NA_character_, size),
     country = rep(NA_character_, size),
     stateProvince = rep(NA_character_, size),
@@ -519,7 +522,10 @@ dryad_fill_common_fields <- function(output, base_df, row_index, guesses, proven
   output$elevation_m[[row_index]] <- suppressWarnings(as.numeric(if (!is.null(guesses$elevation) && !is.na(guesses$elevation)) base_df[[guesses$elevation]][[1]] else NA))
   output$trait_name[[row_index]] <- trait_match$standardized_trait_name
   output$trait_value[[row_index]] <- dryad_non_empty_string(raw_trait_value)
+  raw_unit_clean <- dryad_non_empty_string(raw_unit)
+  use_standard_unit <- is.na(raw_unit_clean) && !is.na(trait_match$standard_unit)
   output$unit[[row_index]] <- dryad_non_empty_string(if (!is.na(raw_unit)) raw_unit else trait_match$standard_unit)
+  output$inferred_unit[[row_index]] <- use_standard_unit
   output$expected_unit_class[[row_index]] <- trait_match$expected_unit_class
   output$value_type[[row_index]] <- trait_match$value_type
   output$standard_unit[[row_index]] <- trait_match$standard_unit

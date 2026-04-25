@@ -193,6 +193,10 @@ dryad_qa_pass1 <- function(df) {
     # 1c. Unit vs. expected_unit_class compatibility
     unit_str  <- df$unit[[i]]
     exp_class <- df$expected_unit_class[[i]]
+    inferred <- if ("inferred_unit" %in% names(df)) isTRUE(df$inferred_unit[[i]]) else FALSE
+    if (inferred) {
+      row_flags <- c(row_flags, "P1_UNIT_INFERRED[standard_unit_used]")
+    }
     if (!is.na(unit_str) && nzchar(unit_str) &&
         !is.na(exp_class) && nzchar(exp_class) &&
         !dryad_unit_likely_compatible(unit_str, exp_class)) {
