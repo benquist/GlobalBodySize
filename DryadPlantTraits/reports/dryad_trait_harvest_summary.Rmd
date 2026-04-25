@@ -1,0 +1,215 @@
+---
+title: "DryadPlantTraits: Trait Harvest Summary"
+author: "DryadPlantTraits Pipeline"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+# Detect project root from Rmd location
+proj_root <- normalizePath(
+  file.path(dirname(knitr::current_input(dir = TRUE)), ".."),
+  mustWork = FALSE
+)
+
+source(file.path(proj_root, "R", "dryad_api.R"))
+source(file.path(proj_root, "R", "search_terms.R"))
+source(file.path(proj_root, "R", "candidate_filter.R"))
+source(file.path(proj_root, "R", "trait_dictionary.R"))
+source(file.path(proj_root, "R", "standardize_records.R"))
+
+kable_styled <- function(df, caption = NULL) {
+  tbl <- knitr::kable(df, caption = caption, format = "html")
+  result <- tryCatch(
+    kableExtra::kable_styling(tbl, bootstrap_options = c("striped", "hover", "condensed"),
+                              full_width = FALSE),
+    error = function(e) tbl
+  )
+  result
+}
+```
+
+## Overview
+
+**DryadPlantTraits** is a pipeline for discovering, downloading, and standardising plant functional trait data from [Dryad](https://datadryad.org). It targets ten well-studied traits drawn from an AusTraits-inspired vocabulary (leaf area, SLA, LDMC, leaf N/P, wood density, stem specific density, seed mass, plant height, leaf thickness) and maps them to the BIEN observation model for direct upload into the BIEN plant trait database.
+
+The pipeline proceeds in three stages:
+
+1. **Discovery** — `discover_dryad_plant_traits.R` searches the Dryad API with keyword seed terms and scores candidate datasets using `R/candidate_filter.R`.
+2. **Download & compile** — `compile_downloaded_traits.R` downloads scored datasets (requires `DRYAD_API_TOKEN`), extracts trait columns via `R/trait_dictionary.R`, and writes `output/compiled_trait_observations.csv` in the BIEN schema.
+3. **Upload** — the compiled CSV is validated and submitted to BIEN using the schema defined in `output/bien_trait_upload_template.csv`.
+
+---
+
+## Trait Dictionary
+
+```{r trait-dictionary}
+trait_dict <- tryCatch(
+  dryad_read_trait_dictionary(),
+  error = function(e) {
+    message("Could not load trait dictionary: ", conditionMessage(e))
+    data.frame()
+  }
+)
+
+if (nrow(trait_dict) > 0) {
+  kable_styled(trait_dict, caption = "Trait dictionary (data/trait_dictionary_starter.csv)")
+} else {
+  cat("Trait dictionary unavailable.")
+}
+```
+
+---
+
+## Harvestable Traits by Functional Category
+
+```{r traits-by-category}
+trait_categories <- data.frame(
+  `Functional Category` = c(
+    "leaf_economics", "leaf_economics",
+    "leaf_morphology", "leaf_morphology",
+    "leaf_chemistry", "leaf_chemistry",
+    "stem_structure", "stem_structure",
+    "reproduction",
+    "size_structure"
+  ),
+  `Trait Name` = c(
+    "specific_leaf_area", "leaf_dry_matter_content",
+    "leaf_area", "leaf_thickness",
+    "leaf_n", "leaf_p",
+    "wood_density", "stem_specific_density",
+    "seed_mass",
+    "plant_height"
+  ),
+  `Standard Unit` = c(
+    "mm2/mg", "mg/g",
+    "mm2", "mm",
+    "mg/g", "mg/g",
+    "g/cm3", "g/cm3",
+    "mg",
+    "m"
+  ),
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+# Add estimated counts from API (populated in next chunk; placeholder here)
+trait_categories$`Estimated Dryad Dataset Count` <- NA_integer_
+
+kable_styled(trait_categories, caption = "Harvestable traits by functional category")
+```
+
+---
+
+## Dryad Search Coverage
+
+```{r dryad-search-coverage}
+seed_terms <- dryad_search_seed_terms()
+
+counts <- vapply(seed_terms$query_term, function(term) {
+  result <- tryCatch({
+    parsed <- dryad_search_datasets(q = term, per_page = 1L, page = 1L)
+    total <- parsed[["total"]]
+    if (is.null(total)) NA_integer_ else as.integer(total)
+  }, error = function(e) NA_integer_)
+  Sys.sleep(0.5)
+  result
+}, integer(1))
+
+coverage <- data.frame(
+  `Query Term`              = seed_terms$query_term,
+  `Theme`                   = seed_terms$theme,
+  `Trait Focus`             = seed_terms$trait_focus,
+  `Estimated Dataset Count` = counts,
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+na_count <- sum(is.na(coverage$`Estimated Dataset Count`))
+if (na_count > 0) {
+  cat(sprintf(
+    "_Note: %d of %d API queries returned NA — likely a network timeout or rate-limit; counts will populate when run with connectivity._\n\n",
+    na_count, nrow(coverage)
+  ))
+}
+
+kable_styled(coverage, caption = "Dryad API search coverage by seed term")
+```
+
+---
+
+## BIEN Upload Schema
+
+The primary compiled output is `output/compiled_trait_observations.csv`. It follows the BIEN observation model below. Use `output/bien_trait_upload_template.csv` as a zero-row header-only reference for downstream validation.
+
+```{r bien-schema}
+bien_schema <- data.frame(
+  Column = c(
+    "scrubbed_species_binomial",
+    "latitude", "longitude",
+    "date_collected",
+    "country", "stateProvince", "county", "locality",
+    "trait_name", "trait_value", "unit",
+    "dataset", "datasource", "dataowner",
+    "source_citation",
+    "dryad_dataset_doi", "dryad_version_id", "dryad_file_id",
+    "download_timestamp_utc",
+    "source_file_path",
+    "source_column_trait_name", "source_column_trait_value", "source_column_unit",
+    "raw_scrubbed_species_binomial",
+    "raw_latitude", "raw_longitude", "raw_date_collected",
+    "raw_trait_name", "raw_trait_value", "raw_unit"
+  ),
+  Description = c(
+    "TNRS-resolved binomial; primary taxonomic key",
+    "Decimal degrees (WGS84)", "Decimal degrees (WGS84)",
+    "ISO 8601 date of collection",
+    "Country name", "State or province", "County", "Verbatim locality string",
+    "Standardised trait name (AusTraits vocabulary)", "Numeric trait value (standardised unit)", "Standard unit string",
+    "Dryad dataset title", "Dryad (datasource label)", "Dataset owner / PI",
+    "Full bibliographic citation",
+    "Dryad dataset DOI", "Dryad version integer ID", "Dryad file integer ID",
+    "UTC timestamp of file download (ISO 8601)",
+    "Relative path to source file within downloaded archive",
+    "Original column name mapped to trait", "Original column name mapped to value", "Original column name mapped to unit",
+    "Original (pre-TNRS) species string",
+    "Original latitude", "Original longitude", "Original date string",
+    "Original trait name string", "Original trait value string", "Original unit string"
+  ),
+  Source = c(
+    "standardization",
+    "source data", "source data",
+    "source data",
+    "source data", "source data", "source data", "source data",
+    "standardization", "standardization", "standardization",
+    "Dryad metadata", "Dryad metadata", "Dryad metadata",
+    "Dryad metadata",
+    "Dryad metadata", "Dryad metadata", "Dryad metadata",
+    "pipeline",
+    "pipeline",
+    "standardization", "standardization", "standardization",
+    "source data",
+    "source data", "source data", "source data",
+    "source data", "source data", "source data"
+  ),
+  stringsAsFactors = FALSE
+)
+
+kable_styled(bien_schema, caption = "BIEN observation model — 30-column upload schema")
+```
+
+---
+
+## Next Steps
+
+1. **Build candidate list** — run `scripts/discover_dryad_plant_traits.R` (no token needed). This writes `output/candidate_datasets.csv` with scored Dryad datasets.
+
+2. **Download and compile** — set `DRYAD_API_TOKEN` (obtain from [datadryad.org/stash/user_account](https://datadryad.org/stash/user_account)), then run `scripts/compile_downloaded_traits.R`. This writes `output/compiled_trait_observations.csv`.
+
+3. **Validate** — compare the compiled CSV columns against `output/bien_trait_upload_template.csv` and inspect record counts, trait coverage, and any missing species binomials before BIEN submission.
