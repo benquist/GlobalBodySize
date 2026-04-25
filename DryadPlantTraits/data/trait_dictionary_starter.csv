@@ -1,0 +1,11 @@
+standardized_trait_name,aliases,expected_unit_class,value_type,standard_unit,notes
+leaf_area,"leaf area;leaf_area;lamina area;leafarea",area,numeric,mm2,"Starter crosswalk for individual leaf or lamina area measurements."
+specific_leaf_area,"specific leaf area;sla;specific_leaf_area",ratio,numeric,mm2_per_mg,"AusTraits-inspired concept; source units vary widely and need review."
+leaf_dry_matter_content,"leaf dry matter content;ldmc;leaf_dry_matter_content",ratio,numeric,mg_per_g,"Often reported as dry mass divided by saturated fresh mass."
+leaf_n,"leaf n;leaf nitrogen;leaf_nitrogen;nitrogen concentration",concentration,numeric,mg_per_g,"Leaf nitrogen concentration or content; check basis and unit semantics."
+leaf_p,"leaf p;leaf phosphorus;leaf_phosphorus;phosphorus concentration",concentration,numeric,mg_per_g,"Leaf phosphorus concentration or content; check basis and unit semantics."
+wood_density,"wood density;wood specific gravity;stem density;wood_density",density,numeric,g_per_cm3,"Wood density and stem density are often close but not always identical concepts."
+stem_specific_density,"stem specific density;ssd;stem_specific_density",density,numeric,g_per_cm3,"Starter distinction retained because some studies separate stem from wood tissue."
+seed_mass,"seed mass;seed weight;seed_mass",mass,numeric,mg,"Seed mass often appears in mg or g and may reflect mean-per-seed values."
+plant_height,"plant height;height;max height;plant_height",length,numeric,m,"Includes direct or maximum height labels; confirm life stage in source data."
+leaf_thickness,"leaf thickness;leaf_thickness",length,numeric,mm,"Leaf thickness may be reported in mm or um."

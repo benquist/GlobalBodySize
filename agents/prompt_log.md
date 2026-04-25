@@ -1,3 +1,9 @@
+2026-04-25 | Create a new DryadPlantTraits project at the workspace root with R scripts and documentation for a Dryad plant-traits harvesting pipeline aligned to BIEN-style trait observations. Requested: public Dryad discovery workflow, authenticated file download support via DRYAD_API_TOKEN, AusTraits-inspired search vocabulary and starter trait dictionary, BIEN-style row-level standardizer with provenance/raw fields, project README, project chat provenance log, prompt-log update, and smoke-test validation.
+
+2026-04-25 | Repair DryadPlantTraits project based on review findings: fix payload$`_links`$next reserved-word parse error; robust project-root detection for all three scripts; fail-fast auth on HTTP 401 and 403; long-format source_column_trait_name provenance; strengthen smoke_test.R with pagination and metadata inventory checks. Smoke test PASS.
+
+2026-04-25 | Apply a focused refinement in BIEN-TraitsShinyApp/app_gateway.R: (1) hoist MAP_MARKER_CAP to mapServer scope so renderLeaflet and renderUI both see it; (2) remove invalid scroller/deferRender/scrollY options from recordsServer DT (Scroller extension not loaded); (3) remove redundant observeEvent(input$rank) in queryServer that duplicated suggest_mode update already handled by combined observer. Parse OK. No deploy.
+
 2026-04-24 | BIEN-TraitsShinyApp/app_gateway.R P1-P4 all-phases implementation final review pass (C1/W1-W7 fixes): C1 reduce leaflet map record cap to 5000 and show truncation notice; W1 set DT server=TRUE/deferRender=TRUE for server-side rendering; W2 decouple total-count query from critical path via needs_count_refresh flag; W3 process-level cache for BIEN_trait_list; W4 reduce suggestion payload caps; W5 batch CSV download for multi-species output; W6 fix UTC timestamp labeling; W7 fix trait count in scope preview to count unique trait_name values instead of rows. Committed 2b9412f, pushed to origin/master. Parse OK.
 
 2026-04-24 | BIEN-TraitsShinyApp/app_gateway.R Phase 4 (use-case coverage): P4-A multi-species batch input (radioButtons toggle, conditionalPanel for single/batch, batch_species_list reactive, batch query loop with withProgress, per-species record limit splitting); P4-B leaflet map tab (mapUI/mapServer, coordinate detection, popup build, provider tiles, map_controls/map_summary); P4-C help & caveats tab (helpUI/helpServer with workflow guide, ecological caveats, citation instructions); P4-D trait-only scope confirmation panel (uiOutput trait_scope_preview in queryUI, output$trait_scope_preview renderUI in queryServer); P4-E quick insights panel in scopeServer scope_display (top traits, source concentration, unit heterogeneity, truncation risk). leaflet added to required_packages and library block. Parse OK.
@@ -115,6 +121,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Implement targeted BIEN-SpeciesShinyApp app.R changes for random-species responsiveness, post-query non-blocking behavior, and ingest tab/handler removal.
 - Requested outcomes: Add guaranteed starter-pool fast fallback in find_lucky_species_with_mappable_points; remove taxonomy_species_exists blocking lookup from zero-mappable notification gate; remove Ingest to BIEN tab and active ingest server handlers/outputs; keep unrelated logic unchanged; verify app.R parse.
 - Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; BIEN-SpeciesShinyApp/chat_provenance_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Apply a focused refinement in BIEN-TraitsShinyApp/app_gateway.R to address reviewer warnings while improving Step 1 responsiveness.
+- Requested outcomes: Remove startup prewarm rank preload block; reduce suggestion caps in suggestion_cap_for_rank; do not cache empty suggestion results in rv$suggestion_cache; retry suggestions when cache is NULL/empty; preserve single-mode guard and mode/rank cache keying; update provenance logs and parse-validate app_gateway.R; no commit/push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-03-28
@@ -258,6 +270,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-04-21
 - Prompt summary: Fix duplicate Home tabs on the Enquist Lab site and populate publications from a Google Doc link.
 - Requested outcomes: Remove duplicate Home navigation item and ingest all publications into the publications page from the provided Google Doc source.
+
+- Date: 2026-04-25
+- Prompt summary: Apply code-checker follow-up fixes in BIEN-TraitsShinyApp bug-fix files (Step 6 DT API misuse and Step 1 rank-switch latency residual risk), then update provenance logs and run parse validation.
+- Requested outcomes: In BIEN-TraitsShinyApp/app_gateway.R remove invalid `server = TRUE` from `datatable(...)` and set `renderDT(..., server = TRUE)`; improve cold rank-switch responsiveness with deterministic warm-cache/smaller caps without breaking single/batch mode; append entries to BIEN-TraitsShinyApp/chat_provenance_log.md and agents/prompt_log.md; run syntax parse check on BIEN-TraitsShinyApp/app_gateway.R.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Files changed: enquistlab-site-migration/_pages/home.md; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
 
@@ -758,6 +776,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-04-22
 - Prompt summary: Full design review and implementation of all improvements across enquistlab.github.io — navigation, content, visual system, and SCSS.
 - Requested outcomes: Review each page; implement all recommended changes: reorder Join and Field Sites in nav, rename Resources to Tools & Data, add What the Lab Actually Does section, framing intros, CTA buttons, hero height reduction, details styling, team card hover states, global link hover.
+
+- Date: 2026-04-25
+- Prompt summary: Fix two deployed BIEN-TraitsShinyApp bugs in Step 6 complete-record table rendering and Step 1 rank-change suggestion responsiveness.
+- Requested outcomes: Apply minimal safe code changes in BIEN-TraitsShinyApp/app_gateway.R to harden DT rendering for large/irregular schemas and reduce query-rank suggestion lag without aggressive background loading; run quick validation; append required provenance logs; report root causes, diffs, validation, risks, and commit status.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
 - Files changed: enquistlab-site-migration/_pages/join.md; enquistlab-site-migration/_pages/field-sites.md; enquistlab-site-migration/_pages/software.md; enquistlab-site-migration/_pages/home.md; enquistlab-site-migration/_pages/about.md; enquistlab-site-migration/_pages/research.md; enquistlab-site-migration/_pages/conservation-impacts.md; enquistlab-site-migration/_sass/_lab-redesign.scss; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot (commit de8b44f)
 
@@ -1022,3 +1046,9 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 2026-04-24 | papers.bib: added 5 missing entries — Cruz 2025, Enquist scaling 2024, Castorena 2022, Brummer 2021, Enquist megabiota 2020 — so Metabolic Scaling tab matchers can now find them.
+
+- Date: 2026-04-25
+- Prompt summary: Make a minimal follow-up app_gateway.R change to reduce Step 1 rank-switch delay risk.
+- Requested outcomes: Prewarm species, genus, and family suggestion caches at startup (keeping suggestion_cap_for_rank logic), append BIEN-TraitsShinyApp and agent prompt provenance entries, and run parse validation for BIEN-TraitsShinyApp/app_gateway.R.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot

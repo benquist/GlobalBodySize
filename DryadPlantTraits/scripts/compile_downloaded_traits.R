@@ -1,0 +1,211 @@
+#!/usr/bin/env Rscript
+
+parse_named_args <- function(args) {
+  values <- list()
+  if (!length(args)) {
+    return(values)
+  }
+
+  for (arg in args) {
+    if (!startsWith(arg, "--")) {
+      next
+    }
+    parts <- strsplit(sub("^--", "", arg), "=", fixed = TRUE)[[1]]
+    key <- parts[[1]]
+    value <- if (length(parts) > 1L) paste(parts[-1L], collapse = "=") else "TRUE"
+    values[[key]] <- value
+  }
+
+  values
+}
+
+source_project_files <- function() {
+  root <- if (basename(getwd()) == "DryadPlantTraits") getwd() else file.path(getwd(), "DryadPlantTraits")
+  files <- c(
+    file.path(root, "R", "search_terms.R"),
+    file.path(root, "R", "trait_dictionary.R"),
+    file.path(root, "R", "io_helpers.R"),
+    file.path(root, "R", "dryad_api.R"),
+    file.path(root, "R", "candidate_filter.R"),
+    file.path(root, "R", "standardize_records.R")
+  )
+  invisible(lapply(files, source, local = FALSE))
+}
+
+empty_processing_log <- function() {
+  data.frame(
+    dryad_dataset_doi = character(0),
+    dryad_version_id = integer(0),
+    dryad_file_id = integer(0),
+    file_path = character(0),
+    action = character(0),
+    status = character(0),
+    message = character(0),
+    rows_in = integer(0),
+    rows_out = integer(0),
+    timestamp_utc = character(0),
+    stringsAsFactors = FALSE
+  )
+}
+
+append_log <- function(log_table, row) {
+  rbind(log_table, as.data.frame(row, stringsAsFactors = FALSE))
+}
+
+select_candidate_files <- function(file_table, max_datasets, max_files) {
+  if (!nrow(file_table)) {
+    return(file_table)
+  }
+
+  filtered <- file_table[file_table$candidate_keep & (file_table$file_supported_tabular | file_table$file_supported_container), , drop = FALSE]
+  if (!nrow(filtered)) {
+    return(filtered)
+  }
+
+  filtered <- filtered[order(-filtered$candidate_score, filtered$dryad_dataset_doi, filtered$file_path), , drop = FALSE]
+  if (is.finite(max_datasets)) {
+    keep_datasets <- unique(filtered$dryad_dataset_doi)[seq_len(min(max_datasets, length(unique(filtered$dryad_dataset_doi))))]
+    filtered <- filtered[filtered$dryad_dataset_doi %in% keep_datasets, , drop = FALSE]
+  }
+  if (is.finite(max_files)) {
+    filtered <- filtered[seq_len(min(max_files, nrow(filtered))), , drop = FALSE]
+  }
+  filtered
+}
+
+source_project_files()
+
+args <- parse_named_args(commandArgs(trailingOnly = TRUE))
+output_dir <- args$output_dir %||% {
+  if (basename(getwd()) == "DryadPlantTraits") file.path("output") else file.path("DryadPlantTraits", "output")
+}
+candidate_files_path <- args$`candidate-files` %||% file.path(output_dir, "candidate_files.csv")
+max_datasets <- as.integer(args$`max-datasets` %||% "3")
+max_files <- as.integer(args$`max-files` %||% "5")
+token <- Sys.getenv("DRYAD_API_TOKEN", "")
+
+dryad_make_dir(output_dir)
+
+if (!file.exists(candidate_files_path)) {
+  stop(sprintf("Candidate file inventory not found at %s. Run the discovery script first.", candidate_files_path), call. = FALSE)
+}
+
+candidate_files <- utils::read.csv(candidate_files_path, stringsAsFactors = FALSE, check.names = FALSE)
+selected_files <- select_candidate_files(candidate_files, max_datasets = max_datasets, max_files = max_files)
+processing_log <- empty_processing_log()
+compiled_rows <- list()
+
+if (!nzchar(token)) {
+  processing_log <- append_log(processing_log, list(
+    dryad_dataset_doi = NA_character_,
+    dryad_version_id = NA_integer_,
+    dryad_file_id = NA_integer_,
+    file_path = NA_character_,
+    action = "authenticate",
+    status = "failed",
+    message = "DRYAD_API_TOKEN is not set.",
+    rows_in = 0L,
+    rows_out = 0L,
+    timestamp_utc = dryad_now_utc()
+  ))
+  utils::write.csv(processing_log, file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+  stop("Dryad file downloads require DRYAD_API_TOKEN. Set a valid bearer token and rerun.", call. = FALSE)
+}
+
+download_dir <- file.path(output_dir, "downloads")
+dryad_make_dir(download_dir)
+
+for (row_index in seq_len(nrow(selected_files))) {
+  row <- selected_files[row_index, , drop = FALSE]
+  local_name <- sprintf("%s_%s_%s", row$dryad_file_id[[1]], row$dryad_version_id[[1]], basename(row$file_path[[1]]))
+  destfile <- file.path(download_dir, local_name)
+  download_timestamp <- dryad_now_utc()
+  download_result <- dryad_download_file(row$dryad_file_id[[1]], destfile, token = token)
+
+  if (!isTRUE(download_result$success)) {
+    processing_log <- append_log(processing_log, list(
+      dryad_dataset_doi = row$dryad_dataset_doi[[1]],
+      dryad_version_id = row$dryad_version_id[[1]],
+      dryad_file_id = row$dryad_file_id[[1]],
+      file_path = row$file_path[[1]],
+      action = "download",
+      status = "failed",
+      message = download_result$message,
+      rows_in = 0L,
+      rows_out = 0L,
+      timestamp_utc = download_timestamp
+    ))
+
+    utils::write.csv(processing_log, file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+
+    if (download_result$status %in% c(401L, 403L)) {
+      stop(download_result$message, call. = FALSE)
+    }
+    next
+  }
+
+  read_result <- dryad_read_supported_inputs(destfile)
+  if (!nrow(read_result$log)) {
+    next
+  }
+
+  for (log_index in seq_len(nrow(read_result$log))) {
+    log_row <- read_result$log[log_index, , drop = FALSE]
+    processing_log <- append_log(processing_log, list(
+      dryad_dataset_doi = row$dryad_dataset_doi[[1]],
+      dryad_version_id = row$dryad_version_id[[1]],
+      dryad_file_id = row$dryad_file_id[[1]],
+      file_path = log_row$extracted_path[[1]] %||% row$file_path[[1]],
+      action = "read",
+      status = log_row$status[[1]],
+      message = log_row$message[[1]],
+      rows_in = 0L,
+      rows_out = 0L,
+      timestamp_utc = download_timestamp
+    ))
+  }
+
+  if (!length(read_result$tables)) {
+    next
+  }
+
+  for (table_entry in read_result$tables) {
+    standardized <- dryad_standardize_records(
+      table_entry$data,
+      provenance = list(
+        dryad_dataset_doi = row$dryad_dataset_doi[[1]],
+        dryad_version_id = row$dryad_version_id[[1]],
+        dryad_file_id = row$dryad_file_id[[1]],
+        source_title = row$source_title[[1]],
+        source_authors = row$source_authors[[1]],
+        source_subjects = row$source_subjects[[1]],
+        source_abstract = row$source_abstract[[1]],
+        download_timestamp_utc = download_timestamp,
+        source_file_path = table_entry$path
+      )
+    )
+
+    processing_log <- append_log(processing_log, list(
+      dryad_dataset_doi = row$dryad_dataset_doi[[1]],
+      dryad_version_id = row$dryad_version_id[[1]],
+      dryad_file_id = row$dryad_file_id[[1]],
+      file_path = table_entry$path,
+      action = "standardize",
+      status = if (nrow(standardized)) "compiled" else "skipped",
+      message = if (nrow(standardized)) "Compiled BIEN-style observation rows." else "No likely trait observation fields detected.",
+      rows_in = nrow(table_entry$data),
+      rows_out = nrow(standardized),
+      timestamp_utc = dryad_now_utc()
+    ))
+
+    if (nrow(standardized)) {
+      compiled_rows[[length(compiled_rows) + 1L]] <- standardized
+    }
+  }
+}
+
+compiled_table <- if (length(compiled_rows)) do.call(rbind, compiled_rows) else dryad_make_observation_table(0L)
+utils::write.csv(compiled_table, file.path(output_dir, "compiled_trait_observations.csv"), row.names = FALSE, na = "")
+utils::write.csv(processing_log, file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+
+message(sprintf("Compiled %s observation rows from %s selected files.", nrow(compiled_table), nrow(selected_files)))
