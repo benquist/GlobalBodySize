@@ -155,3 +155,20 @@
 - Requested outcomes: Fix map summary renderUI scope error; harden Step 6 DT stability; eliminate duplicate suggest_mode update trigger.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Resolve step-compliance BLOCKED items for the latest BIEN-TraitsShinyApp bug-fix cycle.
+- Requested outcomes: Record final-gate/compliance prompt in agents/prompt_log.md, run verifiable package build/check evidence for BIEN-TraitsShinyApp cycle, report PASS/FAIL and residual issues, and avoid commit/push.
+- Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Record explicit tracked evidence artifacts for the latest BIEN-TraitsShinyApp bug-fix cycle so compliance checker can verify PASS state from files.
+- Requested outcomes: Capture cycle evidence for commit 54270b4 pushed to origin/master, successful deploy URL https://benquist.shinyapps.io/bien-traits-shinyapp/, successful shinyapps bundle id 11905323, and note this evidence corresponds to the Step 6 complete-records fix + Step 1 rank-switch latency fix cycle.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Fix Step 1 Query rank-switch bug where trait-only search leaves Taxon / Trait Name selectize in trait mode after switching back to taxon ranks.
+- Requested outcomes: In app_gateway.R, ensure species/genus/family rank changes force suggest_mode back to taxa so placeholder and choices switch to accepted BIEN taxon names, while keeping trait-only behavior and existing rank-switch performance fixes intact.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md; agents/agent_chat_provenance_log.txt
+- Completed by: GitHub Copilot

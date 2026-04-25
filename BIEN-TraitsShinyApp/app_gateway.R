@@ -682,6 +682,9 @@ queryServer <- function(id) {
       if (identical(rank, "trait-only") && !identical(mode, "traits")) {
         mode <- "traits"
         updateRadioButtons(session, "suggest_mode", selected = "traits")
+      } else if (!identical(rank, "trait-only") && !identical(mode, "taxa")) {
+        mode <- "taxa"
+        updateRadioButtons(session, "suggest_mode", selected = "taxa")
       }
 
       key <- paste(mode, if (identical(mode, "taxa")) rank else "traits", sep = "::")
