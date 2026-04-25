@@ -1,0 +1,9 @@
+Variable name	Definition	Units
+Species	Species name	
+Day_95%	Day of the year when the individuals on average reach 95% of their maximum size	Day of the year
+Day_75%	Day of the year when the individuals on average reach 75% of their maximum size	Day of the year
+Day_05%	Day of the year when the individuals on average reach 05% of their maximum size	Day of the year
+Senescence_date	Senescence date: Day of the year when the individuals on average reach 50% of their maximum size	Day of the year
+Senescence_pace	Senescence pace: inverse of the number of days elapsed between the last average value being equal to 95% of the maximum size and the first average value being equal to 5% of the maximum size	day-1
+Senescence_shape	"Senescence shape: log(C/D), where C is the difference between the dates on which the predicted value reached 50% and 5% of the maximum size of the species, D is the difference between the dates on which the predicted value reached 50% and 95% of the maximum size of the species"	dimensionless
+Senescence_asynchrony	standard deviation of the date on which individuals reached 50% of their maximum size 	day

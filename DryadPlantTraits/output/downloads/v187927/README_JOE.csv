@@ -1,0 +1,30 @@
+Raw data belonging to:,"Liu, Bai; Gao, Decai; Chang, Qing; Liu, Ziping; Fan, Xianlei; Meng, Di; Bai, Edith. 2022.  Leaf enzyme plays a more important role in leaf nitrogen resorption efficiency than soil properties along an elevation gradient. Journal of Ecology"
+"Metadata for tab ""PLANT""",
+Abbreviations,Full names
+Q. mongolica,Quercus mongolica
+F. mandshurica,Fraxinus mandshurica
+T. amurensis,Tilia amurensis
+A. mono,Acer mono
+A. pseudosieboldianum,Acer pseudosieboldianum
+N resorption  ,N resorption fulx (g N tree-1 yr-1)
+Leaf ¦Ä15N ,Leaf ¦Ä15N (¡ë)
+Green leaf N ,Green leaf nitrogen content (%)
+Senesced leaf N ,Senesced leaf nitrogen content (%)
+NRE ,Leaf nitrogen resorption efficiency (%)
+Senescing leaf GDH activity  ,Senescing leaf glutamate dehydrogenase activity (nmol min -1 mL-1£© 
+Green leaf GDH activity ,Green leaf glutamate dehydrogenase activity (nmol min -1 mL-1£©
+SLA ,Specific leaf area (cm2g-1)
+"Metadata for tab ""SOIL""",
+Abbreviations,Full names
+¦Ä15N ,Soil ¦Ä15N (¡ë)
+Gross ammonification  ,Soil gross ammonification rate (g N m-2 day-1)
+Gross nitrification  ,Soil gross nitrification rate (g N m-2 day-1)
+MBC ,Soil microbial biomass carbon ( g C m-2)
+MBN ,Soil microbial biomass nitrogen ( g N m-2)
+Total C ,Soil total organic carbon ( kg C m-2)
+Total N ,Soil total nitrogen ( kg N m-2)
+NH4+ ,Soil ammonium content ( g m-2)
+NO3- ,Soil nitrate content ( g m-2)
+Moisture ,Soil moisture (%)
+Temperature ,Soil temperature (¡æ)
+pH,Soil pH

@@ -1,0 +1,2115 @@
+transect_id,plot,individual,herbivory
+Barn.North.East,1,1,0
+Barn.North.East,1,1,2
+Barn.North.East,1,1,4
+Barn.North.East,1,1,8
+Barn.North.East,1,1,5
+Barn.North.East,1,1,3
+Barn.North.East,1,1,3
+Barn.North.East,1,1,0
+Barn.North.East,1,2,5
+Barn.North.East,1,2,3
+Barn.North.East,1,2,2
+Barn.North.East,1,2,1
+Barn.North.East,1,2,2
+Barn.North.East,1,2,2
+Barn.North.East,1,2,0
+Barn.North.East,1,2,1
+Barn.North.East,1,3,0
+Barn.North.East,1,3,10
+Barn.North.East,1,3,2
+Barn.North.East,1,3,20
+Barn.North.East,1,4,1
+Barn.North.East,1,4,0
+Barn.North.East,1,5,1
+Barn.North.East,1,5,1
+Barn.North.East,2,1,0
+Barn.North.East,2,1,1
+Barn.North.East,2,1,0
+Barn.North.East,2,1,0
+Barn.North.East,2,2,0
+Barn.North.East,2,2,3
+Barn.North.East,2,2,1
+Barn.North.East,2,2,1
+Barn.North.East,2,3,0
+Barn.North.East,2,3,0
+Barn.North.East,2,3,1
+Barn.North.East,2,3,4
+Barn.North.East,2,4,0
+Barn.North.East,2,4,1
+Barn.North.East,2,4,5
+Barn.North.East,2,4,0
+Barn.North.East,2,4,0
+Barn.North.East,2,4,0
+Barn.North.East,2,5,0
+Barn.North.East,2,5,0
+Barn.North.East,2,5,0
+Barn.North.East,2,5,0
+Barn.North.East,2,5,0
+Barn.North.East,2,5,0
+Barn.North.East,2,5,80
+Barn.North.East,2,5,40
+Barn.North.East,2,5,0
+Barn.North.East,2,5,5
+Barn.North.East,3,1,2
+Barn.North.East,3,1,0
+Barn.North.East,3,1,3
+Barn.North.East,3,1,1
+Barn.North.East,3,1,5
+Barn.North.East,3,2,0
+Barn.North.East,3,2,5
+Barn.North.East,3,2,0
+Barn.North.East,3,2,3
+Barn.North.East,3,3,1
+Barn.North.East,3,3,2
+Barn.North.East,3,3,1
+Barn.North.East,3,3,40
+Barn.North.East,3,3,3
+Barn.North.East,3,3,2
+Barn.North.East,3,3,1
+Barn.North.East,3,3,1
+Barn.North.East,3,3,0
+Barn.North.East,3,4,40
+Barn.North.East,3,4,0
+Barn.North.East,3,4,7
+Barn.North.East,3,4,2
+Barn.North.East,3,5,5
+Barn.North.East,3,5,2
+Barn.North.East,3,5,2
+Barn.North.East,3,5,4
+Barn.North.East,4,1,2
+Barn.North.East,4,1,3
+Barn.North.East,4,2,2
+Barn.North.East,4,2,18
+Barn.North.East,4,2,1
+Barn.North.East,4,2,0
+Barn.North.East,4,2,3
+Barn.North.East,4,2,3
+Barn.North.East,4,2,1
+Barn.North.East,4,2,4
+Barn.North.East,4,3,2
+Barn.North.East,4,3,2
+Barn.North.East,4,3,0
+Barn.North.East,4,4,4
+Barn.North.East,4,4,1
+Barn.North.East,4,4,45
+Barn.North.East,4,4,1
+Barn.North.East,4,4,3
+Barn.North.East,4,5,3
+Barn.North.East,4,5,1
+Barn.North.East,4,5,2
+Barn.North.East,4,5,30
+Barn.North.East,4,5,5
+Barn.North.East,5,1,5
+Barn.North.East,5,1,1
+Barn.North.East,5,1,1
+Barn.North.East,5,1,0
+Barn.North.East,5,1,2
+Barn.North.East,5,1,0
+Barn.North.East,5,1,0
+Barn.North.East,5,2,4
+Barn.North.East,5,2,1
+Barn.North.East,5,2,20
+Barn.North.East,5,2,35
+Barn.North.East,5,2,8
+Barn.North.East,5,2,2
+Barn.North.East,5,3,0
+Barn.North.East,5,3,0
+Barn.North.East,5,3,0
+Barn.North.East,5,3,1
+Barn.North.East,5,3,1
+Barn.North.East,5,4,5
+Barn.North.East,5,4,2
+Barn.North.East,5,4,3
+Barn.North.East,5,4,6
+Barn.North.East,5,4,10
+Barn.North.East,5,5,1
+Barn.North.East,5,5,0
+Barn.North.East,5,5,0
+Barn.North.West,1,1,9
+Barn.North.West,1,1,25
+Barn.North.West,1,1,2
+Barn.North.West,1,1,0
+Barn.North.West,1,1,2
+Barn.North.West,1,1,4
+Barn.North.West,1,1,6
+Barn.North.West,1,1,1
+Barn.North.West,1,1,4
+Barn.North.West,1,2,2
+Barn.North.West,1,2,7
+Barn.North.West,1,2,0
+Barn.North.West,1,2,0
+Barn.North.West,2,1,0
+Barn.North.West,2,1,0
+Barn.North.West,2,1,0
+Barn.North.West,2,1,0
+Barn.North.West,2,1,0
+Barn.North.West,2,1,0
+Barn.North.West,2,1,1
+Barn.North.West,2,1,10
+Barn.North.West,2,2,0
+Barn.North.West,2,2,0
+Barn.North.West,2,2,0
+Barn.North.West,2,2,0
+Barn.North.West,2,2,5
+Barn.North.West,3,1,2
+Barn.North.West,3,1,0
+Barn.North.West,3,1,15
+Barn.North.West,3,2,0
+Barn.North.West,3,2,0
+Barn.North.West,4,1,1
+Barn.North.West,4,1,1
+Barn.North.West,4,1,0
+Barn.North.West,4,1,0
+Barn.North.West,4,1,0
+Barn.North.West,4,2,0
+Barn.North.West,4,2,0
+Barn.North.West,4,3,2
+Barn.North.West,4,3,3
+Barn.North.West,4,3,5
+Barn.North.West,4,3,7
+Barn.North.West,4,3,15
+Barn.North.West,4,4,1
+Barn.North.West,4,4,0
+Barn.North.West,4,5,1
+Barn.North.West,4,5,1
+Barn.North.West,4,5,0
+Barn.North.West,4,5,1
+Barn.North.West,5,1,0
+Barn.North.West,5,1,0
+Barn.North.West,5,1,0
+Barn.North.West,5,1,0
+Barn.North.West,5,1,0
+Barn.North.West,5,1,0
+Barn.North.West,5,1,1
+Barn.North.West,5,1,1
+Barn.South.NA,1,1,0
+Barn.South.NA,1,1,1
+Barn.South.NA,1,1,0
+Barn.South.NA,1,2,1
+Barn.South.NA,1,2,1
+Barn.South.NA,1,2,0
+Barn.South.NA,1,2,8
+Barn.South.NA,1,3,0
+Barn.South.NA,1,3,0
+Barn.South.NA,1,3,2
+Barn.South.NA,1,3,4
+Barn.South.NA,1,3,0
+Barn.South.NA,1,3,0
+Barn.South.NA,1,3,0
+Barn.South.NA,1,3,1
+Barn.South.NA,1,4,0
+Barn.South.NA,1,4,0
+Barn.South.NA,1,4,4
+Barn.South.NA,1,4,2
+Barn.South.NA,2,NA,NA
+Barn.South.NA,3,NA,NA
+Barn.South.NA,4,NA,NA
+Barn.South.NA,5,NA,NA
+Duck.Lake.West,1,1,0
+Duck.Lake.West,1,1,0
+Duck.Lake.West,1,1,0
+Duck.Lake.West,1,1,0
+Duck.Lake.West,1,2,0
+Duck.Lake.West,1,2,0
+Duck.Lake.West,1,2,0
+Duck.Lake.West,1,2,0
+Duck.Lake.West,1,2,0
+Duck.Lake.West,1,2,25
+Duck.Lake.West,1,3,0
+Duck.Lake.West,1,3,0
+Duck.Lake.West,1,3,3
+Duck.Lake.West,1,4,0
+Duck.Lake.West,1,4,0
+Duck.Lake.West,1,4,2
+Duck.Lake.West,1,4,3
+Duck.Lake.West,1,4,3
+Duck.Lake.West,1,5,0
+Duck.Lake.West,1,5,0
+Duck.Lake.West,1,5,5
+Duck.Lake.West,1,5,20
+Duck.Lake.West,2,1,0
+Duck.Lake.West,2,1,2
+Duck.Lake.West,2,1,4
+Duck.Lake.West,2,1,10
+Duck.Lake.West,2,2,1
+Duck.Lake.West,2,2,0
+Duck.Lake.West,2,3,1
+Duck.Lake.West,2,3,3
+Duck.Lake.West,2,3,2
+Duck.Lake.West,2,4,0
+Duck.Lake.West,2,4,0
+Duck.Lake.West,2,5,0
+Duck.Lake.West,2,5,0
+Duck.Lake.West,2,5,1
+Duck.Lake.West,2,5,3
+Duck.Lake.West,3,1,0
+Duck.Lake.West,3,1,50
+Duck.Lake.West,3,2,1
+Duck.Lake.West,3,2,2
+Duck.Lake.West,3,2,1
+Duck.Lake.West,3,2,0
+Duck.Lake.West,3,3,0
+Duck.Lake.West,3,3,0
+Duck.Lake.West,3,3,0
+Duck.Lake.West,3,3,0
+Duck.Lake.West,3,3,1
+Duck.Lake.West,3,3,1
+Duck.Lake.West,3,4,0
+Duck.Lake.West,3,4,0
+Duck.Lake.West,3,4,0
+Duck.Lake.West,3,5,0
+Duck.Lake.West,3,5,0
+Duck.Lake.West,3,5,1
+Duck.Lake.West,3,5,1
+Duck.Lake.West,3,5,0
+Duck.Lake.West,3,5,11
+Duck.Lake.West,3,5,1
+Duck.Lake.West,3,5,1
+Duck.Lake.West,4,1,0
+Duck.Lake.West,4,1,0
+Duck.Lake.West,4,1,0
+Duck.Lake.West,4,1,0
+Duck.Lake.West,4,1,2
+Duck.Lake.West,4,1,0
+Duck.Lake.West,4,1,5
+Duck.Lake.West,4,1,0
+Duck.Lake.West,4,1,6
+Duck.Lake.West,4,2,0
+Duck.Lake.West,4,2,0
+Duck.Lake.West,4,2,4
+Duck.Lake.West,4,3,0
+Duck.Lake.West,4,3,0
+Duck.Lake.West,4,3,30
+Duck.Lake.West,4,3,30
+Duck.Lake.West,4,4,1
+Duck.Lake.West,4,4,0
+Duck.Lake.West,4,4,1
+Duck.Lake.West,4,4,3
+Duck.Lake.West,4,5,0
+Duck.Lake.West,4,5,0
+Duck.Lake.West,4,5,1
+Duck.Lake.West,4,5,1
+Duck.Lake.West,5,1,1
+Duck.Lake.West,5,1,0
+Duck.Lake.West,5,1,0
+Duck.Lake.West,5,1,1
+Duck.Lake.West,5,2,1
+Duck.Lake.West,5,2,1
+Duck.Lake.West,5,2,0
+Duck.Lake.West,5,2,0
+Duck.Lake.West,5,2,5
+Duck.Lake.West,5,2,0
+Duck.Lake.West,5,3,0
+Duck.Lake.West,5,3,2
+Duck.Lake.West,5,3,0
+Duck.Lake.West,5,3,0
+Duck.Lake.West,5,4,3
+Duck.Lake.West,5,4,1
+Duck.Lake.West,5,4,4
+Duck.Lake.West,5,4,95
+Duck.Lake.West,5,5,1
+Duck.Lake.West,5,5,50
+Duck.Lake.West,5,5,60
+Duck.Lake.West,5,5,30
+Duck.Lake.West,5,5,3
+Duck.Lake.East,1,avg,5.593220339
+Duck.Lake.East,2,avg,5.593220339
+Duck.Lake.East,3,1,0
+Duck.Lake.East,3,1,0
+Duck.Lake.East,3,1,0
+Duck.Lake.East,3,2,0
+Duck.Lake.East,3,2,0
+Duck.Lake.East,3,2,1
+Duck.Lake.East,3,2,1
+Duck.Lake.East,3,2,0
+Duck.Lake.East,3,2,11
+Duck.Lake.East,3,2,1
+Duck.Lake.East,3,2,1
+Duck.Lake.East,4,1,0
+Duck.Lake.East,4,1,0
+Duck.Lake.East,4,1,0
+Duck.Lake.East,4,1,0
+Duck.Lake.East,4,1,2
+Duck.Lake.East,4,1,0
+Duck.Lake.East,4,1,5
+Duck.Lake.East,4,1,0
+Duck.Lake.East,4,1,6
+Duck.Lake.East,4,2,0
+Duck.Lake.East,4,2,0
+Duck.Lake.East,4,2,4
+Duck.Lake.East,4,3,0
+Duck.Lake.East,4,3,0
+Duck.Lake.East,4,3,3
+Duck.Lake.East,4,3,0
+Duck.Lake.East,4,3,30
+Duck.Lake.East,4,4,1
+Duck.Lake.East,4,4,0
+Duck.Lake.East,4,4,1
+Duck.Lake.East,4,4,3
+Duck.Lake.East,4,5,0
+Duck.Lake.East,4,5,0
+Duck.Lake.East,4,5,1
+Duck.Lake.East,4,5,1
+Duck.Lake.East,5,1,1
+Duck.Lake.East,5,1,0
+Duck.Lake.East,5,1,0
+Duck.Lake.East,5,1,1
+Duck.Lake.East,5,2,1
+Duck.Lake.East,5,2,1
+Duck.Lake.East,5,2,0
+Duck.Lake.East,5,2,0
+Duck.Lake.East,5,2,5
+Duck.Lake.East,5,2,0
+Duck.Lake.East,5,3,0
+Duck.Lake.East,5,3,2
+Duck.Lake.East,5,3,0
+Duck.Lake.East,5,3,0
+Duck.Lake.East,5,4,3
+Duck.Lake.East,5,4,1
+Duck.Lake.East,5,4,4
+Duck.Lake.East,5,4,95
+Duck.Lake.East,5,5,1
+Duck.Lake.East,5,5,50
+Duck.Lake.East,5,5,60
+Duck.Lake.East,5,5,30
+Duck.Lake.East,5,5,3
+Field.Lab.West,1,1,0
+Field.Lab.West,1,1,0
+Field.Lab.West,1,1,0
+Field.Lab.West,1,1,0
+Field.Lab.West,1,1,1
+Field.Lab.West,1,1,1
+Field.Lab.West,1,1,10
+Field.Lab.West,1,2,0
+Field.Lab.West,1,2,0
+Field.Lab.West,1,2,0
+Field.Lab.West,1,2,0
+Field.Lab.West,1,2,1
+Field.Lab.West,1,2,2
+Field.Lab.West,1,3,1
+Field.Lab.West,1,3,1
+Field.Lab.West,1,3,1
+Field.Lab.West,1,3,1
+Field.Lab.West,1,3,5
+Field.Lab.West,1,4,1
+Field.Lab.West,1,4,5
+Field.Lab.West,1,4,7
+Field.Lab.West,1,4,1
+Field.Lab.West,1,5,0
+Field.Lab.West,1,5,0
+Field.Lab.West,1,5,0
+Field.Lab.West,1,5,0
+Field.Lab.West,1,5,1
+Field.Lab.West,1,5,1
+Field.Lab.West,1,5,1
+Field.Lab.West,1,5,4
+Field.Lab.West,1,5,2
+Field.Lab.West,1,5,5
+Field.Lab.West,1,5,0
+Field.Lab.West,1,5,1
+Field.Lab.West,2,1,1
+Field.Lab.West,2,1,1
+Field.Lab.West,2,2,1
+Field.Lab.West,2,2,1
+Field.Lab.West,2,3,0
+Field.Lab.West,2,3,0
+Field.Lab.West,2,3,1
+Field.Lab.West,2,3,2
+Field.Lab.West,2,3,2
+Field.Lab.West,2,4,5
+Field.Lab.West,2,4,1
+Field.Lab.West,2,4,1
+Field.Lab.West,2,4,1
+Field.Lab.West,2,4,1
+Field.Lab.West,2,4,0
+Field.Lab.West,2,5,5
+Field.Lab.West,2,5,1
+Field.Lab.West,2,5,1
+Field.Lab.West,3,1,2
+Field.Lab.West,3,1,1
+Field.Lab.West,3,1,1
+Field.Lab.West,3,1,1
+Field.Lab.West,3,1,1
+Field.Lab.West,3,1,0
+Field.Lab.West,3,1,0
+Field.Lab.West,3,2,5
+Field.Lab.West,3,2,4
+Field.Lab.West,3,2,1
+Field.Lab.West,3,2,1
+Field.Lab.West,3,2,0
+Field.Lab.West,3,2,0
+Field.Lab.West,3,3,3
+Field.Lab.West,3,3,3
+Field.Lab.West,3,3,0
+Field.Lab.West,3,3,0
+Field.Lab.West,3,3,1
+Field.Lab.West,3,4,2
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,1
+Field.Lab.West,3,4,0
+Field.Lab.West,3,5,30
+Field.Lab.West,3,5,25
+Field.Lab.West,3,5,15
+Field.Lab.West,4,1,1
+Field.Lab.West,4,1,1
+Field.Lab.West,4,1,1
+Field.Lab.West,4,1,1
+Field.Lab.West,4,1,1
+Field.Lab.West,4,1,4
+Field.Lab.West,4,2,0
+Field.Lab.West,4,2,0
+Field.Lab.West,4,2,0
+Field.Lab.West,4,3,1
+Field.Lab.West,4,3,1
+Field.Lab.West,4,3,20
+Field.Lab.West,4,4,1
+Field.Lab.West,4,4,1
+Field.Lab.West,4,4,1
+Field.Lab.West,4,4,1
+Field.Lab.West,4,4,1
+Field.Lab.West,4,4,0
+Field.Lab.West,4,5,1
+Field.Lab.West,4,5,2
+Field.Lab.West,4,5,0
+Field.Lab.West,5,1,1
+Field.Lab.West,5,1,0
+Field.Lab.West,5,2,1
+Field.Lab.West,5,2,1
+Field.Lab.West,5,2,1
+Field.Lab.West,5,2,0
+Field.Lab.West,5,3,1
+Field.Lab.West,5,3,1
+Field.Lab.West,5,3,1
+Field.Lab.West,5,3,2
+Field.Lab.West,5,3,2
+Field.Lab.West,5,4,0
+Field.Lab.West,5,4,1
+Field.Lab.West,5,4,1
+Field.Lab.West,5,4,1
+Field.Lab.West,5,5,1
+Field.Lab.West,5,5,0
+Field.Lab.East ,1,1,0
+Field.Lab.East ,1,1,0
+Field.Lab.East ,1,1,1
+Field.Lab.East ,1,2,0
+Field.Lab.East ,1,2,0
+Field.Lab.East ,1,2,0
+Field.Lab.East ,1,2,1
+Field.Lab.East ,1,2,7
+Field.Lab.East ,1,2,5
+Field.Lab.East ,1,3,0
+Field.Lab.East ,1,3,0
+Field.Lab.East ,1,3,0
+Field.Lab.East ,1,3,0
+Field.Lab.East ,1,4,0
+Field.Lab.East ,1,4,0
+Field.Lab.East ,1,4,0
+Field.Lab.East ,1,4,0
+Field.Lab.East ,1,4,1
+Field.Lab.East ,1,4,1
+Field.Lab.East ,1,4,2
+Field.Lab.East ,1,4,5
+Field.Lab.East ,1,5,1
+Field.Lab.East ,1,5,1
+Field.Lab.East ,1,5,1
+Field.Lab.East ,1,5,0
+Field.Lab.East ,1,5,0
+Field.Lab.East ,2,1,0
+Field.Lab.East ,2,1,0
+Field.Lab.East ,2,1,0
+Field.Lab.East ,2,1,0
+Field.Lab.East ,2,1,0
+Field.Lab.East ,2,1,0
+Field.Lab.East ,2,2,1
+Field.Lab.East ,2,2,0
+Field.Lab.East ,2,2,1
+Field.Lab.East ,2,2,0
+Field.Lab.East ,2,2,0
+Field.Lab.East ,2,2,1
+Field.Lab.East ,2,2,0
+Field.Lab.East ,2,2,1
+Field.Lab.East ,2,2,2
+Field.Lab.East ,2,2,0
+Field.Lab.East ,2,2,2
+Field.Lab.East ,2,3,0
+Field.Lab.East ,2,3,0
+Field.Lab.East ,2,3,2
+Field.Lab.East ,2,4,0
+Field.Lab.East ,2,4,0
+Field.Lab.East ,2,4,0
+Field.Lab.East ,2,4,0
+Field.Lab.East ,2,5,0
+Field.Lab.East ,2,5,0
+Field.Lab.East ,2,5,0
+Field.Lab.East ,2,5,1
+Field.Lab.East ,3,1,0
+Field.Lab.East ,3,1,0
+Field.Lab.East ,3,1,2
+Field.Lab.East ,3,1,1
+Field.Lab.East ,3,2,0
+Field.Lab.East ,3,2,10
+Field.Lab.East ,3,2,1
+Field.Lab.East ,3,3,3
+Field.Lab.East ,3,3,0
+Field.Lab.East ,3,3,1
+Field.Lab.East ,3,3,12
+Field.Lab.East ,3,4,0
+Field.Lab.East ,3,4,0
+Field.Lab.East ,3,4,0
+Field.Lab.East ,3,4,0
+Field.Lab.East ,3,4,1
+Field.Lab.East ,3,5,0
+Field.Lab.East ,3,5,1
+Field.Lab.East ,3,5,2
+Field.Lab.East ,3,5,1
+Field.Lab.East ,3,5,1
+Field.Lab.East ,3,5,0
+Field.Lab.East ,3,5,0
+Field.Lab.East ,4,1,0
+Field.Lab.East ,4,1,2
+Field.Lab.East ,4,1,0
+Field.Lab.East ,4,1,0
+Field.Lab.East ,4,2,0
+Field.Lab.East ,4,2,20
+Field.Lab.East ,4,2,0
+Field.Lab.East ,4,2,0
+Field.Lab.East ,4,3,1
+Field.Lab.East ,4,3,1
+Field.Lab.East ,4,3,0
+Field.Lab.East ,4,3,0
+Field.Lab.East ,4,3,0
+Field.Lab.East ,4,4,0
+Field.Lab.East ,4,4,0
+Field.Lab.East ,4,4,0
+Field.Lab.East ,4,4,2
+Field.Lab.East ,4,4,0
+Field.Lab.East ,4,5,0
+Field.Lab.East ,4,5,0
+Field.Lab.East ,4,5,0
+Field.Lab.East ,4,5,0
+Field.Lab.East ,5,1,0
+Field.Lab.East ,5,1,1
+Field.Lab.East ,5,1,0
+Field.Lab.East ,5,1,1
+Field.Lab.East ,5,2,1
+Field.Lab.East ,5,2,1
+Field.Lab.East ,5,2,2
+Field.Lab.East ,5,2,0
+Field.Lab.East ,5,3,0
+Field.Lab.East ,5,3,0
+Field.Lab.East ,5,3,1
+Field.Lab.East ,5,3,0
+Field.Lab.East ,5,4,0
+Field.Lab.East ,5,4,0
+Field.Lab.East ,5,4,1
+Field.Lab.East ,5,4,2
+Field.Lab.East ,5,5,0
+Field.Lab.East ,5,5,0
+Field.Lab.East ,5,5,3
+No.Till.South,1,1,0
+No.Till.South,1,1,3
+No.Till.South,1,1,0
+No.Till.South,1,2,0
+No.Till.South,1,2,1
+No.Till.South,1,3,1
+No.Till.South,1,3,1
+No.Till.South,1,3,1
+No.Till.South,1,4,3
+No.Till.South,1,4,5
+No.Till.South,1,4,0
+No.Till.South,1,4,0
+No.Till.South,1,5,0
+No.Till.South,1,5,0
+No.Till.South,2,1,0
+No.Till.South,2,1,1
+No.Till.South,2,1,40
+No.Till.South,2,1,25
+No.Till.South,2,2,1
+No.Till.South,2,2,1
+No.Till.South,2,2,0
+No.Till.South,2,3,0
+No.Till.South,2,3,0
+No.Till.South,2,3,0
+No.Till.South,2,3,1
+No.Till.South,2,3,10
+No.Till.South,2,4,1
+No.Till.South,2,4,1
+No.Till.South,2,4,0
+No.Till.South,2,4,0
+No.Till.South,2,5,1
+No.Till.South,2,5,1
+No.Till.South,3,1,1
+No.Till.South,3,1,25
+No.Till.South,3,1,0
+No.Till.South,3,1,0
+No.Till.South,3,2,1
+No.Till.South,3,2,1
+No.Till.South,3,2,2
+No.Till.South,3,3,3
+No.Till.South,3,3,1
+No.Till.South,3,3,0
+No.Till.South,4,avg,3.142857143
+No.Till.South,5,avg,3.142857143
+No.Till.North,1,1,2
+No.Till.North,1,1,10
+No.Till.North,1,1,1
+No.Till.North,1,2,0
+No.Till.North,1,2,1
+No.Till.North,1,2,1
+No.Till.North,1,2,5
+No.Till.North,2,1,0
+No.Till.North,2,1,5
+No.Till.North,2,1,1
+No.Till.North,2,2,0
+No.Till.North,2,2,0
+No.Till.North,2,2,0
+No.Till.North,2,2,0
+No.Till.North,2,3,1
+No.Till.North,2,3,0
+No.Till.North,2,4,1
+No.Till.North,2,4,0
+No.Till.North,3,1,1
+No.Till.North,3,1,0
+No.Till.North,3,1,0
+No.Till.North,3,2,0
+No.Till.North,3,2,0
+No.Till.North,3,2,1
+No.Till.North,3,3,1
+No.Till.North,3,3,0
+No.Till.North,3,3,2
+No.Till.North,3,4,0
+No.Till.North,3,4,0
+No.Till.North,3,5,0
+No.Till.North,3,5,95
+No.Till.North,4,1,0
+No.Till.North,4,1,0
+No.Till.North,4,2,0
+No.Till.North,4,2,1
+No.Till.North,4,2,0
+No.Till.North,5,avg,3.583333333
+LTER.Pot.Hole.North,1,1,10
+LTER.Pot.Hole.North,1,1,5
+LTER.Pot.Hole.North,1,1,0
+LTER.Pot.Hole.North,1,1,1
+LTER.Pot.Hole.North,1,1,2
+LTER.Pot.Hole.North,1,2,1
+LTER.Pot.Hole.North,1,2,1
+LTER.Pot.Hole.North,1,2,1
+LTER.Pot.Hole.North,1,2,0
+LTER.Pot.Hole.North,1,2,0
+LTER.Pot.Hole.North,1,2,2
+LTER.Pot.Hole.North,1,2,5
+LTER.Pot.Hole.North,1,3,1
+LTER.Pot.Hole.North,1,3,1
+LTER.Pot.Hole.North,1,3,1
+LTER.Pot.Hole.North,1,3,2
+LTER.Pot.Hole.North,1,3,2
+LTER.Pot.Hole.North,1,3,0
+LTER.Pot.Hole.North,1,3,0
+LTER.Pot.Hole.North,1,4,1
+LTER.Pot.Hole.North,1,4,1
+LTER.Pot.Hole.North,1,4,0
+LTER.Pot.Hole.North,1,5,0
+LTER.Pot.Hole.North,1,5,0
+LTER.Pot.Hole.North,1,5,0
+LTER.Pot.Hole.North,1,5,2
+LTER.Pot.Hole.North,1,5,5
+LTER.Pot.Hole.North,1,5,1
+LTER.Pot.Hole.North,1,5,50
+LTER.Pot.Hole.North,2,1,0
+LTER.Pot.Hole.North,2,1,0
+LTER.Pot.Hole.North,2,1,0
+LTER.Pot.Hole.North,2,1,1
+LTER.Pot.Hole.North,2,1,1
+LTER.Pot.Hole.North,2,1,1
+LTER.Pot.Hole.North,2,1,5
+LTER.Pot.Hole.North,2,1,2
+LTER.Pot.Hole.North,2,1,30
+LTER.Pot.Hole.North,2,2,0
+LTER.Pot.Hole.North,2,2,0
+LTER.Pot.Hole.North,2,2,0
+LTER.Pot.Hole.North,2,2,15
+LTER.Pot.Hole.North,2,2,3
+LTER.Pot.Hole.North,2,2,1
+LTER.Pot.Hole.North,2,2,1
+LTER.Pot.Hole.North,2,2,1
+LTER.Pot.Hole.North,2,3,2
+LTER.Pot.Hole.North,2,3,4
+LTER.Pot.Hole.North,2,3,0
+LTER.Pot.Hole.North,2,3,0
+LTER.Pot.Hole.North,2,3,1
+LTER.Pot.Hole.North,2,3,5
+LTER.Pot.Hole.North,2,4,1
+LTER.Pot.Hole.North,2,3,1
+LTER.Pot.Hole.North,2,4,2
+LTER.Pot.Hole.North,2,4,1
+LTER.Pot.Hole.North,2,4,2
+LTER.Pot.Hole.North,2,5,2
+LTER.Pot.Hole.North,2,5,7
+LTER.Pot.Hole.North,2,5,0
+LTER.Pot.Hole.North,2,5,0
+LTER.Pot.Hole.North,2,5,0
+LTER.Pot.Hole.North,3,1,2
+LTER.Pot.Hole.North,3,1,2
+LTER.Pot.Hole.North,3,1,1
+LTER.Pot.Hole.North,3,1,1
+LTER.Pot.Hole.North,3,1,0
+LTER.Pot.Hole.North,3,1,50
+LTER.Pot.Hole.North,3,2,3
+LTER.Pot.Hole.North,3,2,5
+LTER.Pot.Hole.North,3,2,10
+LTER.Pot.Hole.North,3,3,1
+LTER.Pot.Hole.North,3,3,1
+LTER.Pot.Hole.North,3,3,1
+LTER.Pot.Hole.North,3,3,1
+LTER.Pot.Hole.North,3,3,0
+LTER.Pot.Hole.North,3,4,0
+LTER.Pot.Hole.North,3,4,1
+LTER.Pot.Hole.North,3,4,2
+LTER.Pot.Hole.North,3,4,5
+LTER.Pot.Hole.North,3,5,0
+LTER.Pot.Hole.North,3,5,1
+LTER.Pot.Hole.North,3,5,0
+LTER.Pot.Hole.North,3,5,0
+LTER.Pot.Hole.North,3,5,0
+LTER.Pot.Hole.North,4,1,2
+LTER.Pot.Hole.North,4,1,1
+LTER.Pot.Hole.North,4,1,1
+LTER.Pot.Hole.North,4,1,0
+LTER.Pot.Hole.North,4,1,0
+LTER.Pot.Hole.North,4,1,0
+LTER.Pot.Hole.North,4,1,0
+LTER.Pot.Hole.North,4,2,1
+LTER.Pot.Hole.North,4,2,1
+LTER.Pot.Hole.North,4,2,0
+LTER.Pot.Hole.North,4,3,1
+LTER.Pot.Hole.North,4,3,1
+LTER.Pot.Hole.North,4,3,1
+LTER.Pot.Hole.North,4,3,1
+LTER.Pot.Hole.North,4,3,0
+LTER.Pot.Hole.North,4,3,0
+LTER.Pot.Hole.North,4,3,0
+LTER.Pot.Hole.North,4,3,0
+LTER.Pot.Hole.North,4,3,0
+LTER.Pot.Hole.North,4,3,0
+LTER.Pot.Hole.North,4,3,0
+LTER.Pot.Hole.North,4,3,40
+LTER.Pot.Hole.North,4,3,25
+LTER.Pot.Hole.North,4,4,1
+LTER.Pot.Hole.North,4,4,2
+LTER.Pot.Hole.North,4,4,0
+LTER.Pot.Hole.North,4,4,0
+LTER.Pot.Hole.North,4,4,0
+LTER.Pot.Hole.North,4,4,20
+LTER.Pot.Hole.North,4,5,0
+LTER.Pot.Hole.North,4,5,1
+LTER.Pot.Hole.North,4,5,0
+LTER.Pot.Hole.North,5,1,20
+LTER.Pot.Hole.North,5,1,5
+LTER.Pot.Hole.North,5,1,2
+LTER.Pot.Hole.North,5,2,1
+LTER.Pot.Hole.North,5,2,3
+LTER.Pot.Hole.North,5,2,0
+LTER.Pot.Hole.North,5,3,2
+LTER.Pot.Hole.North,5,3,0
+LTER.Pot.Hole.North,5,3,1
+LTER.Pot.Hole.North,5,3,1
+LTER.Pot.Hole.North,5,4,1
+LTER.Pot.Hole.North,5,4,1
+LTER.Pot.Hole.North,5,4,1
+LTER.Pot.Hole.North,5,4,1
+LTER.Pot.Hole.North,5,4,0
+LTER.Pot.Hole.North,5,4,2
+LTER.Pot.Hole.North,5,5,1
+LTER.Pot.Hole.North,5,5,2
+LTER.Pot.Hole.North,5,5,2
+LTER.Pot.Hole.North,5,5,0
+LTER.Pot.Hole.North,5,5,0
+LTER.Pot.Hole.South,1,1,0
+LTER.Pot.Hole.South,1,1,0
+LTER.Pot.Hole.South,1,1,0
+LTER.Pot.Hole.South,1,1,0
+LTER.Pot.Hole.South,1,2,4
+LTER.Pot.Hole.South,1,2,5
+LTER.Pot.Hole.South,1,2,3
+LTER.Pot.Hole.South,1,3,0
+LTER.Pot.Hole.South,1,3,10
+LTER.Pot.Hole.South,1,3,5
+LTER.Pot.Hole.South,1,3,0
+LTER.Pot.Hole.South,1,3,1
+LTER.Pot.Hole.South,1,4,0
+LTER.Pot.Hole.South,1,4,8
+LTER.Pot.Hole.South,1,4,0
+LTER.Pot.Hole.South,1,4,1
+LTER.Pot.Hole.South,1,4,0
+LTER.Pot.Hole.South,1,4,0
+LTER.Pot.Hole.South,1,4,4
+LTER.Pot.Hole.South,1,4,0
+LTER.Pot.Hole.South,1,4,1
+LTER.Pot.Hole.South,1,5,12
+LTER.Pot.Hole.South,1,5,4
+LTER.Pot.Hole.South,1,5,0
+LTER.Pot.Hole.South,1,5,0
+LTER.Pot.Hole.South,1,5,0
+LTER.Pot.Hole.South,1,5,1
+LTER.Pot.Hole.South,1,5,13
+LTER.Pot.Hole.South,2,1,1
+LTER.Pot.Hole.South,2,1,0
+LTER.Pot.Hole.South,2,1,1
+LTER.Pot.Hole.South,2,1,20
+LTER.Pot.Hole.South,2,2,1
+LTER.Pot.Hole.South,2,2,0
+LTER.Pot.Hole.South,2,2,0
+LTER.Pot.Hole.South,2,2,1
+LTER.Pot.Hole.South,2,2,1
+LTER.Pot.Hole.South,2,3,1
+LTER.Pot.Hole.South,2,3,1
+LTER.Pot.Hole.South,2,3,3
+LTER.Pot.Hole.South,2,3,0
+LTER.Pot.Hole.South,2,3,1
+LTER.Pot.Hole.South,2,3,1
+LTER.Pot.Hole.South,2,3,0
+LTER.Pot.Hole.South,2,3,2
+LTER.Pot.Hole.South,2,4,1
+LTER.Pot.Hole.South,2,4,1
+LTER.Pot.Hole.South,2,4,0
+LTER.Pot.Hole.South,2,4,2
+LTER.Pot.Hole.South,2,4,0
+LTER.Pot.Hole.South,2,4,3
+LTER.Pot.Hole.South,2,4,1
+LTER.Pot.Hole.South,2,4,0
+LTER.Pot.Hole.South,2,4,4
+LTER.Pot.Hole.South,2,4,4
+LTER.Pot.Hole.South,2,4,1
+LTER.Pot.Hole.South,2,4,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,1
+LTER.Pot.Hole.South,2,5,3
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,2
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,1
+LTER.Pot.Hole.South,2,5,3
+LTER.Pot.Hole.South,2,5,1
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,2
+LTER.Pot.Hole.South,2,5,0
+LTER.Pot.Hole.South,2,5,8
+LTER.Pot.Hole.South,2,5,2
+LTER.Pot.Hole.South,2,5,5
+LTER.Pot.Hole.South,3,1,0
+LTER.Pot.Hole.South,3,1,7
+LTER.Pot.Hole.South,3,1,3
+LTER.Pot.Hole.South,3,1,18
+LTER.Pot.Hole.South,3,1,2
+LTER.Pot.Hole.South,3,1,0
+LTER.Pot.Hole.South,3,1,1
+LTER.Pot.Hole.South,3,1,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,1
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,0
+LTER.Pot.Hole.South,3,2,2
+LTER.Pot.Hole.South,3,3,1
+LTER.Pot.Hole.South,3,3,2
+LTER.Pot.Hole.South,3,3,2
+LTER.Pot.Hole.South,3,3,1
+LTER.Pot.Hole.South,3,3,0
+LTER.Pot.Hole.South,3,3,80
+LTER.Pot.Hole.South,3,3,0
+LTER.Pot.Hole.South,3,3,0
+LTER.Pot.Hole.South,3,3,2
+LTER.Pot.Hole.South,3,4,0
+LTER.Pot.Hole.South,3,4,7
+LTER.Pot.Hole.South,3,4,1
+LTER.Pot.Hole.South,3,4,1
+LTER.Pot.Hole.South,3,4,0
+LTER.Pot.Hole.South,3,4,2
+LTER.Pot.Hole.South,3,4,1
+LTER.Pot.Hole.South,3,4,0
+LTER.Pot.Hole.South,3,5,10
+LTER.Pot.Hole.South,3,5,0
+LTER.Pot.Hole.South,3,5,0
+LTER.Pot.Hole.South,4,1,2
+LTER.Pot.Hole.South,4,1,1
+LTER.Pot.Hole.South,4,1,0
+LTER.Pot.Hole.South,4,1,0
+LTER.Pot.Hole.South,4,1,0
+LTER.Pot.Hole.South,4,1,0
+LTER.Pot.Hole.South,4,1,4
+LTER.Pot.Hole.South,4,1,2
+LTER.Pot.Hole.South,4,2,0
+LTER.Pot.Hole.South,4,2,0
+LTER.Pot.Hole.South,4,2,2
+LTER.Pot.Hole.South,4,2,1
+LTER.Pot.Hole.South,4,2,0
+LTER.Pot.Hole.South,4,2,1
+LTER.Pot.Hole.South,4,3,4
+LTER.Pot.Hole.South,4,3,1
+LTER.Pot.Hole.South,4,3,5
+LTER.Pot.Hole.South,4,3,1
+LTER.Pot.Hole.South,4,3,2
+LTER.Pot.Hole.South,4,4,0
+LTER.Pot.Hole.South,4,4,2
+LTER.Pot.Hole.South,4,4,7
+LTER.Pot.Hole.South,4,4,3
+LTER.Pot.Hole.South,4,4,5
+LTER.Pot.Hole.South,4,4,1
+LTER.Pot.Hole.South,4,4,0
+LTER.Pot.Hole.South,4,4,10
+LTER.Pot.Hole.South,4,4,15
+LTER.Pot.Hole.South,4,4,2
+LTER.Pot.Hole.South,4,4,0
+LTER.Pot.Hole.South,4,4,1
+LTER.Pot.Hole.South,4,4,0
+LTER.Pot.Hole.South,4,4,12
+LTER.Pot.Hole.South,4,4,4
+LTER.Pot.Hole.South,4,4,1
+LTER.Pot.Hole.South,4,4,8
+LTER.Pot.Hole.South,4,5,0
+LTER.Pot.Hole.South,4,5,2
+LTER.Pot.Hole.South,4,5,2
+LTER.Pot.Hole.South,4,5,0
+LTER.Pot.Hole.South,4,5,1
+LTER.Pot.Hole.South,4,5,0
+LTER.Pot.Hole.South,4,5,1
+LTER.Pot.Hole.South,4,5,1
+LTER.Pot.Hole.South,4,5,0
+LTER.Pot.Hole.South,4,5,2
+LTER.Pot.Hole.South,4,5,0
+LTER.Pot.Hole.South,4,5,5
+LTER.Pot.Hole.South,4,5,4
+LTER.Pot.Hole.South,4,5,1
+LTER.Pot.Hole.South,4,5,0
+LTER.Pot.Hole.South,5,1,0
+LTER.Pot.Hole.South,5,1,0
+LTER.Pot.Hole.South,5,1,4
+LTER.Pot.Hole.South,5,1,1
+LTER.Pot.Hole.South,5,1,2
+LTER.Pot.Hole.South,5,1,1
+LTER.Pot.Hole.South,5,2,0
+LTER.Pot.Hole.South,5,2,0
+LTER.Pot.Hole.South,5,2,1
+LTER.Pot.Hole.South,5,2,1
+LTER.Pot.Hole.South,5,2,8
+LTER.Pot.Hole.South,5,3,1
+LTER.Pot.Hole.South,5,3,30
+LTER.Pot.Hole.South,5,3,2
+LTER.Pot.Hole.South,5,3,1
+LTER.Pot.Hole.South,5,3,0
+LTER.Pot.Hole.South,5,3,40
+LTER.Pot.Hole.South,5,3,1
+LTER.Pot.Hole.South,5,3,2
+LTER.Pot.Hole.South,5,3,1
+LTER.Pot.Hole.South,5,4,1
+LTER.Pot.Hole.South,5,4,2
+LTER.Pot.Hole.South,5,4,0
+LTER.Pot.Hole.South,5,4,4
+LTER.Pot.Hole.South,5,4,1
+LTER.Pot.Hole.South,5,4,0
+LTER.Pot.Hole.South,5,4,1
+LTER.Pot.Hole.South,5,4,0
+LTER.Pot.Hole.South,5,4,0
+LTER.Pot.Hole.South,5,5,1
+LTER.Pot.Hole.South,5,5,2
+LTER.Pot.Hole.South,5,5,1
+LTER.Pot.Hole.South,5,5,1
+LTER.Pot.Hole.South,5,5,2
+LTER.Pot.Hole.South,5,5,4
+LTER.Pot.Hole.South,5,5,5
+LTER.Pot.Hole.South,5,5,40
+LTER.Pot.Hole.South,5,5,3
+LTER.Pot.Hole.South,5,5,20
+LTER.Pot.Hole.South,5,5,3
+Reed.Canary.South,1,1,0
+Reed.Canary.South,1,1,0
+Reed.Canary.South,1,1,2
+Reed.Canary.South,1,2,0
+Reed.Canary.South,1,2,0
+Reed.Canary.South,1,2,0
+Reed.Canary.South,1,3,1
+Reed.Canary.South,1,3,1
+Reed.Canary.South,1,3,1
+Reed.Canary.South,1,4,1
+Reed.Canary.South,1,4,0
+Reed.Canary.South,1,5,0
+Reed.Canary.South,1,5,95
+Reed.Canary.South,1,5,0
+Reed.Canary.South,1,5,1
+Reed.Canary.South,1,5,0
+Reed.Canary.South,1,5,1
+Reed.Canary.South,2,1,1
+Reed.Canary.South,2,1,50
+Reed.Canary.South,2,1,95
+Reed.Canary.South,2,1,95
+Reed.Canary.South,2,2,0
+Reed.Canary.South,2,2,8
+Reed.Canary.South,2,3,1
+Reed.Canary.South,2,3,0
+Reed.Canary.South,2,3,3
+Reed.Canary.South,2,3,0
+Reed.Canary.South,2,4,1
+Reed.Canary.South,2,4,0
+Reed.Canary.South,2,5,1
+Reed.Canary.South,2,5,0
+Reed.Canary.South,2,5,0
+Reed.Canary.South,2,5,1
+Reed.Canary.South,2,5,15
+Reed.Canary.South,2,5,0
+Reed.Canary.South,2,5,0
+Reed.Canary.South,2,5,0
+Reed.Canary.South,3,1,0
+Reed.Canary.South,3,1,10
+Reed.Canary.South,3,1,0
+Reed.Canary.South,3,1,0
+Reed.Canary.South,3,1,0
+Reed.Canary.South,3,2,0
+Reed.Canary.South,3,2,0
+Reed.Canary.South,3,2,4
+Reed.Canary.South,3,3,5
+Reed.Canary.South,3,3,0
+Reed.Canary.South,3,3,2
+Reed.Canary.South,3,3,0
+Reed.Canary.South,3,3,0
+Reed.Canary.South,3,4,0
+Reed.Canary.South,3,4,0
+Reed.Canary.South,3,4,0
+Reed.Canary.South,3,5,2
+Reed.Canary.South,3,5,0
+Reed.Canary.South,3,5,2
+Reed.Canary.South,4,1,1
+Reed.Canary.South,4,1,0
+Reed.Canary.South,4,1,0
+Reed.Canary.South,4,1,1
+Reed.Canary.South,4,2,10
+Reed.Canary.South,4,2,0
+Reed.Canary.South,4,2,2
+Reed.Canary.South,4,2,0
+Reed.Canary.South,4,2,1
+Reed.Canary.South,4,2,1
+Reed.Canary.South,4,3,1
+Reed.Canary.South,4,3,0
+Reed.Canary.South,4,3,1
+Reed.Canary.South,4,3,0
+Reed.Canary.South,4,3,1
+Reed.Canary.South,4,3,1
+Reed.Canary.South,4,4,1
+Reed.Canary.South,4,4,3
+Reed.Canary.South,4,4,0
+Reed.Canary.South,4,4,0
+Reed.Canary.South,4,5,10
+Reed.Canary.South,4,5,2
+Reed.Canary.South,4,5,0
+Reed.Canary.South,5,1,0
+Reed.Canary.South,5,1,5
+Reed.Canary.South,5,1,0
+Reed.Canary.South,5,2,0
+Reed.Canary.South,5,2,0
+Reed.Canary.South,5,3,1
+Reed.Canary.South,5,3,0
+Reed.Canary.South,5,3,95
+Reed.Canary.South,5,4,0
+Reed.Canary.South,5,4,2
+Reed.Canary.South,5,5,0
+Reed.Canary.South,5,5,0
+Reed.Canary.South,5,5,3
+Reed.Canary.North,1,1,0
+Reed.Canary.North,1,2,0
+Reed.Canary.North,1,2,0
+Reed.Canary.North,1,2,1
+Reed.Canary.North,1,3,1
+Reed.Canary.North,1,3,1
+Reed.Canary.North,1,3,1
+Reed.Canary.North,1,3,1
+Reed.Canary.North,1,3,0
+Reed.Canary.North,1,3,0
+Reed.Canary.North,1,3,15
+Reed.Canary.North,1,4,0
+Reed.Canary.North,1,5,0
+Reed.Canary.North,1,5,0
+Reed.Canary.North,1,5,0
+Reed.Canary.North,1,5,0
+Reed.Canary.North,1,5,0
+Reed.Canary.North,1,5,0
+Reed.Canary.North,1,5,1
+Reed.Canary.North,1,5,5
+Reed.Canary.North,1,5,3
+Reed.Canary.North,2,1,0
+Reed.Canary.North,2,1,0
+Reed.Canary.North,2,1,20
+Reed.Canary.North,2,2,0
+Reed.Canary.North,2,2,0
+Reed.Canary.North,2,2,1
+Reed.Canary.North,2,3,1
+Reed.Canary.North,2,3,0
+Reed.Canary.North,2,3,1
+Reed.Canary.North,2,4,0
+Reed.Canary.North,2,4,0
+Reed.Canary.North,2,4,0
+Reed.Canary.North,2,4,0
+Reed.Canary.North,2,4,1
+Reed.Canary.North,2,5,0
+Reed.Canary.North,2,5,0
+Reed.Canary.North,2,5,0
+Reed.Canary.North,2,5,0
+Reed.Canary.North,2,5,25
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,0
+Reed.Canary.North,3,1,1
+Reed.Canary.North,3,1,5
+Reed.Canary.North,3,1,15
+Reed.Canary.North,3,2,1
+Reed.Canary.North,3,2,2
+Reed.Canary.North,3,2,1
+Reed.Canary.North,3,2,0
+Reed.Canary.North,3,2,0
+Reed.Canary.North,3,2,10
+Reed.Canary.North,3,2,1
+Reed.Canary.North,3,3,0
+Reed.Canary.North,3,3,0
+Reed.Canary.North,3,3,2
+Reed.Canary.North,3,4,4
+Reed.Canary.North,3,4,0
+Reed.Canary.North,3,4,0
+Reed.Canary.North,3,4,0
+Reed.Canary.North,3,4,1
+Reed.Canary.North,3,5,1
+Reed.Canary.North,3,5,1
+Reed.Canary.North,3,5,0
+Reed.Canary.North,3,5,8
+Reed.Canary.North,4,1,0
+Reed.Canary.North,4,2,0
+Reed.Canary.North,4,2,1
+Reed.Canary.North,4,3,0
+Reed.Canary.North,4,3,1
+Reed.Canary.North,4,3,0
+Reed.Canary.North,4,4,0
+Reed.Canary.North,4,4,0
+Reed.Canary.North,4,4,4
+Reed.Canary.North,4,4,2
+Reed.Canary.North,5,1,0
+Reed.Canary.North,5,1,0
+Reed.Canary.North,5,1,0
+Reed.Canary.North,5,2,1
+Reed.Canary.North,5,2,0
+Reed.Canary.North,5,2,5
+Wetland.South,1,1,6
+Wetland.South,1,1,10
+Wetland.South,1,1,0
+Wetland.South,1,2,0
+Wetland.South,1,2,0
+Wetland.South,1,2,0
+Wetland.South,1,2,0
+Wetland.South,1,2,10
+Wetland.South,1,3,1
+Wetland.South,1,3,0
+Wetland.South,1,3,0
+Wetland.South,1,3,0
+Wetland.South,1,4,0
+Wetland.South,1,4,1
+Wetland.South,1,4,2
+Wetland.South,1,4,0
+Wetland.South,1,4,1
+Wetland.South,1,4,30
+Wetland.South,1,5,4
+Wetland.South,1,5,15
+Wetland.South,1,5,0
+Wetland.South,2,1,0
+Wetland.South,2,1,20
+Wetland.South,2,2,3
+Wetland.South,2,2,0
+Wetland.South,2,2,30
+Wetland.South,2,2,10
+Wetland.South,2,2,20
+Wetland.South,2,2,5
+Wetland.South,2,2,0
+Wetland.South,2,2,0
+Wetland.South,2,2,1
+Wetland.South,3,avg,4.5
+Wetland.South,4,avg,4.5
+Wetland.South,5,4,0
+Wetland.South,5,4,10
+Wetland.South,5,4,0
+Wetland.South,5,5,0
+Wetland.South,5,5,0
+Wetland.South,5,5,0
+Wetland.South,5,5,1
+Wetland.South,5,5,0
+Wetland.North,1,1,0
+Wetland.North,1,1,0
+Wetland.North,1,1,0
+Wetland.North,1,1,0
+Wetland.North,1,1,0
+Wetland.North,1,1,0
+Wetland.North,1,1,1
+Wetland.North,1,1,40
+Wetland.North,1,2,0
+Wetland.North,1,2,0
+Wetland.North,1,2,0
+Wetland.North,1,2,0
+Wetland.North,1,2,0
+Wetland.North,1,2,2
+Wetland.North,1,2,1
+Wetland.North,1,3,4
+Wetland.North,1,3,0
+Wetland.North,1,3,0
+Wetland.North,1,3,0
+Wetland.North,1,4,0
+Wetland.North,1,4,0
+Wetland.North,1,4,0
+Wetland.North,1,4,0
+Wetland.North,1,4,0
+Wetland.North,1,4,0
+Wetland.North,1,4,0
+Wetland.North,1,4,0
+Wetland.North,1,4,1
+Wetland.North,1,4,10
+Wetland.North,1,5,1
+Wetland.North,1,5,2
+Wetland.North,1,5,0
+Wetland.North,1,5,0
+Wetland.North,1,5,0
+Wetland.North,1,5,0
+Wetland.North,2,1,0
+Wetland.North,2,1,0
+Wetland.North,2,2,0
+Wetland.North,2,2,0
+Wetland.North,2,2,2
+Wetland.North,2,3,0
+Wetland.North,2,3,0
+Wetland.North,2,3,2
+Wetland.North,2,3,5
+Wetland.North,2,3,1
+Wetland.North,2,4,0
+Wetland.North,2,4,0
+Wetland.North,2,4,1
+Wetland.North,2,4,20
+Wetland.North,2,4,2
+Wetland.North,2,5,0
+Wetland.North,2,5,0
+Wetland.North,2,5,0
+Wetland.North,2,5,1
+Wetland.North,2,5,1
+Wetland.North,3,1,1
+Wetland.North,3,1,1
+Wetland.North,3,1,0
+Wetland.North,3,1,10
+Wetland.North,3,1,10
+Wetland.North,3,1,5
+Wetland.North,3,2,1
+Wetland.North,3,2,1
+Wetland.North,3,2,2
+Wetland.North,3,2,0
+Wetland.North,3,2,0
+Wetland.North,3,2,0
+Wetland.North,3,2,0
+Wetland.North,3,2,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,3,0
+Wetland.North,3,4,2
+Wetland.North,3,4,0
+Wetland.North,3,4,0
+Wetland.North,3,4,0
+Wetland.North,3,4,0
+Wetland.North,3,4,0
+Wetland.North,3,4,0
+Wetland.North,3,5,0
+Wetland.North,3,5,20
+Wetland.North,4,1,0
+Wetland.North,4,1,0
+Wetland.North,4,1,3
+Wetland.North,4,1,2
+Wetland.North,4,1,20
+Wetland.North,4,2,0
+Wetland.North,4,2,0
+Wetland.North,4,2,0
+Wetland.North,4,2,0
+Wetland.North,4,2,0
+Wetland.North,4,2,0
+Wetland.North,4,2,0
+Wetland.North,4,3,0
+Wetland.North,4,3,0
+Wetland.North,4,3,0
+Wetland.North,4,3,0
+Wetland.North,4,3,0
+Wetland.North,4,3,3
+Wetland.North,4,3,10
+Wetland.North,4,4,0
+Wetland.North,4,4,0
+Wetland.North,4,5,0
+Wetland.North,4,5,0
+Wetland.North,4,5,0
+Wetland.North,4,5,0
+Wetland.North,4,5,0
+Wetland.North,4,5,3
+Wetland.North,5,1,0
+Wetland.North,5,1,0
+Wetland.North,5,1,0
+Wetland.North,5,1,0
+Wetland.North,5,1,0
+Wetland.North,5,1,0
+Wetland.North,5,1,0
+Wetland.North,5,1,1
+Wetland.North,5,1,1
+Wetland.North,5,1,10
+Wetland.North,5,2,0
+Wetland.North,5,2,0
+Wetland.North,5,2,0
+Wetland.North,5,2,95
+Wetland.North,5,3,0
+Wetland.North,5,3,0
+Wetland.North,5,3,0
+Wetland.North,5,3,0
+Wetland.North,5,3,0
+Wetland.North,5,3,0
+Wetland.North,5,3,40
+Wetland.North,5,3,50
+Wetland.North,5,3,10
+Wetland.North,5,4,0
+Wetland.North,5,4,30
+Wetland.North,5,5,0
+Wetland.North,5,5,0
+Wetland.North,5,5,3
+Wetland.North,5,5,3
+Soil.Pit.West,1,1,1
+Soil.Pit.West,1,1,0
+Soil.Pit.West,1,2,1
+Soil.Pit.West,1,2,70
+Soil.Pit.West,1,2,80
+Soil.Pit.West,1,3,0
+Soil.Pit.West,1,3,0
+Soil.Pit.West,1,3,0
+Soil.Pit.West,1,3,40
+Soil.Pit.West,1,3,95
+Soil.Pit.West,1,3,90
+Soil.Pit.West,1,3,80
+Soil.Pit.West,1,3,35
+Soil.Pit.West,1,4,0
+Soil.Pit.West,1,4,5
+Soil.Pit.West,1,4,3
+Soil.Pit.West,1,4,2
+Soil.Pit.West,2,avg,29.52941176
+Soil.Pit.West,3,avg,29.52941176
+Soil.Pit.West,4,avg,29.52941176
+Soil.Pit.West,5,avg,29.52941176
+Soil.Pit.East ,1,1,0
+Soil.Pit.East ,1,1,1
+Soil.Pit.East ,1,2,0
+Soil.Pit.East ,1,2,8
+Soil.Pit.East ,1,2,0
+Soil.Pit.East ,1,3,0
+Soil.Pit.East ,1,3,0
+Soil.Pit.East ,1,4,1
+Soil.Pit.East ,1,4,0
+Soil.Pit.East ,1,4,0
+Soil.Pit.East ,1,4,1
+Soil.Pit.East ,1,4,1
+Soil.Pit.East ,1,5,1
+Soil.Pit.East ,1,5,1
+Soil.Pit.East ,1,5,1
+Soil.Pit.East ,1,5,1
+Soil.Pit.East ,1,5,0
+Soil.Pit.East ,1,5,0
+Soil.Pit.East ,2,1,0
+Soil.Pit.East ,2,1,1
+Soil.Pit.East ,2,1,0
+Soil.Pit.East ,2,2,1
+Soil.Pit.East ,2,2,2
+Soil.Pit.East ,2,2,0
+Soil.Pit.East ,2,2,1
+Soil.Pit.East ,2,2,0
+Soil.Pit.East ,2,2,35
+Soil.Pit.East ,2,3,1
+Soil.Pit.East ,2,3,1
+Soil.Pit.East ,2,3,0
+Soil.Pit.East ,2,3,1
+Soil.Pit.East ,2,3,5
+Soil.Pit.East ,2,3,2
+Soil.Pit.East ,2,3,0
+Soil.Pit.East ,2,3,2
+Soil.Pit.East ,2,4,1
+Soil.Pit.East ,2,4,0
+Soil.Pit.East ,2,4,3
+Soil.Pit.East ,2,4,3
+Soil.Pit.East ,2,4,0
+Soil.Pit.East ,2,4,0
+Soil.Pit.East ,2,5,0
+Soil.Pit.East ,2,5,0
+Soil.Pit.East ,2,5,30
+Soil.Pit.East ,2,5,5
+Soil.Pit.East ,3,1,0
+Soil.Pit.East ,3,1,2
+Soil.Pit.East ,3,1,1
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,20
+Soil.Pit.East ,3,2,5
+Soil.Pit.East ,3,2,60
+Soil.Pit.East ,3,2,40
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,2
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,2,0
+Soil.Pit.East ,3,3,3
+Soil.Pit.East ,3,3,0
+Soil.Pit.East ,3,3,1
+Soil.Pit.East ,3,3,1
+Soil.Pit.East ,3,3,0
+Soil.Pit.East ,3,4,0
+Soil.Pit.East ,3,5,1
+Soil.Pit.East ,3,5,2
+Soil.Pit.East ,3,5,4
+Soil.Pit.East ,4,1,0
+Soil.Pit.East ,4,1,0
+Soil.Pit.East ,4,1,0
+Soil.Pit.East ,4,2,0
+Soil.Pit.East ,4,2,0
+Soil.Pit.East ,4,2,20
+Soil.Pit.East ,4,3,0
+Soil.Pit.East ,4,3,0
+Soil.Pit.East ,4,3,70
+Soil.Pit.East ,4,4,0
+Soil.Pit.East ,4,4,0
+Soil.Pit.East ,4,4,0
+Soil.Pit.East ,4,5,0
+Soil.Pit.East ,4,5,0
+Soil.Pit.East ,4,5,0
+Soil.Pit.East ,5,1,1
+Soil.Pit.East ,5,1,0
+Soil.Pit.East ,5,2,1
+Soil.Pit.East ,5,2,70
+Soil.Pit.East ,5,2,80
+Soil.Pit.East ,5,3,0
+Soil.Pit.East ,5,3,0
+Soil.Pit.East ,5,3,0
+Soil.Pit.East ,5,3,40
+Soil.Pit.East ,5,3,95
+Soil.Pit.East ,5,3,90
+Soil.Pit.East ,5,3,80
+Soil.Pit.East ,5,3,30
+Soil.Pit.East ,5,4,0
+Soil.Pit.East ,5,4,5
+Soil.Pit.East ,5,4,3
+Soil.Pit.East ,5,4,2
+Soil.Pit.East ,5,5,0
+Soil.Pit.East ,5,5,5
+Soil.Pit.East ,5,5,0
+Soil.Pit.East ,5,5,0
+Soil.Pit.East ,5,5,0
+Soil.Pit.East ,5,5,0
+Soil.Pit.East ,5,5,0
+Spruce.Lodge.East,1,1,0
+Spruce.Lodge.East,1,1,0
+Spruce.Lodge.East,1,1,0
+Spruce.Lodge.East,1,1,0
+Spruce.Lodge.East,1,1,1
+Spruce.Lodge.East,1,1,15
+Spruce.Lodge.East,1,2,0
+Spruce.Lodge.East,1,2,0
+Spruce.Lodge.East,1,2,0
+Spruce.Lodge.East,1,2,1
+Spruce.Lodge.East,1,3,3
+Spruce.Lodge.East,1,3,10
+Spruce.Lodge.East,1,3,0
+Spruce.Lodge.East,1,3,0
+Spruce.Lodge.East,1,4,0
+Spruce.Lodge.East,1,4,0
+Spruce.Lodge.East,1,4,0
+Spruce.Lodge.East,1,4,0
+Spruce.Lodge.East,1,5,1
+Spruce.Lodge.East,1,5,0
+Spruce.Lodge.East,1,5,0
+Spruce.Lodge.East,2,1,3
+Spruce.Lodge.East,2,1,0
+Spruce.Lodge.East,2,1,0
+Spruce.Lodge.East,2,2,0
+Spruce.Lodge.East,2,2,0
+Spruce.Lodge.East,2,2,2
+Spruce.Lodge.East,2,2,30
+Spruce.Lodge.East,2,3,0
+Spruce.Lodge.East,2,3,0
+Spruce.Lodge.East,2,4,0
+Spruce.Lodge.East,2,4,0
+Spruce.Lodge.East,2,5,0
+Spruce.Lodge.East,2,5,0
+Spruce.Lodge.East,2,5,2
+Spruce.Lodge.East,2,5,10
+Spruce.Lodge.East,2,5,35
+Spruce.Lodge.East,3,1,70
+Spruce.Lodge.East,3,1,5
+Spruce.Lodge.East,3,1,0
+Spruce.Lodge.East,3,2,1
+Spruce.Lodge.East,3,2,4
+Spruce.Lodge.East,3,3,1
+Spruce.Lodge.East,3,3,1
+Spruce.Lodge.East,3,3,20
+Spruce.Lodge.East,3,4,1
+Spruce.Lodge.East,3,4,10
+Spruce.Lodge.East,3,5,0
+Spruce.Lodge.East,3,5,0
+Spruce.Lodge.East,3,5,0
+Spruce.Lodge.East,4,1,2
+Spruce.Lodge.East,4,1,5
+Spruce.Lodge.East,4,2,0
+Spruce.Lodge.East,4,2,1
+Spruce.Lodge.East,4,2,1
+Spruce.Lodge.East,4,2,3
+Spruce.Lodge.East,4,2,5
+Spruce.Lodge.East,4,3,0
+Spruce.Lodge.East,4,3,0
+Spruce.Lodge.East,4,3,0
+Spruce.Lodge.East,4,3,0
+Spruce.Lodge.East,4,4,1
+Spruce.Lodge.East,4,4,0
+Spruce.Lodge.East,4,5,0
+Spruce.Lodge.East,4,5,0
+Spruce.Lodge.East,4,5,1
+Spruce.Lodge.East,4,5,2
+Spruce.Lodge.East,5,1,0
+Spruce.Lodge.East,5,1,1
+Spruce.Lodge.East,5,2,1
+Spruce.Lodge.East,5,2,4
+Spruce.Lodge.East,5,2,0
+Spruce.Lodge.East,5,2,0
+Spruce.Lodge.East,5,3,0
+Spruce.Lodge.East,5,3,0
+Spruce.Lodge.East,5,3,1
+Spruce.Lodge.East,5,3,2
+Spruce.Lodge.East,5,3,2
+Spruce.Lodge.East,5,4,1
+Spruce.Lodge.East,5,4,2
+Spruce.Lodge.East,5,4,1
+Spruce.Lodge.East,5,4,0
+Spruce.Lodge.East,5,5,0
+Spruce.Lodge.East,5,5,0
+Spruce.Lodge.East,5,5,0
+Spruce.Lodge.East,5,5,0
+Spruce.Lodge.East,5,5,0
+Spruce.Lodge.East,5,5,2
+Spruce.Lodge.West,1,1,5
+Spruce.Lodge.West,1,1,10
+Spruce.Lodge.West,1,1,3
+Spruce.Lodge.West,1,1,30
+Spruce.Lodge.West,1,1,95
+Spruce.Lodge.West,1,2,2
+Spruce.Lodge.West,1,2,0
+Spruce.Lodge.West,1,2,4
+Spruce.Lodge.West,1,2,4
+Spruce.Lodge.West,1,3,1
+Spruce.Lodge.West,1,3,50
+Spruce.Lodge.West,1,3,2
+Spruce.Lodge.West,1,4,12
+Spruce.Lodge.West,1,4,3
+Spruce.Lodge.West,1,4,0
+Spruce.Lodge.West,1,5,1
+Spruce.Lodge.West,1,5,15
+Spruce.Lodge.West,2,1,30
+Spruce.Lodge.West,2,1,0
+Spruce.Lodge.West,2,1,0
+Spruce.Lodge.West,2,2,20
+Spruce.Lodge.West,2,2,0
+Spruce.Lodge.West,2,2,15
+Spruce.Lodge.West,2,2,10
+Spruce.Lodge.West,2,3,0
+Spruce.Lodge.West,2,3,0
+Spruce.Lodge.West,2,3,5
+Spruce.Lodge.West,2,3,2
+Spruce.Lodge.West,2,3,1
+Spruce.Lodge.West,2,4,4
+Spruce.Lodge.West,2,4,8
+Spruce.Lodge.West,2,4,0
+Spruce.Lodge.West,2,4,10
+Spruce.Lodge.West,2,4,0
+Spruce.Lodge.West,2,4,0
+Spruce.Lodge.West,2,4,1
+Spruce.Lodge.West,2,4,1
+Spruce.Lodge.West,2,4,1
+Spruce.Lodge.West,2,4,5
+Spruce.Lodge.West,2,4,4
+Spruce.Lodge.West,2,4,2
+Spruce.Lodge.West,2,4,12
+Spruce.Lodge.West,2,5,4
+Spruce.Lodge.West,2,5,0
+Spruce.Lodge.West,3,1,1
+Spruce.Lodge.West,3,1,0
+Spruce.Lodge.West,3,1,1
+Spruce.Lodge.West,3,2,1
+Spruce.Lodge.West,3,2,2
+Spruce.Lodge.West,3,2,2
+Spruce.Lodge.West,3,2,60
+Spruce.Lodge.West,3,3,0
+Spruce.Lodge.West,3,3,1
+Spruce.Lodge.West,3,3,10
+Spruce.Lodge.West,3,4,1
+Spruce.Lodge.West,3,4,9
+Spruce.Lodge.West,3,4,90
+Spruce.Lodge.West,3,4,90
+Spruce.Lodge.West,3,4,1
+Spruce.Lodge.West,3,4,0
+Spruce.Lodge.West,3,5,0
+Spruce.Lodge.West,3,5,1
+Spruce.Lodge.West,3,5,1
+Spruce.Lodge.West,4,1,0
+Spruce.Lodge.West,4,1,1
+Spruce.Lodge.West,4,1,0
+Spruce.Lodge.West,4,1,2
+Spruce.Lodge.West,4,2,0
+Spruce.Lodge.West,4,2,8
+Spruce.Lodge.West,4,2,5
+Spruce.Lodge.West,4,2,0
+Spruce.Lodge.West,4,3,1
+Spruce.Lodge.West,4,4,1
+Spruce.Lodge.West,4,4,1
+Spruce.Lodge.West,4,5,2
+Spruce.Lodge.West,4,5,0
+Spruce.Lodge.West,4,5,0
+Spruce.Lodge.West,4,5,0
+Spruce.Lodge.West,5,1,4
+Spruce.Lodge.West,5,1,2
+Spruce.Lodge.West,5,1,20
+Spruce.Lodge.West,5,2,5
+Spruce.Lodge.West,5,2,0
+Spruce.Lodge.West,5,2,12
+Spruce.Lodge.West,5,2,0
+Spruce.Lodge.West,5,3,1
+Spruce.Lodge.West,5,3,0
+Spruce.Lodge.West,5,3,95
+Spruce.Lodge.West,5,4,1
+Spruce.Lodge.West,5,4,18
+Spruce.Lodge.West,5,5,0
+Spruce.Lodge.West,5,5,10
+Spruce.Lodge.West,5,5,2
+Spruce.Lodge.West,5,5,1
+Succession.West,1,1,0
+Succession.West,1,1,0
+Succession.West,1,1,0
+Succession.West,1,2,1
+Succession.West,1,2,3
+Succession.West,1,2,3
+Succession.West,1,2,95
+Succession.West,1,2,95
+Succession.West,1,3,0
+Succession.West,1,3,0
+Succession.West,1,3,0
+Succession.West,1,3,0
+Succession.West,1,4,1
+Succession.West,1,4,0
+Succession.West,1,4,0
+Succession.West,1,4,0
+Succession.West,1,4,0
+Succession.West,1,4,95
+Succession.West,1,4,95
+Succession.West,1,4,95
+Succession.West,1,5,1
+Succession.West,1,5,1
+Succession.West,1,5,1
+Succession.West,1,5,2
+Succession.West,1,5,0
+Succession.West,1,5,0
+Succession.West,1,5,0
+Succession.West,1,5,0
+Succession.West,1,5,95
+Succession.West,2,1,1
+Succession.West,2,1,0
+Succession.West,2,2,0
+Succession.West,2,2,0
+Succession.West,2,2,0
+Succession.West,2,2,10
+Succession.West,2,3,0
+Succession.West,2,3,0
+Succession.West,2,4,3
+Succession.West,2,4,0
+Succession.West,2,4,95
+Succession.West,2,5,1
+Succession.West,2,5,2
+Succession.West,2,5,10
+Succession.West,3,1,0
+Succession.West,3,1,0
+Succession.West,3,1,30
+Succession.West,3,2,1
+Succession.West,3,2,1
+Succession.West,3,2,0
+Succession.West,3,2,0
+Succession.West,3,3,5
+Succession.West,3,3,95
+Succession.West,3,4,0
+Succession.West,3,5,0
+Succession.West,3,5,0
+Succession.West,3,5,0
+Succession.West,3,5,1
+Succession.West,4,1,7
+Succession.West,4,1,10
+Succession.West,4,1,5
+Succession.West,4,1,0
+Succession.West,4,1,0
+Succession.West,4,1,1
+Succession.West,4,2,2
+Succession.West,4,2,2
+Succession.West,4,2,1
+Succession.West,4,2,1
+Succession.West,4,2,0
+Succession.West,4,2,3
+Succession.West,4,3,3
+Succession.West,4,3,1
+Succession.West,4,3,1
+Succession.West,4,3,1
+Succession.West,4,3,0
+Succession.West,4,3,10
+Succession.West,4,3,15
+Succession.West,4,3,4
+Succession.West,4,4,1
+Succession.West,4,4,1
+Succession.West,4,4,2
+Succession.West,4,4,2
+Succession.West,4,4,0
+Succession.West,4,5,2
+Succession.West,4,5,0
+Succession.West,4,5,0
+Succession.West,4,5,0
+Succession.West,4,5,3
+Succession.West,5,1,0
+Succession.West,5,1,0
+Succession.West,5,1,3
+Succession.West,5,1,3
+Succession.West,5,2,1
+Succession.West,5,2,1
+Succession.West,5,2,0
+Succession.West,5,2,0
+Succession.West,5,2,0
+Succession.West,5,3,0
+Succession.West,5,3,0
+Succession.West,5,3,0
+Succession.West,5,4,1
+Succession.West,5,4,4
+Succession.West,5,4,0
+Succession.West,5,4,0
+Succession.West,5,4,0
+Succession.West,5,4,0
+Succession.West,5,4,0
+Succession.West,5,4,0
+Succession.West,5,4,0
+Succession.West,5,5,3
+Succession.West,5,5,1
+Succession.West,5,5,0
+Succession.West,5,5,2
+Succession.West,5,5,20
+Succession.East,1,1,0
+Succession.East,1,1,1
+Succession.East,1,1,1
+Succession.East,1,1,6
+Succession.East,1,2,2
+Succession.East,1,2,1
+Succession.East,1,2,1
+Succession.East,1,3,2
+Succession.East,1,3,0
+Succession.East,1,3,0
+Succession.East,1,3,7
+Succession.East,1,1,0
+Succession.East,1,1,0
+Succession.East,1,1,2
+Succession.East,1,2,0
+Succession.East,1,2,0
+Succession.East,1,2,0
+Succession.East,1,3,0
+Succession.East,1,3,0
+Succession.East,1,3,95
+Succession.East,1,4,0
+Succession.East,1,4,0
+Succession.East,1,4,1
+Succession.East,1,5,0
+Succession.East,1,5,1
+Succession.East,1,5,0
+Succession.East,2,1,0
+Succession.East,2,1,40
+Succession.East,2,2,3
+Succession.East,2,2,0
+Succession.East,2,2,0
+Succession.East,2,3,0
+Succession.East,2,3,0
+Succession.East,2,3,0
+Succession.East,2,3,2
+Succession.East,2,4,0
+Succession.East,2,4,0
+Succession.East,2,4,1
+Succession.East,2,5,0
+Succession.East,2,5,1
+Succession.East,2,5,0
+Succession.East,3,1,0
+Succession.East,3,1,0
+Succession.East,3,1,30
+Succession.East,3,2,2
+Succession.East,3,2,4
+Succession.East,3,2,10
+Succession.East,3,3,0
+Succession.East,3,3,2
+Succession.East,3,3,0
+Succession.East,3,3,4
+Succession.East,3,4,0
+Succession.East,3,4,2
+Succession.East,3,4,3
+Succession.East,3,4,1
+Succession.East,3,5,1
+Succession.East,3,5,15
+Succession.East,3,5,1
+Succession.East,4,1,1
+Succession.East,4,1,1
+Succession.East,4,1,0
+Succession.East,4,1,0
+Succession.East,4,2,0
+Succession.East,4,2,0
+Succession.East,4,2,0
+Succession.East,4,3,0
+Succession.East,4,3,1
+Succession.East,4,3,1
+Succession.East,4,3,6
+Succession.East,4,4,2
+Succession.East,4,4,1
+Succession.East,4,4,1
+Succession.East,4,5,2
+Succession.East,4,5,0
+Succession.East,4,5,0
+Succession.East,4,5,7
+Succession.East,5,1,95
+Succession.East,5,1,95
+Succession.East,5,1,0
+Succession.East,5,2,0
+Succession.East,5,2,0
+Succession.East,5,2,4
+Succession.East,5,3,0
+Succession.East,5,3,2
+Succession.East,5,3,3
+Succession.East,5,4,0
+Succession.East,5,4,1
+Succession.East,5,4,0
+Succession.East,5,5,0
+Succession.East,5,5,0
+Succession.East,5,5,8
+Water.Tower.South,1,1,0
+Water.Tower.South,1,1,0
+Water.Tower.South,1,1,0
+Water.Tower.South,1,1,1
+Water.Tower.South,1,1,1
+Water.Tower.South,1,2,1
+Water.Tower.South,1,3,10
+Water.Tower.South,1,3,2
+Water.Tower.South,1,3,0
+Water.Tower.South,1,3,0
+Water.Tower.South,1,3,3
+Water.Tower.South,1,4,1
+Water.Tower.South,1,4,1
+Water.Tower.South,1,4,0
+Water.Tower.South,1,4,0
+Water.Tower.South,1,4,0
+Water.Tower.South,1,5,2
+Water.Tower.South,1,5,1
+Water.Tower.South,2,1,1
+Water.Tower.South,2,1,45
+Water.Tower.South,2,1,95
+Water.Tower.South,2,2,0
+Water.Tower.South,2,2,20
+Water.Tower.South,2,2,0
+Water.Tower.South,2,2,65
+Water.Tower.South,2,3,0
+Water.Tower.South,2,3,3
+Water.Tower.South,2,4,0
+Water.Tower.South,2,4,0
+Water.Tower.South,2,4,0
+Water.Tower.South,2,5,1
+Water.Tower.South,2,5,0
+Water.Tower.South,3,1,0
+Water.Tower.South,3,1,20
+Water.Tower.South,3,1,0
+Water.Tower.South,3,2,10
+Water.Tower.South,3,2,0
+Water.Tower.South,3,2,0
+Water.Tower.South,3,3,2
+Water.Tower.South,3,4,0
+Water.Tower.South,3,4,0
+Water.Tower.South,3,4,0
+Water.Tower.South,3,4,1
+Water.Tower.South,3,5,1
+Water.Tower.South,3,5,0
+Water.Tower.South,3,5,0
+Water.Tower.South,3,5,0
+Water.Tower.South,4,1,1
+Water.Tower.South,4,1,1
+Water.Tower.South,4,1,1
+Water.Tower.South,4,2,0
+Water.Tower.South,4,2,0
+Water.Tower.South,4,2,0
+Water.Tower.South,4,3,0
+Water.Tower.South,4,3,1
+Water.Tower.South,4,4,3
+Water.Tower.South,4,4,0
+Water.Tower.South,4,4,0
+Water.Tower.South,4,5,0
+Water.Tower.South,4,5,0
+Water.Tower.South,4,5,0
+Water.Tower.South,5,1,1
+Water.Tower.South,5,1,2
+Water.Tower.South,5,1,0
+Water.Tower.South,5,1,0
+Water.Tower.South,5,1,0
+Water.Tower.South,5,2,0
+Water.Tower.South,5,2,1
+Water.Tower.South,5,2,5
+Water.Tower.South,5,3,0
+Water.Tower.South,5,3,0
+Water.Tower.South,5,3,0
+Water.Tower.South,5,4,5
+Water.Tower.South,5,4,0
+Water.Tower.South,5,4,95
+Water.Tower.South,5,5,30
+Water.Tower.South,5,5,0
+Water.Tower.South,5,5,0
+Water.Tower.South,NA,1,0
+Water.Tower.South,NA,1,4
+Water.Tower.South,NA,1,2
+Water.Tower.South,NA,1,4
+Water.Tower.South,NA,1,0
+Water.Tower.South,NA,2,1
+Water.Tower.South,NA,2,0
+Water.Tower.South,NA,2,0
+Water.Tower.South,NA,3,1
+Water.Tower.South,NA,3,0
+Water.Tower.South,NA,3,2
+Water.Tower.North,1,1,0
+Water.Tower.North,1,1,0
+Water.Tower.North,1,1,10
+Water.Tower.North,1,1,40
+Water.Tower.North,1,2,8
+Water.Tower.North,1,2,0
+Water.Tower.North,1,2,95
+Water.Tower.North,1,2,95
+Water.Tower.North,1,2,95
+Water.Tower.North,1,3,2
+Water.Tower.North,1,3,95
+Water.Tower.North,1,4,11
+Water.Tower.North,1,4,1
+Water.Tower.North,1,4,0
+Water.Tower.North,1,5,0
+Water.Tower.North,1,5,30
+Water.Tower.North,1,5,10
+Water.Tower.North,2,1,0
+Water.Tower.North,2,1,2
+Water.Tower.North,2,1,1
+Water.Tower.North,2,2,1
+Water.Tower.North,2,2,1
+Water.Tower.North,2,2,2
+Water.Tower.North,2,2,0
+Water.Tower.North,2,3,1
+Water.Tower.North,2,3,0
+Water.Tower.North,2,3,1
+Water.Tower.North,2,3,5
+Water.Tower.North,2,4,0
+Water.Tower.North,2,4,95
+Water.Tower.North,2,5,0
+Water.Tower.North,2,5,0
+Water.Tower.North,3,1,0
+Water.Tower.North,3,1,20
+Water.Tower.North,3,1,95
+Water.Tower.North,3,1,95
+Water.Tower.North,3,2,0
+Water.Tower.North,3,2,0
+Water.Tower.North,3,2,0
+Water.Tower.North,3,2,0
+Water.Tower.North,3,2,0
+Water.Tower.North,3,3,1
+Water.Tower.North,3,3,1
+Water.Tower.North,3,3,1
+Water.Tower.North,3,3,1
+Water.Tower.North,3,3,1
+Water.Tower.North,3,4,0
+Water.Tower.North,3,4,0
+Water.Tower.North,3,4,1
+Water.Tower.North,3,4,0
+Water.Tower.North,3,5,1
+Water.Tower.North,3,5,1
+Water.Tower.North,3,5,1
+Water.Tower.North,3,5,0
+Water.Tower.North,3,5,1
+Water.Tower.North,4,1,1
+Water.Tower.North,4,1,1
+Water.Tower.North,4,1,80
+Water.Tower.North,4,2,2
+Water.Tower.North,4,2,1
+Water.Tower.North,4,3,0
+Water.Tower.North,4,3,3
+Water.Tower.North,4,3,2
+Water.Tower.North,4,4,1
+Water.Tower.North,4,4,1
+Water.Tower.North,4,4,0
+Water.Tower.North,4,4,1
+Water.Tower.North,4,5,0
+Water.Tower.North,4,5,2
+Water.Tower.North,4,5,0
+Water.Tower.North,5,1,1
+Water.Tower.North,5,1,0
+Water.Tower.North,5,2,2
+Water.Tower.North,5,2,0
+Water.Tower.North,5,2,1
+Water.Tower.North,5,3,0
+Water.Tower.North,5,3,0
+Water.Tower.North,5,3,2
+Water.Tower.North,5,4,2
+Water.Tower.North,5,4,95
+Water.Tower.North,5,4,95
+Water.Tower.North,5,5,0
+Water.Tower.North,5,5,0
+Water.Tower.North,5,5,0
+Water.Tower.North,5,5,0

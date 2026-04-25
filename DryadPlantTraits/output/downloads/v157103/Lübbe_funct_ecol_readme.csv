@@ -1,0 +1,34 @@
+Variable;Unit;Definition
+code;;Unique sample identifier
+tree;;Tree ID
+sample;;Sample ID
+species;;Species
+organ;;Organ
+VC_length;;Diameter of the rotor used for constructing the VC's
+WD;g cm-3;Wood density
+D;µm;Average vessel diameter
+Dh;µm;Hydraulically-weighted vessel diameter
+VD;n mm-2;Vessel density
+F;;Vessel lumen fraction
+S;mm4;Vessel size-to-number ratio
+Kp;kg m-1 MPa-1 s-1;Potential hydraulic conductivity
+Ks;kg m-1 MPa-1 s-1;Specific hydraulic conductivity
+Ks_max;kg m-1 MPa-1 s-1;Hydraulic coductivity divided by the basipetal maximal cross-sectional area
+Ks_min;kg m-1 MPa-1 s-1;Hydraulic coductivity divided by the acropetal minimal cross-sectional area
+P12;MPa;Xylem pressure at 12% loss of conductance
+P50;MPa;Xylem pressure at 50% loss of conductance
+P88;MPa;Xylem pressure at 88% loss of conductance
+;;
+;;
+Description;Accompanied dataset for the following publication;
+Journal;Functional Ecology;
+Article titel;High variation in hydraulic efficiency but not xylem safety between roots and branches in four temperate broad-leaved tree species;
+Autors;Torben Lübbe, Laurent J. Lamarque, Sylvain Delzon, José M. Torres Ruiz, Régis Burlett, Christoph Leuschner, Bernhard Schuldt;
+Acceptance date;13.11.2021;
+DOI:;10.1111/1365-2435.13975;
+Weblink:;https://besjournals.onlinelibrary.wiley.com/doi/10.1111/1365-2435.13975?af=R;
+;;
+Contact:;Bernhard Schuldt;
+;bernhard.schuldt@plant-ecology.de;
+;;
+Sheet;data;All results on sample level including pseudoreplication on tree level

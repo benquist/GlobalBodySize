@@ -1,0 +1,13 @@
+Block	Block number; 1 to 4
+Composition	Specific Species composition (81 levels)
+Plot	Plot number
+Nitrogen	Nitrogen treatment
+Fungicide	Funcide treatment
+Plant_richness	Plant species richness; 1, 4, 8, 20 Species
+Functional_composition	Functional composition; slow growing (S), fast growing (F) or a mix of fast and slow growing species (M)
+Sown_SLA	Mean specific leaf area of all sown species
+SLA_shift	Difference between sown SLA and abundance weighted mean SLA
+Micr_humidity	Mean difference between ambient % humidity and humidity in the vegetation (measured at different time points in the different plots)
+Micr_temperature	Mean difference between ambient temperature and temperature in the vegetation (measured at different time points in the different plots)
+Plant_cover	total plant cover
+Infection_incidence	abundance weighted mean of % infected individuals per species

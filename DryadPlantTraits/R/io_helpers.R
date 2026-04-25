@@ -60,16 +60,30 @@ dryad_extract_supported_files <- function(path, work_dir = tempfile("dryad_extra
   list(paths = tabular_paths, extracted = TRUE, message = "archive_extracted")
 }
 
+dryad_safe_readlines <- function(path, n = 1L) {
+  # Try UTF-8 first, fall back to latin1 for files with non-UTF-8 bytes
+  tryCatch(
+    readLines(path, n = n, warn = FALSE, encoding = "UTF-8"),
+    error = function(e) {
+      tryCatch(
+        readLines(path, n = n, warn = FALSE, encoding = "latin1"),
+        error = function(e2) character(0)
+      )
+    }
+  )
+}
+
 dryad_detect_delimiter <- function(path) {
   lower_path <- tolower(path)
   if (endsWith(lower_path, ".tsv") || endsWith(lower_path, ".tab")) {
     return("\t")
   }
 
-  first_line <- tryCatch(readLines(path, n = 1L, warn = FALSE), error = function(e) "")
-  if (!nzchar(first_line)) {
+  first_line <- dryad_safe_readlines(path, n = 1L)
+  if (!length(first_line) || !nzchar(first_line[[1]])) {
     return(",")
   }
+  first_line <- first_line[[1]]
 
   comma_count <- lengths(regmatches(first_line, gregexpr(",", first_line, fixed = TRUE)))
   tab_count <- lengths(regmatches(first_line, gregexpr("\t", first_line, fixed = TRUE)))
@@ -83,6 +97,14 @@ dryad_detect_delimiter <- function(path) {
 dryad_read_tabular_file <- function(path) {
   delim <- dryad_detect_delimiter(path)
 
+  # Detect encoding: try UTF-8 first, fall back to latin1
+  enc <- tryCatch({
+    con <- file(path, open = "r", encoding = "UTF-8")
+    on.exit(close(con))
+    readLines(con, n = 5L, warn = FALSE)
+    "UTF-8"
+  }, error = function(e) "latin1")
+
   utils::read.table(
     path,
     header = TRUE,
@@ -91,7 +113,8 @@ dryad_read_tabular_file <- function(path) {
     comment.char = "",
     stringsAsFactors = FALSE,
     check.names = FALSE,
-    fill = TRUE
+    fill = TRUE,
+    fileEncoding = enc
   )
 }
 

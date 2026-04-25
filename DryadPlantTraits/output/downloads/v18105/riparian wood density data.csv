@@ -1,0 +1,108 @@
+plotID,species,speciescover,fieldWD,fieldPRESABS,allFieldWD,allFieldPRESABS,allWD,allPRESABS
+1,Abrophyllum ornans,14.4,0.601603758,P,0.601603758,P,0.601603758,P
+1,Acmena smithii,57.4,0.771117393,P,0.771117393,P,0.771117393,P
+1,Ceratopetalum apetalum,11.6,0.499899061,P,0.499899061,P,0.499899061,P
+1,Cryptocarya glaucescens,6.8,0.496343742,P,0.496343742,P,0.496343742,P
+1,Doryphora sassafras,9.8,0.376812554,P,0.376812554,P,0.376812554,P
+1,Guioa semiglauca,1.2,NA,A,NA,A,0.77,P
+1,Pittosporum spinescens,1.8,NA,A,NA,A,0.728,P
+1,Tristaniopsis laurina,17,0.575187964,P,0.575187964,P,0.575187964,P
+1,Waterhousea floribunda,14,0.542954174,P,0.542954174,P,0.542954174,P
+2,Tristaniopsis laurina,88,0.66140655,P,0.66140655,P,0.66140655,P
+3,Acacia melanoxylon,5.5,0.416440093,P,0.416440093,P,0.416440093,P
+3,Coprosma quadrifida,2,NA,A,0.485,P,0.485,P
+3,Eucalyptus viminalis,29,0.698733735,P,0.698733735,P,0.698733735,P
+3,Leptospermum brevipes,15.3,0.700289744,P,0.700289744,P,0.700289744,P
+3,Pomaderris aspera,25.4,0.563386143,P,0.563386143,P,0.563386143,P
+4,Acacia floribunda,14.4,0.580556686,P,0.580556686,P,0.580556686,P
+4,Bursaria spinosa subsp. spinosa,1.2,0.650078892,P,0.650078892,P,0.650078892,P
+4,Cassinia trinerva,2,NA,A,NA,A,0.52,P
+4,Casuarina cunninghamiana,36,0.643369914,P,0.643369914,P,0.643369914,P
+4,Eucalyptus cypellocarpa,8,0.623867961,P,0.623867961,P,0.623867961,P
+4,Lomatia myricoides,1.9,NA,A,NA,A,NA,A
+4,Melicytus dentatus,10,NA,A,0.53,P,0.53,P
+5,Acacia floribunda,10.4,0.523497635,P,0.523497635,P,0.523497635,P
+5,Backhousia myrtifolia,22.9,0.820059734,P,0.820059734,P,0.820059734,P
+5,Casuarina cunninghamiana,20,0.692669086,P,0.692669086,P,0.692669086,P
+5,Eucalyptus elata,3.4,0.502816615,P,0.502816615,P,0.502816615,P
+5,Tristaniopsis laurina,21.2,0.645716352,P,0.645716352,P,0.645716352,P
+6,Acacia floribunda,15.4,0.480008289,P,0.537730981,P,0.537730981,P
+6,Acacia mearnsii,2.8,0.642039888,P,0.642039888,P,0.642039888,P
+6,Callistemon subulatus,3.2,0.642039888,P,0.642039888,P,0.642039888,P
+6,Casuarina cunninghamiana,30.6,0.485513009,P,0.485513009,P,0.485513009,P
+6,Leptospermum brevipes,27.6,0.772674252,P,0.772674252,P,0.772674252,P
+7,Acacia boormanii,13.2,0.503041879,P,0.503041879,P,0.503041879,P
+7,Acacia dealbata subsp. dealbata,32,0.455614795,P,0.455614795,P,0.455614795,P
+7,Acacia melanoxylon,1.2,0.497392285,P,0.497392285,P,0.497392285,P
+7,Beyeria viscosa,6.2,NA,A,NA,A,NA,A
+7,Eucalyptus rubida,42.2,0.440198065,P,0.440198065,P,0.440198065,P
+7,Pomaderris aspera,1.4,NA,A,0.566,P,0.566,P
+8,Acacia dealbata subsp. dealbata,7,0.440198065,P,0.440198065,P,0.440198065,P
+8,Acacia melanoxylon,14,0.516140745,P,0.516140745,P,0.516140745,P
+8,Coprosma quadrifida,9.6,0.485016435,P,0.485016435,P,0.485016435,P
+8,Eucalyptus camphora subsp. humeana,38,0.426201226,P,0.426201226,P,0.426201226,P
+8,Eucalyptus radiata,2,NA,A,0.578,P,0.578,P
+8,Leptospermum brevipes,12.1,0.678543674,P,0.678543674,P,0.678543674,P
+8,Melicytus dentatus,3.9,0.541547022,P,0.541547022,P,0.541547022,P
+8,Pomaderris aspera,7.4,0.56921463,P,0.56921463,P,0.56921463,P
+9,Acacia dealbata subsp. dealbata,62.6,0.520407106,P,0.520407106,P,0.520407106,P
+9,Bedfordia arborescens,4.2,NA,A,NA,A,0.65,P
+9,Cassinia aculeata,6,NA,A,NA,A,NA,A
+9,Coprosma quadrifida,6.2,NA,A,0.485,P,0.485,P
+9,Eucalyptus camphora subsp. humeana,1.4,NA,A,NA,A,NA,A
+9,Eucalyptus radiata,14.9,0.565362602,P,0.565362602,P,0.565362602,P
+9,Eucalyptus viminalis,3.4,0.605338431,P,0.605338431,P,0.605338431,P
+9,Lomatia ilicifolia,2.2,NA,A,NA,A,NA,A
+9,Lomatia myricoides,11,NA,A,NA,A,NA,A
+9,Pomaderris aspera,2.2,NA,A,0.566,P,0.566,P
+9,Prostanthera lasianthos,7,NA,A,NA,A,0.58,P
+9,Pultenaea juniperina,7.1,NA,A,NA,A,0.88,P
+10,Bursaria spinosa subsp. lasiophylla,29,NA,A,0.65,P,0.65,P
+10,Cassinia aculeata,6,NA,A,NA,A,NA,A
+10,Coprosma quadrifida,23,NA,A,0.485,P,0.485,P
+10,Eucalyptus camphora subsp. humeana,17,0.573141475,P,0.573141475,P,0.573141475,P
+10,Eucalyptus stellulata,31,0.63697796,P,0.63697796,P,0.63697796,P
+10,Leptospermum brevipes,70,0.696607157,P,0.696607157,P,0.696607157,P
+10,Pomaderris aspera,8.4,NA,A,0.566,P,0.566,P
+11,Acacia irrorata subsp. irrorata,11,0.419941579,P,0.419941579,P,0.419941579,P
+11,Casuarina cunninghamiana,17,0.590095613,P,0.590095613,P,0.590095613,P
+11,Eucalyptus amplifolia,10,0.785769362,P,0.785769362,P,0.785769362,P
+11,Notelaea microcarpa subsp. microcarpa,3.8,0.638719277,P,0.638719277,P,0.638719277,P
+12,Acacia floribunda,2.22,NA,A,0.528033333,P,0.528033333,P
+12,Acacia irrorata subsp. irrorata,8.6,NA,A,0.42,P,0.42,P
+12,Angophora subvelutina,7,0.658192325,P,0.658192325,P,0.658192325,P
+12,Casuarina cunninghamiana,16,0.649355341,P,0.649355341,P,0.649355341,P
+12,Eucalyptus tereticornis,33.2,0.713995475,P,0.713995475,P,0.713995475,P
+12,Ligustrum sinense,4.5,NA,A,NA,A,0.612,P
+12,Melicytus dentatus,13,NA,A,0.53,P,0.53,P
+12,Notelaea microcarpa subsp. velutina,1.4,NA,A,NA,A,NA,A
+12,Solanum mauritianum,5.4,NA,A,NA,A,0.449,P
+13,Acacia floribunda,4.2,NA,A,0.528033333,P,0.528033333,P
+13,Acacia leiocalyx subsp. leiocalyx,8.4,0.569275537,P,0.569275537,P,0.569275537,P
+13,Alphitonia excelsa,23.4,0.725166841,P,0.725166841,P,0.725166841,P
+13,Casuarina glauca,20.7,0.60140898,P,0.60140898,P,0.60140898,P
+13,Duboisia myoporoides,8.7,0.414430689,P,0.414430689,P,0.414430689,P
+13,Grevillea robusta,1.6,NA,A,NA,A,0.521,P
+13,Lophostemon suaveolens,31.4,0.577025052,P,0.577025052,P,0.577025052,P
+13,Melaleuca quinquenervia,11.2,0.751375108,P,0.751375108,P,0.751375108,P
+13,Notelaea longifolia,3.6,NA,A,NA,A,0.87,P
+13,Syzygium oleosum,8,0.58133195,P,0.58133195,P,0.58133195,P
+13,Tree (Sportsmans 57),12,0.612402056,P,0.612402056,P,0.612402056,P
+13,Trema tomentosa subsp. aspera,1.2,NA,A,NA,A,0.331,P
+14,Acacia dealbata subsp. dealbata,18.7,0.452091876,P,0.452091876,P,0.452091876,P
+14,Acacia falciformis,1.2,NA,A,NA,A,0.724,P
+14,Acacia implexa,3.7,NA,A,NA,A,0.639,P
+14,Acacia pravissima,45,0.624416686,P,0.624416686,P,0.624416686,P
+14,Cassinia aculeata,2.2,NA,A,NA,A,NA,A
+14,Dodonaea viscosa subsp. cuneata,3.5,NA,A,NA,A,0.947,P
+14,Eucalyptus radiata,15.2,0.5906246,P,0.5906246,P,0.5906246,P
+14,Eucalyptus viminalis,35.4,0.549681222,P,0.549681222,P,0.549681222,P
+14,Hovea asperifolia subsp. asperifolia,13.5,NA,A,NA,A,NA,A
+14,Leptospermum brevipes,8.3,NA,A,0.712,P,0.712,P
+14,Lomatia myricoides,5.6,NA,A,NA,A,NA,A
+15,Acmena smithii,21.2,0.658186341,P,0.658186341,P,0.658186341,P
+15,Commersonia fraseri,22,0.371790888,P,0.371790888,P,0.371790888,P
+15,Eucalyptus resinifera,19,0.599707427,P,0.599707427,P,0.599707427,P
+15,Eucalyptus tereticornis,28,0.737352572,P,0.737352572,P,0.737352572,P
+15,Glochidion ferdinandi subsp. ferdinandi,8,0.665265627,P,0.665265627,P,0.665265627,P
+15,Ligustrum sinense,9,NA,A,NA,A,0.612,P

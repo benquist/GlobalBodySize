@@ -36,7 +36,8 @@ source_project_files <- function() {
     file.path(root, "R", "io_helpers.R"),
     file.path(root, "R", "dryad_api.R"),
     file.path(root, "R", "candidate_filter.R"),
-    file.path(root, "R", "standardize_records.R")
+    file.path(root, "R", "standardize_records.R"),
+    file.path(root, "R", "qa_checks.R")
   )
   invisible(lapply(files, source, local = FALSE))
 }
@@ -142,6 +143,8 @@ for (version_id in names(version_groups)) {
   # Process each candidate file extracted from this version zip
   for (row_index in row_indices) {
     row <- selected_files[row_index, , drop = FALSE]
+
+    file_result <- tryCatch({
     target_filename <- basename(row$file_path[[1]])
 
     # Extract just the target file from the zip into the downloads directory
@@ -224,6 +227,51 @@ for (version_id in names(version_groups)) {
         )
       )
 
+      # --- QA: apply plausibility checks ("check yourself twice") ---
+      if (nrow(standardized)) {
+        standardized <- tryCatch(
+          dryad_qa_check(standardized),
+          error = function(e) {
+            message("QA check failed: ", conditionMessage(e))
+            standardized
+          }
+        )
+
+        # Log QA summary counts
+        n_flagged <- sum(nzchar(standardized$qa_flags), na.rm = TRUE)
+        flag_types <- sort(table(unlist(strsplit(
+          standardized$qa_flags[nzchar(standardized$qa_flags)], "\\|"
+        ))))
+        qa_summary <- if (n_flagged > 0L) {
+          paste(names(flag_types), flag_types, sep = "=", collapse = "; ")
+        } else {
+          "PASS"
+        }
+
+        processing_log_list[[length(processing_log_list) + 1L]] <- list(
+          dryad_dataset_doi = row$dryad_dataset_doi[[1]],
+          dryad_version_id = row$dryad_version_id[[1]],
+          dryad_file_id = row$dryad_file_id[[1]],
+          file_path = table_entry$path,
+          action = "qa",
+          status = if (n_flagged == 0L) "PASS" else "FLAGS",
+          message = qa_summary,
+          rows_in = nrow(standardized),
+          rows_out = nrow(standardized) - n_flagged,
+          timestamp_utc = dryad_now_utc()
+        )
+
+        # Spot check: sample up to 5 rows per dataset and append to spot_check_log.csv
+        spot <- tryCatch(dryad_spot_check(standardized, n = 5L), error = function(e) NULL)
+        if (!is.null(spot) && nrow(spot)) {
+          spot_path <- file.path(output_dir, "spot_check_log.csv")
+          write_spot_header <- !file.exists(spot_path)
+          utils::write.table(spot, spot_path,
+            sep = ",", row.names = FALSE, na = "",
+            append = !write_spot_header, col.names = write_spot_header, qmethod = "double")
+        }
+      }
+
       processing_log_list[[length(processing_log_list) + 1L]] <- list(
         dryad_dataset_doi = row$dryad_dataset_doi[[1]],
         dryad_version_id = row$dryad_version_id[[1]],
@@ -247,6 +295,24 @@ for (version_id in names(version_groups)) {
     }
 
     utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+    NULL
+    }, error = function(e) e)
+
+    if (inherits(file_result, "error")) {
+      processing_log_list[[length(processing_log_list) + 1L]] <- list(
+        dryad_dataset_doi = row$dryad_dataset_doi[[1]],
+        dryad_version_id = row$dryad_version_id[[1]],
+        dryad_file_id = row$dryad_file_id[[1]],
+        file_path = row$file_path[[1]],
+        action = "process",
+        status = "error",
+        message = conditionMessage(file_result),
+        rows_in = 0L,
+        rows_out = 0L,
+        timestamp_utc = dryad_now_utc()
+      )
+      utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+    }
   }
 }
 

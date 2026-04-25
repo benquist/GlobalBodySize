@@ -1,0 +1,43 @@
+source,Accession_ID,population,Seed_g,State,County,Lat,Long,Elev_m,Elev_f,Est_prec,Plant_community,Detailed_site_info,Yr_of_coll,notes
+1,9106574,Tin_Cup,22.5,ID,Caribou,42.9703977,-111.256828,1973,6470,18,"ARTRv, LECI, SYOR2",Tin Cup road turnout at hwy 34 on SW facing hillside,NA,NA
+2,9106561,Mink_Cyn,5.1,ID,Bingham,42.74361111,-112.3941667,1539,5048,18,"SYOR2, LECI, ARTRv, PRVI",Mink Creek Cyn e of boyscout camp turnoff,NA,Appar—exclude
+3,9106566,Arbon_Val,3.8,ID,Bingham,42.63055556,-112.4969444,1585,5200,18,"ARTRtr, LECI",Mink Creek Rd in Arbon Valley in sagebrush on edge of PJ comm.,NA,NA
+4,9107571,McCoy_Cr,3.3,ID,Bonneville,43.18158333,-111.1181833,1735,5692,20,"ARTRv, PUTR, JUSC, POSE",McCoy Creek @ Jensen Crk in open meadow,NA,NA
+5,9106576,Kress,9,ID,Oneida,42.29416667,-112.8215667,1665,5460,16,"ARTRtr, AMAL2, ERNA",Kress Fork near Curlew NG,NA,Appar—exclude
+6,9106553,Lava,23,ID,Bannock,42.63035,-112.0725,1634,5360,16,"ARTRtr, PJ, MEOF","Frandsen Rd near Lava Hotsprings, off Old Oregon Trail Rd",NA,NA
+7,9106554,Cove_Rd,12.8,ID,Caribou,42.88428333,-111.8842833,1595,5231,16,"ARTRtr, LECI, POAM, ACMI, ERHE","Cove Rd, South of Lund",NA,NA
+8,U31,OC_MG,4,UT,Millard,39.02333333,-112.0783333,1915,6280,16,"ARTRtr,wy,v (mixed) QUGA, PSSP","Original collection site for ""Maple Grove' release, mixed alluvium",2010,"Original collection site for ""Maple Grove' "
+9,U41,DER1,10,UT,Millard,38.69138889,-113.8116667,1848,6060,7.5,"ATCO, KRLA, EPNE","Desert Experimental Range, dolomite derived soil",2011,NA
+10,U40,DER2,60,UT,Millard,38.0111111,-113.7833333,1787,5860,7.5,"ATCO, KRLA, EPNE","Desert Experimental Range, dolomite derived soil",2005,NA
+11,U42,Crystal1,7,UT,Millard,38.79555556,-113.5891667,1915,6280,8.5,"JUOS, mixed shrub","Crystal Peak road, sandy soil from valcanic ash",2011,Sources 11 and 18 from same small population but collected by different individuals in different years
+12,U34-06,PGJ1,50,UT,Iron,37.9119444,-113.0302778,1691,5546,11,Arno,Parowan Gap Junction,2006,NA
+13,U34-11,PGJ2,5,UT,Iron,37.9119444,-113.0302778,1691,5546,11,ARNO,Parowan Gap Junction,2011,"Repeat collection of UT_5b, five years later"
+14,U43,Provo,7,UT,Utah,40.29944444,-111.6230556,2073,6800,22,"PSSP, QUGA",Provo Overlook steep south-facing slope,2011,NA
+15,C1,Delta_CP,7,CO,Delta,38.66143583,-108.2498775,1895,6214,NA,"ARNO, KRLA, HIJA, STCO,","Delta Cactus Park, PJ Mtn Sagebrush",2004,NA
+16,C2,Paradox,15,CO,Montrose,38.2207569,-108.6423056,1741,5710,NA,"ARTRw, ARNO, STCO, GUSA, HIJA","Paradox, PJ",2004,NA
+17,1146 (P8),Dow_Mtn,2.5,CO,Dolores,37.753896,-108.210286,1976,6481,NA,pine douglas fir,"Dow Mtn, sandstone",2007,NA
+18,1143,Crystal2,5.2,UT,Millard,38.793654,-113.587316,1905,6250,8.5,Desert Shrub,Crystal Peak,2009,Sources 11 and 18 from same small population but collected by different individuals in different years
+19,1150 (P12),Halfway,5.2,UT,Millard,38.619351,-113.845166,1905,6248,8,Desert Shrub,Halfway Hills (DER),2009,NA
+20,1136 (pssl-84),Water_Cyn,5.5,NV,Lander,40.630333,-116.702777,1768,5800,10 to 14,ARTR,Water Canyon (Argenta),2010,NA
+21,1141 (P13),Cave_Val,4.4,NV,Lincoln,38.590587,-114.76803,1977,6486,10 to 14,Desert Shrub,Cave Valley,2009,NA
+22,1153 (P10),N_Wells,5.4,NV,Elko,41.218981,-114.855453,1853,6079,10 to 14,ARTR,North of Wells (private land),2008,Appar—exclude
+23,1155 (P1),LL_Pass,1.3,NV,Elko,40.825527,-114.596355,1954,6408,10 to 14,ARTR,Little Lake Pass,2008,NA
+24,1156 (P6),Long_Hill,3.1,UT,Iron,37.948626,-113.014705,1757,5762,10 to 14,Juniper - pinyon,Long Hill,2008,NA
+25,1157 (pssl 142),Major,8.5,NV,White Pine,39.031595,-114.589954,2059,6755,10 to 14,Juniper - pinyon,Major's Place,2010,NA
+26,1158 (pssl 162),Patterson1,6.6,NV,Lincoln,38.595632,-114.692499,2016,6611,10 to 14,Juniper - pinyon,Patterson Pass,2010,NA
+27,1169 (pssl 136),West_Ely,6.4,NV,White Pine,39.253167,-114.887612,1973,6472,10 to 14,Desert Shrub,West Ely,2010,NA
+28,1170 (pssl 92),Wilson,4.5,NV,Elko,41.633722,-116.282694,1677,5500,10 to 14,ARTR,Wilson Reservoir,2010,NA
+29,1139 (P2),Silver_King,5,NV,Lincoln,38.08902,-114.896205,1639,5377,10 to 14,Desert shrub,Basin South of Silver King,2008,NA
+30,1144 (P5),Deep_Crk,4.4,UT,Tooele,39.854172,-113.857179,2469,8099,14 to 24,Spruce fir - Douglas fir,Deep Creek,2008,NA
+31,1142 (pssl 176),Crestline,4,NV,Lincoln,37.75537,-114.210878,1980,6493,14 to 24,Juniper - pinyon,Crestline Rd.,2010,NA
+32,1149 (PSSL-239),Goyeneche,7.5,NV,Elko,40.234828,-115.631329,1966,6450,14 to 24,ARTR,Goyeneche Ranch,2008,Appar—exclude
+33,1152 (pssl 146),Levan,8,UT,Juab,39.592011,-111.823608,1767,5795,14,ARTR,Levan,2010,NA
+34,1159 (P3),Pequop,3,NV,Elko,41.076472,-114.584889,2090,6854,14 to 24,ARTR,Pequop Summit,2008,NA
+35,1161 (P9),Rice_Mtn,4,UT,Iron,38.053128,-113.968942,2013,6601,14 to 24,Juniper - pinyon,Rice Mtn,2009,NA
+36,56087201,Soldier_Cyn,1.3,NV,Elko,40.78307,-115.342834,1860,6100,14 to 24,ARTR,Soldier Canyon,2009,NA
+37,(P11),37,6.7,NA,NA,NA,NA,NA,NA,NA,NA,NA,2007,Location info unknown. From Shrub lab?
+38,FRRL-3 Boardman,Boardman,NA,OR,Morrow,45.6324,-119.727,265,869,NA,NA,NA,NA,Appar—exclude. Collection info from Tom Jones
+39,FRRL-2 Bear Lake,Bear_Lk,NA,UT,Rich,41.8799,-111.2452,2228,7310,NA,NA,Bear Lake,NA,Collection info from Tom Jones
+40,FRRL- 1 Patterson,Patterson2,NA,NV,Lincoln,38.583333,-114.7,2036,6678,NA,NA,Same as collection site of Fanny Germplasm release of Dalea searlsiae,NA,Collection info from Tom Jones. Repeat collection of NV_6?
+41,Appar SFD-10-8,Appar,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,L. perenne—Eurasian
+42,Maple Grove SBR-02-08,MG,NA,UT,Millard,39.02333333,-112.0783333,1915,6280,NA,NA,Same site as source 8,NA,Lat/Long copied from source 8

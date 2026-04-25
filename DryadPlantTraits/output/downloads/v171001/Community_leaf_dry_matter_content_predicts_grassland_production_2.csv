@@ -1,0 +1,14 @@
+Grassland,Year,Precipitation,(mm),ANP-LDMC,ANP-[N]res
+type,measured,Oct-Feb.,March,slope,slope
+mixture,2016,546.2,120.1,-10.83,0
+mixture,2017,307.6,84.6,-10.5,6.98
+mixture,2018,189.3,106.1,-9.164,0
+mixture,2019,550.3,24.5,-13.43,2.52
+mixture,2020,414.4,72.9,-14.71,6.46
+mixture,2021,216.1,25.4,-9.73,0
+switchgrass,2016,546.2,120.1,-12.71,9.71
+switchgrass,2017,307.6,84.6,-10.82,9.28
+switchgrass,2018,189.3,106.1,-11.3,5.19
+switchgrass,2019,550.3,24.5,-13.43,0
+switchgrass,2020,414.4,72.9,-11.81,3.87
+switchgrass,2021,216,25.5,-7.81,0
