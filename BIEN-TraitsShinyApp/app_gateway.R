@@ -61,6 +61,14 @@ extract_rank_token <- function(rank, taxon) {
 }
 
 safe_bien_call <- function(expr, timeout_sec = 120) {
+  timeout_sec <- suppressWarnings(as.numeric(timeout_sec))
+  if (is.na(timeout_sec) || !is.finite(timeout_sec) || timeout_sec <= 0) {
+    timeout_sec <- 120
+  }
+
+  setTimeLimit(elapsed = timeout_sec, transient = TRUE)
+  on.exit(setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE), add = TRUE)
+
   tryCatch(expr, error = function(e) {
     structure(list(error = conditionMessage(e)), class = "bien_error")
   })
@@ -254,7 +262,7 @@ load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120)
 
 suggestion_cap_for_rank <- function(rank) {
   if (identical(rank, "species")) return(1500L)
-  if (identical(rank, "genus")) return(600L)
+  if (identical(rank, "genus")) return(2500L)
   if (identical(rank, "family")) return(300L)
   500L
 }
@@ -331,20 +339,9 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
     }, timeout_sec = timeout_sec, attempts = 3)
   } else if (rank == "genus") {
     dat <- safe_bien_retry(function() {
-      BIEN_trait_genus(genus = taxon, all.taxonomy = TRUE, 
+      BIEN_trait_genus(genus = taxon, all.taxonomy = TRUE,
                       source.citation = TRUE, limit = max_records)
     }, timeout_sec = timeout_sec, attempts = 3)
-
-    # Fallback for genus inputs that include extra text/punctuation.
-    if (!inherits(dat, "bien_error") && is.data.frame(dat) && nrow(dat) == 0) {
-      genus_token <- extract_rank_token("genus", taxon)
-      if (!identical(genus_token, taxon)) {
-        dat <- safe_bien_retry(function() {
-          BIEN_trait_genus(genus = genus_token, all.taxonomy = TRUE,
-                          source.citation = TRUE, limit = max_records)
-        }, timeout_sec = timeout_sec, attempts = 2)
-      }
-    }
   } else if (rank == "family") {
     dat <- safe_bien_retry(function() {
       BIEN_trait_family(family = taxon, all.taxonomy = TRUE, 
@@ -478,6 +475,8 @@ compute_diagnostics <- function(dat, query_rank, query_taxon, total_available = 
       unique_traits = 0,
       coverage_by_trait = data.frame(),
       missingness_summary = data.frame(),
+      query_rank = query_rank,
+      query_taxon = query_taxon,
       warnings = "No data returned for query"
     ))
   }
@@ -585,7 +584,8 @@ queryUI <- function(id) {
                 selected = "",
                 options = list(
                   placeholder = "Start typing to search BIEN suggestions...",
-                  create = FALSE,
+                  create = TRUE,
+                  createOnBlur = TRUE,
                   maxOptions = 2000
                 ),
                 width = "100%"
@@ -666,7 +666,8 @@ queryServer <- function(id) {
       error_msg = "",
       suggestion_cache = list(),
       needs_count_refresh = FALSE,
-      batch_species = character(0)
+      batch_species = character(0),
+      effective_taxon = ""
     ) -> rv
 
     observeEvent(list(input$suggest_mode, input$rank, input$input_mode), {
@@ -717,7 +718,8 @@ queryServer <- function(id) {
         selected = selected,
         server = !identical(mode, "traits"),
         options = list(
-          create = FALSE,
+          create = TRUE,
+          createOnBlur = TRUE,
           maxOptions = 2000,
           openOnFocus = TRUE,
           minChars = 2,
@@ -753,8 +755,27 @@ queryServer <- function(id) {
     })
 
     observeEvent(input$query_btn, {
-      rv$is_querying <- TRUE
       rv$error_msg <- ""
+      mode <- if (is.null(input$input_mode)) "single" else input$input_mode
+      taxon_input <- ""
+      species_vec <- character(0)
+      
+      if (identical(mode, "batch")) {
+        species_vec <- batch_species_list()
+        if (length(species_vec) == 0) {
+          rv$error_msg <- "Batch mode: enter at least one species name or upload a CSV."
+          return()
+        }
+      } else {
+        taxon_input <- if (is.null(input$taxon)) "" else str_squish(as.character(input$taxon))
+        if (!nzchar(taxon_input)) {
+          rv$error_msg <- "Enter a taxon or trait name before querying BIEN."
+          return()
+        }
+      }
+
+      rv$is_querying <- TRUE
+      refresh_counts <- FALSE
 
       # Visually disable button and show spinner via plain JS message
       session$sendCustomMessage("queryBtnState", list(
@@ -763,17 +784,17 @@ queryServer <- function(id) {
         loading  = TRUE
       ))
 
-      mode <- if (is.null(input$input_mode)) "single" else input$input_mode
-      
+      on.exit({
+        session$sendCustomMessage("queryBtnState", list(
+          btnId    = session$ns("query_btn"),
+          spinnerId = session$ns("query_btn_spinner"),
+          loading  = FALSE
+        ))
+        rv$is_querying <- FALSE
+        rv$needs_count_refresh <- isTRUE(refresh_counts)
+      }, add = TRUE)
+
       if (identical(mode, "batch")) {
-        species_vec <- batch_species_list()
-        if (length(species_vec) == 0) {
-          rv$error_msg <- "Batch mode: enter at least one species name or upload a CSV."
-          session$sendCustomMessage("queryBtnState", list(
-            btnId = session$ns("query_btn"), spinnerId = session$ns("query_btn_spinner"), loading = FALSE))
-          rv$is_querying <- FALSE
-          return()
-        }
         # Query each species and bind rows
         max_records <- suppressWarnings(as.integer(input$max_records))
         if (is.na(max_records) || max_records < 100) max_records <- 5000
@@ -795,24 +816,20 @@ queryServer <- function(id) {
         
         dat <- if (length(all_results) > 0) dplyr::bind_rows(all_results) else data.frame()
         dat <- ensure_unique_names(dat)
+        rv$effective_taxon <- paste(species_vec, collapse = "; ")
         rv$query_data <- dat
         rv$diagnostics <- compute_diagnostics(dat, "species", paste(species_vec, collapse = "; "),
                                               total_available = NA_integer_, max_records = max_records)
         rv$error_msg <- if (nrow(dat) == 0) "No records returned for any of the provided species." else ""
-        rv$needs_count_refresh <- FALSE
-        session$sendCustomMessage("queryBtnState", list(
-          btnId = session$ns("query_btn"), spinnerId = session$ns("query_btn_spinner"), loading = FALSE))
-        rv$is_querying <- FALSE
+        refresh_counts <- FALSE
         return()
       }
 
-      req(input$taxon, nzchar(str_trim(input$taxon)))
-
       tryCatch({
         taxon_clean <- if (identical(input$rank, "trait-only")) {
-          str_squish(as.character(input$taxon))
+          str_squish(as.character(taxon_input))
         } else {
-          normalize_taxon_name(input$taxon)
+          normalize_taxon_name(taxon_input)
         }
         max_records <- suppressWarnings(as.integer(input$max_records))
         if (is.na(max_records) || max_records < 100) max_records <- 5000
@@ -825,6 +842,7 @@ queryServer <- function(id) {
                                    max_records = max_records, timeout_sec = 120)
           bien_err <- attr(dat, "bien_error", exact = TRUE)
           incProgress(0.7, message = "Processing results...")
+          rv$effective_taxon <- taxon_clean
           rv$query_data <- dat
           rv$diagnostics <- compute_diagnostics(
             dat,
@@ -841,20 +859,13 @@ queryServer <- function(id) {
             ""
           }
         })
+        refresh_counts <- TRUE
       }, error = function(e) {
         rv$query_data <- data.frame()
         rv$diagnostics <- NULL
+        rv$effective_taxon <- ""
         rv$error_msg <- paste("Error:", conditionMessage(e))
       })
-
-      # Restore button
-      session$sendCustomMessage("queryBtnState", list(
-        btnId    = session$ns("query_btn"),
-        spinnerId = session$ns("query_btn_spinner"),
-        loading  = FALSE
-      ))
-      rv$is_querying <- FALSE
-      rv$needs_count_refresh <- TRUE
     })
 
     observe({
@@ -866,7 +877,7 @@ queryServer <- function(id) {
       total_available <- query_bien_total_records(
         rank = diag$query_rank,
         taxon = diag$query_taxon,
-        timeout_sec = 120
+        timeout_sec = 25
       )
       rv$diagnostics <- compute_diagnostics(
         qr,
@@ -924,7 +935,7 @@ queryServer <- function(id) {
         data = rv$query_data,
         diagnostics = rv$diagnostics,
         rank = input$rank,
-        taxon = input$taxon,
+        taxon = rv$effective_taxon,
         max_records = input$max_records,
         is_loading = rv$is_querying
       )
@@ -960,6 +971,7 @@ scopeServer <- function(id, query_result) {
       }
       
       diag <- qr$diagnostics
+      if (is.null(diag)) return(p("Diagnostics not yet available.", style = "color: #666;"))
       
       tagList(
         div(class = "alert alert-info",
@@ -1024,14 +1036,15 @@ scopeServer <- function(id, query_result) {
                 }
               }
               
-              # Unit heterogeneity
+              # Unit heterogeneity (O(N) group-by instead of O(T*N) per-trait subsetting)
               unit_het_ui <- if (!is.null(trait_col_i) && !is.null(unit_col_i)) {
-                n_mixed <- sum(vapply(unique(as.character(qr$data[[trait_col_i]])), function(tr) {
-                  sub <- qr$data[as.character(qr$data[[trait_col_i]]) == tr, ]
-                  u <- unique(tolower(str_squish(as.character(sub[[unit_col_i]]))))
-                  u <- u[!is.na(u) & nzchar(u)]
-                  length(u) > 1
-                }, logical(1)))
+                n_mixed <- qr$data |>
+                  dplyr::mutate(.unit_clean = tolower(str_squish(as.character(.data[[unit_col_i]])))) |>
+                  dplyr::filter(!is.na(.unit_clean), nzchar(.unit_clean)) |>
+                  dplyr::group_by(.data[[trait_col_i]]) |>
+                  dplyr::summarise(.n_units = dplyr::n_distinct(.unit_clean), .groups = "drop") |>
+                  dplyr::filter(.n_units > 1) |>
+                  nrow()
                 if (n_mixed > 0) {
                   tags$p(strong("Unit heterogeneity: "),
                     sprintf("%d trait(s) have mixed units \u2014 check before pooling values.", n_mixed),
@@ -1103,6 +1116,7 @@ diagnosticsServer <- function(id, query_result) {
       }
       
       diag <- qr$diagnostics
+      if (is.null(diag)) return(p("Diagnostics not yet available.", style = "color: #666;"))
       
       tagList(
         div(class = "row",
@@ -1222,6 +1236,7 @@ provenanceServer <- function(id, query_result) {
       qr <- query_result()
       ts <- format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")
       
+      diag <- qr$diagnostics
       manifest <- list(
         query_rank = qr$rank,
         query_taxon = qr$taxon,
@@ -1229,14 +1244,14 @@ provenanceServer <- function(id, query_result) {
         timestamp_utc = ts,
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(qr$data),
-        total_available_records = qr$diagnostics$total_available_records,
-        records_not_returned = qr$diagnostics$records_not_returned,
-        unique_species = qr$diagnostics$unique_species,
-        unique_traits = qr$diagnostics$unique_traits,
+        total_available_records = if (!is.null(diag)) diag$total_available_records else NA_integer_,
+        records_not_returned = if (!is.null(diag)) diag$records_not_returned else NA_integer_,
+        unique_species = if (!is.null(diag)) diag$unique_species else NA_integer_,
+        unique_traits = if (!is.null(diag)) diag$unique_traits else NA_integer_,
         download_all_traits = isTRUE(qr$download_all),
         selected_traits = qr$selected_traits
       )
-      
+
       manifest_json <- toJSON(manifest, pretty = TRUE)
       
       tagList(
@@ -1252,6 +1267,7 @@ provenanceServer <- function(id, query_result) {
     
     reactive({
       req(query_result())
+      diag <- query_result()$diagnostics
       manifest <- list(
         query_rank = query_result()$rank,
         query_taxon = query_result()$taxon,
@@ -1259,8 +1275,8 @@ provenanceServer <- function(id, query_result) {
         timestamp_utc = format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC"),
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(query_result()$data),
-        total_available_records = query_result()$diagnostics$total_available_records,
-        records_not_returned = query_result()$diagnostics$records_not_returned,
+        total_available_records = if (!is.null(diag)) diag$total_available_records else NA_integer_,
+        records_not_returned = if (!is.null(diag)) diag$records_not_returned else NA_integer_,
         download_all_traits = isTRUE(query_result()$download_all),
         selected_traits = query_result()$selected_traits
       )
@@ -1274,6 +1290,7 @@ provenanceServer <- function(id, query_result) {
       content = function(file) {
         req(query_result())
         ts <- format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")
+        diag <- query_result()$diagnostics
         manifest <- list(
           query_rank = query_result()$rank,
           query_taxon = query_result()$taxon,
@@ -1281,11 +1298,13 @@ provenanceServer <- function(id, query_result) {
           timestamp_utc = ts,
           app_version = "BIEN Trait Gateway v1.0",
           records = nrow(query_result()$data),
-          total_available_records = query_result()$diagnostics$total_available_records,
-          records_not_returned = query_result()$diagnostics$records_not_returned,
+          total_available_records = if (!is.null(diag)) diag$total_available_records else NA_integer_,
+          records_not_returned = if (!is.null(diag)) diag$records_not_returned else NA_integer_,
+          unique_species = if (!is.null(diag)) diag$unique_species else NA_integer_,
+          unique_traits = if (!is.null(diag)) diag$unique_traits else NA_integer_,
           download_all_traits = isTRUE(query_result()$download_all),
           selected_traits = query_result()$selected_traits,
-          diagnostics = query_result()$diagnostics
+          diagnostics = if (!is.null(diag)) diag else list()
         )
         writeLines(toJSON(manifest, pretty = TRUE, auto_unbox = TRUE), con = file)
       }
@@ -1298,8 +1317,8 @@ provenanceServer <- function(id, query_result) {
       content = function(file) {
         req(query_result())
         ts <- format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")
-        rank <- query_result()$rank
-        taxon <- query_result()$taxon
+        rank <- if (!is.null(query_result()$rank)) query_result()$rank else "species"
+        taxon <- if (!is.null(query_result()$taxon)) query_result()$taxon else ""
         max_records <- suppressWarnings(as.integer(query_result()$max_records))
         if (is.na(max_records) || max_records < 100) max_records <- 5000
         max_records <- min(max_records, 50000)
@@ -1313,7 +1332,7 @@ provenanceServer <- function(id, query_result) {
           sprintf("BIEN::BIEN_trait_family(family = \"%s\", all.taxonomy = TRUE, source.citation = TRUE, limit = %d)", taxon, max_records)
         } else {
           # For trait-only: use expanded trait names if available
-          queried_traits <- attr(query_result()$data, "queried_traits")
+          queried_traits <- query_result()$queried_traits
           if (length(queried_traits) > 1) {
             traits_str <- paste0(sprintf("\"%s\"", queried_traits), collapse = ", ")
             sprintf("dplyr::bind_rows(lapply(c(%s), function(t) BIEN::BIEN_trait_trait(trait = t, all.taxonomy = TRUE, source.citation = TRUE, limit = %d)))", 
@@ -1572,6 +1591,7 @@ traitSelectServer <- function(id, query_result) {
       base_rank <- if (!is.null(base$rank)) base$rank else "species"
       base_taxon <- if (!is.null(base$taxon)) base$taxon else ""
       dat <- query_result()$data
+      qt <- attr(dat, "queried_traits")
       if (!is.data.frame(dat) || nrow(dat) == 0) {
         return(list(
           data = data.frame(),
@@ -1584,7 +1604,8 @@ traitSelectServer <- function(id, query_result) {
           max_records = base$max_records,
           diagnostics = compute_diagnostics(data.frame(), base_rank, base_taxon),
           is_loading = isTRUE(base$is_loading),
-          base = base
+          base = base,
+          queried_traits = NULL
         ))
       }
 
@@ -1601,7 +1622,8 @@ traitSelectServer <- function(id, query_result) {
           max_records = base$max_records,
           diagnostics = compute_diagnostics(data.frame(), base_rank, base_taxon),
           is_loading = isTRUE(base$is_loading),
-          base = base
+          base = base,
+          queried_traits = NULL
         ))
       }
 
@@ -1642,7 +1664,8 @@ traitSelectServer <- function(id, query_result) {
         max_records = base$max_records,
         diagnostics = base_diagnostics(),
         is_loading = isTRUE(base$is_loading),
-        base = base
+        base = base,
+        queried_traits = qt
       )
     })
   })
@@ -1981,7 +2004,7 @@ distributionsServer <- function(id, query_result) {
 
 downloadGateServer <- function(id, query_result) {
   moduleServer(id, function(input, output, session) {
-    ns <- NS(id)
+    ns <- session$ns
     
     output$checklist_display <- renderUI({
       req(query_result())
@@ -2163,18 +2186,17 @@ mapServer <- function(id, query_result) {
         dat <- dat[sample.int(nrow(dat), MAP_MARKER_CAP), , drop = FALSE]
       }
       
-      # Build popup text
-      popup_txt <- vapply(seq_len(nrow(dat)), function(i) {
-        row <- dat[i, , drop = FALSE]
-        sp <- if (!is.null(md$species_col)) as.character(row[[md$species_col]]) else "unknown"
-        tr <- if (!is.null(md$trait_col)) as.character(row[[md$trait_col]]) else ""
-        vl <- if (!is.null(md$value_col)) as.character(row[[md$value_col]]) else ""
-        ct <- if (!is.null(md$cite_col)) as.character(row[[md$cite_col]]) else ""
-        paste0("<b>", htmltools::htmlEscape(sp), "</b><br/>",
-               if (nzchar(tr)) paste0("Trait: ", htmltools::htmlEscape(tr), "<br/>") else "",
-               if (nzchar(vl)) paste0("Value: ", htmltools::htmlEscape(vl), "<br/>") else "",
-               if (nzchar(ct)) paste0("<small>", htmltools::htmlEscape(ct), "</small>") else "")
-      }, character(1))
+      # Build popup text (vectorized: avoids per-row data frame extraction)
+      sp_esc <- htmltools::htmlEscape(if (!is.null(md$species_col)) as.character(dat[[md$species_col]]) else rep("unknown", nrow(dat)))
+      tr_esc <- htmltools::htmlEscape(if (!is.null(md$trait_col))   as.character(dat[[md$trait_col]])   else rep("", nrow(dat)))
+      vl_esc <- htmltools::htmlEscape(if (!is.null(md$value_col))   as.character(dat[[md$value_col]])   else rep("", nrow(dat)))
+      ct_esc <- htmltools::htmlEscape(if (!is.null(md$cite_col))    as.character(dat[[md$cite_col]])    else rep("", nrow(dat)))
+      popup_txt <- paste0(
+        "<b>", sp_esc, "</b><br/>",
+        ifelse(nzchar(tr_esc), paste0("Trait: ", tr_esc, "<br/>"), ""),
+        ifelse(nzchar(vl_esc), paste0("Value: ", vl_esc, "<br/>"), ""),
+        ifelse(nzchar(ct_esc), paste0("<small>", ct_esc, "</small>"), "")
+      )
       
       leaflet::leaflet(dat) |>
         leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
