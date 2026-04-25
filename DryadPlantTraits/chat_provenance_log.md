@@ -47,3 +47,8 @@ Outcome: All three issues resolved. Smoke test PASS from workspace root and proj
 Prompt: Repair the newly created DryadPlantTraits project based on review findings: (1) fix reserved-word `next` in pagination; (2) make project-root detection robust for running from workspace root or inside DryadPlantTraits; (3) fail-fast on 401 and 403 auth errors; (4) preserve source column name provenance for long-format trait records; (5) strengthen smoke_test.R to cover pagination and metadata inventory.
 Source session: current workspace session
 Outcome: Fixed payload[["_links"]][["next"]] access in discover script; updated source_project_files() and output_dir defaults in all three scripts to detect CWD; dryad_download_file() and compile script now stop on 401 or 403; dryad_standardize_long_records() passes source_column_trait_name in row_provenance and dryad_fill_common_fields() uses it; smoke_test.R adds pagination-check assertion and live version-inventory call. Smoke test PASS (20 search rows, 4 standardized observations, pagination and inventory checks OK).
+
+3. Date: 2026-04-25
+Prompt: Resolve HTTP 401 authentication failure that blocked file downloads from Dryad. Bearer tokens (both OAuth client-credentials and personal API tokens) were rejected by the /api/v2/files/{id}/download endpoint. Pivot to public download URLs using Dryad's /stash/files/{id}/{filename} pattern.
+Source session: current workspace session
+Outcome: Modified dryad_download_file() to construct public download URL from file_id + filename using /stash/files/{id}/{filename} pattern. Removed all token/authentication requirements from compile_downloaded_traits.R. Validated syntax; committed to DryadPlantTraits origin.

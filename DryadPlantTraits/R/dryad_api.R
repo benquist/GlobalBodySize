@@ -207,6 +207,48 @@ dryad_get_version_files <- function(version_id, page = 1L, per_page = 100L) {
   result
 }
 
+#' Download all files in a Dryad dataset version as a zip archive.
+#' No authentication required for public datasets. Retries on HTTP 429.
+#' @param version_id Integer Dryad version ID.
+#' @param destfile Path where the zip will be written.
+#' @return Named list: success (logical), status (int), message (chr), destfile (chr).
+dryad_download_version_zip <- function(version_id, destfile) {
+  url <- dryad_build_url(sprintf("versions/%s/download", as.integer(version_id)))
+  max_retries <- 5L
+  wait_secs <- 60L
+
+  for (attempt in seq_len(max_retries)) {
+    response <- dryad_run_curl(url, destfile = destfile)
+    dryad_request_sleep()
+
+    if (response$http_code == 429L) {
+      if (file.exists(destfile)) unlink(destfile)
+      if (attempt == max_retries) break
+      Sys.sleep(wait_secs * (2L ^ (attempt - 1L)))
+      next
+    }
+
+    if (response$curl_status != 0L || response$http_code >= 400L || response$http_code == 0L) {
+      if (file.exists(destfile)) unlink(destfile)
+      return(list(
+        success = FALSE,
+        status = response$http_code,
+        message = sprintf("Dryad version zip download failed with HTTP status %s.", response$http_code),
+        destfile = destfile
+      ))
+    }
+
+    return(list(success = TRUE, status = response$http_code, message = "downloaded", destfile = destfile))
+  }
+
+  list(
+    success = FALSE,
+    status = 429L,
+    message = "Dryad version zip download failed after max retries (HTTP 429).",
+    destfile = destfile
+  )
+}
+
 dryad_download_file <- function(file_id = NULL, filename = NULL, destfile, download_url = NULL) {
   if (is.null(download_url) && (is.null(file_id) || is.null(filename))) {
     return(list(success = FALSE, status = 0L, message = "Either download_url or both file_id and filename must be provided.", destfile = destfile))

@@ -65,14 +65,19 @@ dryad_detect_delimiter <- function(path) {
   if (endsWith(lower_path, ".tsv") || endsWith(lower_path, ".tab")) {
     return("\t")
   }
-  if (endsWith(lower_path, ".csv")) {
+
+  first_line <- tryCatch(readLines(path, n = 1L, warn = FALSE), error = function(e) "")
+  if (!nzchar(first_line)) {
     return(",")
   }
 
-  first_line <- tryCatch(readLines(path, n = 1L, warn = FALSE), error = function(e) "")
   comma_count <- lengths(regmatches(first_line, gregexpr(",", first_line, fixed = TRUE)))
   tab_count <- lengths(regmatches(first_line, gregexpr("\t", first_line, fixed = TRUE)))
-  if (tab_count > comma_count) "\t" else ","
+  semi_count <- lengths(regmatches(first_line, gregexpr(";", first_line, fixed = TRUE)))
+
+  if (tab_count >= comma_count && tab_count >= semi_count) return("\t")
+  if (semi_count > comma_count) return(";")
+  ","
 }
 
 dryad_read_tabular_file <- function(path) {
