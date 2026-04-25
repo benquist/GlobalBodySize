@@ -194,15 +194,50 @@ dryad_alias_map <- function() {
       "harvestdate", "harvest_date", "date_of_collection",
       "verbatimeventdate"
     ),
-    country = c("country", "country_name", "nation", "countrycode", "country_code"),
-    stateProvince = c(
-      "stateprovince", "state_province", "state", "province",
-      "region", "administrative_area"
+    country = c(
+      # Darwin Core / BIEN standard
+      "country", "countrycode", "country_code",
+      # Descriptive variants
+      "country_name", "nation", "nation_name", "country_of_collection",
+      # ISO / abbreviation columns seen in ecological datasets
+      "iso_country", "iso2", "iso3", "iso_a2", "iso_a3",
+      # Common field name variants
+      "sampling_country", "collection_country", "site_country"
     ),
-    county = c("county", "municipality", "district"),
+    stateProvince = c(
+      # Darwin Core / BIEN standard
+      "stateprovince", "state_province",
+      # Short forms
+      "state", "province", "prov",
+      # Regional / administrative
+      "region", "administrative_area", "admin_area", "adm1",
+      # Descriptive variants common in ecological CSVs
+      "state_name", "province_name", "region_name",
+      "sampling_region", "collection_state", "site_state",
+      "state_province_name", "dept", "department"
+    ),
+    county = c(
+      # Darwin Core / BIEN standard
+      "county",
+      # Administrative level 2 variants
+      "municipality", "district", "adm2",
+      # Common ecological field names
+      "county_name", "municipality_name", "district_name",
+      "subregion", "sub_region", "departamento", "comarca",
+      "collection_county", "site_county"
+    ),
     locality = c(
-      "locality", "site", "site_name", "plot", "plot_name", "location",
-      "verbatimlocality", "place_name", "site_id", "plot_id"
+      # Darwin Core / BIEN standard
+      "locality", "verbatimlocality",
+      # Site / plot names (very common in trait datasets)
+      "site", "site_name", "site_id", "site_code",
+      "plot", "plot_name", "plot_id", "plot_code",
+      # Generic location descriptors
+      "location", "location_name", "location_id",
+      "place", "place_name",
+      # Descriptive / narrative
+      "sampling_location", "collection_site", "observation_site",
+      "habitat", "stand", "stand_name", "transect", "transect_name"
     ),
     trait_name = c(
       "trait_name", "trait", "measurementtype", "variable", "measurement_name",
