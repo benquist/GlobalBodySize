@@ -15,6 +15,19 @@ dryad_now_utc <- function() {
   format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 }
 
+dryad_request_sleep <- function() {
+  Sys.sleep(getOption("dryad.request_delay", 1.0))
+}
+
+dryad_parse_retry_after <- function(header_file) {
+  if (is.null(header_file) || !file.exists(header_file)) return(NA_real_)
+  lines <- readLines(header_file, warn = FALSE)
+  match <- grep("^[Rr]etry-[Aa]fter:", lines, value = TRUE)
+  if (!length(match)) return(NA_real_)
+  val <- suppressWarnings(as.numeric(trimws(sub("^[Rr]etry-[Aa]fter:\\s*", "", match[[1]]))))
+  if (is.na(val) || val < 0) NA_real_ else val
+}
+
 dryad_require_curl <- function() {
   curl_path <- Sys.which("curl")
   if (identical(curl_path, "")) {
@@ -56,7 +69,7 @@ dryad_build_url <- function(path, query = list()) {
   paste0(full_url, "?", query_string)
 }
 
-dryad_run_curl <- function(url, headers = NULL, destfile = NULL) {
+dryad_run_curl <- function(url, headers = NULL, destfile = NULL, header_file = NULL) {
   curl_bin <- dryad_require_curl()
   args <- c("-L", "--silent", "--show-error")
 
@@ -68,6 +81,10 @@ dryad_run_curl <- function(url, headers = NULL, destfile = NULL) {
 
   if (!is.null(destfile)) {
     args <- c(args, "-o", destfile)
+  }
+
+  if (!is.null(header_file)) {
+    args <- c(args, "-D", header_file)
   }
 
   args <- c(args, "--write-out", "__DRYAD_STATUS__:%{http_code}", url)
@@ -126,43 +143,68 @@ dryad_extract_error_message <- function(body_text) {
 }
 
 dryad_api_get_json <- function(path, query = list(), headers = NULL) {
-  response <- dryad_run_curl(dryad_build_url(path, query = query), headers = headers)
+  url <- dryad_build_url(path, query = query)
+  header_file <- tempfile("dryad_headers_", fileext = ".txt")
+  on.exit(unlink(header_file), add = TRUE)
+  max_retries <- 5L
+  backoff <- 60.0
 
-  if (response$curl_status != 0L || response$http_code >= 400L || response$http_code == 0L) {
-    error_message <- dryad_extract_error_message(response$body)
-    stop(
-      sprintf(
-        "Dryad request failed [%s] for %s%s",
-        response$http_code,
-        response$url,
-        if (!is.na(error_message) && nzchar(error_message)) paste0(": ", error_message) else ""
-      ),
-      call. = FALSE
-    )
+  for (attempt in seq_len(max_retries + 1L)) {
+    response <- dryad_run_curl(url, headers = headers, header_file = header_file)
+
+    if (response$http_code == 429L) {
+      if (attempt > max_retries) break
+      retry_after <- dryad_parse_retry_after(header_file)
+      wait_secs <- if (!is.na(retry_after)) retry_after else backoff * 2^(attempt - 1L)
+      message(sprintf("Dryad rate limit (HTTP 429): waiting %.0f seconds before retry %d/%d.", wait_secs, attempt, max_retries))
+      Sys.sleep(wait_secs)
+      next
+    }
+
+    if (response$curl_status != 0L || response$http_code >= 400L || response$http_code == 0L) {
+      error_message <- dryad_extract_error_message(response$body)
+      stop(
+        sprintf(
+          "Dryad request failed [%s] for %s%s",
+          response$http_code,
+          response$url,
+          if (!is.na(error_message) && nzchar(error_message)) paste0(": ", error_message) else ""
+        ),
+        call. = FALSE
+      )
+    }
+
+    return(jsonlite::fromJSON(response$body, simplifyVector = FALSE))
   }
 
-  jsonlite::fromJSON(response$body, simplifyVector = FALSE)
+  stop(sprintf("Dryad rate limit (HTTP 429) for %s: giving up after %d retries.", url, max_retries), call. = FALSE)
 }
 
 dryad_search_datasets <- function(q, subject = NULL, page = 1L, per_page = 100L) {
-  dryad_api_get_json(
+  result <- dryad_api_get_json(
     "search",
     query = list(q = q, subject = subject, page = page, per_page = per_page)
   )
+  dryad_request_sleep()
+  result
 }
 
 dryad_get_dataset_versions <- function(dataset_identifier, page = 1L, per_page = 100L) {
-  dryad_api_get_json(
+  result <- dryad_api_get_json(
     sprintf("datasets/%s/versions", utils::URLencode(dataset_identifier, reserved = TRUE)),
     query = list(page = page, per_page = per_page)
   )
+  dryad_request_sleep()
+  result
 }
 
 dryad_get_version_files <- function(version_id, page = 1L, per_page = 100L) {
-  dryad_api_get_json(
+  result <- dryad_api_get_json(
     sprintf("versions/%s/files", as.integer(version_id)),
     query = list(page = page, per_page = per_page)
   )
+  dryad_request_sleep()
+  result
 }
 
 dryad_download_file <- function(file_id, destfile, token = Sys.getenv("DRYAD_API_TOKEN", "")) {

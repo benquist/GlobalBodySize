@@ -99,11 +99,12 @@ if (!file.exists(candidate_files_path)) {
 
 candidate_files <- utils::read.csv(candidate_files_path, stringsAsFactors = FALSE, check.names = FALSE)
 selected_files <- select_candidate_files(candidate_files, max_datasets = max_datasets, max_files = max_files)
-processing_log <- empty_processing_log()
+processing_log_list <- list()
 compiled_rows <- list()
+first_compiled_write <- TRUE
 
 if (!nzchar(token)) {
-  processing_log <- append_log(processing_log, list(
+  processing_log_list[[length(processing_log_list) + 1L]] <- list(
     dryad_dataset_doi = NA_character_,
     dryad_version_id = NA_integer_,
     dryad_file_id = NA_integer_,
@@ -114,8 +115,8 @@ if (!nzchar(token)) {
     rows_in = 0L,
     rows_out = 0L,
     timestamp_utc = dryad_now_utc()
-  ))
-  utils::write.csv(processing_log, file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+  )
+  utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
   stop("Dryad file downloads require DRYAD_API_TOKEN. Set a valid bearer token and rerun.", call. = FALSE)
 }
 
@@ -130,7 +131,7 @@ for (row_index in seq_len(nrow(selected_files))) {
   download_result <- dryad_download_file(row$dryad_file_id[[1]], destfile, token = token)
 
   if (!isTRUE(download_result$success)) {
-    processing_log <- append_log(processing_log, list(
+    processing_log_list[[length(processing_log_list) + 1L]] <- list(
       dryad_dataset_doi = row$dryad_dataset_doi[[1]],
       dryad_version_id = row$dryad_version_id[[1]],
       dryad_file_id = row$dryad_file_id[[1]],
@@ -141,9 +142,9 @@ for (row_index in seq_len(nrow(selected_files))) {
       rows_in = 0L,
       rows_out = 0L,
       timestamp_utc = download_timestamp
-    ))
+    )
 
-    utils::write.csv(processing_log, file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+    utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
 
     if (download_result$status %in% c(401L, 403L)) {
       stop(download_result$message, call. = FALSE)
@@ -158,7 +159,7 @@ for (row_index in seq_len(nrow(selected_files))) {
 
   for (log_index in seq_len(nrow(read_result$log))) {
     log_row <- read_result$log[log_index, , drop = FALSE]
-    processing_log <- append_log(processing_log, list(
+    processing_log_list[[length(processing_log_list) + 1L]] <- list(
       dryad_dataset_doi = row$dryad_dataset_doi[[1]],
       dryad_version_id = row$dryad_version_id[[1]],
       dryad_file_id = row$dryad_file_id[[1]],
@@ -169,7 +170,7 @@ for (row_index in seq_len(nrow(selected_files))) {
       rows_in = 0L,
       rows_out = 0L,
       timestamp_utc = download_timestamp
-    ))
+    )
   }
 
   if (!length(read_result$tables)) {
@@ -192,7 +193,7 @@ for (row_index in seq_len(nrow(selected_files))) {
       )
     )
 
-    processing_log <- append_log(processing_log, list(
+    processing_log_list[[length(processing_log_list) + 1L]] <- list(
       dryad_dataset_doi = row$dryad_dataset_doi[[1]],
       dryad_version_id = row$dryad_version_id[[1]],
       dryad_file_id = row$dryad_file_id[[1]],
@@ -203,16 +204,20 @@ for (row_index in seq_len(nrow(selected_files))) {
       rows_in = nrow(table_entry$data),
       rows_out = nrow(standardized),
       timestamp_utc = dryad_now_utc()
-    ))
+    )
 
     if (nrow(standardized)) {
       compiled_rows[[length(compiled_rows) + 1L]] <- standardized
+      utils::write.table(standardized, file.path(output_dir, "compiled_trait_observations.csv"),
+        sep = ",", row.names = FALSE, na = "",
+        append = !first_compiled_write, col.names = first_compiled_write, qmethod = "double")
+      first_compiled_write <- FALSE
     }
   }
+
+  utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
 }
 
-compiled_table <- if (length(compiled_rows)) do.call(rbind, compiled_rows) else dryad_make_observation_table(0L)
-utils::write.csv(compiled_table, file.path(output_dir, "compiled_trait_observations.csv"), row.names = FALSE, na = "")
-utils::write.csv(processing_log, file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
+utils::write.csv(do.call(rbind, lapply(processing_log_list, as.data.frame, stringsAsFactors = FALSE)), file.path(output_dir, "processing_log.csv"), row.names = FALSE, na = "")
 
-message(sprintf("Compiled %s observation rows from %s selected files.", nrow(compiled_table), nrow(selected_files)))
+message(sprintf("Compiled %s observation rows from %s selected files.", sum(vapply(compiled_rows, nrow, integer(1L))), nrow(selected_files)))

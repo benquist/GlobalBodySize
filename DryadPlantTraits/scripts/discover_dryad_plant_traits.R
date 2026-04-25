@@ -72,14 +72,34 @@ dryad_make_dir(output_dir)
 
 search_terms <- dryad_search_seed_terms()
 search_rows <- list()
+search_checkpoint_path <- file.path(output_dir, "search_checkpoint.csv")
+resume <- identical(args$resume, "TRUE")
+fetched_combos <- character(0)
+first_search_write <- TRUE
+
+if (resume && file.exists(search_checkpoint_path)) {
+  existing <- utils::read.csv(search_checkpoint_path, stringsAsFactors = FALSE, check.names = FALSE)
+  if (nrow(existing) && "query_term" %in% names(existing) && "fetch_page" %in% names(existing)) {
+    fetched_combos <- paste(existing$query_term, existing$fetch_page, sep = "\t")
+    search_rows <- list(existing)
+    first_search_write <- FALSE
+  }
+}
 
 for (term_index in seq_len(nrow(search_terms))) {
   query_term <- search_terms$query_term[[term_index]]
   for (page_index in seq_len(pages_per_term)) {
+    combo_key <- paste(query_term, page_index, sep = "\t")
+    if (combo_key %in% fetched_combos) next
     payload <- dryad_search_datasets(query_term, page = page_index, per_page = per_page)
     rows <- dryad_flatten_search_results(payload, query_term = query_term)
+    rows$fetch_page <- page_index
     if (nrow(rows)) {
       search_rows[[length(search_rows) + 1L]] <- rows
+      utils::write.table(rows, search_checkpoint_path,
+        sep = ",", row.names = FALSE, na = "",
+        append = !first_search_write, col.names = first_search_write, qmethod = "double")
+      first_search_write <- FALSE
     }
     if (is.null(payload[["_links"]][["next"]])) {
       break
@@ -96,6 +116,9 @@ candidate_rows <- dataset_table[dataset_table$candidate_keep, , drop = FALSE]
 file_rows <- list()
 
 dataset_errors <- character(0)
+
+candidate_files_checkpoint_path <- file.path(output_dir, "candidate_files_checkpoint.csv")
+first_file_write <- TRUE
 
 if (nrow(candidate_rows)) {
   for (row_index in seq_len(nrow(candidate_rows))) {
@@ -138,6 +161,10 @@ if (nrow(candidate_rows)) {
       file_table$file_supported_tabular <- vapply(file_table$file_path, dryad_is_supported_tabular_path, logical(1))
       file_table$file_supported_container <- vapply(file_table$file_path, dryad_is_supported_archive_path, logical(1))
       file_rows[[length(file_rows) + 1L]] <- file_table
+      utils::write.table(file_table, candidate_files_checkpoint_path,
+        sep = ",", row.names = FALSE, na = "",
+        append = !first_file_write, col.names = first_file_write, qmethod = "double")
+      first_file_write <- FALSE
     }, error = function(e) {
       msg <- sprintf("%s: %s", dataset_identifier, conditionMessage(e))
       warning(sprintf("Dataset %s: skipping due to error — %s", dataset_identifier, conditionMessage(e)))
