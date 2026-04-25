@@ -114,3 +114,14 @@
 - Prompt summary: Fix delayed Taxon/Trait autocomplete after changing Query Rank (Species/Genus/Family/Trait Only).
 - Requested outcomes: Remove duplicate rank-triggered suggestion refreshes and reduce BIEN suggestion payload sizes so selectize autofill becomes responsive immediately after rank switches.
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Review the deployed BIEN-TraitsShinyApp for central goal, use cases, problems solved, uncovered use cases, insights, and speed optimization opportunities.
+- Requested outcomes: Assess the live app and local code, synthesize product/code review findings, and prioritize recommendations with emphasis on responsiveness and workflow coverage.
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Turn the BIEN-TraitsShinyApp review into a prioritized implementation plan.
+- Requested outcomes: Produce a phased, actionable implementation plan derived from REVIEW_2026-04-24.md, covering speed quick wins (P1), correctness fixes (P2), medium performance refactors (P3), and use-case coverage additions (P4), with per-item file/line guidance, acceptance criteria, and dependency notes.
+- Files changed: BIEN-TraitsShinyApp/IMPLEMENTATION_PLAN.md; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot

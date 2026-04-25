@@ -68,6 +68,42 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-24
+- Prompt summary: Review BIEN-TraitsShinyApp for speed optimization opportunities and bottlenecks.
+- Requested outcomes: Focus on app responsiveness, BIEN query latency handling, reactive inefficiencies, DT rendering cost, and large suggestion loading; read BIEN-TraitsShinyApp/README.md and BIEN-TraitsShinyApp/app_gateway.R; return severity-ranked bottlenecks with precise file/line references, optimization recommendations without behavior change, quick wins vs deeper refactors, and expected impact.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Review the deployed BIEN-TraitsShinyApp for central goal, use cases, problems solved, missing use cases, insights, and recommendations, with emphasis on speed optimization.
+- Requested outcomes: Assess https://benquist.shinyapps.io/bien-traits-shinyapp/, identify the app's central goal and use cases, explain what problems it solves, identify under-covered workflows and likely insights, and use optimizer and coder support to draft prioritized recommendations.
+- Files changed: BIEN-TraitsShinyApp/REVIEW_2026-04-24.md; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Run the mandatory final pre-return gate for the current BIEN-TraitsShinyApp review-only task.
+- Requested outcomes: Verify prompt log recorded, changed Rmd compile status if applicable, changed R package build status if applicable, and git push status; return strict PASS or BLOCKED with concise evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Re-run the mandatory final pre-return gate for the BIEN-TraitsShinyApp review-only task after creating the review artifact and provenance entries.
+- Requested outcomes: Verify prompt log recorded, changed Rmd compile status if applicable, changed R package build status if applicable, and git push status; return strict PASS or BLOCKED with concise evidence after changes to BIEN-TraitsShinyApp/REVIEW_2026-04-24.md, BIEN-TraitsShinyApp/chat_provenance_log.md, and agents/prompt_log.md.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Run the mandatory final pre-return gate using the exact pre-logged wording for the BIEN-TraitsShinyApp review-only task.
+- Requested outcomes: Verify prompt is recorded in agents/prompt_log.md, updated Rmd files compile successfully if any changed, updated R packages build successfully if any changed projects with DESCRIPTION were modified, and git push status is confirmed; return strict PASS or BLOCKED with concise evidence.
+- Files changed: agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Turn the BIEN-TraitsShinyApp review into a prioritized implementation plan.
+- Requested outcomes: Produce a phased, actionable implementation plan derived from REVIEW_2026-04-24.md, covering speed quick wins (P1), correctness fixes (P2), medium performance refactors (P3), and use-case coverage additions (P4), with per-item file/line guidance, acceptance criteria, and dependency notes.
+- Files changed: BIEN-TraitsShinyApp/IMPLEMENTATION_PLAN.md; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
 - Prompt summary: Implement targeted BIEN-SpeciesShinyApp app.R changes for random-species responsiveness, post-query non-blocking behavior, and ingest tab/handler removal.
 - Requested outcomes: Add guaranteed starter-pool fast fallback in find_lucky_species_with_mappable_points; remove taxonomy_species_exists blocking lookup from zero-mappable notification gate; remove Ingest to BIEN tab and active ingest server handlers/outputs; keep unrelated logic unchanged; verify app.R parse.
 - Files changed: BIEN-SpeciesShinyApp/app.R; agents/prompt_log.md; BIEN-SpeciesShinyApp/chat_provenance_log.md
@@ -251,6 +287,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Set up an automated check of the Google Docs CV and update the website CV automatically when the Google Doc changes.
 - Requested outcomes: Implement scheduled Google Docs CV change detection and automatic CV artifact refresh in the site repository.
 - Files changed: enquistlab-site-migration/.github/workflows/sync-google-doc-cv.yml; enquistlab-site-migration/scripts/sync_google_doc_cv.sh; enquistlab-site-migration/_pages/cv.md; enquistlab-site-migration/assets/pdf/enquist_cv.pdf; enquistlab-site-migration/assets/cv/google_doc_cv_latest.txt; enquistlab-site-migration/assets/cv/google_doc_cv.sha256; enquistlab-site-migration/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-24
+- Prompt summary: Perform a product+code review of BIEN-TraitsShinyApp to identify central goal, explicit use cases, problems solved, uncovered/under-covered use cases, and insights users can gain.
+- Requested outcomes: Use code evidence from BIEN-TraitsShinyApp/README.md and BIEN-TraitsShinyApp/app_gateway.R plus inference from deployed app URL; return concise sections for central goal, primary use cases, problems solved, gaps, and prioritized recommendations.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-22
