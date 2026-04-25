@@ -210,7 +210,11 @@ load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120)
   )
   if (is.null(sql)) return(character(0))
 
-  bien_sql <- get(".BIEN_sql", envir = asNamespace("BIEN"))
+  bien_sql <- tryCatch(
+    get(".BIEN_sql", envir = asNamespace("BIEN")),
+    error = function(e) NULL
+  )
+  if (is.null(bien_sql)) return(character(0))
   out <- safe_bien_retry(function() {
     bien_sql(query = sql, fetch.query = FALSE)
   }, timeout_sec = timeout_sec, attempts = 2)
@@ -335,6 +339,7 @@ query_bien_traits <- function(rank, taxon, max_records = 5000, timeout_sec = 120
     # Combine all trait results into a single dataframe
     if (length(trait_results) > 0) {
       dat <- dplyr::bind_rows(trait_results)
+      if (nrow(dat) > max_records) dat <- dat[seq_len(max_records), , drop = FALSE]
       # Store which traits were queried for later reference
       attr(dat, "queried_traits") <- names(trait_results)
     } else {
@@ -375,14 +380,17 @@ query_bien_total_records <- function(rank, taxon, timeout_sec = 120) {
     if (length(trait_names) == 0) trait_names <- taxon
     total <- 0L
     for (tn in trait_names) {
-      sql_fn <- tryCatch(
-        BIEN_trait_trait(trait = tn, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE),
-        error = function(e) NULL
-      )
-      if (!is.character(sql_fn) || !nzchar(sql_fn)) next
+      sql_fn <- safe_bien_retry(function() {
+        BIEN_trait_trait(trait = tn, all.taxonomy = TRUE, source.citation = TRUE, return.query = TRUE)
+      }, timeout_sec = timeout_sec, attempts = 2)
+      if (inherits(sql_fn, "bien_error") || !is.character(sql_fn) || !nzchar(sql_fn)) next
       sql_clean <- gsub(";\\s*$", "", sql_fn)
       count_sql <- sprintf("SELECT COUNT(*) AS total_records FROM (%s) t", sql_clean)
-      bien_sql <- get(".BIEN_sql", envir = asNamespace("BIEN"))
+      bien_sql <- tryCatch(
+        get(".BIEN_sql", envir = asNamespace("BIEN")),
+        error = function(e) NULL
+      )
+      if (is.null(bien_sql)) return(NA_integer_)
       cnt <- safe_bien_retry(function() {
         bien_sql(query = count_sql, fetch.query = FALSE)
       }, timeout_sec = timeout_sec, attempts = 2)
@@ -411,7 +419,11 @@ query_bien_total_records <- function(rank, taxon, timeout_sec = 120) {
   sql_clean <- gsub(";\\s*$", "", sql)
   count_sql <- sprintf("SELECT COUNT(*) AS total_records FROM (%s) bien_trait_query", sql_clean)
 
-  bien_sql <- get(".BIEN_sql", envir = asNamespace("BIEN"))
+  bien_sql <- tryCatch(
+    get(".BIEN_sql", envir = asNamespace("BIEN")),
+    error = function(e) NULL
+  )
+  if (is.null(bien_sql)) return(NA_integer_)
   cnt <- safe_bien_retry(function() {
     bien_sql(query = count_sql, fetch.query = FALSE)
   }, timeout_sec = timeout_sec, attempts = 2)
@@ -689,7 +701,9 @@ queryServer <- function(id) {
       # CSV upload takes precedence over pasted text
       csv_path <- input$batch_csv$datapath
       if (!is.null(csv_path) && file.exists(csv_path)) {
-        tbl <- tryCatch(read.csv(csv_path, stringsAsFactors = FALSE, header = TRUE), error = function(e) NULL)
+        first_line <- tryCatch(readLines(csv_path, n = 1, warn = FALSE), error = function(e) "")
+        has_header <- !grepl("\\s", trimws(first_line[[1]])) && !grepl(",.*,", first_line[[1]])
+        tbl <- tryCatch(read.csv(csv_path, stringsAsFactors = FALSE, header = has_header), error = function(e) NULL)
         if (!is.null(tbl) && ncol(tbl) >= 1) {
           vals <- as.character(tbl[[1]])
           vals <- vals[!is.na(vals) & nzchar(str_squish(vals))]
@@ -1171,12 +1185,13 @@ provenanceServer <- function(id, query_result) {
     output$provenance_display <- renderUI({
       req(query_result())
       qr <- query_result()
+      ts <- format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")
       
       manifest <- list(
         query_rank = qr$rank,
         query_taxon = qr$taxon,
         max_records = qr$max_records,
-        timestamp_utc = format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC"),
+        timestamp_utc = ts,
         app_version = "BIEN Trait Gateway v1.0",
         records = nrow(qr$data),
         total_available_records = qr$diagnostics$total_available_records,
@@ -1223,11 +1238,12 @@ provenanceServer <- function(id, query_result) {
       },
       content = function(file) {
         req(query_result())
+        ts <- format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")
         manifest <- list(
           query_rank = query_result()$rank,
           query_taxon = query_result()$taxon,
           max_records = query_result()$max_records,
-          timestamp_utc = format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC"),
+          timestamp_utc = ts,
           app_version = "BIEN Trait Gateway v1.0",
           records = nrow(query_result()$data),
           total_available_records = query_result()$diagnostics$total_available_records,
@@ -1246,6 +1262,7 @@ provenanceServer <- function(id, query_result) {
       },
       content = function(file) {
         req(query_result())
+        ts <- format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")
         rank <- query_result()$rank
         taxon <- query_result()$taxon
         max_records <- suppressWarnings(as.integer(query_result()$max_records))
@@ -1277,7 +1294,7 @@ provenanceServer <- function(id, query_result) {
 
         script <- c(
           "# Reproducible BIEN query script generated by BIEN Trait Data Gateway",
-          sprintf("# Generated: %s", format(as.POSIXct(Sys.time(), tz = "UTC"), "%Y-%m-%d %H:%M:%S UTC")),
+          sprintf("# Generated: %s", ts),
           "library(BIEN)",
           "library(dplyr)",
           "",
@@ -1506,7 +1523,12 @@ traitSelectServer <- function(id, query_result) {
       dat <- base$data
       base_rank <- if (!is.null(base$rank)) base$rank else "species"
       base_taxon <- if (!is.null(base$taxon)) base$taxon else ""
-      compute_diagnostics(dat, base_rank, base_taxon)
+      diag <- base$diagnostics
+      total_avail <- if (!is.null(diag) && !is.null(diag$total_available_records)) diag$total_available_records else NA_integer_
+      max_rec <- if (!is.null(base$max_records)) suppressWarnings(as.integer(base$max_records)) else NA_integer_
+      compute_diagnostics(dat, base_rank, base_taxon,
+                          total_available = total_avail,
+                          max_records = max_rec)
     })
 
     reactive({
@@ -2101,6 +2123,11 @@ mapServer <- function(id, query_result) {
         return(leaflet::leaflet() |> leaflet::addTiles() |> leaflet::setView(-100, 20, 2))
       }
       
+      MAP_MARKER_CAP <- 5000L
+      if (nrow(dat) > MAP_MARKER_CAP) {
+        dat <- dat[sample.int(nrow(dat), MAP_MARKER_CAP), , drop = FALSE]
+      }
+      
       # Build popup text
       popup_txt <- vapply(seq_len(nrow(dat)), function(i) {
         row <- dat[i, , drop = FALSE]
@@ -2134,9 +2161,12 @@ mapServer <- function(id, query_result) {
       total_obs <- nrow(query_result()$data)
       mapped_obs <- nrow(md$dat)
       pct <- round(100 * mapped_obs / total_obs, 1)
+      cap_note <- if (mapped_obs > MAP_MARKER_CAP) {
+        sprintf(" A random sample of %s is displayed on the map.", format(MAP_MARKER_CAP, big.mark = ","))
+      } else ""
       div(class = "alert alert-info", style = "margin-top: 10px;",
-        sprintf("%d of %d observations (%s%%) have valid coordinates and are shown on the map.",
-                mapped_obs, total_obs, pct))
+        sprintf("%d of %d observations (%s%%) have valid coordinates.%s",
+                mapped_obs, total_obs, pct, cap_note))
     })
     
     reactive(list(ok = TRUE))
