@@ -95,6 +95,42 @@ ensure_unique_names <- function(df) {
   df
 }
 
+sanitize_for_dt <- function(df) {
+  if (!is.data.frame(df)) {
+    return(data.frame())
+  }
+
+  df <- ensure_unique_names(df)
+  nm <- names(df)
+  blank_idx <- is.na(nm) | !nzchar(nm)
+  if (any(blank_idx)) {
+    nm[blank_idx] <- paste0("col_", which(blank_idx))
+    names(df) <- make.unique(nm, sep = "__dup")
+  }
+
+  # DT fails on list columns for some BIEN responses; coerce safely to character.
+  for (i in seq_along(df)) {
+    col <- df[[i]]
+    if (inherits(col, "POSIXlt")) {
+      df[[i]] <- as.POSIXct(col)
+      next
+    }
+    if (is.list(col) && !is.data.frame(col)) {
+      df[[i]] <- vapply(col, function(x) {
+        if (is.null(x)) return("")
+        if (length(x) == 0) return("")
+        if (length(x) == 1 && !is.list(x)) {
+          return(as.character(x))
+        }
+        out <- tryCatch(jsonlite::toJSON(x, auto_unbox = TRUE), error = function(e) NA_character_)
+        if (is.na(out)) paste(as.character(unlist(x, use.names = FALSE)), collapse = "; ") else as.character(out)
+      }, character(1))
+    }
+  }
+
+  df
+}
+
 load_trait_suggestions <- function(timeout_sec = 120) {
   if (is.null(.bien_trait_catalog_cache)) {
     trait_catalog <- safe_bien_retry(function() {
@@ -160,48 +196,36 @@ load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120)
   sql <- switch(rank,
     species = sprintf(
       paste0(
-        "SELECT a.scrubbed_species_binomial AS taxon, COUNT(*) AS n_rec ",
-        "FROM agg_traits a ",
-        "WHERE a.scrubbed_species_binomial IS NOT NULL AND a.scrubbed_species_binomial <> '' ",
-        "AND EXISTS (",
-        "  SELECT 1 FROM bien_taxonomy b ",
-        "  WHERE b.scrubbed_species_binomial = a.scrubbed_species_binomial ",
-        "  AND b.scrubbed_taxonomic_status = 'Accepted'",
-        ") ",
-        "GROUP BY a.scrubbed_species_binomial ",
-        "ORDER BY n_rec DESC, a.scrubbed_species_binomial ",
+        "SELECT DISTINCT b.scrubbed_species_binomial AS taxon ",
+        "FROM bien_taxonomy b ",
+        "WHERE b.scrubbed_taxonomic_status = 'Accepted' ",
+        "AND b.scrubbed_species_binomial IS NOT NULL ",
+        "AND b.scrubbed_species_binomial <> '' ",
+        "ORDER BY b.scrubbed_species_binomial ",
         "LIMIT %d;"
       ),
       as.integer(max_choices)
     ),
     genus = sprintf(
       paste0(
-        "SELECT a.scrubbed_genus AS taxon, COUNT(*) AS n_rec ",
-        "FROM agg_traits a ",
-        "WHERE a.scrubbed_genus IS NOT NULL AND a.scrubbed_genus <> '' ",
-        "AND EXISTS (",
-        "  SELECT 1 FROM bien_taxonomy b ",
-        "  WHERE b.scrubbed_genus = a.scrubbed_genus ",
-        "  AND b.scrubbed_taxonomic_status = 'Accepted'",
-        ") ",
-        "GROUP BY a.scrubbed_genus ",
-        "ORDER BY n_rec DESC, a.scrubbed_genus ",
+        "SELECT DISTINCT b.scrubbed_genus AS taxon ",
+        "FROM bien_taxonomy b ",
+        "WHERE b.scrubbed_taxonomic_status = 'Accepted' ",
+        "AND b.scrubbed_genus IS NOT NULL ",
+        "AND b.scrubbed_genus <> '' ",
+        "ORDER BY b.scrubbed_genus ",
         "LIMIT %d;"
       ),
       as.integer(max_choices)
     ),
     family = sprintf(
       paste0(
-        "SELECT a.scrubbed_family AS taxon, COUNT(*) AS n_rec ",
-        "FROM agg_traits a ",
-        "WHERE a.scrubbed_family IS NOT NULL AND a.scrubbed_family <> '' ",
-        "AND EXISTS (",
-        "  SELECT 1 FROM bien_taxonomy b ",
-        "  WHERE b.scrubbed_family = a.scrubbed_family ",
-        "  AND b.scrubbed_taxonomic_status = 'Accepted'",
-        ") ",
-        "GROUP BY a.scrubbed_family ",
-        "ORDER BY n_rec DESC, a.scrubbed_family ",
+        "SELECT DISTINCT b.scrubbed_family AS taxon ",
+        "FROM bien_taxonomy b ",
+        "WHERE b.scrubbed_taxonomic_status = 'Accepted' ",
+        "AND b.scrubbed_family IS NOT NULL ",
+        "AND b.scrubbed_family <> '' ",
+        "ORDER BY b.scrubbed_family ",
         "LIMIT %d;"
       ),
       as.integer(max_choices)
@@ -226,6 +250,13 @@ load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120)
   vals <- unique(as.character(out$taxon))
   vals <- vals[!is.na(vals) & nzchar(vals)]
   vals
+}
+
+suggestion_cap_for_rank <- function(rank) {
+  if (identical(rank, "species")) return(1500L)
+  if (identical(rank, "genus")) return(600L)
+  if (identical(rank, "family")) return(300L)
+  500L
 }
 
 # Identify plot-based traits and enrich with available source metadata
@@ -638,14 +669,11 @@ queryServer <- function(id) {
       batch_species = character(0)
     ) -> rv
 
-    observeEvent(input$rank, {
-      # Trait-only mode must use trait suggestions to keep the control coherent.
-      if (!is.null(input$rank) && identical(input$rank, "trait-only") && !identical(input$suggest_mode, "traits")) {
-        updateRadioButtons(session, "suggest_mode", selected = "traits")
+    observeEvent(list(input$suggest_mode, input$rank, input$input_mode), {
+      if (!identical(input$input_mode, "single")) {
+        return()
       }
-    }, ignoreInit = TRUE)
 
-    observeEvent(list(input$suggest_mode, input$rank), {
       mode <- if (is.null(input$suggest_mode) || !nzchar(input$suggest_mode)) "taxa" else input$suggest_mode
       rank <- if (is.null(input$rank) || !nzchar(input$rank)) "species" else input$rank
 
@@ -659,15 +687,16 @@ queryServer <- function(id) {
       key <- paste(mode, if (identical(mode, "taxa")) rank else "traits", sep = "::")
 
       choices <- rv$suggestion_cache[[key]]
-      if (is.null(choices)) {
+      if (is.null(choices) || length(choices) == 0) {
         choices <- if (identical(mode, "traits")) {
           load_trait_suggestions()
         } else {
-          # Keep suggestion payloads smaller so rank switches do not block typing.
-          cap <- if (identical(rank, "species")) 8000 else if (identical(rank, "genus")) 3000 else 1500
-          load_taxon_suggestions(rank = rank, max_choices = cap)
+          # Keep suggestion payloads small enough to avoid blocking rank switches.
+          load_taxon_suggestions(rank = rank, max_choices = suggestion_cap_for_rank(rank))
         }
-        rv$suggestion_cache[[key]] <- choices
+        if (length(choices) > 0) {
+          rv$suggestion_cache[[key]] <- choices
+        }
       }
 
       current <- input$taxon
@@ -1148,15 +1177,18 @@ recordsServer <- function(id, query_result) {
 
     output$records_table <- renderDT({
       req(query_result())
-      dat <- query_result()$data
+      dat <- sanitize_for_dt(query_result()$data)
       req(nrow(dat) > 0)
-      datatable(dat, server = TRUE, options = list(
-        scrollX = TRUE,
-        pageLength = 10,
-        deferRender = TRUE,
-        dom = "frtip"
-      ), rownames = FALSE)
-    })
+      datatable(
+        dat,
+        options = list(
+          scrollX = TRUE,
+          pageLength = 25,
+          dom = "frtip"
+        ),
+        rownames = FALSE
+      )
+    }, server = TRUE)
     
     reactive({
       req(query_result())
@@ -2056,7 +2088,8 @@ mapUI <- function(id) {
 
 mapServer <- function(id, query_result) {
   moduleServer(id, function(input, output, session) {
-    
+    MAP_MARKER_CAP <- 5000L
+
     map_data <- reactive({
       req(query_result())
       dat <- query_result()$data
@@ -2123,7 +2156,6 @@ mapServer <- function(id, query_result) {
         return(leaflet::leaflet() |> leaflet::addTiles() |> leaflet::setView(-100, 20, 2))
       }
       
-      MAP_MARKER_CAP <- 5000L
       if (nrow(dat) > MAP_MARKER_CAP) {
         dat <- dat[sample.int(nrow(dat), MAP_MARKER_CAP), , drop = FALSE]
       }

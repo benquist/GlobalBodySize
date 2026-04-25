@@ -125,3 +125,33 @@
 - Requested outcomes: Produce a phased, actionable implementation plan derived from REVIEW_2026-04-24.md, covering speed quick wins (P1), correctness fixes (P2), medium performance refactors (P3), and use-case coverage additions (P4), with per-item file/line guidance, acceptance criteria, and dependency notes.
 - Files changed: BIEN-TraitsShinyApp/IMPLEMENTATION_PLAN.md; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Fix deployed BIEN-TraitsShinyApp issues where Step 6 complete records table errors at large row counts and Step 1 rank-change suggestions lag heavily.
+- Requested outcomes: In BIEN-TraitsShinyApp/app_gateway.R, add defensive DT sanitization for irregular BIEN schemas (blank/duplicate names, list columns, POSIXlt), harden Step 6 DT options for large datasets, and reduce rank-switch suggestion latency by replacing heavy aggregate-count SQL with accepted-taxonomy distinct lookup plus smaller capped payloads and single-mode gating.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Apply follow-up code-checker bug-fix changes scoped to BIEN-TraitsShinyApp bug-fix files.
+- Requested outcomes: Fix DT API misuse by moving `server = TRUE` from `datatable(...)` to `renderDT(..., server = TRUE)` in recordsServer; further reduce cold rank-switch suggestion latency with deterministic low-risk caching/caps while preserving single/batch behavior.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Make a minimal follow-up change in app_gateway.R to reduce Step 1 rank-switch delay risk.
+- Requested outcomes: Update startup warm-cache to prewarm species, genus, and family suggestion caches while keeping current cap helper logic and avoiding unrelated behavior changes; append provenance entries; parse-validate app_gateway.R.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Refine Step 1 suggestion loading in app_gateway.R to address reviewer warnings while preserving responsiveness gains.
+- Requested outcomes: Remove startup prewarm; reduce rank suggestion caps; avoid permanently caching empty suggestion results; retry loading when cache is NULL/empty while preserving single-mode guard and mode/rank keying.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-25
+- Prompt summary: Apply targeted fixes in app_gateway.R: hoist MAP_MARKER_CAP to mapServer scope, remove invalid Scroller DT options in recordsServer, remove redundant rank observer in queryServer.
+- Requested outcomes: Fix map summary renderUI scope error; harden Step 6 DT stability; eliminate duplicate suggest_mode update trigger.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
