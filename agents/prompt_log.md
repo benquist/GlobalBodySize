@@ -258,6 +258,7 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Verify prompt logging, change-gated Rmd compile, change-gated package builds, and git push status; return strict output.
 - Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
+2026-04-25 | Final pre-return gate requested: ran mandatory always gate to validate prompt log, BIEN-TraitsShinyApp project provenance log, Rmd compile requirement, R package build/check requirement, and git push sync status.
 
 - Date: 2026-03-28
 - Prompt summary: Create an expanded literature synthesis list of plant body-size allometric scaling relationships across physiology, ecology, and evolution.
