@@ -108,15 +108,25 @@ format_bien_error <- function(err_msg, context = c("query", "suggestions")) {
 
 safe_bien_retry <- function(call_fn, timeout_sec = 120, attempts = 3, sleep_sec = 1) {
   last <- NULL
-  for (i in seq_len(attempts)) {
+  capacity_backoff <- c(8, 20, 40)
+  attempts <- max(1L, as.integer(attempts))
+  capacity_attempts <- max(attempts, length(capacity_backoff) + 1L)
+  for (i in seq_len(capacity_attempts)) {
     last <- safe_bien_call(call_fn(), timeout_sec = timeout_sec)
     if (!inherits(last, "bien_error")) {
       return(last)
     }
     if (is_bien_connection_slot_error(last$error)) {
-      break
+      if (i < capacity_attempts) {
+        Sys.sleep(capacity_backoff[min(i, length(capacity_backoff))])
+        next
+      }
+      return(last)
     }
-    if (i < attempts) Sys.sleep(sleep_sec * i)
+    if (i >= attempts) {
+      return(last)
+    }
+    Sys.sleep(sleep_sec * i)
   }
   last
 }
