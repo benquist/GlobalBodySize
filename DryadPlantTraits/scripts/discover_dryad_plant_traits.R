@@ -19,8 +19,17 @@ parse_named_args <- function(args) {
   values
 }
 
+find_project_root <- function() {
+  cwd <- getwd()
+  if (basename(cwd) == "DryadPlantTraits") return(cwd)
+  if (basename(cwd) == "scripts" && basename(dirname(cwd)) == "DryadPlantTraits") return(dirname(cwd))
+  proj <- file.path(cwd, "DryadPlantTraits")
+  if (dir.exists(proj)) return(proj)
+  stop("Cannot locate DryadPlantTraits project root from: ", cwd, call. = FALSE)
+}
+
 source_project_files <- function() {
-  root <- if (basename(getwd()) == "DryadPlantTraits") getwd() else file.path(getwd(), "DryadPlantTraits")
+  root <- find_project_root()
   files <- c(
     file.path(root, "R", "search_terms.R"),
     file.path(root, "R", "trait_dictionary.R"),

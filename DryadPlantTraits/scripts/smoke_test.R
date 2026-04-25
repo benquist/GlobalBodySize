@@ -1,7 +1,16 @@
 #!/usr/bin/env Rscript
 
+find_project_root <- function() {
+  cwd <- getwd()
+  if (basename(cwd) == "DryadPlantTraits") return(cwd)
+  if (basename(cwd) == "scripts" && basename(dirname(cwd)) == "DryadPlantTraits") return(dirname(cwd))
+  proj <- file.path(cwd, "DryadPlantTraits")
+  if (dir.exists(proj)) return(proj)
+  stop("Cannot locate DryadPlantTraits project root from: ", cwd, call. = FALSE)
+}
+
 source_project_files <- function() {
-  root <- if (basename(getwd()) == "DryadPlantTraits") getwd() else file.path(getwd(), "DryadPlantTraits")
+  root <- find_project_root()
   files <- c(
     file.path(root, "R", "search_terms.R"),
     file.path(root, "R", "trait_dictionary.R"),
@@ -42,6 +51,25 @@ if (!is.na(first_doi) && nzchar(first_doi)) {
   } else {
     version_table <- dryad_flatten_versions(version_payload, dataset_identifier = first_doi)
     message(sprintf("Smoke test: inventory OK (%s version(s) found for %s).", nrow(version_table), first_doi))
+
+    # Narrow file-inventory check: exercise dryad_get_version_files / dryad_flatten_files.
+    if (nrow(version_table) > 0L) {
+      latest_version_id <- version_table$dryad_version_id[[nrow(version_table)]]
+      file_payload <- tryCatch(
+        dryad_get_version_files(latest_version_id, per_page = 5),
+        error = function(e) NULL
+      )
+      if (is.null(file_payload)) {
+        message("Smoke test: file inventory call failed (network issue?); skipping file assertion.")
+      } else {
+        file_table <- dryad_flatten_files(
+          file_payload,
+          dryad_dataset_doi = first_doi,
+          dryad_version_id = latest_version_id
+        )
+        message(sprintf("Smoke test: file inventory OK (%s file(s) listed for version %s).", nrow(file_table), latest_version_id))
+      }
+    }
   }
 }
 

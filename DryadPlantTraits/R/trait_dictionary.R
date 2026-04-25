@@ -1,5 +1,11 @@
 dryad_trait_dictionary_path <- function() {
-  file.path("DryadPlantTraits", "data", "trait_dictionary_starter.csv")
+  candidates <- c(
+    file.path("data", "trait_dictionary_starter.csv"),
+    file.path("DryadPlantTraits", "data", "trait_dictionary_starter.csv"),
+    file.path("..", "data", "trait_dictionary_starter.csv")
+  )
+  found <- Filter(file.exists, candidates)
+  if (length(found)) found[[1L]] else candidates[[1L]]
 }
 
 dryad_read_trait_dictionary <- function(path = dryad_trait_dictionary_path()) {
