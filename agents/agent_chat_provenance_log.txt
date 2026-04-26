@@ -1,3 +1,25 @@
+[16] Date: 2026-04-26
+Source: active chat request
+Request summary: Review planned post-compile DryadPlantTraits trait QA design and return biodiversity-science standards requirements with mandatory citation-gap analysis.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the exact prompt intent to agents/prompt_log.md to satisfy mandatory final-gate prompt logging.
+- Appended this provenance entry because an agent-folder file was updated in this turn.
+Outcome: Agent-folder provenance remains append-only and current for this standards-review request.
+
+[15] Date: 2026-04-26
+Source: active chat request
+Request summary: Design a rigorous ecology-user post-compile QA workflow for DryadPlantTraits compiled trait observations with modular stages, observation-level range checks, trait diagnostics, triage rules, and validation checks.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+Action taken:
+- Appended the exact prompt intent to agents/prompt_log.md for mandatory final-gate prompt logging.
+- Added this append-only provenance entry because an agents/ file was updated.
+Outcome: Agent-folder provenance remains current for this workflow-design request.
+
 Agent Chat Provenance Log
 =========================
 
@@ -1006,3 +1028,4 @@ Outcome: Final gate evidence for enquistlab-site-migration is recorded with prom
 2026-04-25 | BIEN-TraitsShinyApp genus suggestion/hang bug session: updated BIEN-TraitsShinyApp/app_gateway.R (real BIEN elapsed-time guard, expanded genus suggestion cap, count-query timeout fallback) and appended required entries in BIEN-TraitsShinyApp/chat_provenance_log.md and agents/prompt_log.md.
 2026-04-25 09:19:34 MST | Provenance compliance session for BIEN-TraitsShinyApp dd996b6 cycle: verified required logs, appended missing entries to agents/prompt_log.md and BIEN-TraitsShinyApp/chat_provenance_log.md, and recorded this append-only agent-folder update.
 2026-04-25 | DryadPlantTraits public URL download session: resolved HTTP 401 authentication failure by switching dryad_download_file() to use /stash/files/{id}/{filename} public URL pattern (no auth required). Updated compile script to pass file_id+filename instead of token. Committed and pushed to DryadPlantTraits origin.
+2026-04-26: Created bio-units-specialist.agent.md — biological measurement units specialist for trait unit inference pipeline.

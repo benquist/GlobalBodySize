@@ -38,7 +38,7 @@ If the task changed agent behavior or agent files, append a new entry to:
 	- Do not hide record caps, filters, QA losses, or fallback behavior.
 	- Preserve taxonomic reconciliation outputs and source/citation fields in exports.
 	- Treat native/introduced/cultivated interpretations as context-dependent, not absolute truth.
-- For complex multi-step work, route through specialist agents (for example `m`, `code-checker`, `code-verifier`, `biodiversity-science-guard`, `stats-specialist`) before final gate.
+- For complex multi-step work, route through specialist agents (for example `m`, `code-checker`, `code-verifier`, `biodiversity-science-guard`, `stats-specialist`, `bio-units-specialist`) before final gate.
 
 ## Linked Docs
 - Workspace overview: `README.md`
