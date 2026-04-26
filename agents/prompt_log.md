@@ -1,3 +1,21 @@
+2026-04-26 | Implement DryadPlantTraits/scripts/generate_audit_report.R — reads completed dual-review audit sample CSV, computes inter-rater agreement (Wilson CI), adjudicated accuracy (Wilson CI), trait/dataset accuracy tables, error type frequency, reviewer confusion matrix, and rows_needs_adjudication; base R only; CLI args --input / --output-dir.
+
+2026-04-26 | Design and implement standalone post-compile trait QA + independent random publication audit workflow for DryadPlantTraits, explicitly incorporating ecology-user (proxy), merow-ecology, biodiversity-science-guard, and biodiversity-informatics-checker (proxy) recommendations into species gating, range-accuracy scoring columns, triage, and audit sampling design.
+
+2026-04-26 | Apply targeted fixes in DryadPlantTraits post-compile QA module based on code-checker findings: numeric-only no-reference triage, explicit invalid reference-range flag/reject routing, NA-preserving diagnostics aggregation, blinded default publication audit sample with optional model columns switch, strict n/seed arg validation, dictionary key uniqueness fail-fast, then rerun run_post_compile_qa.R and sample_publication_audit.R and report updated keep/review/reject/sample counts without commit/push.
+
+2026-04-26 | Implement a separate modular post-compile QA workflow in DryadPlantTraits: add independent post_compile_qa modules and scripts (run_post_compile_qa.R, sample_publication_audit.R), enforce species gate, score numeric observations against trait reference ranges with unit conversion handling, triage keep/review/reject outputs, generate stratified publication audit sample, add citation-strength metadata columns and DOI URLs in trait_dictionary_starter.csv, run validation commands, and append provenance logs without commit/push.
+
+2026-04-26 | Review planned post-compile trait QA design for DryadPlantTraits and provide standards requirements focused on: separate pass-through workflow over compiled_trait_observations.csv, keeping only observations with associated species names, adding observation-level comparison columns against published/reference ranges, including random manual sanity-check sampling against original publications, and applying mandatory citation-standard assessment of required vs weak citations.
+
+2026-04-26 | Act as ecology-user agent and design a post-compile QA workflow for DryadPlantTraits/output/compiled_trait_observations.csv with modular species-name filtering, observation-level reference-range accuracy fields, all-trait uncertainty/reproducibility design, trait-level diagnostics, keep/review/reject triage rules, minimal R function/file structure, and validation checks.
+
+2026-04-25 | Expand BIEN-TraitsShinyApp-Project README with detailed use cases, examples, background, search examples, and output examples.
+
+2026-04-25 | In /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp-Project/app_gateway.R, implement a minimal targeted fix: (1) fix timeout wrapping so safe_bien_call executes call_fn inside setTimeLimit (safe_bien_retry currently pre-evaluates via safe_bien_call(call_fn(), ...)); keep existing behavior/error return structure as much as possible; (2) add deferRender = TRUE to recordsServer output$records_table datatable options; no unrelated edits; return exact changed snippets/lines summary.
+
+2026-04-25 | In /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp-Project, fix code-review items: make deploy.R use this repo directory as robust appDir, update README local run instruction for this repo, and restore a minimal safe root .gitignore for R/Shiny. Do not make unrelated changes; return changed files and exact key lines.
+
 2026-04-25 | User asked whether trait value ranges were checked against reported values elsewhere. Requested outcome: confirm if P2_VALUE_OUT_OF_RANGE/range-source boundary checks were run and summarize coverage limits.
 
 2026-04-25 | User asked: "how many inferred trait units?" Requested outcome: return exact count from DryadPlantTraits/output/compiled_trait_observations.csv inferred_unit == TRUE.
@@ -232,6 +250,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Date: 2026-03-28
 - Prompt summary: Execute a full Merow-style ecology-first overhaul of california_poppy_sdm.Rmd.
 - Requested outcomes: Reframe the inferential target, define and justify M, clean occurrences, use bias-aware background, reduce predictor redundancy, constrain complexity, add spatial validation, uncertainty, novelty diagnostics, sensitivity analyses, and rewrite interpretation and future-projection language.
+
+2026-04-25 | Final-gate provenance update request for BIEN-TraitsShinyApp-Project sync/push verification: append concise matching entries to agents/prompt_log.md and BIEN-TraitsShinyApp-Project/chat_provenance_log.md only; no other edits, no commit/push, return added lines.
 
 2026-04-25 | DryadPlantTraits unit-transparency enhancement: add inferred_unit output field in standardization, set TRUE when standard_unit backfills missing raw unit, add additive P1_UNIT_INFERRED[standard_unit_used] QA flag without changing existing mismatch/range logic, parse-check updated R files, and run a quick reproducible test row showing inferred_unit=TRUE.
 - Files changed: california_poppy_sdm.Rmd; agents/prompt_log.md
@@ -1217,3 +1237,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-25 | Final gate for this turn: verify current range-check question is logged and run mandatory checks (Rmd trigger, R package build trigger, git push sync); no code edits except this prompt_log append.
 
 2026-04-25 | User said "I am going to go to sleep but you keep working on this ok?" — session context: DryadPlantTraits pipeline fixes (trait dictionary aliases for 12 unmatched trait labels, unit conversion for P2 range checks, numeric growth_form codes, 12 new search terms). Code committed d2f3505 and pushed to origin/master. Always gate requested to verify prompt log, Rmd trigger (not applicable), R package build trigger (not applicable — scripts/data project, no DESCRIPTION), and git push sync.
+
+2026-04-25 | Task: update /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp-Project with the latest app from /Users/brianjenquist/VSCode/BIEN-TraitsShinyApp using a safe sync that leaves target .git untouched; ensure target README includes centered BIEN logo and BIENDataLoader-style structure with app-specific content and launch URL https://benquist.shinyapps.io/bien-traits-shinyapp/; ensure referenced logo path exists in target repo; do not commit/push; report changed/added/deleted files, README+logo confirmation, and risks/manual follow-up.
+2026-04-26 | Implement modular provider architecture in DryadPlantTraits with strict folder isolation: add providers/common + providers/try/fred/leda ingest modules and CLI scripts, add multisource merge orchestrator and Dryad compatibility adapter, add lightweight smoke coverage, preserve existing Dryad logic, update provenance logs, and run validation commands (provider missing-manifest error, merge run, git status).
+2026-04-26 | Review and refine planned post-compile QA workflow for DryadPlantTraits compiled trait observations: define modeling objective, explicit ecological assumptions, risks (sampling bias, global-range transferability, context dependence), conservative diagnostics/thresholds, and caveats for interpretation of observation-level range-accuracy scores.
+2026-04-26 | Final mandatory pre-return gate for current DryadPlantTraits task in /Users/brianjenquist/VSCode: verify PASS/BLOCKED for (1) prompt recorded in agents/prompt_log.md including latest request context, (2) updated Rmd compile status if changed, (3) updated R package build status for DESCRIPTION-triggered projects, and (4) git push divergence status (ahead/behind), then return concise evidence.
