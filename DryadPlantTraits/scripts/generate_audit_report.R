@@ -56,7 +56,12 @@ empty_accuracy_row <- function(by_col, by_val) {
 }
 
 accuracy_table_by <- function(df, by_col) {
-  levels <- sort(unique(df[[by_col]]))
+  raw_levels <- unique(df[[by_col]])
+  n_na <- sum(is.na(raw_levels))
+  if (n_na > 0L) {
+    warning(sprintf("%d row(s) with NA %s excluded from accuracy table.", n_na, by_col))
+  }
+  levels <- sort(raw_levels[!is.na(raw_levels)])
   rows <- lapply(levels, function(val) {
     sub_df <- df[df[[by_col]] == val, ]
     n      <- nrow(sub_df)
@@ -153,16 +158,17 @@ agree_ci      <- wilson_ci(n_agreed, n_filled)
 message("Resolving adjudicated labels...")
 filled$final_label <- NA_character_
 
-for (i in seq_len(nrow(filled))) {
-  adj <- trimws(filled$adjudicator_label[i] %||% "")
-  if (!is.na(filled$adjudicator_label[i]) && nzchar(adj)) {
-    filled$final_label[i] <- adj
-  } else if (filled$agreed[i]) {
-    filled$final_label[i] <- trimws(filled$reviewer_1_label[i])
-  } else {
-    filled$final_label[i] <- "needs_adjudication"
-  }
-}
+adj_raw <- filled$adjudicator_label
+has_adj  <- !is.na(adj_raw) & nzchar(trimws(ifelse(is.na(adj_raw), "", adj_raw)))
+filled$final_label <- ifelse(
+  has_adj,
+  trimws(adj_raw),
+  ifelse(
+    filled$agreed,
+    trimws(filled$reviewer_1_label),
+    "needs_adjudication"
+  )
+)
 
 adjudicated  <- filled[filled$final_label != "needs_adjudication", ]
 needs_adj    <- filled[filled$final_label == "needs_adjudication", ]
