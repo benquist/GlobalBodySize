@@ -1,3 +1,5 @@
+2026-04-26 | Fully rewrite BIEN-TraitsShinyApp-Project/README.md with structured tutorial, who-it's-for, search examples, expected outputs, scientific caveats, run-locally steps, repository links, and deploy section — verified against app_gateway.R for accurate download types (CSV, JSON manifest, R script).
+
 2026-04-26 | Implement DryadPlantTraits/scripts/generate_audit_report.R — reads completed dual-review audit sample CSV, computes inter-rater agreement (Wilson CI), adjudicated accuracy (Wilson CI), trait/dataset accuracy tables, error type frequency, reviewer confusion matrix, and rows_needs_adjudication; base R only; CLI args --input / --output-dir.
 
 2026-04-26 | Design and implement standalone post-compile trait QA + independent random publication audit workflow for DryadPlantTraits, explicitly incorporating ecology-user (proxy), merow-ecology, biodiversity-science-guard, and biodiversity-informatics-checker (proxy) recommendations into species gating, range-accuracy scoring columns, triage, and audit sampling design.
