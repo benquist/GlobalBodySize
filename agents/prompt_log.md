@@ -1260,3 +1260,5 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-26 | User asked: "Of the original trait observations falling outside of the presume bounds based on assumed units how many are we now able to reconcile?" Computed reconciliation from DryadPlantTraits/output/qa_post_compile/observations_scored.csv using unit conversion outcomes and pre-vs-post range status; no code changes.
 
 2026-04-26 | User asked why reconciliation is only ~4.9% and whether this is due to unsorted harvested observations vs difficulty inferring units. Performed QA diagnostics on observations_scored/review outputs and checked integration status of infer_units.R.
+
+2026-04-26 | User asked: "ah, ok, we are still waiting on the new code from the bio-units-specialist.agent.md , correct?" Verified infer_units.R existence and whether it is integrated into run_post_compile_qa flow.
