@@ -1,0 +1,26 @@
+# Downloaded raw data (large binary ZIPs and extracted folders)
+output/downloads/
+
+# Generated / compiled outputs (reproducible from scripts)
+output/compiled_trait_observations.csv
+output/compiled_trait_observations_with_unit_inference.csv
+output/qa_post_compile/
+output/unit_inference_summary.csv
+output/discovery_errors.csv
+output/multisource_candidate_datasets.csv
+output/multisource_candidate_files.csv
+
+# Scientific Data provider generated outputs
+output/providers/scientific_data/sdata_search_checkpoint.csv
+output/providers/scientific_data/candidate_datasets.csv
+output/providers/scientific_data/candidate_files.csv
+
+# Candidate checkpoint files (regenerated on each run)
+output/candidate_files_checkpoint.csv
+output/spot_check_log.csv
+
+# R session artifacts
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj

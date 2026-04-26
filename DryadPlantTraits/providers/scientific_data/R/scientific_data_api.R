@@ -268,26 +268,127 @@ sdata_flatten_crossref_results <- function(payload, query_term) {
 }
 
 
-# Score a single candidate dataset using the existing dryad_score_candidate_dataset()
-# if available, otherwise return a neutral score.
+# ---------------------------------------------------------------------------
+# Scientific Data-specific candidate scoring
+# ---------------------------------------------------------------------------
+#
+# Stricter than the Dryad baseline scorer because Scientific Data is a general
+# journal — many papers match generic terms like "functional", "species",
+# "height" but are about genomics, geology, material science, etc.
+#
+# Rules:
+#   KEEP when:
+#     plant_hits >= 2 AND trait_hits >= 2 AND score >= 14
+#     OR plant_hits >= 1 AND trait_hits >= 3 AND measurement_hits >= 1 AND score >= 14
+#   EXCLUDE when:
+#     exclude_hits >= 1  (hard veto regardless of score)
+#
+# Scoring weights:
+#   plant    term hit: +3
+#   trait    term hit: +4
+#   measurement hit:  +2
+#   exclude  term hit: -8  (heavy penalty)
+
+sdata_plant_signal_terms <- function() {
+  c(
+    "plant", "leaf", "seed", "wood", "stem", "tree", "shrub",
+    "herb", "root", "forest", "grass", "angiosperm", "gymnosperm",
+    "vascular plant", "terrestrial plant", "plant species",
+    "flora", "vegetation survey", "plant community"
+  )
+}
+
+sdata_trait_signal_terms <- function() {
+  c(
+    "plant trait", "leaf trait", "functional trait",
+    "specific leaf area", "leaf area", "wood density",
+    "seed mass", "plant height", "leaf dry matter",
+    "ldmc", "leaf nitrogen", "leaf phosphorus",
+    "stomatal conductance", "photosynthesis", "net photosynthesis",
+    "cavitation", "p50", "turgor loss", "hydraulic conductance",
+    "bark thickness", "vessel diameter", "dispersal",
+    "leaf thickness", "chlorophyll content",
+    "root length", "root diameter", "fine root",
+    "trait database", "trait data", "trait measurements",
+    "phenotypic trait", "morphological trait"
+  )
+}
+
+sdata_measurement_signal_terms <- function() {
+  c(
+    "measured", "measurement", "observations", "field data",
+    "common garden", "individual plant", "plot-level", "sample size",
+    "morphology", "gas exchange", "pressure-volume",
+    "trait value", "trait values", "database of", "dataset of",
+    "trait observations", "data paper"
+  )
+}
+
+sdata_exclude_signal_terms <- function() {
+  c(
+    # Non-plant organisms
+    "animal", "microbe", "bacteria", "fungi", "fish", "bird", "mammal",
+    "coral", "reef", "insect", "arthropod", "invertebrate",
+    "marine mammal", "amphibian", "reptile",
+    # Plant genomics/genomics (not functional traits)
+    "genome assembly", "chromosome-level", "genomic", "whole genome",
+    "transcriptome", "annotation", "gene expression",
+    "snp", "qtl", "gwas", "sequencing", "genome sequence",
+    # Physics/chemistry/materials
+    "diffusion", "crystal", "ab-initio", "dft ", "density functional",
+    "metal", "alloy", "polymer", "solute", "lattice",
+    # Other irrelevant domains
+    "archaeological", "archaeology", "radiocarbon", "climate model",
+    "satellite image", "remote sensing", "spectral", "ocean",
+    "atmospheric", "soil chemistry", "geochemistry",
+    "medical", "clinical", "patient", "disease", "drug"
+  )
+}
+
+# Score a single candidate dataset using Scientific Data-specific rules.
 sdata_score_candidate <- function(title, abstract, source_subjects) {
-  score_fn <- get0("dryad_score_candidate_dataset", mode = "function", inherits = TRUE)
-  if (!is.null(score_fn)) {
-    return(score_fn(
-      title = title %||% "",
-      abstract = abstract %||% "",
-      source_subjects = source_subjects %||% ""
-    ))
+  text_blob <- paste(
+    as.character(title         %||% ""),
+    as.character(abstract      %||% ""),
+    as.character(source_subjects %||% ""),
+    sep = " "
+  )
+  text_blob <- tolower(gsub("\\s+", " ", text_blob))
+
+  count_hits <- function(text, terms) {
+    sum(vapply(terms, function(t) grepl(t, text, fixed = TRUE), logical(1)))
   }
 
-  # Fallback neutral score when dryad_score_candidate_dataset is not sourced
+  plant_hits       <- count_hits(text_blob, sdata_plant_signal_terms())
+  trait_hits       <- count_hits(text_blob, sdata_trait_signal_terms())
+  measurement_hits <- count_hits(text_blob, sdata_measurement_signal_terms())
+  exclude_hits     <- count_hits(text_blob, sdata_exclude_signal_terms())
+
+  score <- (plant_hits * 3L) + (trait_hits * 4L) + (measurement_hits * 2L) -
+           (exclude_hits * 8L)
+
+  include_candidate <- (
+    exclude_hits == 0L &&
+    (
+      (plant_hits >= 2L && trait_hits >= 2L && score >= 14L) ||
+      (plant_hits >= 1L && trait_hits >= 3L && measurement_hits >= 1L && score >= 14L)
+    )
+  )
+
+  rationale_parts <- c(
+    sprintf("plant_hits=%s", plant_hits),
+    sprintf("trait_hits=%s", trait_hits),
+    sprintf("measurement_hits=%s", measurement_hits),
+    sprintf("exclude_hits=%s", exclude_hits)
+  )
+
   list(
-    candidate_score     = 0L,
-    candidate_keep      = TRUE,
-    candidate_rationale = "scoring_unavailable",
-    plant_signal_count  = NA_integer_,
-    trait_signal_count  = NA_integer_,
-    measurement_signal_count = NA_integer_,
-    exclude_signal_count = NA_integer_
+    candidate_score      = score,
+    candidate_keep       = include_candidate,
+    candidate_rationale  = paste(rationale_parts, collapse = "; "),
+    plant_signal_count   = plant_hits,
+    trait_signal_count   = trait_hits,
+    measurement_signal_count = measurement_hits,
+    exclude_signal_count = exclude_hits
   )
 }
