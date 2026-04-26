@@ -181,6 +181,9 @@ iu_add_citation <- function(existing, additions) {
 }
 
 iu_detect_explicit_unit <- function(text, trait_key) {
+  if (is.na(trait_key) || !nzchar(trait_key)) {
+    return(NA_character_)
+  }
   if (is.na(text) || !nzchar(trimws(text))) {
     return(NA_character_)
   }
