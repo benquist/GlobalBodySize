@@ -37,7 +37,22 @@ dryad_search_seed_terms <- function() {
       # --- Categorical ---
       '"growth form" plant trait',
       '"leaf phenology" plant',
-      '"dispersal syndrome" plant'
+      '"dispersal syndrome" plant',
+      # --- Abbreviation / shorthand terms ---
+      '"SLA" plant trait',
+      '"LMA" plant trait',
+      '"LDMC" plant',
+      '"Amax" plant',
+      '"Ks" xylem plant',
+      # --- Community / functional framing ---
+      '"functional diversity" plant',
+      '"community weighted mean" trait plant',
+      '"trait-based" plant ecology',
+      # --- Taxon-scoped ---
+      '"grass traits"',
+      '"tree traits" tropical',
+      '"shrub traits"',
+      '"tropical forest" plant traits'
     ),
     theme = c(
       "broad_trait_discovery",
@@ -49,7 +64,10 @@ dryad_search_seed_terms <- function() {
       "gas_exchange", "gas_exchange",
       "root_economics", "root_economics",
       "hydraulics", "hydraulics", "hydraulics", "hydraulics", "hydraulics",
-      "whole_plant", "whole_plant", "whole_plant"
+      "whole_plant", "whole_plant", "whole_plant",
+      "abbreviation", "abbreviation", "abbreviation", "abbreviation", "abbreviation",
+      "community_ecology", "community_ecology", "community_ecology",
+      "taxon_scoped", "taxon_scoped", "taxon_scoped", "taxon_scoped"
     ),
     trait_focus = c(
       "mixed",
@@ -61,7 +79,11 @@ dryad_search_seed_terms <- function() {
       "photosynthetic_rate", "stomatal_conductance",
       "specific_root_length", "root_tissue_density",
       "stem_hydraulic_conductivity", "p50", "p50", "turgor_loss_point", "huber_value",
-      "growth_form", "leaf_phenology", "dispersal_syndrome"
+      "growth_form", "leaf_phenology", "dispersal_syndrome",
+      "specific_leaf_area", "leaf_mass_per_area", "leaf_dry_matter_content",
+      "photosynthetic_rate", "stem_hydraulic_conductivity",
+      "mixed", "mixed", "mixed",
+      "mixed", "mixed", "mixed", "mixed"
     ),
     stringsAsFactors = FALSE
   )

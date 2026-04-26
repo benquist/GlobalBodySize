@@ -23,7 +23,12 @@ dryad_categorical_vocab <- function() {
   list(
     growth_form = c(
       "tree", "shrub", "herb", "grass", "vine", "liana",
-      "subshrub", "fern", "moss", "epiphyte", "succulent", "palm"
+      "subshrub", "fern", "moss", "epiphyte", "succulent", "palm",
+      # Numeric codes used in some Dryad datasets (e.g. Pla et al.)
+      "1", "2", "3", "4", "5", "6", "7", "8",
+      # Common extended terms
+      "forb", "sedge", "geophyte", "chamaephyte", "hemicryptophyte",
+      "phanerophyte", "therophyte", "cryptophyte"
     ),
     leaf_phenology = c(
       "evergreen", "deciduous", "semi-deciduous",
@@ -222,6 +227,43 @@ dryad_qa_pass1 <- function(df) {
 }
 
 # ---------------------------------------------------------------------------
+# Unit-aware scaling for P2 range checking.
+# Returns list(scaled_value, note) where note is non-empty if conversion applied.
+# Does NOT modify stored values — scaling is for comparison only.
+# ---------------------------------------------------------------------------
+
+dryad_scale_for_range_check <- function(trait_nm, num_val, unit_str) {
+  if (is.na(num_val) || is.na(trait_nm)) return(list(val = num_val, note = ""))
+  u <- if (!is.na(unit_str)) tolower(trimws(unit_str)) else ""
+
+  conversions <- list(
+    plant_height = list(
+      list(pattern = "^mm$",      scale = 0.001, note = "mm_to_m"),
+      list(pattern = "^cm$",      scale = 0.01,  note = "cm_to_m")
+    ),
+    leaf_area = list(
+      list(pattern = "^cm2$|^cm\\^2$|^cm2$",  scale = 100, note = "cm2_to_mm2")
+    ),
+    specific_leaf_area = list(
+      list(pattern = "cm2.*g|cm2/g|cm2 g",  scale = 0.1, note = "cm2_per_g_to_mm2_per_mg")
+    ),
+    leaf_dry_matter_content = list(
+      list(pattern = "^g/g$|^g per g$|^g\\.per\\.g$",  scale = 1000, note = "g_per_g_to_mg_per_g")
+    )
+  )
+
+  trait_convs <- conversions[[trait_nm]]
+  if (is.null(trait_convs)) return(list(val = num_val, note = ""))
+
+  for (conv in trait_convs) {
+    if (grepl(conv$pattern, u, perl = TRUE, ignore.case = TRUE)) {
+      return(list(val = num_val * conv$scale, note = conv$note))
+    }
+  }
+  list(val = num_val, note = "")
+}
+
+# ---------------------------------------------------------------------------
 # PASS 2 — Biological plausibility QA (independent re-check)
 # Checks: cited range bounds for numeric traits, categorical vocabulary
 #         validation, Huber value × vessel diameter cross-trait red flag.
@@ -258,12 +300,19 @@ dryad_qa_pass2 <- function(df, ranges = NULL) {
     num_val <- suppressWarnings(as.numeric(trait_val_raw))
 
     if (!is.na(num_val) && !is.null(ranges[[trait_nm]])) {
+      unit_str <- if ("unit" %in% names(df)) df$unit[[i]] else NA_character_
+      scaled   <- dryad_scale_for_range_check(trait_nm, num_val, unit_str)
+      check_val <- scaled$val
+      if (nzchar(scaled$note)) {
+        row_flags <- c(row_flags,
+          sprintf("P2_UNIT_CONVERTED[%s;value_used_for_range_check:%g]", scaled$note, check_val))
+      }
       rng <- ranges[[trait_nm]]
       if (!is.na(rng$min) && !is.na(rng$max)) {
-        if (num_val < rng$min || num_val > rng$max) {
+        if (check_val < rng$min || check_val > rng$max) {
           row_flags <- c(row_flags,
             sprintf("P2_VALUE_OUT_OF_RANGE[cited_range:%g_to_%g,got:%g]",
-                    rng$min, rng$max, num_val))
+                    rng$min, rng$max, check_val))
         }
       }
     }
