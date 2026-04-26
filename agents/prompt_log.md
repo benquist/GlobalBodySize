@@ -1,5 +1,7 @@
 2026-04-26 | Quantitative theory analysis (dimensional analysis + Bayesian framework) for DryadPlantTraits unit inference module (infer_units.R): SI dimension formulas for 15 plant traits, disambiguation thresholds from TRY ranges, Bayesian P(unit|col_name,values,source) sketch, dimensionless ratio handling, and conversion chain validation for 5 canonical unit transforms. Output passed to bio-units-specialist.
 
+2026-04-26 | Answer user question for the DryadPlantTraits unit-inference workflow about specific_leaf_area ambiguity: explain why SLA is hard because it is a ratio with multiple equivalent numerator/denominator unit pairs, why inverse leaf_mass_per_area (LMA) is a separate and larger semantic problem, and what concrete next code changes should be made in DryadPlantTraits/R/infer_units.R to catch SLA vs LMA and numerator/denominator variants.
+
 2026-04-26 | Apply a focused correction pass to BIENDataLoader/README.md to align documented behavior with app.R: TNRS backbone (WCVP/WFO), in-app TNRS/NSR 20-item caps, GNRS writeback fields, GVS coordinate-level behavior, service-order recommendation wording, BLOCK export wording, Step 2/3 timing, coordinate requirement wording, BIEN staging subset wording, and is_cultivated_observation writeback semantics; no non-README functional code changes.
 
 2026-04-26 | Fully rewrite BIEN-TraitsShinyApp-Project/README.md with structured tutorial, who-it's-for, search examples, expected outputs, scientific caveats, run-locally steps, repository links, and deploy section — verified against app_gateway.R for accurate download types (CSV, JSON manifest, R script).
@@ -173,6 +175,12 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt summary: Apply targeted fixes from code-checker review in LoadingHistoricalObservationDataIntoBIEN.
 - Requested outcomes: Align Help copy with current stage labels and conservative BIEN service messaging; update README worked example; enforce join-blocker gating in key download handlers; fix coordinate-ready count logic; improve small-screen persistent Help button responsiveness; run smoke checks.
 - Files changed: LoadingHistoricalObservationDataIntoBIEN/app.R; LoadingHistoricalObservationDataIntoBIEN/README.md; LoadingHistoricalObservationDataIntoBIEN/R/bien_pipeline_helpers.R; LoadingHistoricalObservationDataIntoBIEN/R/multi_file_merge.R; LoadingHistoricalObservationDataIntoBIEN/tests/smoke_join_blocker_service_state.R; LoadingHistoricalObservationDataIntoBIEN/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot
+
+- Date: 2026-04-26
+- Prompt summary: Statistically defensible next-step coding ideas to raise DryadPlantTraits harvested-unit inference from medium to high confidence.
+- Requested outcomes: Identify the top 5-8 codeable improvements for the main medium-confidence traits (SLA, plant_height, seed_mass, leaf_area, LDMC, TLP/P50/P88), explain the mechanism and why each would safely upgrade medium to high, recommend formal scoring changes, give safe trait-specific decision rules, and prioritize implementation order using only harvested data and existing source metadata fields.
+- Files changed: agents/prompt_log.md
 - Completed by: GitHub Copilot
 
 - Date: 2026-04-26
@@ -1266,3 +1274,5 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-26 | User asked: "Can we now start the new unit inference workflow on the harvested traits?" Started workflow on DryadPlantTraits/output/compiled_trait_observations.csv, fixed NA-trait guard in DryadPlantTraits/R/infer_units.R, and generated compiled_trait_observations_with_unit_inference.csv plus unit_inference_summary.csv.
 
 2026-04-26 | User asked: "where is the code for the trait inference?" Verified the code location for harvested trait unit inference and prepared direct file references.
+
+2026-04-26 | User asked: "As SLA is a ratio the units of the numerator and denominator could vary in ways differently. So it is mixing two units. Is that the issue? Also, some SLA values may actually be reported as LMA (the inverse!). I have seen that happen" Synthesized stats-specialist guidance: yes, numerator/denominator unit-pair ambiguity contributes, but SLA vs LMA reciprocal-trait ambiguity is a larger issue and should be coded as a separate hypothesis in infer_units.R.
