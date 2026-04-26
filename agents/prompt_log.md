@@ -78,6 +78,8 @@
 
 2026-04-24 | publications.md: added Metabolic Scaling matchers for Vasseur 2025, Cruz 2025, Enquist 2024, Castorena 2022, Brummer 2021. conservation-impacts.md: added Krieger et al. 2022. research.md: linked Gallagher et al. 2020.
 
+2026-04-25 | BIENDataLoader/README.md revision: biodiversity-informatics-checker (fix TNRS input column bug, GVS description, scrubbed_* attribution, GNRS→NSR dependency, score thresholds, is_cultivated_observation clarification, CRS requirement, GNRS fields); ecology-user (add 160M records BIEN context, Maitner 2018 citation, user audience list, Mason demo context, use case table, infraspecific note); design-atelier (reorder sections: About first, caveats before field reference; blockquote callout style; emoji step headers; pipeline diagram; hero nav links). Committed c64adbb to BIEN_Data_Loader/main and a350799 to monorepo/master.
+
 2026-04-25 | BIENDataLoader: Initialized standalone git repo in BIENDataLoader/ and pushed app.R, README.md, demo_data/, www/bien.png, deploy.R to github.com/benquist/BIEN_Data_Loader (commit e11b77a, branch main).
 
 2026-04-25 | BIENDataLoader/README.md: Created tutorial README with BIEN logo header, quick-start link, step-by-step tab guide (Upload/Map/Stage/Export), BIEN web services workflow, field reference table, demo data explanation, local run instructions, repo structure, and scientific caveats. Committed 88540a3, pushed to origin/master.
