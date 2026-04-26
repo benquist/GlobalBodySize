@@ -61,8 +61,9 @@ sdata_is_supported_archive <- function(file_name) {
 # ---------------------------------------------------------------------------
 
 args           <- provider_parse_named_args(commandArgs(trailingOnly = TRUE))
-output_dir     <- args$`output-dir`      %||% args$output_dir     %||%
-                  file.path(project_root, "output", "providers", "scientific_data")
+base_output_dir <- args$`output-dir`      %||% args$output_dir     %||%
+                  file.path(project_root, "output")
+output_dir <- file.path(base_output_dir, "providers", "scientific_data")
 pages_per_term <- as.integer(args$`pages-per-term` %||% "3")
 per_page       <- as.integer(args$`per-page`       %||% "20")
 resume         <- identical(args$resume, "TRUE")

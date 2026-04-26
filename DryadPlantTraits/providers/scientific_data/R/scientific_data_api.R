@@ -4,7 +4,8 @@
 
 SDATA_CROSSREF_BASE <- "https://api.crossref.org/works"
 SDATA_ISSN           <- "2052-4463"
-SDATA_USER_AGENT     <- "DryadPlantTraits/1.0 (mailto:data-pipeline@research.org)"
+# CrossRef polite pool: pass mailto as query param (avoids shell-quoting issues with User-Agent)
+SDATA_CROSSREF_MAILTO <- "data-pipeline@research.org"
 
 # Patterns for detecting data repository links in text fields
 SDATA_FIGSHARE_PATTERN <- "10\\.6084/m9\\.figshare\\.([0-9]+(\\.[0-9]+)*)"
@@ -30,7 +31,8 @@ sdata_crossref_build_url <- function(query_term, rows = 20L, offset = 0L) {
     "&query=", encoded_term,
     "&rows=", as.integer(rows),
     "&offset=", as.integer(offset),
-    "&select=", select_fields
+    "&select=", select_fields,
+    "&mailto=", utils::URLencode(SDATA_CROSSREF_MAILTO, reserved = TRUE)
   )
 }
 
@@ -42,10 +44,9 @@ sdata_crossref_search <- function(query_term, rows = 20L, offset = 0L) {
   Sys.sleep(1)
 
   url <- sdata_crossref_build_url(query_term, rows = rows, offset = offset)
-  headers <- c(paste0("User-Agent: ", SDATA_USER_AGENT))
 
   result <- tryCatch(
-    dryad_run_curl(url, headers = headers),
+    dryad_run_curl(url),  # CrossRef polite pool via mailto= query param
     error = function(e) {
       warning(sprintf("sdata_crossref_search: curl error for term '%s' offset %d: %s",
                       query_term, offset, conditionMessage(e)))
@@ -59,7 +60,7 @@ sdata_crossref_search <- function(query_term, rows = 20L, offset = 0L) {
     warning("sdata_crossref_search: HTTP 429 — sleeping 10s then retrying once.")
     Sys.sleep(10)
     result <- tryCatch(
-      dryad_run_curl(url, headers = headers),
+      dryad_run_curl(url),
       error = function(e) {
         warning(sprintf("sdata_crossref_search: retry curl error: %s", conditionMessage(e)))
         NULL
