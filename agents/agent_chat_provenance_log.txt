@@ -1030,3 +1030,4 @@ Outcome: Final gate evidence for enquistlab-site-migration is recorded with prom
 2026-04-25 | DryadPlantTraits public URL download session: resolved HTTP 401 authentication failure by switching dryad_download_file() to use /stash/files/{id}/{filename} public URL pattern (no auth required). Updated compile script to pass file_id+filename instead of token. Committed and pushed to DryadPlantTraits origin.
 2026-04-26: Created bio-units-specialist.agent.md — biological measurement units specialist for trait unit inference pipeline.
 2026-04-26 | Reconciliation-count query session: computed out-of-bounds pre-vs-post unit-conversion reconciliation from DryadPlantTraits QA scored output; no code edits, analysis only.
+2026-04-26 | Diagnostic session for low reconciliation fraction (~4.9%): quantified drivers in QA outputs and confirmed infer_units.R not yet integrated into active pipeline.
