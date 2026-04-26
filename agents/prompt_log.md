@@ -1,3 +1,7 @@
+2026-04-26 | Quantitative theory analysis (dimensional analysis + Bayesian framework) for DryadPlantTraits unit inference module (infer_units.R): SI dimension formulas for 15 plant traits, disambiguation thresholds from TRY ranges, Bayesian P(unit|col_name,values,source) sketch, dimensionless ratio handling, and conversion chain validation for 5 canonical unit transforms. Output passed to bio-units-specialist.
+
+2026-04-26 | Apply a focused correction pass to BIENDataLoader/README.md to align documented behavior with app.R: TNRS backbone (WCVP/WFO), in-app TNRS/NSR 20-item caps, GNRS writeback fields, GVS coordinate-level behavior, service-order recommendation wording, BLOCK export wording, Step 2/3 timing, coordinate requirement wording, BIEN staging subset wording, and is_cultivated_observation writeback semantics; no non-README functional code changes.
+
 2026-04-26 | Fully rewrite BIEN-TraitsShinyApp-Project/README.md with structured tutorial, who-it's-for, search examples, expected outputs, scientific caveats, run-locally steps, repository links, and deploy section — verified against app_gateway.R for accurate download types (CSV, JSON manifest, R script).
 
 2026-04-26 | Implement DryadPlantTraits/scripts/generate_audit_report.R — reads completed dual-review audit sample CSV, computes inter-rater agreement (Wilson CI), adjudicated accuracy (Wilson CI), trait/dataset accuracy tables, error type frequency, reviewer confusion matrix, and rows_needs_adjudication; base R only; CLI args --input / --output-dir.
