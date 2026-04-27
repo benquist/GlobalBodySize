@@ -257,6 +257,7 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Requested outcomes: Remove startup prewarm rank preload block; reduce suggestion caps in suggestion_cap_for_rank; do not cache empty suggestion results in rv$suggestion_cache; retry suggestions when cache is NULL/empty; preserve single-mode guard and mode/rank cache keying; update provenance logs and parse-validate app_gateway.R; no commit/push.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+2026-04-27 | Website redirect - I would like to redirect users from my old webstite https://brianjenquist.wordpress.com/brian-j-enquist/ to my new website https://enquistlab.github.io/ How do I do that?
 
 - Date: 2026-03-28
 - Prompt summary: Create an always agent that runs last and checks prompt logging, Rmd compile status, R package build status, and git push status.
@@ -1301,3 +1302,16 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-26 | User asked bio-units-specialist, enhanced-theory, and ecology-user agents to propose 4 solutions for fixing 0% resolved dt_none traits in the DryadPlantTraits pipeline: stomatal_conductance, growth_form, leaf_phenology, root_tissue_density, specific_root_length, p50/p88. Analysis/research task only — no code written, no files modified.
 
 2026-04-26 | DryadPlantTraits DT S5: implement unit inference additions in infer_units_decision_tree.R and infer_units.R for 7 problem traits (leaf_n, leaf_p, leaf_lignin, leaf_cn_ratio, stem_hydraulic_conductivity, turgor_loss_point, leaf_dry_matter_content) — add range_map entries with biologically validated bounds, conversion_map entries for common non-SI units, variants_map aliases, and canonical_unit_map entries; QA pipeline re-run confirms all 7 traits now achieve high or near-high confidence; committed 9dc70b8 and pushed to origin/master.
+
+2026-04-27 | Implement robust BIENDataLoader hosted-upload crash fix in BIENDataLoader/app.R: add resilient CSV ingestion helper with separator/encoding fallbacks (comma/semicolon, UTF-8/Latin-1), wrap upload ingestion failures so they surface as showNotification instead of unhandled exceptions, keep session alive when one uploaded file fails by clearing upload state, set options(shiny.maxRequestSize=100MB), preserve >50MB warning with coherent messaging, keep demo/downstream behavior unchanged, parse-validate app.R, run lightweight non-interactive helper smoke check, and update BIENDataLoader/chat_provenance_log.md.
+2026-04-27 | User asked for clarification of upload source semantics (whether uploaded files come from the user's own computer/hard drive), requested review/report of BIENDataLoader upload-fix changes using coder/optimizer context, and shared remote symptom: upload progress reaches complete then session disconnects and reload resets state.
+2026-04-27 | Produced BIENDataLoader review note at BIENDataLoader/upload_disconnect_review_2026-04-27.md covering upload-source semantics and independent diagnosis of remaining disconnect risk after upload completion.
+
+- 2026-04-27: Re-run mandatory pre-return checks after appending the latest prompt to agents/prompt_log.md. Need PASS/BLOCKED for prompt log, Rmd compile trigger, R package build trigger, and git push divergence status; provide concise evidence.
+2026-04-27 | Final pre-return gate (always agent): website redirect guidance session only — verified prompt log appended, no Rmd files changed (compile trigger not fired), no DESCRIPTION files changed (R package build trigger not fired), git push status confirmed current (no unpushed commits in active projects).
+
+2026-04-27 | Re-run final pre-return gate (always agent): user requested explicit PASS/BLOCKED re-verification for website redirect guidance turn — prompt log verified, no Rmd/DESCRIPTION files changed, git push confirmed 0 ahead/0 behind on master.
+
+2026-04-27 | BIENDataLoader/app.R: 5-fix optimizer patch — blank_row_filter helper (no as.matrix), delimiter sniff in safe_read_csv_with_fallbacks, 200 MB aggregate cap, 20 MB upload-back guards, stg_names_key pre-hoist; PARSE_OK + BLANK_FILTER_OK.
+
+2026-04-27 | Implement multi-pronged Scientific Data plant trait discovery: OpenAlex, Figshare reverse, Europe PMC, plus CrossRef orchestrator. Created 4 new R files: providers/scientific_data/R/openalex_api.R, figshare_group_api.R, europepmc_api.R, scripts/discover_scientific_data_multipronged.R.
