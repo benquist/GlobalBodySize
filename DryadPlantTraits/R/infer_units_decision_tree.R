@@ -216,7 +216,13 @@ iu_get_conversion_factor <- function(trait_key, from_unit, to_unit) {
       list(from = "mg_per_g", to = "g_per_g", factor = 0.001),
       list(from = "percent", to = "g_per_g", factor = 0.01),
       list(from = "mg_per_g", to = "percent", factor = 0.1),
-      list(from = "g_per_g", to = "percent", factor = 100)
+      list(from = "g_per_g", to = "percent", factor = 100),
+      list(from = "fraction",  to = "g_per_g",  factor = 1),
+      list(from = "fraction",  to = "mg_per_g", factor = 1000),
+      list(from = "fraction",  to = "percent",  factor = 100),
+      list(from = "g_per_g",   to = "fraction", factor = 1),
+      list(from = "mg_per_g",  to = "fraction", factor = 0.001),
+      list(from = "percent",   to = "fraction", factor = 0.01)
     ),
     wood_density = list(
       list(from = "kg_per_m3", to = "g_per_cm3", factor = 0.001),
@@ -272,15 +278,6 @@ iu_get_conversion_factor <- function(trait_key, from_unit, to_unit) {
       list(from = "g_per_kg",  to = "percent",   factor = 0.1),
       list(from = "mg_per_g",  to = "g_per_kg",  factor = 1),
       list(from = "percent",   to = "g_per_kg",  factor = 10)
-    ),
-    # leaf_dry_matter_content: add fraction (= g/g)
-    leaf_dry_matter_content_fraction = list(
-      list(from = "fraction",  to = "g_per_g",   factor = 1),
-      list(from = "fraction",  to = "mg_per_g",  factor = 1000),
-      list(from = "fraction",  to = "percent",   factor = 100),
-      list(from = "g_per_g",   to = "fraction",  factor = 1),
-      list(from = "mg_per_g",  to = "fraction",  factor = 0.001),
-      list(from = "percent",   to = "fraction",  factor = 0.01)
     ),
     # leaf_lignin: 1% = 10 mg/g = 10 g/kg
     leaf_lignin = list(
@@ -395,7 +392,6 @@ iu_scan_unit_variants <- function(trait_key) {
     specific_leaf_area = c("mm2_per_mg", "cm2_per_g", "m2_per_kg"),
     leaf_mass_per_area = c("mg_per_mm2", "mg_per_cm2", "g_per_m2"),
     plant_height = c("m", "cm", "mm"),
-    leaf_dry_matter_content = c("mg_per_g", "g_per_g", "percent"),
     wood_density = c("g_per_cm3", "kg_per_m3"),
     stem_specific_density = c("g_per_cm3", "kg_per_m3"),
     stomatal_conductance = c("mmol_per_m2_per_s", "mol_per_m2_per_s"),
@@ -915,6 +911,56 @@ iu_test_decision_tree <- function(verbose = FALSE) {
     total_pass <- sum(sapply(test_results, function(r) r$pass))
     cat(sprintf("\n=== SUMMARY: %d/%d tests passed ===\n", total_pass, length(test_results)))
   }
+
+  # --- leaf_n: 20 mg/g -> canonical mg_per_g, HIGH ---
+  res <- iu_infer_unit_by_decision_tree("leaf nitrogen", c(18, 22, 25), unit_string = "mg/g")
+  stopifnot(res$confidence == "high")
+  stopifnot(res$inferred_unit == "mg_per_g")
+  if (verbose) message("leaf_n HIGH: PASS")
+
+  # --- leaf_n: 2.0 % -> in percent range (0.5-8%) -> HIGH ---
+  res <- iu_infer_unit_by_decision_tree("leaf nitrogen", c(1.8, 2.0, 2.5))
+  stopifnot(res$confidence == "high")
+  if (verbose) message("leaf_n percent HIGH: PASS")
+
+  # --- leaf_p: 1.5 mg/g -> HIGH ---
+  res <- iu_infer_unit_by_decision_tree("leaf phosphorus", c(1.2, 1.5, 1.8))
+  stopifnot(res$confidence == "high")
+  if (verbose) message("leaf_p HIGH: PASS")
+
+  # --- leaf_lignin: 20 % -> HIGH ---
+  res <- iu_infer_unit_by_decision_tree("leaf lignin", c(15, 20, 25))
+  stopifnot(res$confidence == "high")
+  if (verbose) message("leaf_lignin HIGH: PASS")
+
+  # --- leaf_cn_ratio: 25 -> dimensionless, HIGH ---
+  res <- iu_infer_unit_by_decision_tree("leaf C:N ratio", c(20, 25, 30))
+  stopifnot(res$confidence == "high")
+  stopifnot(res$inferred_unit == "dimensionless")
+  if (verbose) message("leaf_cn_ratio HIGH: PASS")
+
+  # --- stem_hydraulic_conductivity: 2.5 kg/m/s/MPa -> HIGH ---
+  res <- iu_infer_unit_by_decision_tree("stem hydraulic conductivity", c(1.5, 2.5, 5.0))
+  stopifnot(res$confidence == "high")
+  if (verbose) message("stem_hydraulic_conductivity HIGH: PASS")
+
+  # --- turgor_loss_point: -1.5 MPa -> HIGH (negative value) ---
+  res <- iu_infer_unit_by_decision_tree("turgor loss point", c(-2.0, -1.5, -1.0))
+  stopifnot(res$confidence == "high")
+  stopifnot(res$inferred_unit == "MPa")
+  if (verbose) message("turgor_loss_point HIGH: PASS")
+
+  # --- leaf_dry_matter_content: fraction input 0.25 -> mg_per_g via conversion ---
+  res <- iu_infer_unit_by_decision_tree("leaf dry matter content", c(0.2, 0.25, 0.3))
+  # 0.25 falls in g_per_g range [0.05, 0.9] -> UNIT_VARIANT_FOUND, converts to mg_per_g
+  stopifnot(res$confidence == "high")
+  if (verbose) message("LDMC fraction HIGH: PASS")
+
+  # --- leaf_dry_matter_content: normal mg/g input 250 -> HIGH ---
+  res <- iu_infer_unit_by_decision_tree("leaf dry matter content", c(200, 250, 300))
+  stopifnot(res$confidence == "high")
+  stopifnot(res$inferred_unit == "mg_per_g")
+  if (verbose) message("LDMC mg_per_g HIGH: PASS")
 
   invisible(test_results)
 }
