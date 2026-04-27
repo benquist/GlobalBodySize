@@ -327,10 +327,14 @@ sdata_measurement_signal_terms <- function() {
 sdata_exclude_signal_terms <- function() {
   c(
     # Non-plant organisms
-    "animal", "microbe", "bacteria", "fungi", "fish", "bird", "mammal",
+    # NOTE: "bird" removed — grepl fixed-match fires on "seabird" (site context, not study organism).
+    #       Use "avian" and "bird species" instead, which are specific to bird-ecology papers.
+    # NOTE: "spectral" removed — fires on "leaf spectral reflectance", a standard measured plant trait.
+    #       Use "hyperspectral" for remote-sensing-only spectral papers.
+    "animal", "microbe", "bacteria", "fungi", "fish", "avian", "mammal",
     "coral", "reef", "insect", "arthropod", "invertebrate",
-    "marine mammal", "amphibian", "reptile",
-    # Plant genomics/genomics (not functional traits)
+    "marine mammal", "amphibian", "reptile", "bird species",
+    # Plant genomics (not functional traits)
     "genome assembly", "chromosome-level", "genomic", "whole genome",
     "transcriptome", "annotation", "gene expression",
     "snp", "qtl", "gwas", "sequencing", "genome sequence",
@@ -339,20 +343,33 @@ sdata_exclude_signal_terms <- function() {
     "metal", "alloy", "polymer", "solute", "lattice",
     # Other irrelevant domains
     "archaeological", "archaeology", "radiocarbon", "climate model",
-    "satellite image", "remote sensing", "spectral", "ocean",
+    "satellite image", "remote sensing", "hyperspectral", "ocean",
     "atmospheric", "soil chemistry", "geochemistry",
     "medical", "clinical", "patient", "disease", "drug"
   )
 }
 
 # Score a single candidate dataset using Scientific Data-specific rules.
+#
+# Title-override rule (Bug fix):
+#   If the paper TITLE contains "plant trait" as a phrase, the paper is always kept
+#   regardless of exclude-term hits. Authors who title their paper "Plant traits and..."
+#   are unambiguously publishing a plant trait dataset; no exclude term should
+#   override that signal. The override is title-only (not abstract) to prevent
+#   false positives from cited comparisons.
 sdata_score_candidate <- function(title, abstract, source_subjects) {
+  # Title-only check for override (strip JATS tags, lowercase)
+  title_clean <- tolower(gsub("<[^>]+>", " ", as.character(title %||% "")))
+  title_is_plant_trait_paper <- grepl("plant trait", title_clean, fixed = TRUE)
+
   text_blob <- paste(
     as.character(title         %||% ""),
     as.character(abstract      %||% ""),
     as.character(source_subjects %||% ""),
     sep = " "
   )
+  # Strip JATS XML tags (CrossRef abstracts often contain <jats:p>, <jats:italic>, etc.)
+  text_blob <- gsub("<[^>]+>", " ", text_blob)
   text_blob <- tolower(gsub("\\s+", " ", text_blob))
 
   count_hits <- function(text, terms) {
@@ -367,11 +384,18 @@ sdata_score_candidate <- function(title, abstract, source_subjects) {
   score <- (plant_hits * 3L) + (trait_hits * 4L) + (measurement_hits * 2L) -
            (exclude_hits * 8L)
 
+  # The exclude veto is a hard gate UNLESS the title unambiguously declares
+  # this is a plant trait paper (title_is_plant_trait_paper). In that case
+  # the paper is kept; the rationale records the override for auditability.
+  hard_excluded <- exclude_hits > 0L && !title_is_plant_trait_paper
+
   include_candidate <- (
-    exclude_hits == 0L &&
+    !hard_excluded &&
     (
-      (plant_hits >= 2L && trait_hits >= 2L && score >= 14L) ||
-      (plant_hits >= 1L && trait_hits >= 3L && measurement_hits >= 1L && score >= 14L)
+      title_is_plant_trait_paper ||
+      (plant_hits >= 2L && trait_hits >= 1L && score >= 8L) ||
+      (plant_hits >= 1L && trait_hits >= 2L && score >= 8L) ||
+      (plant_hits >= 1L && trait_hits >= 1L && measurement_hits >= 2L && score >= 8L)
     )
   )
 
@@ -379,7 +403,8 @@ sdata_score_candidate <- function(title, abstract, source_subjects) {
     sprintf("plant_hits=%s", plant_hits),
     sprintf("trait_hits=%s", trait_hits),
     sprintf("measurement_hits=%s", measurement_hits),
-    sprintf("exclude_hits=%s", exclude_hits)
+    sprintf("exclude_hits=%s", exclude_hits),
+    if (title_is_plant_trait_paper) "title_override=TRUE" else NULL
   )
 
   list(
