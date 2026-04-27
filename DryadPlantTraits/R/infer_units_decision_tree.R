@@ -91,6 +91,30 @@ iu_get_reference_range <- function(trait_key, unit) {
     leaf_p = list(
       mg_per_g = list(min = 0.5, max = 10, cite = c("Kattge2020", "Wright2004")),
       mg_per_cm2 = list(min = 0.005, max = 1, cite = c("Kattge2020", "Wright2004"))
+    ),
+    # --- Solution 2: SRL, RTD, p50/p88 additions ---
+    # Perez-Harguindeguy 2013 (doi:10.1071/BT12225); Bergmann 2020 (doi:10.1126/sciadv.aba3756)
+    specific_root_length = list(
+      m_per_g   = list(min = 0.5,   max = 1500,  cite = c("PerezHarguindeguy2013", "Kattge2020")),
+      cm_per_g  = list(min = 50,    max = 150000, cite = c("PerezHarguindeguy2013", "Kattge2020")),
+      km_per_kg = list(min = 0.5,   max = 1500,  cite = c("PerezHarguindeguy2013", "Kattge2020"))
+    ),
+    # Kramer-Walter et al. 2016, New Phytologist 209:1553-1565 (doi:10.1111/nph.13737)
+    root_tissue_density = list(
+      g_per_cm3  = list(min = 0.05, max = 1.5,   cite = c("KramerWalter2016", "Kattge2020")),
+      mg_per_cm3 = list(min = 50,   max = 1500,  cite = c("KramerWalter2016", "Kattge2020")),
+      kg_per_m3  = list(min = 50,   max = 1500,  cite = c("KramerWalter2016", "Kattge2020"))
+    ),
+    # Choat et al. 2012, Nature 491:752-755 (doi:10.1038/nature11688)
+    # Maherali et al. 2004, Ecology 85:2361-2380 (doi:10.1890/03-0238)
+    # All p50/p88 values expected negative (MPa); bar would be 10x more negative
+    p50 = list(
+      MPa = list(min = -20, max = -0.1, cite = c("Choat2012", "Maherali2004")),
+      bar = list(min = -200, max = -1,  cite = c("Choat2012", "Maherali2004"))
+    ),
+    p88 = list(
+      MPa = list(min = -20, max = -0.1, cite = c("Choat2012", "Maherali2004")),
+      bar = list(min = -200, max = -1,  cite = c("Choat2012", "Maherali2004"))
     )
   )
 
@@ -158,6 +182,31 @@ iu_get_conversion_factor <- function(trait_key, from_unit, to_unit) {
     stomatal_conductance = list(
       list(from = "mol_per_m2_per_s", to = "mmol_per_m2_per_s", factor = 1000),
       list(from = "mmol_per_m2_per_s", to = "mol_per_m2_per_s", factor = 0.001)
+    ),
+    # Solution 2: SRL conversions (km/kg == m/g numerically)
+    specific_root_length = list(
+      list(from = "cm_per_g",  to = "m_per_g",   factor = 0.01),
+      list(from = "km_per_kg", to = "m_per_g",   factor = 1),
+      list(from = "m_per_g",   to = "cm_per_g",  factor = 100),
+      list(from = "km_per_kg", to = "cm_per_g",  factor = 100),
+      list(from = "m_per_g",   to = "km_per_kg", factor = 1),
+      list(from = "cm_per_g",  to = "km_per_kg", factor = 0.01)
+    ),
+    root_tissue_density = list(
+      list(from = "mg_per_cm3", to = "g_per_cm3",  factor = 0.001),
+      list(from = "kg_per_m3",  to = "g_per_cm3",  factor = 0.001),
+      list(from = "g_per_cm3",  to = "mg_per_cm3", factor = 1000),
+      list(from = "kg_per_m3",  to = "mg_per_cm3", factor = 1),
+      list(from = "g_per_cm3",  to = "kg_per_m3",  factor = 1000),
+      list(from = "mg_per_cm3", to = "kg_per_m3",  factor = 1)
+    ),
+    p50 = list(
+      list(from = "bar", to = "MPa", factor = 0.1),
+      list(from = "MPa", to = "bar", factor = 10)
+    ),
+    p88 = list(
+      list(from = "bar", to = "MPa", factor = 0.1),
+      list(from = "MPa", to = "bar", factor = 10)
     ),
     photosynthetic_rate = list(
       list(from = "mmol_per_m2_per_s", to = "umol_per_m2_per_s", factor = 1000),
@@ -252,7 +301,12 @@ iu_scan_unit_variants <- function(trait_key) {
     seed_mass = c("mg", "g", "kg"),
     leaf_area = c("mm2", "cm2", "m2"),
     leaf_n = c("mg_per_g", "mg_per_cm2"),
-    leaf_p = c("mg_per_g", "mg_per_cm2")
+    leaf_p = c("mg_per_g", "mg_per_cm2"),
+    # Solution 2 additions
+    specific_root_length = c("m_per_g", "cm_per_g", "km_per_kg"),
+    root_tissue_density  = c("g_per_cm3", "mg_per_cm3", "kg_per_m3"),
+    p50 = c("MPa", "bar"),
+    p88 = c("MPa", "bar")
   )
 
   variants <- variants_map[[trait_key]]
@@ -346,8 +400,34 @@ iu_infer_unit_by_decision_tree <- function(
     seed_mass = "mg",
     leaf_area = "mm2",
     leaf_n = "mg_per_g",
-    leaf_p = "mg_per_g"
+    leaf_p = "mg_per_g",
+    # Solution 2 additions
+    specific_root_length = "m_per_g",
+    root_tissue_density  = "g_per_cm3",
+    p50 = "MPa",
+    p88 = "MPa"
   )
+
+  # Solution 3: Categorical trait early-exit — no unit to infer
+  IU_CATEGORICAL_TRAITS <- c(
+    "growth_form", "leaf_phenology", "dispersal_syndrome",
+    "leaf_type", "mycorrhizal_type", "woodiness"
+  )
+  if (canonical_trait_key %in% IU_CATEGORICAL_TRAITS) {
+    return(list(
+      inferred_unit     = "categorical",
+      confidence        = "categorical",
+      evidence          = "CATEGORICAL_TRAIT_NO_UNIT",
+      candidate_units   = character(0),
+      conversion_factor = NA_real_,
+      reciprocal        = FALSE,
+      reason            = paste0(
+        "Trait '", canonical_trait_key, "' is categorical; ",
+        "use standardize_categorical_trait() for vocabulary mapping. No unit inference applicable."
+      ),
+      citation_keys = character(0)
+    ))
+  }
 
   assumed_canonical_unit <- canonical_unit_map[[canonical_trait_key]]
   if (is.null(assumed_canonical_unit)) {

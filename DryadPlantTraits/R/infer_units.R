@@ -45,7 +45,10 @@ iu_trait_aliases <- function() {
     p50 = c("p50", "psi50"),
     p88 = c("p88", "psi88"),
     turgor_loss_point = c("turgor_loss_point", "tlp", "psi_tlp"),
-    stem_hydraulic_conductivity = c("stem_hydraulic_conductivity", "ks", "specific hydraulic conductivity")
+    stem_hydraulic_conductivity = c("stem_hydraulic_conductivity", "ks", "specific hydraulic conductivity"),
+    # Solution 2: root traits
+    specific_root_length = c("specific_root_length", "specific root length", "srl"),
+    root_tissue_density  = c("root_tissue_density",  "root tissue density",  "rtd", "root density")
   )
 }
 

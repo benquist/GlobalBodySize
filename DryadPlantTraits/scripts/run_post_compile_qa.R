@@ -16,6 +16,7 @@ source(file.path(project_root, "R", "post_compile_qa", "range_scoring.R"), local
 source(file.path(project_root, "R", "post_compile_qa", "triage.R"), local = FALSE)
 source(file.path(project_root, "R", "infer_units.R"), local = FALSE)
 source(file.path(project_root, "R", "infer_units_decision_tree.R"), local = FALSE)
+source(file.path(project_root, "R", "standardize_categorical_traits.R"), local = FALSE)
 
 args <- pcqa_parse_named_args(commandArgs(trailingOnly = TRUE))
 input_path <- args$input %||% file.path(project_root, "output", "compiled_trait_observations.csv")
@@ -99,6 +100,39 @@ dt_apply_to_df <- function(df) {
   unit_col       <- if ("unit"                   %in% names(df)) df$unit                   else rep(NA_character_, n)
   value_col      <- if ("trait_value"            %in% names(df)) df$trait_value            else rep(NA_character_, n)
 
+  # ---- S1: Sanitize inferred_unit boolean coercion bug ----
+  # When a column is mostly empty, R/fread can coerce it to logical (TRUE/FALSE).
+  # Guard by forcing character and replacing "TRUE"/"FALSE" with NA.
+  for (.col in c("inferred_unit", "raw_unit", "unit", "source_column_unit")) {
+    if (.col %in% names(df)) {
+      df[[.col]] <- as.character(df[[.col]])
+      df[[.col]][df[[.col]] %in% c("TRUE", "FALSE", "true", "false")] <- NA_character_
+    }
+  }
+  # Re-extract unit_col after sanitization
+  unit_col <- if ("unit" %in% names(df)) df$unit else rep(NA_character_, n)
+
+  # ---- S4: Pre-DT triage for numeric-required traits with abstract-text values ----
+  # stomatal_conductance and related gas-exchange traits are sometimes mapped
+  # from abstract-text columns during compilation, yielding non-numeric values.
+  # These should be flagged as DATA_COMPILATION_ERROR rather than run through DT.
+  NUMERIC_REQUIRED_TRAITS <- c(
+    "stomatal_conductance", "photosynthetic_rate",
+    "transpiration", "leaf_hydraulic_conductance"
+  )
+  is_numeric_val <- suppressWarnings(!is.na(as.numeric(as.character(value_col))))
+  is_compilation_error <- trait_col %in% NUMERIC_REQUIRED_TRAITS & !is_numeric_val
+  if (any(is_compilation_error)) {
+    n_err <- sum(is_compilation_error)
+    message(sprintf(
+      "  [S4 triage] %d rows flagged as DATA_COMPILATION_ERROR_ABSTRACT_TEXT ",
+      n_err
+    ))
+    dt_confidence[is_compilation_error] <- "none"
+    dt_reason[is_compilation_error]     <- "DATA_COMPILATION_ERROR_ABSTRACT_TEXT"
+    dt_evidence[is_compilation_error]   <- "NON_NUMERIC_VALUE_FOR_NUMERIC_TRAIT"
+  }
+
   group_key <- paste(doi_col, trait_col, col_name_col, sep = "\t")
   groups    <- split(seq_len(n), group_key)
   n_groups  <- length(groups)
@@ -156,7 +190,7 @@ scored_with_dt <- dt_apply_to_df(tri$scored)
 
 message("Decision-tree reconciliation complete.")
 dt_conf_tbl <- table(scored_with_dt$dt_confidence)
-for (lvl in c("high", "medium", "low", "none")) {
+for (lvl in c("high", "medium", "low", "categorical", "none")) {
   cnt <- if (!is.na(dt_conf_tbl[lvl])) dt_conf_tbl[[lvl]] else 0L
   message(sprintf("  dt_confidence=%s: %d rows", lvl, cnt))
 }
@@ -171,11 +205,12 @@ dt_summary <- do.call(rbind, lapply(
     data.frame(
       trait_name        = g$trait_name[[1]],
       n_obs             = nrow(g),
-      dt_high           = sum(g$dt_confidence == "high",   na.rm = TRUE),
-      dt_medium         = sum(g$dt_confidence == "medium", na.rm = TRUE),
-      dt_low            = sum(g$dt_confidence == "low",    na.rm = TRUE),
-      dt_none           = sum(g$dt_confidence == "none",   na.rm = TRUE),
-      dt_reciprocal     = sum(g$dt_reciprocal,             na.rm = TRUE),
+      dt_high           = sum(g$dt_confidence == "high",        na.rm = TRUE),
+      dt_medium         = sum(g$dt_confidence == "medium",      na.rm = TRUE),
+      dt_low            = sum(g$dt_confidence == "low",         na.rm = TRUE),
+      dt_categorical    = sum(g$dt_confidence == "categorical", na.rm = TRUE),
+      dt_none           = sum(g$dt_confidence == "none",        na.rm = TRUE),
+      dt_reciprocal     = sum(g$dt_reciprocal,                  na.rm = TRUE),
       stringsAsFactors  = FALSE
     )
   }
