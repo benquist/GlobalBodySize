@@ -35,7 +35,7 @@ iu_trait_aliases <- function() {
     photosynthetic_rate = c("photosynthetic_rate", "anet", "amax", "asat", "net photosynthesis", "assimilation"),
     seed_mass = c("seed_mass", "seed mass", "seed weight"),
     leaf_area = c("leaf_area", "leaf area", "lamina area"),
-    leaf_n = c("leaf_n", "leaf nitrogen", "foliar n", "nmass", "narea"),
+    leaf_n = c("leaf_n", "leaf nitrogen", "leaf nitrogen content", "foliar n", "nmass", "narea"),
     leaf_p = c("leaf_p", "leaf phosphorus", "foliar p", "pmass", "parea"),
     leaf_cn_ratio = c("leaf_cn_ratio", "leaf cn ratio", "c:n", "cn ratio",
                       "leaf C:N ratio", "leaf_cn", "leaf_c_n_ratio", "C_N_ratio",
