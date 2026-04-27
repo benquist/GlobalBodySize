@@ -55,6 +55,53 @@ europepmc_plant_trait_queries <- function() {
         'KW:"AusTraits" OR KW:"TRY" OR KW:"BIEN" OR KW:"FRED" OR KW:"LEDA"',
         ')'
       )
+    ),
+    # Full-text BODY: queries — searches methods/results/data descriptor body text.
+    # This catches papers where trait names appear only in the data description,
+    # not in the title, abstract, or keywords.
+    list(
+      label = "epmc_body_leaf_traits",
+      query = paste0(
+        'JOURNAL:"Scientific Data" AND (',
+        'BODY:"specific leaf area" OR BODY:"leaf dry matter content" OR ',
+        'BODY:"leaf nitrogen content" OR BODY:"leaf area index" OR ',
+        'BODY:"leaf thickness" OR BODY:"leaf phosphorus" OR ',
+        'BODY:"leaf carbon" OR BODY:"leaf mass per area"',
+        ')'
+      )
+    ),
+    list(
+      label = "epmc_body_wood_root_traits",
+      query = paste0(
+        'JOURNAL:"Scientific Data" AND (',
+        'BODY:"wood density" OR BODY:"wood specific gravity" OR ',
+        'BODY:"specific root length" OR BODY:"root tissue density" OR ',
+        'BODY:"root length density" OR BODY:"bark thickness" OR ',
+        'BODY:"xylem vessel" OR BODY:"conduit diameter"',
+        ')'
+      )
+    ),
+    list(
+      label = "epmc_body_plant_hydraulics",
+      query = paste0(
+        'JOURNAL:"Scientific Data" AND (',
+        'BODY:"turgor loss point" OR BODY:"hydraulic conductance" OR ',
+        'BODY:"stomatal conductance" OR BODY:"P50" OR BODY:"P88" OR ',
+        'BODY:"vessel diameter" OR BODY:"cavitation resistance"',
+        ')'
+      )
+    ),
+    list(
+      label = "epmc_body_trait_dataset",
+      query = paste0(
+        'JOURNAL:"Scientific Data" AND (',
+        'BODY:"plant trait" OR BODY:"functional trait" OR BODY:"plant functional trait"',
+        ') AND (',
+        'BODY:"elevation gradient" OR BODY:"climate gradient" OR ',
+        'BODY:"vegetation survey" OR BODY:"community weighted mean" OR ',
+        'BODY:"trait database" OR BODY:"trait dataset"',
+        ')'
+      )
     )
   )
 }
@@ -64,14 +111,24 @@ europepmc_plant_trait_queries <- function() {
 # ---------------------------------------------------------------------------
 
 europepmc_build_url <- function(query, cursor_mark = "*", page_size = 1000L) {
+  # EPMC requires spaces encoded as + and double-quotes as %22.
+  # URLencode(reserved=TRUE) over-encodes the colon in field prefixes like JOURNAL:
+  # which causes the API to silently return XML instead of JSON.
+  epmc_encode_query <- function(q) {
+    q <- gsub('"',  '%22', q, fixed = TRUE)
+    q <- gsub(' ',  '+',   q, fixed = TRUE)
+    q <- gsub('(',  '%28', q, fixed = TRUE)
+    q <- gsub(')',  '%29', q, fixed = TRUE)
+    q
+  }
   paste0(
     EPMC_BASE,
-    "?query=",      utils::URLencode(query,       reserved = TRUE),
+    "?query=",      epmc_encode_query(query),
     "&resultType=", "core",
     "&format=",     "json",
     "&pageSize=",   as.integer(page_size),
-    "&cursorMark=", utils::URLencode(cursor_mark, reserved = TRUE),
-    "&email=",      utils::URLencode(EPMC_EMAIL,  reserved = TRUE)
+    "&cursorMark=", utils::URLencode(cursor_mark, reserved = FALSE),
+    "&email=",      utils::URLencode(EPMC_EMAIL,  reserved = FALSE)
   )
 }
 
@@ -79,7 +136,7 @@ europepmc_fetch_page <- function(url) {
   Sys.sleep(0.5)
 
   result <- tryCatch(
-    dryad_run_curl(url),
+    dryad_run_curl(url, headers = list("Accept:application/json")),
     error = function(e) {
       warning(sprintf("europepmc_fetch_page: curl error: %s", conditionMessage(e)))
       NULL
@@ -90,7 +147,7 @@ europepmc_fetch_page <- function(url) {
   if (result$http_code == 429L) {
     warning("europepmc_fetch_page: HTTP 429 — sleeping 30s then retrying.")
     Sys.sleep(30)
-    result <- tryCatch(dryad_run_curl(url), error = function(e) NULL)
+    result <- tryCatch(dryad_run_curl(url, headers = list("Accept:application/json")), error = function(e) NULL)
     if (is.null(result)) return(NULL)
   }
   if (!result$http_code %in% c(200L)) {
