@@ -85,12 +85,20 @@ iu_get_reference_range <- function(trait_key, unit) {
       m2 = list(min = 1e-6, max = 30, cite = "Kattge2020")
     ),
     leaf_n = list(
-      mg_per_g = list(min = 5, max = 80, cite = c("Kattge2020", "Wright2004")),
-      mg_per_cm2 = list(min = 0.05, max = 8, cite = c("Kattge2020", "Wright2004"))
+      mg_per_g   = list(min = 5,    max = 80,  cite = c("Kattge2020", "Wright2004")),
+      mg_per_cm2 = list(min = 0.05, max = 8,   cite = c("Kattge2020", "Wright2004")),
+      # 1% = 10 mg/g, so 5-80 mg/g == 0.5-8%
+      percent    = list(min = 0.5,  max = 8,   cite = c("Kattge2020", "Wright2004")),
+      # g/kg is numerically identical to mg/g
+      g_per_kg   = list(min = 5,    max = 80,  cite = c("Kattge2020", "Wright2004"))
     ),
     leaf_p = list(
-      mg_per_g = list(min = 0.5, max = 10, cite = c("Kattge2020", "Wright2004")),
-      mg_per_cm2 = list(min = 0.005, max = 1, cite = c("Kattge2020", "Wright2004"))
+      mg_per_g   = list(min = 0.5,   max = 10,  cite = c("Kattge2020", "Wright2004")),
+      mg_per_cm2 = list(min = 0.005, max = 1,   cite = c("Kattge2020", "Wright2004")),
+      # 0.5-10 mg/g == 0.05-1%
+      percent    = list(min = 0.05,  max = 1,   cite = c("Kattge2020", "Wright2004")),
+      # g/kg numerically identical to mg/g
+      g_per_kg   = list(min = 0.5,   max = 10,  cite = c("Kattge2020", "Wright2004"))
     ),
     # --- Solution 2: SRL, RTD, p50/p88 additions ---
     # Perez-Harguindeguy 2013 (doi:10.1071/BT12225); Bergmann 2020 (doi:10.1126/sciadv.aba3756)
@@ -115,6 +123,45 @@ iu_get_reference_range <- function(trait_key, unit) {
     p88 = list(
       MPa = list(min = -20, max = -0.1, cite = c("Choat2012", "Maherali2004")),
       bar = list(min = -200, max = -1,  cite = c("Choat2012", "Maherali2004"))
+    ),
+    # Perez-Harguindeguy et al. 2013 (doi:10.1071/BT12225):
+    #   typical 5-40% dry mass in angiosperms, up to ~45% in conifers/grasses.
+    #   Herbaceous, aquatic, or young-tissue samples can be below 5% — the DT
+    #   minimum is set to 0.1% to accommodate the observed data range without
+    #   producing false "low" scores. Values below 0.5% warrant biological review.
+    #   mg/g and g/kg are numerically identical; 1% == 10 mg/g.
+    leaf_lignin = list(
+      percent  = list(min = 0.1,  max = 50,  cite = "PerezHarguindeguy2013"),
+      mg_per_g = list(min = 1,    max = 500, cite = "PerezHarguindeguy2013"),
+      g_per_kg = list(min = 1,    max = 500, cite = "PerezHarguindeguy2013")
+    ),
+    # Tyree & Ewers 1991, Ann Bot 67:115-135 (doi:10.1093/oxfordjournals.aob.a088109).
+    # Ks (stem-specific hydraulic conductivity, path-length normalised).
+    # Range is extremely wide across organ types and species:
+    #   angiosperm stems typically 0.1-20 kg m-1 s-1 MPa-1;
+    #   outer bounds 0.0001-100 span roots to large-stemmed trees.
+    # CAVEAT: upper bound of 100 is rarely exceeded; flag values >50 for review.
+    stem_hydraulic_conductivity = list(
+      kg_per_m_per_s_per_MPa   = list(min = 1e-4, max = 100,     cite = "TyreeEwers1991"),
+      # 1 kg = 1000 g => g range is 1000x larger
+      g_per_m_per_s_per_MPa    = list(min = 0.1,  max = 100000,  cite = "TyreeEwers1991"),
+      # 1 kg/s = 55556 mmol/s (MW water 18 g/mol)
+      mmol_per_m_per_s_per_MPa = list(min = 5.56, max = 5.556e6, cite = "TyreeEwers1991")
+    ),
+    # Bartlett et al. 2012, PNAS 109:10787-10792 (doi:10.1073/pnas.1204680109).
+    # Negative values are biologically expected (water potential).
+    # Global range -0.5 to -4.0 MPa; using -5 as outer bound for outlier tolerance.
+    turgor_loss_point = list(
+      MPa = list(min = -5,  max = -0.3, cite = "Bartlett2012"),
+      # 1 MPa = 10 bar => bar range 10x more negative
+      bar = list(min = -50, max = -3,   cite = "Bartlett2012")
+    ),
+    # Kattge2020; Reich et al. 1997, Am Nat 149:369-422 (doi:10.1086/285996).
+    # Mass-based C:N ratio is dimensionless; most plants 5-100, median ~20.
+    # CAVEAT: extreme outliers (>200) occur in very N-poor soils; cap at 150 for QA.
+    leaf_cn_ratio = list(
+      dimensionless = list(min = 3,  max = 150, cite = c("Kattge2020", "Reich1997")),
+      ratio         = list(min = 3,  max = 150, cite = c("Kattge2020", "Reich1997"))
     )
   )
 
@@ -208,6 +255,61 @@ iu_get_conversion_factor <- function(trait_key, from_unit, to_unit) {
       list(from = "bar", to = "MPa", factor = 0.1),
       list(from = "MPa", to = "bar", factor = 10)
     ),
+    # leaf_n: 1% = 10 mg/g; g/kg = mg/g numerically
+    leaf_n = list(
+      list(from = "percent",   to = "mg_per_g", factor = 10),
+      list(from = "g_per_kg",  to = "mg_per_g", factor = 1),
+      list(from = "mg_per_g",  to = "percent",   factor = 0.1),
+      list(from = "g_per_kg",  to = "percent",   factor = 0.1),
+      list(from = "mg_per_g",  to = "g_per_kg",  factor = 1),
+      list(from = "percent",   to = "g_per_kg",  factor = 10)
+    ),
+    # leaf_p: same scaling as leaf_n
+    leaf_p = list(
+      list(from = "percent",   to = "mg_per_g", factor = 10),
+      list(from = "g_per_kg",  to = "mg_per_g", factor = 1),
+      list(from = "mg_per_g",  to = "percent",   factor = 0.1),
+      list(from = "g_per_kg",  to = "percent",   factor = 0.1),
+      list(from = "mg_per_g",  to = "g_per_kg",  factor = 1),
+      list(from = "percent",   to = "g_per_kg",  factor = 10)
+    ),
+    # leaf_dry_matter_content: add fraction (= g/g)
+    leaf_dry_matter_content_fraction = list(
+      list(from = "fraction",  to = "g_per_g",   factor = 1),
+      list(from = "fraction",  to = "mg_per_g",  factor = 1000),
+      list(from = "fraction",  to = "percent",   factor = 100),
+      list(from = "g_per_g",   to = "fraction",  factor = 1),
+      list(from = "mg_per_g",  to = "fraction",  factor = 0.001),
+      list(from = "percent",   to = "fraction",  factor = 0.01)
+    ),
+    # leaf_lignin: 1% = 10 mg/g = 10 g/kg
+    leaf_lignin = list(
+      list(from = "percent",   to = "mg_per_g", factor = 10),
+      list(from = "percent",   to = "g_per_kg", factor = 10),
+      list(from = "mg_per_g",  to = "percent",  factor = 0.1),
+      list(from = "g_per_kg",  to = "percent",  factor = 0.1),
+      list(from = "mg_per_g",  to = "g_per_kg", factor = 1),
+      list(from = "g_per_kg",  to = "mg_per_g", factor = 1)
+    ),
+    # stem_hydraulic_conductivity: kg<->g (×1000); kg<->mmol (×55556, MW water 18 g/mol)
+    stem_hydraulic_conductivity = list(
+      list(from = "g_per_m_per_s_per_MPa",    to = "kg_per_m_per_s_per_MPa",   factor = 0.001),
+      list(from = "mmol_per_m_per_s_per_MPa", to = "kg_per_m_per_s_per_MPa",   factor = 1 / 55555.6),
+      list(from = "kg_per_m_per_s_per_MPa",   to = "g_per_m_per_s_per_MPa",    factor = 1000),
+      list(from = "mmol_per_m_per_s_per_MPa", to = "g_per_m_per_s_per_MPa",    factor = 1000 / 55555.6),
+      list(from = "kg_per_m_per_s_per_MPa",   to = "mmol_per_m_per_s_per_MPa", factor = 55555.6),
+      list(from = "g_per_m_per_s_per_MPa",    to = "mmol_per_m_per_s_per_MPa", factor = 55.556)
+    ),
+    # turgor_loss_point: 1 MPa = 10 bar
+    turgor_loss_point = list(
+      list(from = "bar", to = "MPa", factor = 0.1),
+      list(from = "MPa", to = "bar", factor = 10)
+    ),
+    # leaf_cn_ratio: dimensionless and ratio are identical
+    leaf_cn_ratio = list(
+      list(from = "ratio",         to = "dimensionless", factor = 1),
+      list(from = "dimensionless", to = "ratio",         factor = 1)
+    ),
     photosynthetic_rate = list(
       list(from = "mmol_per_m2_per_s", to = "umol_per_m2_per_s", factor = 1000),
       list(from = "mol_per_m2_per_s", to = "umol_per_m2_per_s", factor = 1e6),
@@ -300,13 +402,19 @@ iu_scan_unit_variants <- function(trait_key) {
     photosynthetic_rate = c("umol_per_m2_per_s", "mmol_per_m2_per_s", "mol_per_m2_per_s"),
     seed_mass = c("mg", "g", "kg"),
     leaf_area = c("mm2", "cm2", "m2"),
-    leaf_n = c("mg_per_g", "mg_per_cm2"),
-    leaf_p = c("mg_per_g", "mg_per_cm2"),
+    leaf_n = c("mg_per_g", "mg_per_cm2", "percent", "g_per_kg"),
+    leaf_p = c("mg_per_g", "mg_per_cm2", "percent", "g_per_kg"),
+    leaf_dry_matter_content = c("mg_per_g", "g_per_g", "percent", "fraction"),
     # Solution 2 additions
     specific_root_length = c("m_per_g", "cm_per_g", "km_per_kg"),
     root_tissue_density  = c("g_per_cm3", "mg_per_cm3", "kg_per_m3"),
     p50 = c("MPa", "bar"),
-    p88 = c("MPa", "bar")
+    p88 = c("MPa", "bar"),
+    # Solution 7 additions
+    leaf_lignin                 = c("percent", "mg_per_g", "g_per_kg"),
+    stem_hydraulic_conductivity = c("kg_per_m_per_s_per_MPa", "g_per_m_per_s_per_MPa", "mmol_per_m_per_s_per_MPa"),
+    turgor_loss_point           = c("MPa", "bar"),
+    leaf_cn_ratio               = c("dimensionless", "ratio")
   )
 
   variants <- variants_map[[trait_key]]
@@ -405,7 +513,12 @@ iu_infer_unit_by_decision_tree <- function(
     specific_root_length = "m_per_g",
     root_tissue_density  = "g_per_cm3",
     p50 = "MPa",
-    p88 = "MPa"
+    p88 = "MPa",
+    # Solution 7 additions
+    leaf_lignin                 = "percent",
+    stem_hydraulic_conductivity = "kg_per_m_per_s_per_MPa",
+    turgor_loss_point           = "MPa",
+    leaf_cn_ratio               = "dimensionless"
   )
 
   # Solution 3: Categorical trait early-exit — no unit to infer
@@ -522,6 +635,18 @@ iu_infer_unit_by_decision_tree <- function(
   }
 
   # ========== STEP 5: Try unit VARIANTS (same trait, different unit scale) ==========
+  #
+  # Correct inference direction: ask "does the raw value fall directly within the
+  # biologically expected range for each candidate unit?"
+  #
+  # For each candidate unit C:
+  #   If median_value ∈ C's reference range → raw data is plausibly in unit C.
+  #   Report conversion_factor = C→canonical so downstream code can normalize.
+  #
+  # This is more robust than computing canonical→C first (which fails when values
+  # are at biological extremes and the ranges are not strictly proportional), and
+  # naturally excludes units that lack a conversion path to canonical (e.g.,
+  # mg_per_cm2 for leaf N, which requires LMA to bridge mass and area bases).
   unit_variants <- iu_scan_unit_variants(canonical_trait_key)
   variant_matches <- character(0)
   variant_factors <- numeric(0)
@@ -531,19 +656,19 @@ iu_infer_unit_by_decision_tree <- function(
       next
     }
 
-    conversion_factor <- iu_get_conversion_factor(canonical_trait_key, assumed_canonical_unit, candidate_unit)
-    if (is.na(conversion_factor)) {
+    # Only consider candidates with a defined C→canonical conversion factor;
+    # this implicitly excludes incompatible bases (e.g., area-based vs mass-based).
+    reverse_factor <- iu_get_conversion_factor(canonical_trait_key, candidate_unit, assumed_canonical_unit)
+    if (is.na(reverse_factor)) {
       next
     }
 
-    converted_median <- median_value * conversion_factor
     candidate_range <- iu_get_reference_range(canonical_trait_key, candidate_unit)
-
     if (!is.na(candidate_range$min) && !is.na(candidate_range$max)) {
-      if (converted_median >= candidate_range$min &&
-          converted_median <= candidate_range$max) {
+      if (median_value >= candidate_range$min &&
+          median_value <= candidate_range$max) {
         variant_matches <- c(variant_matches, candidate_unit)
-        variant_factors <- c(variant_factors, conversion_factor)
+        variant_factors <- c(variant_factors, reverse_factor)  # C→canonical, for normalization
       }
     }
   }
@@ -551,15 +676,15 @@ iu_infer_unit_by_decision_tree <- function(
   # Exactly one variant matches → high confidence with inferred unit
   if (length(variant_matches) == 1) {
     return(list(
-      inferred_unit = assumed_canonical_unit,  # canonical unit key
+      inferred_unit = assumed_canonical_unit,  # normalize to canonical unit
       confidence = "high",
       evidence = "UNIT_VARIANT_FOUND",
       candidate_units = unit_variants,
-      conversion_factor = variant_factors[[1]],
+      conversion_factor = variant_factors[[1]],  # apply to raw values to get canonical
       reciprocal = FALSE,
       reason = sprintf(
-        "Median value %.4g matches unit scale %s with conversion factor %.4g.",
-        median_value, variant_matches[[1]], variant_factors[[1]]
+        "Median value %.4g in range for unit %s; conversion factor %.4g to %s.",
+        median_value, variant_matches[[1]], variant_factors[[1]], assumed_canonical_unit
       ),
       citation_keys = iu_get_reference_range(canonical_trait_key, variant_matches[[1]])$cite
     ))
