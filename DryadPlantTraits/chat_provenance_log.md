@@ -74,3 +74,9 @@ Source session: current workspace session
 Outcome: Added provider-common schema/helpers, provider-specific ingest modules and CLIs, multisource merge script with legacy Dryad sync adapter, and a lightweight smoke script. Existing Dryad scripts were left intact.
 
 2026-04-26 | Started harvested unit inference workflow using DryadPlantTraits/R/infer_units.R on DryadPlantTraits/output/compiled_trait_observations.csv. Fixed NA trait-key guard in iu_detect_explicit_unit (commit b4f399a). Successful run produced DryadPlantTraits/output/compiled_trait_observations_with_unit_inference.csv and DryadPlantTraits/output/unit_inference_summary.csv with counts: rows=414226, high=241648, medium=107578, low=5160, none=59840.
+
+8. Date: 2026-04-26
+Prompt: DT S5 — implement unit inference additions in infer_units_decision_tree.R and infer_units.R for 7 problem traits (leaf_n, leaf_p, leaf_lignin, leaf_cn_ratio, stem_hydraulic_conductivity, turgor_loss_point, leaf_dry_matter_content) with biologically validated range bounds, conversion factors, unit variant aliases, and canonical unit assignments; re-run QA pipeline; confirm all 7 now high or near-high confidence.
+Source session: current workspace session
+Commit: 9dc70b8
+Outcome: All 7 target traits now achieve high or near-high confidence in the decision tree; committed and pushed to origin/master; always-gate verified PASS.
