@@ -1378,3 +1378,5 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-04-28 | "For enquistlab.github.io/research/ add links for the three BIEN Shiny apps (bien-species-shinyapp, bien-traits-shinyapp, bien-data-loader) with short descriptions and links to their GitHub READMEs." — Added BIEN Interactive Apps grid section to _pages/research.md with three app cards (Species Explorer, Traits Explorer, Data Loader), each with launch link, short description, and GitHub README link. Pushed as 3e4ffad to origin/main (EnquistLab/enquistlab.github.io).
 
 2026-04-28 | "Push this project to random_BIEN_species_Climate and write a detailed README; confirm HTML status" — completed random_BIEN_species multivariate report (.Rmd + rendered .html), expanded README with methods/citations, and prepared subtree push for project-only remote.
+
+2026-04-28 | User asked: 'what is the name of the .rmd and .html file?' — confirmed report filenames in random_BIEN_species project.
