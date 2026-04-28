@@ -124,10 +124,10 @@ releases <- list(
 
 gh_release_create <- function(tag, title, notes, repo) {
   rc      <- system2(GH,
-                     args   = c("release", "create", tag,
-                                "--repo",  repo,
-                                "--title", title,
-                                "--notes", notes,
+                     args   = c("release", "create", shQuote(tag),
+                                paste0("--repo=",  repo),
+                                paste0("--title=", shQuote(title)),
+                                paste0("--notes=", shQuote(notes)),
                                 "--prerelease"),
                      stdout = TRUE, stderr = TRUE)
   status  <- attr(rc, "status")
@@ -173,8 +173,9 @@ for (i in seq_along(upload_files)) {
   tag   <- upload_tags[[i]]
   cat(sprintf("[upload] %s -> %s ...\n", basename(fpath), tag))
   rc     <- system2(GH,
-                    args   = c("release", "upload", tag, fpath,
-                               "--repo", repo, "--clobber"),
+                    args   = c("release", "upload", shQuote(tag), shQuote(fpath),
+                               paste0("--repo=", repo),
+                               "--clobber"),
                     stdout = TRUE, stderr = TRUE)
   status <- attr(rc, "status")
   if (is.null(status) || status == 0L) {
