@@ -133,7 +133,7 @@ append_log_row <- function(row_list, first_flag) {
     append = !first_flag, col.names = first_flag,
     qmethod = "double"
   )
-  invisible(df)
+  invisible(FALSE)
 }
 
 # Download a single file by URL into download_dir.
