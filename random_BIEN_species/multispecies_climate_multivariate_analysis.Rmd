@@ -1,0 +1,344 @@
+---
+title: "Random BIEN Species: Multi-Species Climate and Multivariate Analysis"
+author: "BIEN Climate Workflow"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+---
+
+## Analysis Objective
+
+This report samples several random species from BIEN, keeps species with at least 50 cleaned occurrence records, extracts WorldClim climate variables, and performs multivariate climate analyses.
+
+The response model choice for constrained ordination follows gradient-length guidance from direct gradient analysis: use DCA axis-1 length as the diagnostic for linear (RDA) versus unimodal (CCA) methods.
+
+- ter Braak, C.J.F. and Prentice, I.C. (1988). A theory of gradient analysis. Advances in Ecological Research 18:271-317. https://doi.org/10.1016/S0065-2504(08)60183-X
+- ter Braak, C.J.F. (1986). Canonical Correspondence Analysis: a new eigenvector technique for multivariate direct gradient analysis. Ecology 67:1167-1179. https://doi.org/10.2307/1938672
+
+## Data Sources and Method Citations
+
+- BIEN data access:
+  Maitner, B.S., et al. (2018). The BIEN R package: A tool to access the Botanical Information and Ecology Network (BIEN) database. Methods in Ecology and Evolution 9:373-379. https://doi.org/10.1111/2041-210X.12861
+- WorldClim climate layers:
+  Fick, S.E. and Hijmans, R.J. (2017). WorldClim 2: New 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology 37:4302-4315. https://doi.org/10.1002/joc.5086
+- Hellinger transformation before linear ordination:
+  Legendre, P. and Gallagher, E.D. (2001). Ecologically meaningful transformations for ordination of species data. Oecologia 129:271-280. https://doi.org/10.1007/s004420100716
+- Permutation-based forward selection rationale:
+  Blanchet, F.G., Legendre, P. and Borcard, D. (2008). Forward selection of explanatory variables. Ecology 89:2623-2632. https://doi.org/10.1890/07-0986.1
+
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(vegan)
+
+source("R/utils.R")
+source("R/data_access.R")
+source("R/cleaning.R")
+source("R/climate.R")
+
+cfg <- read_config("config.yml")
+set.seed(as.integer(cfg$seed))
+
+ensure_directory("outputs")
+ensure_directory("outputs/multispecies")
+```
+
+## 1. Random Species Selection (>= 50 Cleaned Occurrences)
+
+```{r select-species}
+min_clean_records <- 50L
+target_species_n <- 5L
+max_attempts <- 80L
+
+species_pool <- get_species_pool(cfg)
+tried <- character(0)
+selected_list <- list()
+attempt_log <- list()
+
+for (i in seq_len(max_attempts)) {
+  available <- setdiff(species_pool, tried)
+  if (length(available) == 0 || length(selected_list) >= target_species_n) break
+
+  sp <- sample(available, size = 1)
+  tried <- c(tried, sp)
+
+  rec <- tryCatch({
+    raw <- fetch_occurrences(sp, occurrence_limit = as.integer(cfg$occurrence_limit))
+    cln <- qa_clean_occurrences(raw)
+    list(ok = TRUE, raw = raw, cleaned = cln)
+  }, error = function(e) {
+    list(ok = FALSE, msg = conditionMessage(e))
+  })
+
+  if (!isTRUE(rec$ok)) {
+    attempt_log[[length(attempt_log) + 1]] <- data.frame(
+      attempt = i,
+      species = sp,
+      n_raw = 0L,
+      n_clean = 0L,
+      eligible = FALSE,
+      message = rec$msg,
+      stringsAsFactors = FALSE
+    )
+    next
+  }
+
+  n_raw <- nrow(rec$raw)
+  n_clean <- nrow(rec$cleaned$data)
+  eligible <- n_clean >= min_clean_records
+
+  attempt_log[[length(attempt_log) + 1]] <- data.frame(
+    attempt = i,
+    species = sp,
+    n_raw = n_raw,
+    n_clean = n_clean,
+    eligible = eligible,
+    message = "ok",
+    stringsAsFactors = FALSE
+  )
+
+  if (eligible) {
+    rec$cleaned$data$species <- sp
+    selected_list[[sp]] <- rec$cleaned$data
+  }
+}
+
+attempt_df <- bind_rows(attempt_log)
+write_csv(attempt_df, "outputs/multispecies/selection_attempts_multispecies.csv")
+
+selected_species <- names(selected_list)
+if (length(selected_species) < 3) {
+  stop("Fewer than 3 eligible species found with >= 50 cleaned records. Increase candidate pool or attempts.")
+}
+
+selected_summary <- attempt_df %>%
+  filter(species %in% selected_species, eligible) %>%
+  group_by(species) %>%
+  slice_tail(n = 1) %>%
+  ungroup() %>%
+  arrange(desc(n_clean))
+
+write_csv(selected_summary, "outputs/multispecies/selected_species_multispecies.csv")
+selected_summary
+```
+
+## 2. Climate Extraction for Selected Species
+
+```{r climate-extract}
+occ_all <- bind_rows(selected_list)
+
+bio_vars <- c(1, 4, 12, 15)
+bio_names <- resolve_bio_var_names(bio_vars)
+
+bio_rasters <- get_worldclim_bio(
+  worldclim_res = cfg$worldclim_res,
+  cache_dir = "outputs/worldclim_cache",
+  bio_vars = bio_vars
+)
+
+occ_climate <- extract_climate_values(occ_all, bio_rasters)
+occ_climate <- occ_climate %>%
+  mutate(across(all_of(bio_names), as.numeric)) %>%
+  filter(if_all(all_of(bio_names), is.finite))
+
+write_csv(occ_climate, "outputs/multispecies/occurrences_with_climate_multispecies.csv")
+
+occ_climate %>%
+  count(species, name = "n_points") %>%
+  arrange(desc(n_points))
+```
+
+## 3. Climate Plots for Several Random Species
+
+```{r climate-plots, fig.width=11, fig.height=8}
+p1 <- ggplot(occ_climate, aes(x = BIO1, y = BIO12, color = species)) +
+  geom_point(alpha = 0.35, size = 0.8) +
+  geom_density_2d(alpha = 0.5) +
+  facet_wrap(~ species, scales = "free") +
+  theme_minimal(base_size = 11) +
+  labs(
+    title = "Realized Climate Space by Species",
+    subtitle = "BIO1 (Annual Mean Temperature x10) vs BIO12 (Annual Precipitation)",
+    x = "BIO1",
+    y = "BIO12"
+  ) +
+  guides(color = "none")
+
+p1
+
+ggsave(
+  filename = "outputs/multispecies/plot_climate_space_facet.png",
+  plot = p1,
+  width = 12,
+  height = 8,
+  dpi = 300
+)
+```
+
+## 4. PCA of Climate Conditions Across Occurrences
+
+```{r pca, fig.width=9, fig.height=7}
+clim_mat <- as.data.frame(scale(occ_climate[, bio_names, drop = FALSE]))
+pca_fit <- prcomp(clim_mat, center = FALSE, scale. = FALSE)
+
+pca_scores <- data.frame(
+  PC1 = pca_fit$x[, 1],
+  PC2 = pca_fit$x[, 2],
+  species = occ_climate$species
+)
+
+pca_var <- summary(pca_fit)$importance[2, 1:2]
+
+p2 <- ggplot(pca_scores, aes(PC1, PC2, color = species)) +
+  geom_point(alpha = 0.5, size = 1.0) +
+  stat_ellipse(level = 0.80, linewidth = 0.6) +
+  theme_minimal(base_size = 11) +
+  labs(
+    title = "PCA of Climate Variables at Occurrence Points",
+    subtitle = sprintf("Explained variance: PC1 = %.1f%%, PC2 = %.1f%%", 100 * pca_var[1], 100 * pca_var[2])
+  )
+
+p2
+
+ggsave(
+  filename = "outputs/multispecies/plot_pca_climate.png",
+  plot = p2,
+  width = 10,
+  height = 7,
+  dpi = 300
+)
+```
+
+## 5. Gradient-Length Check and Constrained Ordination (ter Braak Logic)
+
+```{r dca-rda-cca, fig.width=9, fig.height=7}
+# Community matrix: rows = occurrence sites, columns = species membership.
+# Each row has one observed species in this workflow.
+comm <- model.matrix(~ species - 1, data = occ_climate)
+colnames(comm) <- sub("^species", "", colnames(comm))
+
+# DCA axis length diagnostic
+# Rule of thumb used:
+#   >4 SD: unimodal methods (CCA)
+#   2-4 SD: compare both
+#   <2 SD: linear methods (RDA)
+dca_fit <- decorana(comm)
+
+axis1_length <- NA_real_
+if (!is.null(dca_fit$rproj) && ncol(dca_fit$rproj) >= 1) {
+  # In current vegan versions, summary.decorana is defunct.
+  # We estimate gradient length as the observed range of DCA1 site scores.
+  axis1_length <- diff(range(dca_fit$rproj[, 1], na.rm = TRUE))
+}
+
+env <- occ_climate[, bio_names, drop = FALSE]
+for (v in names(env)) env[[v]] <- as.numeric(env[[v]])
+
+comm_hell <- decostand(comm, method = "hellinger")
+
+rda_fit <- rda(comm_hell ~ BIO1 + BIO4 + BIO12 + BIO15, data = env)
+cca_fit <- cca(comm ~ BIO1 + BIO4 + BIO12 + BIO15, data = env)
+
+anova_rda <- anova.cca(rda_fit, permutations = 999)
+anova_cca <- anova.cca(cca_fit, permutations = 999)
+
+r2_rda <- RsquareAdj(rda_fit)$adj.r.squared
+r2_cca <- RsquareAdj(cca_fit)$adj.r.squared
+
+method_decision <- if (is.finite(axis1_length)) {
+  if (axis1_length > 4) {
+    "CCA preferred (unimodal response expected)"
+  } else if (axis1_length < 2) {
+    "RDA preferred (linear response expected)"
+  } else {
+    "Intermediate (2-4): compare RDA and CCA"
+  }
+} else {
+  "DCA axis length not available; compare RDA and CCA by permutation and adjusted R2"
+}
+
+method_table <- data.frame(
+  metric = c("DCA axis-1 length (SD units)", "Decision", "RDA adjusted R2", "RDA permutation p", "CCA adjusted R2", "CCA permutation p"),
+  value = c(
+    ifelse(is.finite(axis1_length), sprintf("%.3f", axis1_length), "NA"),
+    method_decision,
+    sprintf("%.4f", r2_rda),
+    sprintf("%.4f", anova_rda$`Pr(>F)`[1]),
+    sprintf("%.4f", r2_cca),
+    sprintf("%.4f", anova_cca$`Pr(>F)`[1])
+  ),
+  stringsAsFactors = FALSE
+)
+
+write_csv(method_table, "outputs/multispecies/method_decision_table.csv")
+method_table
+```
+
+```{r ordination-plot, fig.width=9, fig.height=7}
+# Plot the method selected by the DCA rule; if intermediate, use the model
+# with higher adjusted R2 as the display model.
+use_rda <- TRUE
+if (is.finite(axis1_length)) {
+  if (axis1_length > 4) {
+    use_rda <- FALSE
+  } else if (axis1_length >= 2 && axis1_length <= 4) {
+    use_rda <- is.finite(r2_rda) && is.finite(r2_cca) && (r2_rda >= r2_cca)
+  }
+}
+
+if (use_rda) {
+  ord_fit <- rda_fit
+  ord_name <- "RDA"
+} else {
+  ord_fit <- cca_fit
+  ord_name <- "CCA"
+}
+
+site_scores <- as.data.frame(scores(ord_fit, display = "sites", scaling = 2))
+site_scores$species <- occ_climate$species
+
+axis_names <- names(site_scores)[1:2]
+
+p_ord <- ggplot(site_scores, aes_string(x = axis_names[1], y = axis_names[2], color = "species")) +
+  geom_point(alpha = 0.45, size = 1.0) +
+  stat_ellipse(level = 0.80, linewidth = 0.6) +
+  theme_minimal(base_size = 11) +
+  labs(
+    title = paste0(ord_name, " site scores (scaling = 2)"),
+    subtitle = "Constrained ordination of species membership by climate predictors"
+  )
+
+p_ord
+
+ggsave(
+  filename = paste0("outputs/multispecies/plot_ordination_", tolower(ord_name), ".png"),
+  plot = p_ord,
+  width = 10,
+  height = 7,
+  dpi = 300
+)
+```
+
+## 6. Notes on Interpretation and Limits
+
+- This is a correlative climate-space analysis and constrained ordination exercise, not a causal model of species performance.
+- Occurrence records may retain spatial bias and georeferencing uncertainty.
+- In this workflow, one species is observed per record row; constrained ordination therefore reflects climate separation among species occurrence clouds rather than full co-occurrence community structure.
+
+## Session Outputs
+
+The analysis writes:
+
+- `outputs/multispecies/selection_attempts_multispecies.csv`
+- `outputs/multispecies/selected_species_multispecies.csv`
+- `outputs/multispecies/occurrences_with_climate_multispecies.csv`
+- `outputs/multispecies/method_decision_table.csv`
+- `outputs/multispecies/plot_climate_space_facet.png`
+- `outputs/multispecies/plot_pca_climate.png`
+- `outputs/multispecies/plot_ordination_rda.png` or `outputs/multispecies/plot_ordination_cca.png`

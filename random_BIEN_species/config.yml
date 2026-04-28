@@ -1,0 +1,25 @@
+seed: 20260428
+min_records: 100
+max_random_attempts: 12
+candidate_pool_size: 300
+occurrence_limit: 20000
+worldclim_res: 10
+bio_vars:
+  - 1
+  - 12
+families_pool:
+  - Asteraceae
+  - Fabaceae
+  - Poaceae
+  - Rosaceae
+  - Orchidaceae
+  - Rubiaceae
+  - Myrtaceae
+  - Solanaceae
+  - Euphorbiaceae
+  - Lamiaceae
+plot:
+  bins: 45
+  width: 8
+  height: 6
+  dpi: 300
