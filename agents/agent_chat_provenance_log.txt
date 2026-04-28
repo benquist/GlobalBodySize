@@ -1,3 +1,10 @@
+[17] Date: 2026-04-28
+Source: active chat request
+Request summary: Create a new agent specializing in multivariate statistics, inspired by the published work of Cajo J.F. ter Braak.
+Files affected: agents/ter-braak-multivariate.agent.md (created)
+Action taken: Created ter-braak-multivariate agent with full citation standard, method selection logic (gradient length → unimodal vs. linear), CCA/RDA/partial ordination checklist, transformation guidance, scaling/biplot rules, variance partitioning protocol, common pitfall warnings, and structured output format.
+Outcome: New agent available for multivariate ordination and community ecology statistics tasks.
+
 [16] Date: 2026-04-26
 Source: active chat request
 Request summary: Review planned post-compile DryadPlantTraits trait QA design and return biodiversity-science standards requirements with mandatory citation-gap analysis.
@@ -78,6 +85,17 @@ Guides future work:
 
 Entry Template
 --------------
+
+[17] Date: 2026-04-27
+Source: active chat request
+Request summary: Strategy-only recovery plan for failing DryadPlantTraits Scientific Data discovery pipeline; mandatory final gate required prompt provenance update.
+Files affected:
+  /Users/brianjenquist/VSCode/agents/prompt_log.md (updated)
+  /Users/brianjenquist/VSCode/agents/agent_chat_provenance_log.txt (this file, updated)
+Action taken:
+  - Appended prompt provenance entry to satisfy required always-gate check.
+  - Recorded this agent-folder update in append-only agent provenance log.
+Outcome: Agent provenance remains current for this chat.
 [N] Date: YYYY-MM-DD [time optional]
 Source: active chat | git commit | other evidence
 Request summary: ...
@@ -1034,3 +1052,5 @@ Action taken:
 - Committed as 9dc70b8 and pushed to origin/master.
 - Ran always-gate final checks; all checks passed.
 Outcome: DT S5 complete; all 7 problem traits now handled with biologically validated bounds, unit variant scanning, and canonical unit assignment.
+2026-04-28 | always-gate run: appended required session prompt entry to agents/prompt_log.md; verified no Rmd/DESCRIPTION changes; committed and pushed Zenodo scorer+compile updates in DryadPlantTraits.
+2026-04-28 | m-agent | CV redesign task — orchestrated changes to enquistlab-site-migration: _pages/cv.md (nav, description), _data/cv.yml (Academic Interests section, expanded Awards/Publications), _sass/_cv.scss (print CSS), assets/css/main.scss (@use cv). No agent files changed. commit 54b76e5 on EnquistLab/enquistlab.github.io main.
