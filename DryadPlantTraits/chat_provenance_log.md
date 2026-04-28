@@ -80,3 +80,9 @@ Prompt: DT S5 — implement unit inference additions in infer_units_decision_tre
 Source session: current workspace session
 Commit: 9dc70b8
 Outcome: All 7 target traits now achieve high or near-high confidence in the decision tree; committed and pushed to origin/master; always-gate verified PASS.
+
+9. Date: 2026-04-28
+Prompt: Push the compiled data (harvested traits + unit-standardized traits) to the GitHub repo benquist/DataDryad using GitHub releases so large files do not count against repo size. Use parquet via arrow, compressed.
+Source session: current workspace session
+Commit: 2dff677
+Outcome: Created DryadPlantTraits/scripts/release_to_github.R — reads CSVs with data.table::fread, writes parquet via arrow::write_parquet (zstd compression level 3, not gzip — zstd chosen as it is natively supported by arrow/pandas/DuckDB and yields smaller files at faster read/write speeds than gzip; functionally equivalent for all downstream readers). Two GitHub pre-releases created on benquist/DataDryad: v1-traits-full (dryadplanttraits_v1_full.parquet, 6.9 MB, 414K rows, 58 cols from compiled_trait_observations_with_unit_inference.csv) and v1-traits-qa (dryadplanttraits_v1_qa_scored.parquet 12.5 MB 471K rows, dryadplanttraits_v1_qa_keep.parquet 0.1 MB, dryadplanttraits_v1_qa_keep.csv 12.9 MB). Script committed and pushed to both origin (biodiversity-agents-lab) and datadryad (DataDryad). Script supports --dry-run, --output-dir, --repo flags.
