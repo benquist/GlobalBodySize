@@ -1,3 +1,7 @@
+2026-04-28 | "Task: Update /Users/brianjenquist/VSCode/Literature_Data_To_BIENdb pipeline for Jennings 2026 to include richer occurrence extraction and trait separation. Requirements: inspect source/scripts; expand normalized+staging occurrence fields for ViewFullOccurance alignment; include GNRS political units; create separate habit/growth-form trait output (or explicit empty file); update README mapping notes; rerun jennings_2026 and report non-missing counts for lat/lon/elev/political/habit; update provenance logs."
+
+2026-04-28 | "please generate a .rmd and .html file summarizing a breakdown of the data for each project DataDryad, Zenoto, Scientific Data, and what data sources (citations) go into each, breakdown summary by trait too and any other summary you think would be important including trait unit reconciliation and confidense. Please give me a shorter summary here" — Updated DryadPlantTraits/reports/dryad_trait_harvest_summary.Rmd from a Dryad-only summary into a cross-provider DataDryad/Zenodo/Scientific Data report with provider overview, source/citation breakdowns, trait summaries, unit-reconciliation/confidence sections, QA and geographic summaries, dynamic key takeaways, and rendered HTML output at DryadPlantTraits/reports/dryad_trait_harvest_summary.html.
+
 2026-04-28 | "Final pre-return gate re-check after provenance fix"
 
 2026-04-28 | "Final pre-return gate check for this task."
@@ -258,6 +262,7 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## Entry Template
 - Date:
 - Prompt summary:
+2026-04-28 | "We forgot latitude and longitude for each observation as well as elevation. I think we need to start over." Work only in Literature_Data_To_BIENdb; audit coordinate/elevation handling, implement parser variants, force rebuild jennings_2026 outputs with explicit coord/elev columns, validate non-missing counts, update README/provenance, commit+push only Literature_Data_To_BIENdb changes.
 - Requested outcomes:
 
 2026-04-24 | BIENDataLoader: Add GVS (Geocoordinate Validation Service) and NSR (Native Species Resolver) as steps 3 and 4 in the BIEN web services pipeline after TNRS and GNRS. Confirmed endpoints from ojalaquellueva GitHub: GVS at gvsapi.xyz/gvs_api.php (unkeyed lat/lon array), NSR at nsrapi.xyz/nsr_wsb.php (5-col taxon/country/state/county/user_id). Implemented observers, tab panels, download scripts, writeback (native_status), zip export inclusion. Commit 3170b78, pushed, deployed.

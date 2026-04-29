@@ -1,5 +1,6 @@
 ---
-title: "DryadPlantTraits: Trait Harvest Summary"
+title: "Cross-Provider Plant Trait Harvest Summary"
+subtitle: "DataDryad | Zenodo | Scientific Data"
 author: "DryadPlantTraits Pipeline"
 date: "`r Sys.Date()`"
 output:
@@ -7,229 +8,394 @@ output:
     toc: true
     toc_float: true
     theme: flatly
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 9, fig.height = 5)
+
+library(data.table)
+library(ggplot2)
 
 # Detect project root by walking up until R/dryad_api.R is found
 find_dryad_root <- function(start = getwd()) {
   path <- normalizePath(start, mustWork = FALSE)
-  for (i in seq_len(10)) {
+  for (i in seq_len(12)) {
     if (file.exists(file.path(path, "R", "dryad_api.R"))) return(path)
     parent <- dirname(path)
     if (parent == path) break
     path <- parent
   }
-  stop("Could not locate DryadPlantTraits project root from: ", start)
+  # fall back to the parent of the reports/ directory (= DryadPlantTraits/)
+  normalizePath(file.path(knitr::current_input(dir = TRUE), ".."),
+                mustWork = FALSE)
 }
 proj_root <- find_dryad_root()
 
-source(file.path(proj_root, "R", "dryad_api.R"))
-source(file.path(proj_root, "R", "search_terms.R"))
-source(file.path(proj_root, "R", "candidate_filter.R"))
-source(file.path(proj_root, "R", "trait_dictionary.R"))
-source(file.path(proj_root, "R", "standardize_records.R"))
-
 kable_styled <- function(df, caption = NULL) {
-  tbl <- knitr::kable(df, caption = caption, format = "html")
-  result <- tryCatch(
-    kableExtra::kable_styling(tbl, bootstrap_options = c("striped", "hover", "condensed"),
-                              full_width = FALSE),
-    error = function(e) tbl
-  )
-  result
-}
-```
-
-## Overview
-
-**DryadPlantTraits** is a pipeline for discovering, downloading, and standardising plant functional trait data from [Dryad](https://datadryad.org). It targets ten well-studied traits drawn from an AusTraits-inspired vocabulary (leaf area, SLA, LDMC, leaf N/P, wood density, stem specific density, seed mass, plant height, leaf thickness) and maps them to the BIEN observation model for direct upload into the BIEN plant trait database.
-
-The pipeline proceeds in three stages:
-
-1. **Discovery** — `discover_dryad_plant_traits.R` searches the Dryad API with keyword seed terms and scores candidate datasets using `R/candidate_filter.R`.
-2. **Download & compile** — `compile_downloaded_traits.R` downloads scored datasets (requires `DRYAD_API_TOKEN`), extracts trait columns via `R/trait_dictionary.R`, and writes `output/compiled_trait_observations.csv` in the BIEN schema.
-3. **Upload** — the compiled CSV is validated and submitted to BIEN using the schema defined in `output/bien_trait_upload_template.csv`.
-
----
-
-## Trait Dictionary
-
-```{r trait-dictionary}
-trait_dict <- tryCatch(
-  dryad_read_trait_dictionary(),
-  error = function(e) {
-    message("Could not load trait dictionary: ", conditionMessage(e))
-    data.frame()
+  df_fmt <- as.data.frame(df, stringsAsFactors = FALSE)
+  num_cols <- vapply(df_fmt, is.numeric, logical(1))
+  if (any(num_cols)) {
+    df_fmt[num_cols] <- lapply(df_fmt[num_cols], function(x) {
+      out <- format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+      out[is.na(x)] <- NA_character_
+      out
+    })
   }
-)
-
-if (nrow(trait_dict) > 0) {
-  kable_styled(trait_dict, caption = "Trait dictionary (data/trait_dictionary_starter.csv)")
-} else {
-  cat("Trait dictionary unavailable.")
+  tbl <- knitr::kable(df_fmt, caption = caption, format = "html")
+  if (requireNamespace("kableExtra", quietly = TRUE)) {
+    tryCatch(
+      kableExtra::kable_styling(tbl,
+        bootstrap_options = c("striped", "hover", "condensed"),
+        full_width = FALSE),
+      error = function(e) tbl
+    )
+  } else {
+    tbl
+  }
 }
+
+# -------------------------------------------------------------------------
+# File paths
+# -------------------------------------------------------------------------
+paths <- list(
+  dryad   = file.path(proj_root, "output/compiled_trait_observations_with_unit_inference.csv"),
+  zenodo  = file.path(proj_root, "output/providers/zenodo/compiled_trait_observations_with_unit_inference.csv"),
+  scidata = file.path(proj_root, "output/providers/scientific_data/compiled_trait_observations_with_unit_inference.csv")
+)
+provider_labels <- c(dryad = "DataDryad", zenodo = "Zenodo", scidata = "Scientific Data")
+
+# Explicit file existence checks before loading
+for (.k in names(paths)) {
+  if (!file.exists(paths[[.k]])) {
+    stop(
+      "Missing provider file: ", provider_labels[[.k]],
+      "\n  Expected: ", paths[[.k]]
+    )
+  }
+}
+
+read_provider <- function(path, key) {
+  d <- fread(path, data.table = TRUE)
+  d[, provider := provider_labels[[key]]]
+  d
+}
+
+dat_list <- lapply(names(paths), function(k) read_provider(paths[[k]], k))
+names(dat_list) <- names(paths)
 ```
 
 ---
 
-## Harvestable Traits by Functional Category
+## Key Takeaways
 
-```{r traits-by-category}
-# Query Dryad once per trait-specific search term to get dataset counts
-seed_terms <- dryad_search_seed_terms()
+```{r key-takeaways}
+total_rows   <- sum(sapply(dat_list, nrow))
+total_traits <- length(unique(unlist(lapply(dat_list, function(d) unique(d$trait_name)))))
+total_taxa   <- length(unique(unlist(lapply(dat_list, function(d) unique(d$scrubbed_species_binomial)))))
 
-counts <- vapply(seed_terms$query_term, function(term) {
-  result <- tryCatch({
-    parsed <- dryad_search_datasets(q = term, per_page = 1L, page = 1L)
-    total <- parsed[["total"]]
-    if (is.null(total)) NA_integer_ else as.integer(total)
-  }, error = function(e) NA_integer_)
-  Sys.sleep(0.5)
-  result
-}, integer(1))
+coord_count <- function(d) {
+  lat <- suppressWarnings(as.numeric(d$latitude))
+  lon <- suppressWarnings(as.numeric(d$longitude))
+  sum(is.finite(lat) & is.finite(lon), na.rm = TRUE)
+}
+total_coords <- sum(sapply(dat_list, coord_count))
 
-seed_terms$count <- counts
+# Dynamic per-provider stats used in prose below
+prov_rows     <- sapply(dat_list, nrow)
+prov_datasets <- sapply(dat_list, function(d) data.table::uniqueN(d$source_title))
 
-# Map trait_focus -> count for the trait categories table
-trait_focus_counts <- setNames(seed_terms$count, seed_terms$trait_focus)
+rows_rank <- names(sort(prov_rows, decreasing = TRUE))
+dataset_rank <- names(sort(prov_datasets, decreasing = TRUE))
+largest_volume_provider <- provider_labels[[rows_rank[1L]]]
+largest_volume_rows <- prov_rows[[rows_rank[1L]]]
+most_diverse_provider <- provider_labels[[dataset_rank[1L]]]
+most_diverse_datasets <- prov_datasets[[dataset_rank[1L]]]
+remaining_provider <- setdiff(names(provider_labels), c(rows_rank[1L], dataset_rank[1L]))[1L]
+if (is.na(remaining_provider) || length(remaining_provider) == 0L) {
+  remaining_provider <- rows_rank[2L]
+}
+remaining_provider_label <- provider_labels[[remaining_provider]]
+remaining_provider_rows <- prov_rows[[remaining_provider]]
+remaining_provider_datasets <- prov_datasets[[remaining_provider]]
+```
 
-trait_categories <- data.frame(
-  `Functional Category` = c(
-    "leaf_economics", "leaf_economics",
-    "leaf_morphology", "leaf_morphology",
-    "leaf_chemistry", "leaf_chemistry",
-    "stem_structure", "stem_structure",
-    "reproduction",
-    "size_structure"
-  ),
-  `Trait Name` = c(
-    "specific_leaf_area", "leaf_dry_matter_content",
-    "leaf_area", "leaf_thickness",
-    "leaf_n", "leaf_p",
-    "wood_density", "stem_specific_density",
-    "seed_mass",
-    "plant_height"
-  ),
-  `Standard Unit` = c(
-    "mm2/mg", "mg/g",
-    "mm2", "mm",
-    "mg/g", "mg/g",
-    "g/cm3", "g/cm3",
-    "mg",
-    "m"
-  ),
-  check.names = FALSE,
-  stringsAsFactors = FALSE
+> **`r formatC(total_rows, format="d", big.mark=",")`** observation rows harvested across **3 providers** (DataDryad, Zenodo, Scientific Data) as of `r Sys.Date()`.
+>
+> **`r total_traits`** distinct trait names detected; **`r formatC(total_taxa, format="d", big.mark=",")`** distinct taxa (scrubbed binomials); **`r formatC(total_coords, format="d", big.mark=",")`** rows with geographic coordinates.
+>
+> `r most_diverse_provider` is currently the most source-diverse contributor (`r formatC(most_diverse_datasets, format="d", big.mark=",")` source datasets), while `r largest_volume_provider` provides the largest observation volume (`r formatC(largest_volume_rows, format="d", big.mark=",")` rows). `r remaining_provider_label` adds a complementary set (`r formatC(remaining_provider_datasets, format="d", big.mark=",")` datasets, `r formatC(remaining_provider_rows, format="d", big.mark=",")` rows). All three provider files carry unit reconciliation columns (`inferred_unit`, `inferred_unit_confidence`); `basis_type` column is present in all files.
+>
+> _Note: observation row counts are summed across provider outputs independently -- no cross-provider deduplication has been applied; the same measurement may appear in more than one provider if it was included in multiple source compilations._
+
+---
+
+## 1. Provider Overview
+
+```{r provider-overview}
+provider_summary <- rbindlist(lapply(names(dat_list), function(k) {
+  d <- dat_list[[k]]
+  lat <- suppressWarnings(as.numeric(d$latitude))
+  lon <- suppressWarnings(as.numeric(d$longitude))
+  list(
+    Provider             = provider_labels[[k]],
+    `Observation Rows`   = nrow(d),
+    `Distinct Traits`    = uniqueN(d$trait_name),
+    `Distinct Taxa`      = uniqueN(d$scrubbed_species_binomial),
+    `Source Datasets`    = uniqueN(d$source_title),
+    `Rows with Coords`   = sum(is.finite(lat) & is.finite(lon), na.rm = TRUE),
+    `Rows with QA Flags` = sum(nzchar(trimws(d$qa_flags)), na.rm = TRUE)
+  )
+}))
+
+kable_styled(provider_summary, caption = "Provider-level harvest summary")
+```
+
+### Figure: Observation rows by provider
+
+```{r fig-provider-rows}
+prov_plot <- data.frame(
+  Provider = provider_summary$Provider,
+  Rows     = provider_summary$`Observation Rows`
 )
-
-trait_categories$`Estimated Dryad Dataset Count` <- vapply(
-  trait_categories$`Trait Name`,
-  function(tn) {
-    v <- trait_focus_counts[tn]   # single-bracket: returns NA_integer_ for missing keys
-    if (is.na(v)) NA_integer_ else as.integer(v)
-  },
-  integer(1)
-)
-
-kable_styled(trait_categories, caption = "Harvestable traits by functional category")
+ggplot(prov_plot, aes(x = reorder(Provider, -Rows), y = Rows / 1e3, fill = Provider)) +
+  geom_col(width = 0.55, show.legend = FALSE) +
+  geom_text(aes(label = formatC(Rows, format = "d", big.mark = ",")),
+            vjust = -0.4, size = 3.5) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(x = NULL, y = "Observations (thousands)",
+       title = "Observation rows by provider") +
+  theme_classic(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
 ```
 
 ---
 
-## Dryad Search Coverage
+## 2. Source / Citation Breakdown by Provider
 
-```{r dryad-search-coverage}
-# Reuse seed_terms with counts fetched in the traits-by-category chunk above
-coverage <- data.frame(
-  `Query Term`              = seed_terms$query_term,
-  `Theme`                   = seed_terms$theme,
-  `Trait Focus`             = seed_terms$trait_focus,
-  `Estimated Dataset Count` = seed_terms$count,
-  check.names = FALSE,
-  stringsAsFactors = FALSE
-)
+### 2.1 DataDryad (top 25 sources by row count)
 
-na_count <- sum(is.na(coverage$`Estimated Dataset Count`))
-if (na_count > 0) {
-  cat(sprintf(
-    "_Note: %d of %d API queries returned NA — check network connectivity or Dryad API availability._\n\n",
-    na_count, nrow(coverage)
+```{r dryad-sources}
+d <- dat_list[["dryad"]]
+src_dry <- d[, .(
+  Rows              = .N,
+  `Distinct Traits` = uniqueN(trait_name),
+  `Source ID / DOI` = dryad_dataset_doi[1L],
+  Authors           = substr(source_authors[1L], 1, 65)
+), keyby = source_title][order(-Rows)]
+kable_styled(head(src_dry, 25L)[, .(
+  `Source Title`        = source_title,
+  `Source ID / DOI`,
+  `Authors (truncated)` = Authors,
+  Rows,
+  `Distinct Traits`
+)], caption = "DataDryad: top 25 source datasets by row count")
+```
+
+### 2.2 Zenodo (all sources)
+
+```{r zenodo-sources}
+d <- dat_list[["zenodo"]]
+src_zen <- d[, .(
+  Rows              = .N,
+  `Distinct Traits` = uniqueN(trait_name),
+  `Source ID / DOI` = dryad_dataset_doi[1L],
+  Authors           = substr(source_authors[1L], 1, 65)
+), keyby = source_title][order(-Rows)]
+kable_styled(src_zen[, .(
+  `Source Title`        = source_title,
+  `Source ID / DOI`,
+  `Authors (truncated)` = Authors,
+  Rows,
+  `Distinct Traits`
+)], caption = "Zenodo: all source datasets by row count")
+```
+
+### 2.3 Scientific Data (all sources)
+
+```{r scidata-sources}
+d <- dat_list[["scidata"]]
+src_sci <- d[, .(
+  Rows              = .N,
+  `Distinct Traits` = uniqueN(trait_name),
+  `Source ID / DOI` = dryad_dataset_doi[1L],
+  Authors           = substr(source_authors[1L], 1, 65)
+), keyby = source_title][order(-Rows)]
+kable_styled(src_sci[, .(
+  `Source Title`        = source_title,
+  `Source ID / DOI`,
+  `Authors (truncated)` = Authors,
+  Rows,
+  `Distinct Traits`
+)], caption = "Scientific Data: all source datasets by row count")
+```
+
+---
+
+## 3. Trait Coverage
+
+### 3.1 Overall top 25 traits (all providers combined)
+
+```{r top-traits-overall}
+all_dat <- rbindlist(dat_list, use.names = TRUE, fill = TRUE)
+top_traits <- all_dat[!is.na(trait_name) & nzchar(trait_name),
+  .(Rows = .N, `Distinct Taxa` = uniqueN(scrubbed_species_binomial)),
+  by = trait_name][order(-Rows)]
+kable_styled(head(top_traits, 25L)[, .(
+  `Trait Name`    = trait_name,
+  Rows,
+  `Distinct Taxa`
+)], caption = "Top 25 traits by row count (all providers combined)")
+```
+
+### Figure: Top 20 traits across all providers
+
+```{r fig-top-traits}
+top20 <- head(top_traits, 20L)
+ggplot(top20, aes(x = reorder(trait_name, Rows), y = Rows / 1e3, fill = Rows)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_gradient(low = "#a8d8ea", high = "#0a5275") +
+  coord_flip() +
+  labs(x = NULL, y = "Observations (thousands)",
+       title = "Top 20 plant traits -- all providers combined") +
+  theme_classic(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+### 3.2 Provider-specific top traits (top 15 each)
+
+```{r top-traits-by-provider, results='asis'}
+for (k in names(dat_list)) {
+  d <- dat_list[[k]]
+  top <- d[!is.na(trait_name) & nzchar(trait_name),
+    .(Rows = .N, `Distinct Taxa` = uniqueN(scrubbed_species_binomial)),
+    by = trait_name][order(-Rows)]
+  cat("\n#### ", provider_labels[[k]], "\n\n")
+  print(kable_styled(
+    head(top, 15L)[, .(`Trait Name` = trait_name, Rows, `Distinct Taxa`)],
+    caption = paste(provider_labels[[k]], ": top 15 traits")
   ))
+  cat("\n")
 }
-
-kable_styled(coverage, caption = "Dryad API search coverage by seed term")
 ```
 
 ---
 
-## BIEN Upload Schema
+## 4. Unit Reconciliation Summary
 
-The primary compiled output is `output/compiled_trait_observations.csv`. It follows the BIEN observation model below. Use `output/bien_trait_upload_template.csv` as a zero-row header-only reference for downstream validation.
+All three provider files carry the unit reconciliation columns added by the pipeline (`inferred_unit`, `inferred_unit_confidence`, `inference_evidence`, `basis_type`, `unit_conversion_factor`).
 
-```{r bien-schema}
-bien_schema <- data.frame(
-  Column = c(
-    "scrubbed_species_binomial",
-    "latitude", "longitude",
-    "date_collected",
-    "country", "stateProvince", "county", "locality",
-    "trait_name", "trait_value", "unit",
-    "dataset", "datasource", "dataowner",
-    "source_citation",
-    "dryad_dataset_doi", "dryad_version_id", "dryad_file_id",
-    "download_timestamp_utc",
-    "source_file_path",
-    "source_column_trait_name", "source_column_trait_value", "source_column_unit",
-    "raw_scrubbed_species_binomial",
-    "raw_latitude", "raw_longitude", "raw_date_collected",
-    "raw_trait_name", "raw_trait_value", "raw_unit"
-  ),
-  Description = c(
-    "TNRS-resolved binomial; primary taxonomic key",
-    "Decimal degrees (WGS84)", "Decimal degrees (WGS84)",
-    "ISO 8601 date of collection",
-    "Country name", "State or province", "County", "Verbatim locality string",
-    "Standardised trait name (AusTraits vocabulary)", "Numeric trait value (standardised unit)", "Standard unit string",
-    "Dryad dataset title", "Dryad (datasource label)", "Dataset owner / PI",
-    "Full bibliographic citation",
-    "Dryad dataset DOI", "Dryad version integer ID", "Dryad file integer ID",
-    "UTC timestamp of file download (ISO 8601)",
-    "Relative path to source file within downloaded archive",
-    "Original column name mapped to trait", "Original column name mapped to value", "Original column name mapped to unit",
-    "Original (pre-TNRS) species string",
-    "Original latitude", "Original longitude", "Original date string",
-    "Original trait name string", "Original trait value string", "Original unit string"
-  ),
-  Source = c(
-    "standardization",
-    "source data", "source data",
-    "source data",
-    "source data", "source data", "source data", "source data",
-    "standardization", "standardization", "standardization",
-    "Dryad metadata", "Dryad metadata", "Dryad metadata",
-    "Dryad metadata",
-    "Dryad metadata", "Dryad metadata", "Dryad metadata",
-    "pipeline",
-    "pipeline",
-    "standardization", "standardization", "standardization",
-    "source data",
-    "source data", "source data", "source data",
-    "source data", "source data", "source data"
-  ),
-  stringsAsFactors = FALSE
-)
+```{r unit-reconciliation}
+unit_summary <- rbindlist(lapply(names(dat_list), function(k) {
+  d <- dat_list[[k]]
+  iu  <- d$inferred_unit
+  iuc <- as.character(d$inferred_unit_confidence)
+  iuc[is.na(iuc) | !nzchar(trimws(iuc))] <- NA_character_
+  list(
+    Provider               = provider_labels[[k]],
+    `Total Rows`           = nrow(d),
+    `Inferred TRUE`        = sum(iu %in% c(TRUE, "TRUE",  "true",  1L), na.rm = TRUE),
+    `Inferred FALSE`       = sum(iu %in% c(FALSE,"FALSE", "false", 0L), na.rm = TRUE),
+    `Conf: high`           = sum(iuc == "high",   na.rm = TRUE),
+    `Conf: medium`         = sum(iuc == "medium",  na.rm = TRUE),
+    `Conf: low`            = sum(iuc == "low",     na.rm = TRUE),
+    `Conf: none/missing`   = sum(is.na(iuc))
+  )
+}))
+kable_styled(unit_summary, caption = "Unit inference summary by provider")
+```
 
-kable_styled(bien_schema, caption = "BIEN observation model — 30-column upload schema")
+### 4.1 inferred_unit_confidence breakdown (all providers)
+
+```{r confidence-breakdown}
+conf_rows <- rbindlist(lapply(names(dat_list), function(k) {
+  d <- dat_list[[k]]
+  lvl <- as.character(d$inferred_unit_confidence)
+  lvl[is.na(lvl) | !nzchar(trimws(lvl))] <- "(missing)"
+  lvl <- trimws(lvl)
+  tbl <- d[, .N, by = .(inferred_unit_confidence = lvl)][order(-N)]
+  tbl[, provider := provider_labels[[k]]]
+  tbl
+}))
+conf_wide <- dcast(conf_rows, inferred_unit_confidence ~ provider, value.var = "N", fill = 0L)
+kable_styled(conf_wide, caption = "inferred_unit_confidence counts by provider")
+```
+
+### 4.2 basis_type breakdown
+
+```{r basis-type-breakdown}
+bt_rows <- rbindlist(lapply(names(dat_list), function(k) {
+  d <- dat_list[[k]]
+  bt <- trimws(d$basis_type)
+  bt[!nzchar(bt)] <- "(empty)"
+  tbl <- d[, .N, by = .(basis_type = bt)][order(-N)]
+  tbl[, provider := provider_labels[[k]]]
+  tbl
+}))
+bt_wide <- dcast(bt_rows, basis_type ~ provider, value.var = "N", fill = 0L)
+kable_styled(bt_wide, caption = "basis_type counts by provider")
 ```
 
 ---
 
-## Next Steps
+## 5. Geographic Coverage
 
-1. **Build candidate list** — run `scripts/discover_dryad_plant_traits.R` (no token needed). This writes `output/candidate_datasets.csv` with scored Dryad datasets.
+```{r geo-coverage}
+geo_summary <- rbindlist(lapply(names(dat_list), function(k) {
+  d <- dat_list[[k]]
+  lat <- suppressWarnings(as.numeric(d$latitude))
+  lon <- suppressWarnings(as.numeric(d$longitude))
+  has_coord <- is.finite(lat) & is.finite(lon)
+  list(
+    Provider           = provider_labels[[k]],
+    `Total Rows`       = nrow(d),
+    `Rows with Coords` = sum(has_coord, na.rm = TRUE),
+    `Coverage (%)`     = round(100 * mean(has_coord, na.rm = TRUE), 1)
+  )
+}))
+kable_styled(geo_summary, caption = "Geographic coordinate coverage by provider")
+```
 
-2. **Download and compile** — set `DRYAD_API_TOKEN` (obtain from [datadryad.org/stash/user_account](https://datadryad.org/stash/user_account)), then run `scripts/compile_downloaded_traits.R`. This writes `output/compiled_trait_observations.csv`.
+---
 
-3. **Validate** — compare the compiled CSV columns against `output/bien_trait_upload_template.csv` and inspect record counts, trait coverage, and any missing species binomials before BIEN submission.
+## 6. QA Flag Summary
+
+```{r qa-flags, results='asis'}
+qa_rows <- rbindlist(lapply(names(dat_list), function(k) {
+  d <- dat_list[[k]]
+  flagged <- sum(nzchar(trimws(d$qa_flags)), na.rm = TRUE)
+  list(
+    Provider         = provider_labels[[k]],
+    `Total Rows`     = nrow(d),
+    `Flagged Rows`   = flagged,
+    `Unflagged Rows` = nrow(d) - flagged,
+    `Flag Rate (%)`  = round(100 * flagged / nrow(d), 1)
+  )
+}))
+kable_styled(qa_rows, caption = "QA flag prevalence by provider")
+
+# Top flag codes for DataDryad (most complex)
+d_dry <- dat_list[["dryad"]]
+flagged_vals <- d_dry$qa_flags[nzchar(trimws(d_dry$qa_flags))]
+flag_tokens  <- unlist(strsplit(flagged_vals, "\\|"))
+flag_tokens  <- trimws(sub("\\[.*", "", flag_tokens))
+flag_tokens  <- flag_tokens[nzchar(flag_tokens)]
+flag_tbl_all <- sort(table(flag_tokens), decreasing = TRUE)
+flag_tbl     <- as.data.frame(flag_tbl_all[seq_len(min(15L, length(flag_tbl_all)))])
+names(flag_tbl) <- c("QA Flag Code", "Count")
+cat("\n\n**DataDryad: top 15 QA flag codes**\n\n")
+print(kable_styled(flag_tbl, caption = "DataDryad: top 15 QA flag codes (prefix only)"))
+```
+
+---
+
+## 7. Session Info
+
+```{r session-info}
+si <- sessionInfo()
+cat("R version:", si$R.version$version.string, "\n")
+cat("data.table:", as.character(packageVersion("data.table")), "\n")
+cat("ggplot2:", as.character(packageVersion("ggplot2")), "\n")
+cat("Rendered:", format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"), "\n")
+```

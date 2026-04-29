@@ -101,6 +101,12 @@ Prompt: Implement Fix 2 for DryadPlantTraits with the smallest safe change set.
 Source session: current workspace session
 Outcome: Updated R/io_helpers.R so dryad_read_supported_inputs() expands Excel workbooks into one table per readable sheet with stable `#sheet=` path markers and per-sheet read/skip log rows, while leaving non-Excel reads unchanged; validated the real Zenodo workbook probe returned 4 tables and parse-check passed.
 
+18. Date: 2026-04-28
+Prompt: Generate a .Rmd and .html summary report for DryadPlantTraits covering DataDryad, Zenodo, and Scientific Data with source/citation breakdowns, trait summaries, and unit-reconciliation/confidence summaries.
+Source session: current workspace session
+Review: code-checker FAIL -> repaired -> code-verifier APPROVED WITH NOTES
+Outcome: Reworked reports/dryad_trait_harvest_summary.Rmd from a Dryad-only summary into a multi-provider report driven by the three finalized 58-column provider outputs; added provider overview, source/citation tables, trait coverage summaries, unit reconciliation/confidence summaries, QA/geographic summaries, and dynamic key takeaways; rendered reports/dryad_trait_harvest_summary.html successfully.
+
 15. Date: 2026-04-28
 Prompt: Implement Fix 4 for DryadPlantTraits — add HTTP 403 fallback in zenodo_fetch_files() via record JSON endpoint.
 Source session: current workspace session
@@ -121,3 +127,13 @@ Source session: current workspace session
 Commit: a243441
 Review: code-checker PASS (synthetic-path file.exists gate verified fixed), code-verifier PASS (independent sign-off)
 Outcome: Updated R/io_helpers.R so Excel sheet tables retain the real workbook path in `path` and carry `sheet_name` plus `display_path`; updated providers/zenodo/scripts/compile_zenodo_traits.R to keep provenance `source_file_path` real while using the display path for sheet-specific processing logs; completed the requested workbook smoke validation and parse check. Pushed to origin/master as commit a243441.
+
+16. Date: 2026-04-28
+Prompt: Implement Fix 5 in DryadPlantTraits so known non-BIEN-shaped Zenodo datasets are transformed via a dataset-specific parser registry before generic standardization.
+Source session: current workspace session
+Outcome: Added providers/zenodo/R/zenodo_parser_registry.R with zenodo_apply_parser_registry() and zenodo_parser_19816125() (pl_species + prefixed trait-column detection, species fill, targeted renames, then dryad_standardize_records()); wired providers/zenodo/scripts/compile_zenodo_traits.R to source the registry and run registry-first/fallback-second standardization while preserving existing log schema and no_trait_observation_fields skip behavior.
+
+17. Date: 2026-04-28
+Prompt: Apply a narrow repair for Fix 5 in DryadPlantTraits, limited to Zenodo parser coexistence mapping, row-wise species fill from pl_species, and skip-log error context for parser/fallback failures.
+Source session: current workspace session
+Outcome: Updated providers/zenodo/R/zenodo_parser_registry.R so species blanks are filled row-wise from pl_species and prefixed/canonical rename pairs now coalesce into canonical columns without dropping prefixed columns when both already exist; updated providers/zenodo/scripts/compile_zenodo_traits.R so parser and fallback errors are captured and truncated into skipped no_trait_observation_fields messages only when present; completed the requested syntax parse/source validation and reran the known-file parser smoke test on 1052_Meinzer_1995_master.xlsx.
