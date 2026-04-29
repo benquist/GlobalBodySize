@@ -1,3 +1,4 @@
+2026-04-28 | m (supervisor) | Fix 2 (multi-sheet XLSX) — code-checker PASS, code-verifier PASS, commit a243441 pushed to origin/master; provenance gaps closed in DryadPlantTraits/chat_provenance_log.md entry 13.
 2026-04-28 | biodiversity-informatics-checker | Added prompt provenance entry to agents/prompt_log.md for Zenodo rescue-plan diagnosis request; no agent behavior/instruction logic changed.
 [17] Date: 2026-04-28
 Source: active chat request

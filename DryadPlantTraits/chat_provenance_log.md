@@ -104,4 +104,6 @@ Outcome: Updated R/io_helpers.R so dryad_read_supported_inputs() expands Excel w
 13. Date: 2026-04-28
 Prompt: Apply a narrow repair for the multi-sheet Excel fix in DryadPlantTraits so Excel workbook table entries keep the real file path, expose sheet metadata for display/logging, and leave non-Excel behavior unchanged.
 Source session: current workspace session
-Outcome: Updated R/io_helpers.R so Excel sheet tables retain the real workbook path in `path` and carry `sheet_name` plus `display_path`; updated providers/zenodo/scripts/compile_zenodo_traits.R to keep provenance `source_file_path` real while using the display path for sheet-specific processing logs; completed the requested workbook smoke validation and parse check.
+Commit: a243441
+Review: code-checker PASS (synthetic-path file.exists gate verified fixed), code-verifier PASS (independent sign-off)
+Outcome: Updated R/io_helpers.R so Excel sheet tables retain the real workbook path in `path` and carry `sheet_name` plus `display_path`; updated providers/zenodo/scripts/compile_zenodo_traits.R to keep provenance `source_file_path` real while using the display path for sheet-specific processing logs; completed the requested workbook smoke validation and parse check. Pushed to origin/master as commit a243441.
