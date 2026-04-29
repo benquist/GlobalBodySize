@@ -1,3 +1,4 @@
+2026-04-28 | biodiversity-informatics-checker | Added prompt provenance entry to agents/prompt_log.md for Zenodo rescue-plan diagnosis request; no agent behavior/instruction logic changed.
 [17] Date: 2026-04-28
 Source: active chat request
 Request summary: Create a new agent specializing in multivariate statistics, inspired by the published work of Cajo J.F. ter Braak.
@@ -77,6 +78,14 @@ Files affected:
 Action taken:
   - Coordinated specialist agents to analyze, design, and prototype
   - Produced specification documents with enough detail for developer handoff
+2026-04-28 | coder | Updated agents/prompt_log.md for sPlot task provenance (ecology-focused + biodiversity-science-guard review perspectives noted); no agent behavior/instruction file changes.
+
+[18] Date: 2026-04-28
+Source: active chat request
+Request summary: Fix bugs in splot-open-data/splot_overview.Rmd and splot-open-data/R/01_build_bien_staging.R, with explicit instruction to read files before editing and apply targeted logic/filename/occurrenceID fixes.
+Files affected: agents/prompt_log.md (updated), splot-open-data/splot_overview.Rmd (updated), splot-open-data/R/01_build_bien_staging.R (updated)
+Action taken: Applied requested fixes in both splot-open-data files and appended required prompt provenance entry in agents/prompt_log.md.
+Outcome: Agent-related provenance remains append-only and current for this chat.
   - Included user pain points, implementation priorities, and test criteria
 Guides future work:
   - Coder can implement MVP from REDESIGN_PROPOSAL.md steps
@@ -118,6 +127,34 @@ Commit (optional): <hash> - <message>
 
 [3] Date: 2026-03-28
 Source: active chat request
+
+[18] Date: 2026-04-28
+Source: active chat request
+Request summary: Implement Zenodo-to-final-schema mapping in DryadPlantTraits and append prompt/project provenance entries.
+Files affected:
+  /Users/brianjenquist/VSCode/agents/prompt_log.md (updated)
+  /Users/brianjenquist/VSCode/DryadPlantTraits/chat_provenance_log.md (updated)
+  /Users/brianjenquist/VSCode/agents/agent_chat_provenance_log.txt (this file, updated)
+Action taken:
+  - Appended concise prompt provenance for the Zenodo final-schema mapping request.
+  - Appended matching DryadPlantTraits project provenance entry for new script behavior.
+  - Recorded this agent-folder update per append-only policy.
+Outcome: Agent and project provenance logs are current for this implementation task.
+
+[19] Date: 2026-04-28
+Source: active chat request
+Request summary: Apply a narrow DryadPlantTraits multi-sheet Excel repair so workbook table entries keep real file paths while sheet-specific display/logging remains clear.
+Files affected:
+  /Users/brianjenquist/VSCode/DryadPlantTraits/R/io_helpers.R (updated)
+  /Users/brianjenquist/VSCode/DryadPlantTraits/providers/zenodo/scripts/compile_zenodo_traits.R (updated)
+  /Users/brianjenquist/VSCode/agents/prompt_log.md (updated)
+  /Users/brianjenquist/VSCode/DryadPlantTraits/chat_provenance_log.md (updated)
+  /Users/brianjenquist/VSCode/agents/agent_chat_provenance_log.txt (this file, updated)
+Action taken:
+  - Changed Excel sheet table entries to preserve the real workbook path and attach sheet metadata for display.
+  - Switched Zenodo processing-log file paths to the sheet-specific display form while leaving provenance source_file_path real.
+  - Appended matching prompt and project provenance entries.
+Outcome: Agent-folder provenance remains append-only and current for this DryadPlantTraits repair.
 Request summary: Create an always agent that always runs last and checks prompt logging, updated Rmd compilation, updated R package builds, and git push status.
 Files affected:
 - agents/always.agent.md
@@ -236,6 +273,19 @@ Prompt: I want to start a new document that is an RMD that has a table of every 
 
 5) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
 Prompt: start a subfolder calle cacti and get all the trait data from BIEN for all cacti species. then search the internet and find any other cacti data
+
+[19] Date: 2026-04-28
+Source: active chat request
+Request summary: Implement Fix 2 for DryadPlantTraits Excel ingest so workbook reads expand to one table per readable sheet, plus required prompt/project provenance updates.
+Files affected:
+- agents/prompt_log.md
+- agents/agent_chat_provenance_log.txt
+- DryadPlantTraits/chat_provenance_log.md
+Action taken:
+- Appended the required prompt-log entry for this implementation request.
+- Appended the matching DryadPlantTraits project provenance entry.
+- Recorded this agent-folder update per append-only policy because files under agents/ were changed.
+Outcome: Agent and project provenance remain current for this Excel ingest fix.
 
 6) Session: 65bb9a50-2317-46a2-ab71-91bef6641877 | Created: 2026-03-28 15:17:56 -0700
 Prompt: start a subfolder calle cacti and get all the trait data from BIEN for all cacti species. then search the internet and find any other cacti data to add to this. always record where you got the data that isn't from BIEN. You can just focus on the traits: body size (height or diameter or mass) and flower color

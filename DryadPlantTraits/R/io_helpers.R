@@ -1,6 +1,10 @@
+`%||%` <- function(x, y) {
+  if (is.null(x) || !length(x)) y else x
+}
+
 dryad_is_supported_tabular_path <- function(path) {
   lower_path <- tolower(path)
-  any(endsWith(lower_path, c(".csv", ".tsv", ".txt", ".tab")))
+  any(endsWith(lower_path, c(".csv", ".tsv", ".txt", ".tab", ".xlsx", ".xls")))
 }
 
 dryad_is_supported_archive_path <- function(path) {
@@ -94,7 +98,87 @@ dryad_detect_delimiter <- function(path) {
   ","
 }
 
+dryad_is_excel_path <- function(path) {
+  lower_path <- tolower(path)
+  endsWith(lower_path, ".xlsx") || endsWith(lower_path, ".xls")
+}
+
+dryad_sheet_marker_path <- function(path, sheet_name) {
+  paste0(path, "#sheet=", sheet_name)
+}
+
+dryad_read_excel_workbook <- function(path) {
+  if (!requireNamespace("readxl", quietly = TRUE)) {
+    stop("Package 'readxl' is required to read Excel files. Install with: install.packages('readxl')",
+         call. = FALSE)
+  }
+
+  sheets <- readxl::excel_sheets(path)
+  if (!length(sheets)) {
+    return(list(tables = list(), log = list(list(
+      extracted_path = path,
+      status = "skipped",
+      message = paste0("No sheets found in Excel file: ", path)
+    ))))
+  }
+
+  tables <- list()
+  log_rows <- list()
+
+  for (sheet_name in sheets) {
+    sheet_path <- dryad_sheet_marker_path(path, sheet_name)
+    sheet_result <- tryCatch(
+      as.data.frame(
+        readxl::read_excel(path, sheet = sheet_name, .name_repair = "unique"),
+        stringsAsFactors = FALSE,
+        check.names = FALSE
+      ),
+      error = function(e) e
+    )
+
+    if (inherits(sheet_result, "error")) {
+      log_rows[[length(log_rows) + 1L]] <- list(
+        extracted_path = sheet_path,
+        status = "skipped",
+        message = conditionMessage(sheet_result)
+      )
+      next
+    }
+
+    tables[[length(tables) + 1L]] <- list(
+      path = path,
+      sheet_name = sheet_name,
+      display_path = sheet_path,
+      data = sheet_result
+    )
+    log_rows[[length(log_rows) + 1L]] <- list(
+      extracted_path = sheet_path,
+      status = "read",
+      message = sprintf("Loaded %s rows x %s columns", nrow(sheet_result), ncol(sheet_result))
+    )
+  }
+
+  list(tables = tables, log = log_rows)
+}
+
 dryad_read_tabular_file <- function(path) {
+  lower_path <- tolower(path)
+
+  # Excel files: use readxl if available
+  if (dryad_is_excel_path(path)) {
+    if (!requireNamespace("readxl", quietly = TRUE)) {
+      stop("Package 'readxl' is required to read Excel files. Install with: install.packages('readxl')",
+           call. = FALSE)
+    }
+    sheets <- readxl::excel_sheets(path)
+    if (length(sheets) == 0L) stop("No sheets found in Excel file: ", path, call. = FALSE)
+    # Return first sheet; caller loops over tables so additional sheets are not seen
+    return(as.data.frame(
+      readxl::read_excel(path, sheet = 1L, .name_repair = "unique"),
+      stringsAsFactors = FALSE, check.names = FALSE
+    ))
+  }
+
   delim <- dryad_detect_delimiter(path)
 
   # Detect encoding: try UTF-8 first, fall back to latin1
@@ -135,6 +219,44 @@ dryad_read_supported_inputs <- function(path) {
   }
 
   for (table_path in extracted$paths) {
+    if (dryad_is_excel_path(table_path)) {
+      workbook_result <- tryCatch(
+        dryad_read_excel_workbook(table_path),
+        error = function(e) e
+      )
+
+      if (inherits(workbook_result, "error")) {
+        log_rows[[length(log_rows) + 1L]] <- data.frame(
+          source_path = path,
+          extracted_path = table_path,
+          status = "skipped",
+          message = conditionMessage(workbook_result),
+          stringsAsFactors = FALSE
+        )
+        next
+      }
+
+      if (length(workbook_result$tables)) {
+        for (sheet_table in workbook_result$tables) {
+          tables[[length(tables) + 1L]] <- sheet_table
+        }
+      }
+
+      if (length(workbook_result$log)) {
+        for (sheet_log in workbook_result$log) {
+          log_rows[[length(log_rows) + 1L]] <- data.frame(
+            source_path = path,
+            extracted_path = sheet_log$extracted_path,
+            status = sheet_log$status,
+            message = sheet_log$message,
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+
+      next
+    }
+
     table_result <- tryCatch(
       dryad_read_tabular_file(table_path),
       error = function(e) e

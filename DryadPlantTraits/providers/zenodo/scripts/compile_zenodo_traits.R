@@ -136,6 +136,10 @@ append_log_row <- function(row_list, first_flag) {
   invisible(FALSE)
 }
 
+zenodo_log_path <- function(table_entry) {
+  table_entry$display_path %||% table_entry$path
+}
+
 # Download a single file by URL into download_dir.
 # Returns the local file path, or NULL on failure.
 zenodo_download_file <- function(url, dest_path) {
@@ -254,6 +258,7 @@ for (row_index in seq_len(nrow(supported))) {
     }
 
     for (table_entry in read_result$tables) {
+      log_file_path <- zenodo_log_path(table_entry)
       standardized <- tryCatch(
         dryad_standardize_records(
           table_entry$data,
@@ -275,7 +280,7 @@ for (row_index in seq_len(nrow(supported))) {
       if (is.null(standardized) || !nrow(standardized)) {
         first_log <- append_log_row(list(
           provider_dataset_id = ds_id, provider_file_id = file_id,
-          file_path = table_entry$path, action = "standardize", status = "skipped",
+          file_path = log_file_path, action = "standardize", status = "skipped",
           message = "no_trait_observation_fields", rows_in = nrow(table_entry$data),
           rows_out = 0L, timestamp_utc = ts
         ), first_log)
@@ -298,7 +303,7 @@ for (row_index in seq_len(nrow(supported))) {
 
       first_log <- append_log_row(list(
         provider_dataset_id = ds_id, provider_file_id = file_id,
-        file_path = table_entry$path, action = "qa",
+        file_path = log_file_path, action = "qa",
         status = if (n_flagged == 0L) "PASS" else "FLAGS",
         message = qa_msg, rows_in = nrow(standardized),
         rows_out = nrow(standardized) - n_flagged,
@@ -326,7 +331,7 @@ for (row_index in seq_len(nrow(supported))) {
 
       first_log <- append_log_row(list(
         provider_dataset_id = ds_id, provider_file_id = file_id,
-        file_path = table_entry$path, action = "standardize", status = "compiled",
+        file_path = log_file_path, action = "standardize", status = "compiled",
         message = "Compiled BIEN-style observation rows.",
         rows_in = nrow(table_entry$data), rows_out = nrow(standardized),
         timestamp_utc = zenodo_now_utc()

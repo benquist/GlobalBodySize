@@ -86,3 +86,22 @@ Prompt: Push the compiled data (harvested traits + unit-standardized traits) to 
 Source session: current workspace session
 Commit: 2dff677
 Outcome: Created DryadPlantTraits/scripts/release_to_github.R — reads CSVs with data.table::fread, writes parquet via arrow::write_parquet (zstd compression level 3, not gzip — zstd chosen as it is natively supported by arrow/pandas/DuckDB and yields smaller files at faster read/write speeds than gzip; functionally equivalent for all downstream readers). Two GitHub pre-releases created on benquist/DataDryad: v1-traits-full (dryadplanttraits_v1_full.parquet, 6.9 MB, 414K rows, 58 cols from compiled_trait_observations_with_unit_inference.csv) and v1-traits-qa (dryadplanttraits_v1_qa_scored.parquet 12.5 MB 471K rows, dryadplanttraits_v1_qa_keep.parquet 0.1 MB, dryadplanttraits_v1_qa_keep.csv 12.9 MB). Script committed and pushed to both origin (biodiversity-agents-lab) and datadryad (DataDryad). Script supports --dry-run, --output-dir, --repo flags.
+10. Date: 2026-04-28
+Prompt: Implement Zenodo-to-final-schema mapping pipeline in DryadPlantTraits that keeps provider data separate, reuses unit inference logic, and does not modify Dryad harvested outputs.
+Source session: current workspace session
+Outcome: Added providers/zenodo/scripts/map_zenodo_to_final_schema.R to read output/providers/zenodo/compiled_trait_observations.csv, run infer_units_batch() from R/infer_units.R, enforce Dryad final column order from output/compiled_trait_observations_with_unit_inference.csv, and write output/providers/zenodo/compiled_trait_observations_with_unit_inference.csv. Validated header parity TRUE and row count 4630.
+
+11. Date: 2026-04-28
+Prompt: Please make a minimal fix to harden DryadPlantTraits/providers/zenodo/scripts/map_zenodo_to_final_schema.R by removing silent schema fallback, requiring reconciliation output columns, and validating execution/parity.
+Source session: current workspace session
+Outcome: Updated providers/zenodo/scripts/map_zenodo_to_final_schema.R to fail fast when --schema-reference is missing and to stop if required reconciliation columns are absent post-mapping; validated script run succeeded and header parity with Dryad final schema is TRUE.
+
+12. Date: 2026-04-28
+Prompt: Implement Fix 2 for DryadPlantTraits with the smallest safe change set.
+Source session: current workspace session
+Outcome: Updated R/io_helpers.R so dryad_read_supported_inputs() expands Excel workbooks into one table per readable sheet with stable `#sheet=` path markers and per-sheet read/skip log rows, while leaving non-Excel reads unchanged; validated the real Zenodo workbook probe returned 4 tables and parse-check passed.
+
+13. Date: 2026-04-28
+Prompt: Apply a narrow repair for the multi-sheet Excel fix in DryadPlantTraits so Excel workbook table entries keep the real file path, expose sheet metadata for display/logging, and leave non-Excel behavior unchanged.
+Source session: current workspace session
+Outcome: Updated R/io_helpers.R so Excel sheet tables retain the real workbook path in `path` and carry `sheet_name` plus `display_path`; updated providers/zenodo/scripts/compile_zenodo_traits.R to keep provenance `source_file_path` real while using the display path for sheet-specific processing logs; completed the requested workbook smoke validation and parse check.
