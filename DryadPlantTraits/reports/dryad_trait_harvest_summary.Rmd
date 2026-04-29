@@ -403,9 +403,10 @@ ggplot(taxa_prov, aes(x = reorder(Provider, -`Distinct Taxa`),
 ### 5.3 Country breakdown (top 20) {#country-breakdown}
 
 ```{r fig-country, fig.height=5}
-ctry <- copy(all_dat)
-ctry[is.na(country) | !nzchar(trimws(country)), country := "Unknown"]
-country_tbl <- ctry[, .(Rows = .N), by = country][order(-Rows)]
+country_tbl <- all_dat[,
+  .(country = data.table::fifelse(
+      is.na(country) | !nzchar(trimws(country)), "Unknown", country
+    ))][, .(Rows = .N), by = country][order(-Rows)]
 top20_ctry  <- head(country_tbl, 20L)
 ggplot(top20_ctry, aes(x = reorder(country, Rows), y = Rows / 1e3)) +
   geom_col(fill = "#4e79a7") +
@@ -554,19 +555,21 @@ if (requireNamespace("leaflet", quietly = TRUE)) {
   })
   map_dat <- rbindlist(samp_list, fill = TRUE)
 
+  esc <- function(x) htmltools::htmlEscape(ifelse(is.na(x), "", as.character(x)))
   map_dat[, popup_text := paste0(
-    "<b>", ifelse(is.na(scrubbed_species_binomial), "Unknown species",
-                  scrubbed_species_binomial), "</b><br>",
-    ifelse(is.na(trait_name), "", paste0(trait_name, ": ")),
-    ifelse(is.na(trait_value), "", trait_value), " ",
-    ifelse(is.na(unit), "", unit), "<br>",
-    "Source: ", ifelse(is.na(source_title), "", source_title), "<br>",
-    "Country: ", ifelse(is.na(country), "Unknown", country)
+    "<b>", esc(scrubbed_species_binomial), "</b><br>",
+    ifelse(is.na(trait_name), "", paste0(esc(trait_name), ": ")),
+    esc(trait_value), " ", esc(unit), "<br>",
+    "Source: ", esc(source_title), "<br>",
+    "Country: ", esc(country)
   )]
 
+  map_providers <- unique(map_dat$provider)
   pal <- leaflet::colorFactor(
-    palette = c("#1f77b4", "#ff7f0e"),
-    domain  = c("DataDryad", "Zenodo")
+    palette = c("DataDryad" = "#1f77b4", "Zenodo" = "#ff7f0e",
+                "Scientific Data" = "#2ca02c"),
+    domain  = c("DataDryad", "Zenodo", "Scientific Data"),
+    na.color = "#999999"
   )
 
   map_out <- leaflet::leaflet(map_dat) |>
@@ -601,7 +604,11 @@ if (requireNamespace("leaflet", quietly = TRUE)) {
 ### 7.3 Elevation distribution {#elevation}
 
 ```{r fig-elevation, fig.height=4}
-elev_vals <- suppressWarnings(as.numeric(all_dat$elevation_m))
+elev_vals <- if ("elevation_m" %in% names(all_dat)) {
+  suppressWarnings(as.numeric(all_dat$elevation_m))
+} else {
+  numeric(0)
+}
 elev_valid <- elev_vals[is.finite(elev_vals) & elev_vals >= -500 & elev_vals <= 6000]
 if (length(elev_valid) > 0) {
   elev_df <- data.frame(elevation_m = elev_valid)
