@@ -4,6 +4,31 @@ Tracks prompts that created or changed work under this project folder.
 
 ## Entries
 
+23. Date: 2026-04-29
+Prompt: Fix the new Section 10 manual-intake occurrence-summary chunk in reports/dryad_trait_harvest_summary.Rmd so DT::datatable is only used when DT is available, with a same-columns fallback when DT is unavailable, then re-render and validate the HTML output.
+Source session: current workspace session
+Outcome: Wrapped the Section 10 manual-intake table in the report's existing optional-DT pattern: DT::datatable is now used only when requireNamespace("DT", quietly = TRUE) succeeds; otherwise the same columns are rendered with kable_styled() and caption "Manual intake registry". Re-rendered reports/dryad_trait_harvest_summary.html successfully and confirmed the output still contains manual_gabon_gbif_ipt and 138,748.
+
+22. Date: 2026-04-29
+Prompt: Update reports/dryad_trait_harvest_summary.Rmd so Section 10 dynamically reports manual-intake harvest_status counts and shows the compiled manual occurrence sources with row totals sourced from output/providers/occurrences/*/compiled_occurrences.csv, then re-render the HTML report and validate the required source IDs and total count.
+Source session: current workspace session
+Outcome: Replaced the stale "all 54 pending_review" narrative with a dynamic harvest-status summary driven by data/manual_source_intake.csv; added a new Section 10.1 compiled manual occurrence sources table joined to intake metadata and totaled from the on-disk compiled occurrence CSVs; preserved the existing manual-intake table; and re-rendered reports/dryad_trait_harvest_summary.html successfully.
+
+21. Date: 2026-04-29
+Prompt: Modify the FRED ingest pipeline so compiled rows get heuristic qa_flags for likely BIEN overlap, possible GBIF overlap, missing species/coordinates, non-observation aggregates, and possible sequence/genomic content; tighten conservative manifest excludes for obvious modeled/sequence/readme files; add a qa_flag summary; validate with a narrow helper probe instead of rerunning the full ingest.
+Source session: current workspace session
+Outcome: Updated providers/fred/scripts/download_and_compile_fred_traits.R with deterministic QA helper functions, filename-based exclude regex expansion, row-level qa_flags population, and final qa_flag count reporting. Narrow validation passed via Rscript parse plus helper probes on real FRED candidate/compiled rows and synthetic filename cases.
+
+20. Date: 2026-04-29
+Prompt: Apply a minimal patch to reports/dryad_trait_harvest_summary.Rmd so the interactive map chunk handles zero-coordinate cases safely, returns a benign leaflet map with a clear note when no points are available, keeps current coordinate filtering/diagnostics, and re-render confirms success.
+Source session: current workspace session
+Outcome: Added guard branches in the leaflet chunk for total_georef == 0 and empty/invalid sampled map tables; both paths now emit explicit map notes and return leaflet::leaflet() |> leaflet::addTiles() instead of failing during popup assignment. Existing coordinate validity filtering and map diagnostics were preserved; report re-rendered successfully.
+
+19. Date: 2026-04-29
+Prompt: Fix non-working map in reports/dryad_trait_harvest_summary.Rmd where generated HTML showed no visible data points; inspect leaflet map prep, identify root cause, apply minimal robust lat/lon coercion and validity filtering, and re-render report.
+Source session: current workspace session
+Outcome: Tightened coordinate validity logic to require numeric finite latitude/longitude within [-90, 90] and [-180, 180] in setup preprocessing for all providers; retained plotting on cleaned lat_num/lon_num; added map diagnostic note with plotted point count; re-rendered reports/dryad_trait_harvest_summary.html successfully.
+
 7. Date: 2026-04-26
 Prompt: Design a separate post-compile QA workflow for compiled_trait_observations.csv with species-required filtering, observation-level range-accuracy columns, and an independent random publication sanity-check sample, explicitly using ecology-user, merow-ecology, biodiversity-science-guard, and biodiversity-informatics-checker perspectives.
 Source session: current workspace session
@@ -138,3 +163,8 @@ Outcome: Added providers/zenodo/R/zenodo_parser_registry.R with zenodo_apply_par
 Prompt: Apply a narrow repair for Fix 5 in DryadPlantTraits, limited to Zenodo parser coexistence mapping, row-wise species fill from pl_species, and skip-log error context for parser/fallback failures.
 Source session: current workspace session
 Outcome: Updated providers/zenodo/R/zenodo_parser_registry.R so species blanks are filled row-wise from pl_species and prefixed/canonical rename pairs now coalesce into canonical columns without dropping prefixed columns when both already exist; updated providers/zenodo/scripts/compile_zenodo_traits.R so parser and fallback errors are captured and truncated into skipped no_trait_observation_fields messages only when present; completed the requested syntax parse/source validation and reran the known-file parser smoke test on 1052_Meinzer_1995_master.xlsx.
+
+19. Date: 2026-04-29
+Prompt: In DryadPlantTraits, create a committed manual-source registry for newly supplied external studies/files, add the current user-supplied items as separate rows, note that generated output candidate manifests are not the durable home, update README and provenance logs, and validate the new registry references.
+Source session: current workspace session
+Outcome: Added data/manual_source_intake.csv as the committed registry for manual and user-supplied external sources; registered the six currently supplied items with conservative provenance and harvest-status fields; documented that this registry is distinct from generated output candidate manifests; and updated project and agent prompt provenance.

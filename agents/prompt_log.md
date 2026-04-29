@@ -2,6 +2,8 @@
 
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Modify the FRED ingest pipeline so compiled trait rows are flagged when the source study or row is likely already represented in BIEN and when observations may also be present in GBIF. Tighten the logic so sequence-like and non-observation/model outputs are more clearly flagged for downstream exclusion/review, while keeping changes minimal and local to providers/fred/scripts/download_and_compile_fred_traits.R. Add deterministic study- and row-level qa_flags heuristics, conservative filename-based manifest excludes, an end-of-script qa_flag summary, validate with a narrow Rscript -e helper probe, and report files changed, flags added, validation result, and residual risks." 
 
+2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Fix one local warning in reports/dryad_trait_harvest_summary.Rmd introduced by the new Section 10 occurrence summary: make the pending-sources chunk use DT::datatable only when DT is available, add a simple fallback such as kable_styled on the same columns when DT is unavailable, re-render reports/dryad_trait_harvest_summary.html, validate the HTML still contains manual_gabon_gbif_ipt and 138,748, use apply_patch, and avoid unrelated file changes."
+
 2026-04-28 | "Task: Update /Users/brianjenquist/VSCode/Literature_Data_To_BIENdb pipeline for Jennings 2026 to include richer occurrence extraction and trait separation. Requirements: inspect source/scripts; expand normalized+staging occurrence fields for ViewFullOccurance alignment; include GNRS political units; create separate habit/growth-form trait output (or explicit empty file); update README mapping notes; rerun jennings_2026 and report non-missing counts for lat/lon/elev/political/habit; update provenance logs."
 
 2026-04-28 | "please generate a .rmd and .html file summarizing a breakdown of the data for each project DataDryad, Zenoto, Scientific Data, and what data sources (citations) go into each, breakdown summary by trait too and any other summary you think would be important including trait unit reconciliation and confidense. Please give me a shorter summary here" — Updated DryadPlantTraits/reports/dryad_trait_harvest_summary.Rmd from a Dryad-only summary into a cross-provider DataDryad/Zenodo/Scientific Data report with provider overview, source/citation breakdowns, trait summaries, unit-reconciliation/confidence sections, QA and geographic summaries, dynamic key takeaways, and rendered HTML output at DryadPlantTraits/reports/dryad_trait_harvest_summary.html. Report source and provenance pushed as commit 3cbbb3f.
@@ -1527,3 +1529,16 @@ Record each user prompt that led to creation, direction, or alteration of agent 
   2. News page (_pages/news.md): Fixed apostrophe bug in Mongabay URL slug (year's-worth → years-worth); thematic restructuring (Munch The Sun hero + 5 thematic sections) was already in place.
 - Pushed to origin/main as 4acd8df (enquistlab-site-migration repo).
 - No Rmd or R package changes.
+
+## 2026-04-29 — enquistlab-site-migration CV updates (commit ce27d90)
+- Project: enquistlab-site-migration
+- Task: CV section/content corrections per user request.
+- Changes:
+  - Renamed "Awards" → "Awards and Honors"
+  - Renamed "Publications" → "Selected Publications"
+  - Added Web of Science Highly Cited Researcher entry with explicit years: 2018, 2019, 2020, 2025
+  - Expanded Selected Publications with high-profile papers: Science 1997 (WBE foundational, 6,300+ citations), Science 1999 (fourth dimension of life), Nature 2003 (scaling metabolism), PNAS 2009, 2024, 2025, Nature Plants 2019, 2026, Nature 2021 (Amazon), Nature Communications 2020, 2026, Methods in Ecology & Evolution 2018, 2026
+  - Deleted Certificates section
+  - References: removed WordPress link, added https://enquistlab.github.io/, added Bluesky https://bsky.app/profile/bjenquist.bsky.social with fa-brands fa-bluesky icon
+- Files: _data/cv.yml, _layouts/cv.liquid, _sass/_lab-redesign.scss, chat_provenance_log.md
+- Status: Pushed to origin/main as ce27d90; GitHub Actions deploy in progress

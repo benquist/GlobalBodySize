@@ -809,17 +809,85 @@ ggplot(flag_df, aes(x = reorder(flag_code, count), y = count / 1e3)) +
 
 ## 10 Pending Sources — Manual Intake Queue {#pending-sources}
 
-These are user-supplied sources queued for review and potential ingestion into the pipeline. They are tracked in `data/manual_source_intake.csv` and have not yet been formally harvested or deduplicated against existing provider outputs.
+These user-supplied sources are tracked in `data/manual_source_intake.csv` for review, ingestion, and follow-up against the occurrence harvest outputs.
 
 ```{r pending-sources-table, message=FALSE}
 message(Sys.time(), " - loaded [pending-sources-table]")
 manual_intake <- data.table::fread(file.path(proj_root, "data", "manual_source_intake.csv"))
+manual_status_counts <- manual_intake[, .N, by = harvest_status][order(-N, harvest_status)]
+manual_status_summary <- paste(
+  sprintf(
+    "%s %s",
+    formatC(manual_status_counts$N, format = "d", big.mark = ","),
+    paste0("`", manual_status_counts$harvest_status, "`")
+  ),
+  collapse = ", "
+)
+manual_occurrence_files <- Sys.glob(file.path(
+  proj_root, "output", "providers", "occurrences", "*", "compiled_occurrences.csv"
+))
+compiled_manual_occurrences <- data.table::data.table(
+  source_id = basename(dirname(manual_occurrence_files)),
+  compiled_occurrence_rows = vapply(
+    manual_occurrence_files,
+    function(path) nrow(data.table::fread(path, showProgress = FALSE)),
+    integer(1)
+  )
+)
+if (nrow(compiled_manual_occurrences)) {
+  compiled_manual_occurrences <- manual_intake[
+    compiled_manual_occurrences,
+    on = "source_id"
+  ][
+    , .(source_id, display_name, source_group, harvest_status, compiled_occurrence_rows)
+  ][order(-compiled_occurrence_rows, source_id)]
+} else {
+  compiled_manual_occurrences <- data.table::data.table(
+    source_id = character(),
+    display_name = character(),
+    source_group = character(),
+    harvest_status = character(),
+    compiled_occurrence_rows = integer()
+  )
+}
+compiled_manual_source_count <- nrow(compiled_manual_occurrences)
+compiled_manual_occurrence_total <- sum(compiled_manual_occurrences$compiled_occurrence_rows)
 cols_show <- c("display_name", "source_group", "canonical_url_or_doi",
                "related_publication", "harvest_status", "next_action")
-DT::datatable(manual_intake[, ..cols_show], rownames = FALSE, options = list(scrollX = TRUE))
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(manual_intake[, ..cols_show], rownames = FALSE, options = list(scrollX = TRUE))
+} else {
+  kable_styled(
+    manual_intake[, ..cols_show],
+    caption = "Manual intake registry"
+  )
+}
 ```
 
-All 54 sources are at status `pending_review`. The original 6 entries cover the ShrubHub TraitHub repository (Bjorkman et al. 2018 Nature), three files supplied directly by Jesse Miller (Spasojevic et al. 2016 Ozark trait study), email context from Jesse Miller, and field data from Pablo Peri's BEPSP Patagonia network (Peri et al. 2016 J. Nature Conservation).
+The manual intake registry currently tracks `r formatC(nrow(manual_intake), format = "d", big.mark = ",")` sources across `r formatC(nrow(manual_status_counts), format = "d", big.mark = ",")` harvest statuses: `r manual_status_summary`.
+
+### 10.1 Compiled manual occurrence sources {#compiled-manual-occurrences}
+
+The occurrence harvest currently includes `r formatC(compiled_manual_source_count, format = "d", big.mark = ",")` compiled manual sources totaling `r formatC(compiled_manual_occurrence_total, format = "d", big.mark = ",")` occurrence records.
+
+```{r compiled-manual-occurrence-table}
+if (nrow(compiled_manual_occurrences)) {
+  kable_styled(
+    compiled_manual_occurrences[, .(
+      `Source ID` = source_id,
+      `Display Name` = fifelse(is.na(display_name) | !nzchar(display_name), source_id, display_name),
+      `Source Group` = source_group,
+      `Harvest Status` = harvest_status,
+      `Occurrence Rows` = compiled_occurrence_rows
+    )],
+    caption = "Compiled manual occurrence sources detected under output/providers/occurrences"
+  )
+} else {
+  cat("No compiled manual occurrence sources were detected under output/providers/occurrences.")
+}
+```
+
+The original 6 entries cover the ShrubHub TraitHub repository (Bjorkman et al. 2018 Nature), three files supplied directly by Jesse Miller (Spasojevic et al. 2016 Ozark trait study), email context from Jesse Miller, and field data from Pablo Peri's BEPSP Patagonia network (Peri et al. 2016 J. Nature Conservation).
 
 The 29 entries added in the first 2025 expansion cover underrepresented regions:
 
