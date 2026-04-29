@@ -1,0 +1,7 @@
+Plot_Name,Country,State,County,Locality,Elevation_m,slope,aspect,cover,plot_area_ha
+Plot_A,United States,California,San Luis Obispo,Santa Lucia Range - upper ridge,1240,28,195,72,0.04
+Plot_B,United States,California,San Luis Obispo,Santa Lucia Range - lower canyon,480,12,85,88,0.1
+Plot_C,United States,California,Santa Barbara,San Rafael Mountains - south slope,920,22,170,65,0.04
+Plot_D,United States,California,Monterey,Santa Lucia Range - north face,740,18,340,81,0.04
+Plot_E,United States,California,San Luis Obispo,Cuesta Ridge chaparral,680,35,210,59,0.04
+Plot_F,United States,California,Ventura,Topatopa Mountains - lower belt,310,8,90,93,0.1
