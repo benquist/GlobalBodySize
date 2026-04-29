@@ -68,12 +68,13 @@ kable_styled <- function(df, caption = NULL) {
 
 # -- Provider paths
 paths <- list(
-  dryad   = file.path(proj_root, "output/compiled_trait_observations_with_unit_inference.csv"),
-  zenodo  = file.path(proj_root, "output/providers/zenodo/compiled_trait_observations_with_unit_inference.csv"),
-  scidata = file.path(proj_root, "output/providers/scientific_data/compiled_trait_observations_with_unit_inference.csv")
+  dryad     = file.path(proj_root, "output/compiled_trait_observations_with_unit_inference.csv"),
+  zenodo    = file.path(proj_root, "output/providers/zenodo/compiled_trait_observations_with_unit_inference.csv"),
+  scidata   = file.path(proj_root, "output/providers/scientific_data/compiled_trait_observations_with_unit_inference.csv"),
+  traithub  = file.path(proj_root, "output/providers/traithub/compiled_trait_observations.csv")
 )
-provider_labels <- c(dryad = "DataDryad", zenodo = "Zenodo", scidata = "Scientific Data")
-provider_colors <- c(DataDryad = "#1f77b4", Zenodo = "#ff7f0e", `Scientific Data` = "#2ca02c")
+provider_labels <- c(dryad = "DataDryad", zenodo = "Zenodo", scidata = "Scientific Data", traithub = "TraitHub (tundra)")
+provider_colors <- c(DataDryad = "#1f77b4", Zenodo = "#ff7f0e", `Scientific Data` = "#2ca02c", `TraitHub (tundra)` = "#9467bd")
 
 for (.k in names(paths)) {
   if (!file.exists(paths[[.k]])) {
