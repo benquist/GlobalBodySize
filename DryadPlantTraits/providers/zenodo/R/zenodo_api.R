@@ -115,7 +115,25 @@ zenodo_fetch_files <- function(record_id) {
   url    <- sprintf(ZENODO_FILES_BASE, record_id)
   result <- zenodo_run_with_backoff(url)
 
-  if (is.null(result) || !result$http_code %in% c(200L) || !nzchar(result$body)) {
+  # 403 fallback: try extracting files from the record's own JSON
+  if (!is.null(result) && identical(result$http_code, 403L)) {
+    warning(sprintf(
+      "zenodo_fetch_files: HTTP 403 for record %s — falling back to record JSON files list",
+      record_id
+    ))
+    rec_json <- zenodo_fetch_record_json(record_id)
+    if (!is.null(rec_json)) {
+      fb <- zenodo_files_from_record_json(rec_json)
+      if (nrow(fb) > 0L) return(fb)
+    }
+    warning(sprintf(
+      "zenodo_fetch_files: 403 fallback also returned 0 files for record %s — logging file_discovery_failed_403",
+      record_id
+    ))
+    return(zenodo_empty_file_table())
+  }
+
+  if (is.null(result) || !identical(result$http_code, 200L) || !nzchar(result$body)) {
     return(zenodo_empty_file_table())
   }
 
@@ -136,6 +154,53 @@ zenodo_fetch_files <- function(record_id) {
     list()
   }
 
+  if (!length(entries)) return(zenodo_empty_file_table())
+
+  file_name    <- vapply(entries, function(e) e$key    %||% NA_character_, character(1))
+  file_size    <- vapply(entries, function(e) {
+    sz <- e$size %||% NA_real_
+    if (is.null(sz) || length(sz) == 0L) NA_real_ else as.numeric(sz)
+  }, numeric(1))
+  download_url <- vapply(entries, function(e) {
+    lnk <- e$links$content %||% e$links$self %||% NA_character_
+    if (is.null(lnk) || length(lnk) == 0L) NA_character_ else as.character(lnk)
+  }, character(1))
+
+  data.frame(
+    file_name    = file_name,
+    file_size    = file_size,
+    download_url = download_url,
+    mime_type    = NA_character_,
+    stringsAsFactors = FALSE
+  )
+}
+
+
+# Fetch the full record JSON from https://zenodo.org/api/records/{record_id}.
+# Returns parsed JSON list or NULL on failure.
+zenodo_fetch_record_json <- function(record_id) {
+  Sys.sleep(ZENODO_POLITE_SLEEP_SEC)
+  url    <- sprintf("https://zenodo.org/api/records/%s", record_id)
+  result <- zenodo_run_with_backoff(url)
+  if (is.null(result) || !identical(result$http_code, 200L) || !nzchar(result$body)) {
+    return(NULL)
+  }
+  tryCatch(
+    jsonlite::fromJSON(result$body, simplifyVector = FALSE),
+    error = function(e) {
+      warning(sprintf("zenodo_fetch_record_json: JSON parse error for record %s: %s",
+                      record_id, conditionMessage(e)))
+      NULL
+    }
+  )
+}
+
+
+# Extract a file table from a parsed Zenodo record JSON (used for 403 fallback).
+# Tries record_json[["files"]] first, then record_json[["metadata"]][["_files"]].
+# Returns a data.frame with columns file_name, file_size, download_url, mime_type.
+zenodo_files_from_record_json <- function(record_json) {
+  entries <- record_json[["files"]] %||% record_json[["metadata"]][["_files"]] %||% list()
   if (!length(entries)) return(zenodo_empty_file_table())
 
   file_name    <- vapply(entries, function(e) e$key    %||% NA_character_, character(1))
