@@ -315,3 +315,14 @@
 - Kept Step 2 completion modal and added direct CTA navigation to `3 • Stage & Validate`.
 - Consolidated Step 3 completion path to a single canonical modal/observer flow and explicit export handoff to `4 • Export`.
 - Preserved core processing behavior; parse checks passed.
+
+## 2026-04-29 — Port Approach B plot/verbatim features from BIENDataLoader-Beta (commit c49c4ec)
+- Added `verbatim_scientific_name` to `BIEN_STAGING_FIELDS` and 17 plot/individual/topography fields (cover, cover_total, relative_cover, individual_count, stem_count, plot_area_ha, plot_size_m2, basal_area_m2ha, height_m, dbh_cm, stratum, subplot, slope, aspect, topographic_position).
+- Renamed beta's `subplot_name` to BIEN-canonical `subplot` throughout (field defs, category, alias map). Aliases now map `subplot_name`, `sub_plot`, `quadrat_id` -> `subplot`.
+- Added two BIEN-canonical fields beta omitted: `coord_uncertainty_m` (Plot Structure) and `sampling_protocol` (Provenance), with definitions sourced from BIEN plot view (view_full_occurrence_individual).
+- Added `BIEN_FIELD_DEFS` and `BIEN_FIELD_CATEGORY` constants. Extension fields (not in BIEN view) are flagged with leading "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets)." in the definition string.
+- Added verbatim-name capture block in `build_staging()` so `verbatim_scientific_name` is set from source before TNRS scrubbing.
+- Added `plot_range_check()` helper plus 9 WARN-severity QC rows (cover, cover_total, relative_cover, slope, aspect, dbh_cm, height_m, plot_area_ha, individual_count); fires only when field is populated.
+- Added BIEN Staging Field Reference DT to Help tab (`output$help_field_ref` + UI block before About).
+- Did NOT port: orange BETA badge, beta banner copy, Step 1/2/3 guidance (already in main from c0c3cf9).
+- Parse: PASS (`Rscript -e "invisible(parse(file='app.R')); cat('PARSE_OK\n')"`).

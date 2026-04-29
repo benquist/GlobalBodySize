@@ -1,3 +1,7 @@
+2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. User issue: the rendered HTML report does not show the 8 compiled manual occurrence sources and their row counts. Edit only reports/dryad_trait_harvest_summary.Rmd to add a Section 10 subsection/table that reads data/manual_source_intake.csv, scans output/providers/occurrences/*/compiled_occurrences.csv, summarizes rows per source_id, joins display_name and source_group where available, shows total compiled sources and total occurrence records, fixes the stale pending_review narrative dynamically from current harvest_status counts, keeps the existing pending/manual-intake table, re-renders reports/dryad_trait_harvest_summary.html, validates the HTML contains manual_gabon_gbif_ipt, manual_paciflora_dryad, and 138,748 or 138748, and updates required provenance logs." 
+
+2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Modify the FRED ingest pipeline so compiled trait rows are flagged when the source study or row is likely already represented in BIEN and when observations may also be present in GBIF. Tighten the logic so sequence-like and non-observation/model outputs are more clearly flagged for downstream exclusion/review, while keeping changes minimal and local to providers/fred/scripts/download_and_compile_fred_traits.R. Add deterministic study- and row-level qa_flags heuristics, conservative filename-based manifest excludes, an end-of-script qa_flag summary, validate with a narrow Rscript -e helper probe, and report files changed, flags added, validation result, and residual risks." 
+
 2026-04-28 | "Task: Update /Users/brianjenquist/VSCode/Literature_Data_To_BIENdb pipeline for Jennings 2026 to include richer occurrence extraction and trait separation. Requirements: inspect source/scripts; expand normalized+staging occurrence fields for ViewFullOccurance alignment; include GNRS political units; create separate habit/growth-form trait output (or explicit empty file); update README mapping notes; rerun jennings_2026 and report non-missing counts for lat/lon/elev/political/habit; update provenance logs."
 
 2026-04-28 | "please generate a .rmd and .html file summarizing a breakdown of the data for each project DataDryad, Zenoto, Scientific Data, and what data sources (citations) go into each, breakdown summary by trait too and any other summary you think would be important including trait unit reconciliation and confidense. Please give me a shorter summary here" — Updated DryadPlantTraits/reports/dryad_trait_harvest_summary.Rmd from a Dryad-only summary into a cross-provider DataDryad/Zenodo/Scientific Data report with provider overview, source/citation breakdowns, trait summaries, unit-reconciliation/confidence sections, QA and geographic summaries, dynamic key takeaways, and rendered HTML output at DryadPlantTraits/reports/dryad_trait_harvest_summary.html. Report source and provenance pushed as commit 3cbbb3f.
@@ -257,6 +261,7 @@
 Record each user prompt that led to creation, direction, or alteration of agent files/folder policy.
 
 2026-04-22 | Fix structural hang issues in LoadingHistoricalObservationDataIntoBIEN/app.R: (1) replaced req() race condition in combined_state with fallback logic using merge_plan(); (2) added resolve_dict_path() helper and used it in suggested_mapping eventReactive; (3) changed duplicate_strategy default to first_non_empty; (4) corrected spinner step labels (Step 1→2, Step 3→5).
+2026-04-29 | "Need implementation-ready News page redesign (Jekyll markdown+HTML) to replace long vertical list with block-based spatial organization using horizontal space. Inspect enquistlab-site-migration/_pages/news.md and enquistlab-site-migration/_sass/_lab-redesign.scss; return concrete class structure, desktop/tablet/mobile grid behavior, exact component anatomy for thematic sections/featured item/remaining cards, and short accessibility notes with warm Scandinavian restrained high-scannability style."
 
 2026-04-22 | Step 3 mapping performance: replaced per-column linear scan in suggest_dwc_mapping with O(1) named-vector lookup; replaced lapply+do.call(rbind) with direct vector + single data.frame call; added .bien_lookup_tables cached helper in bien_pipeline_helpers.R so bien_norm and alias reverse-map computed once; updated suggest_bien_field to use .bien_lookup_tables; added .suggest_bien_fields_vec vectorized batch helper in dwc_mapping.R; app.R passes combined_df()[0L,] to suggest_dwc_mapping; fixed spinner label Step 2→Step 3. Deployed to shinyapps.io.
 
@@ -1481,3 +1486,44 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Updated reports/dryad_trait_harvest_summary.Rmd Section 10 narrative; re-rendered reports/dryad_trait_harvest_summary.html (exit 0).
 - Helper script: scripts/add_new_sources_2026_apr29.R.
 - Pushed to origin/master as d9394ff.
+
+## 2026-04-29 — Artwork features: Brueghel (About) + Munch (News) + News thematic restructure (commit 697a98c)
+- Project: enquistlab-site-migration
+- Task: Feature Jan Brueghel the Elder "The Entry of the Animals into Noah's Ark" (1613, Getty Museum, public domain) on About page as biodiversity science anchor. Feature Edvard Munch "The Sun" (1911–1916, Munch Museum, public domain) as editorial hero on News page. Restructure News page from flat chronological list (29 items) into 5 thematic sections: Climate Change & Biodiversity / Forest Conservation & Carbon / Scaling & Functional Ecology / Biodiversity Informatics & BIEN / Science Culture & Synthesis. Each section has one featured item (Klint/Henningsen principle). Added .art-feature, .art-caption-ecology, .munch-hero, .press-section-header, .press-section-label CSS to _lab-redesign.scss.
+- All art works linked to authoritative sources (Getty permalink, edvardmunch.org, Munch Museum, Wikimedia Commons for image hosting).
+- Pushed to origin/main as 697a98c.
+
+## 2026-04-29 — DryadPlantTraits manual occurrence ingest: compile 8 sources to Darwin Core (commit 68ab9ff)
+- Project: DryadPlantTraits
+- Prompt: "Lets start on the downloadable manual sources and return later to FRED." — compile plant occurrence datasets from GBIF/Zenodo/Dryad to Darwin Core schema.
+- Task: Created providers/manual_intake/scripts/download_occurrence_sources.R and download_gbif_3_missing.R (UUID key fallback); compiled 8 manual occurrence sources to Darwin Core schema (138,748 total records): 5 GBIF datasets (Gabon 7981, Sumatra-main 10200, Sumatra-ANDA2 10200, Batang-Toru 3682, PUCV-Chile 10200), Zenodo SIVFLORA 14650, Dryad Kyrgyzstan 156, Dryad PacIFlora 81731.
+- Output: output/providers/occurrences/<source_id>/compiled_occurrences.csv; Darwin Core schema 27 columns; updated data/manual_source_intake.csv harvest_status to "compiled" for all 8 sources.
+- .gitignore: excluded raw ZIPs and combined CSV (47 MB+ files).
+- Pushed to origin/master as 68ab9ff.
+
+- Date: 2026-04-29
+- Prompt summary: Implement News page redesign in enquistlab-site-migration using spatial block architecture with section header + featured item + supporting cards grid; preserve all existing thematic groups/items; keep Munch hero; add responsive desktop/tablet/mobile behavior; update news page and lab redesign SCSS; run local Jekyll build and report result.
+- Requested outcomes: Edit _pages/news.md and _sass/_lab-redesign.scss for a Jekyll-compatible block layout with classes news-page/news-theme/news-theme__head/news-theme__grid/news-feature/news-theme__cards/news-card and metadata/title classes; preserve warm Scandinavian visual language and avoid watermarks.
+- Files changed: enquistlab-site-migration/_pages/news.md; enquistlab-site-migration/_sass/_lab-redesign.scss; agents/prompt_log.md
+- Completed by: GitHub Copilot
+2026-04-29 | "Apply targeted fixes from code-checker to the News redesign in enquistlab-site-migration/_pages/news.md and enquistlab-site-migration/_sass/_lab-redesign.scss: add explicit text-only card variant class usage, remove inline onerror attributes, and adjust tablet breakpoint so supporting cards collapse earlier (~<=900/960), while keeping content/links unchanged and style coherent." — Implemented variant class `news-card--text-only` in text-only entries, removed all inline onerror attributes from news images, and added/adjusted responsive rules in _lab-redesign.scss.
+
+2026-04-29 | "Resolve the remaining code-checker warnings in /Users/brianjenquist/VSCode/enquistlab-site-migration/_sass/_lab-redesign.scss: at <=700px keep .news-card--text-only single-column despite generic mobile .news-card rule, and improve title-link affordance so links are identifiable without relying only on hover color; minimal SCSS-only edits and concise exact-change summary."
+
+## 2026-04-29 — BIENDataLoader: port Approach B from beta (plot fields, verbatim name, field reference, QC)
+- Project: BIENDataLoader
+- Source: BIENDataLoader-Beta commit c49c4ec
+- Ported: verbatim_scientific_name; 17 plot/topography fields; BIEN_FIELD_DEFS/_CATEGORY; verbatim capture in build_staging; plot_range_check + 9 QC rows; Help tab BIEN Staging Field Reference DT.
+- Naming fix: beta `subplot_name` -> BIEN canonical `subplot`.
+- Added beyond beta: BIEN-canonical `coord_uncertainty_m` and `sampling_protocol`.
+- Did not port: BETA badge / banner copy.
+- Parse: PASS.
+
+## 2026-04-29 — enquistlab-site-migration: Van Gogh Irises on About + News Mongabay fix (commit 4acd8df)
+- Project: enquistlab-site-migration
+- Prompt: "Feature the Getty painting https://www.getty.edu/art/collection/object/103RJT (Van Gogh Irises) on About page and start biodiversity themes. Scandinavian-design and ecology-user agents requested. News page thematic reorganization also implemented."
+- Work:
+  1. About page (_pages/about.md): Added Van Gogh Irises (1889, Getty Open Content) as biodiversity anchor figure before Research Pillars section. Image downloaded, resized to 1200px / 480KB, saved as assets/img/art/vangogh_irises_getty_1889.jpg with Getty attribution link.
+  2. News page (_pages/news.md): Fixed apostrophe bug in Mongabay URL slug (year's-worth → years-worth); thematic restructuring (Munch The Sun hero + 5 thematic sections) was already in place.
+- Pushed to origin/main as 4acd8df (enquistlab-site-migration repo).
+- No Rmd or R package changes.

@@ -23,6 +23,8 @@ BIEN_STAGING_FIELDS <- c(
   # Taxonomy — populated by TNRS (scrubbed_* fields from BIEN DB view_full_occurrence_individual)
   "scrubbed_species_binomial", "scrubbed_family", "scrubbed_genus",
   "scrubbed_author", "scrubbed_taxonomic_status",
+  # Verbatim name — captured before TNRS scrubbing; intentionally NOT overwritten by TNRS
+  "verbatim_scientific_name",
   # Coordinates
   "latitude", "longitude",
   # GVS coordinate QA — BIEN DB field is_centroid (filtered: WHERE is_centroid IS NULL OR is_centroid=0)
@@ -43,7 +45,135 @@ BIEN_STAGING_FIELDS <- c(
   "is_cultivated_observation",
   # Verbatim / elevation
   "verbatimLocality", "verbatimElevation",
-  "elevation_min", "elevation_max"
+  "elevation_min", "elevation_max",
+  # ── Plot Structure (vegetation survey fields; canonical BIEN plot view: plot_area_ha, subplot, individual_count, coord_uncertainty_m, sampling_protocol) ──
+  "cover",                # Percent cover of taxon in plot (0–100) — extension field
+  "cover_total",          # Total vegetation cover in plot (0–100; stand-level) — extension field
+  "relative_cover",       # Cover of taxon relative to all taxa in plot (0–100) — extension field
+  "individual_count",     # BIEN plot view: number of individuals of the taxon in plot
+  "stem_count",           # Number of stems counted (clonal taxa) — extension field
+  "plot_area_ha",         # BIEN plot view: plot surveyed area in hectares
+  "plot_size_m2",         # Plot area in m² (pass-through; convert to ha for BIEN ingest) — extension field
+  "basal_area_m2ha",      # Stand basal area in m²/ha (plot-level aggregate) — extension field
+  "coord_uncertainty_m",  # BIEN plot view: coordinate uncertainty in meters
+  "sampling_protocol",    # BIEN plot view: sampling protocol / methodology
+  # ── Individual Plant Metrics ──────────────────────────────────────────────
+  "height_m",             # Plant height in meters — extension field
+  "dbh_cm",               # Diameter at breast height (1.3 m) in cm — extension field
+  "stratum",              # Vertical stratum: canopy/subcanopy/shrub/herb/ground — extension field
+  "subplot",              # BIEN plot view: subplot or sub-quadrat identifier within the main plot
+  # ── Topography ────────────────────────────────────────────────────────────
+  "slope",                # Slope in degrees (0=flat, 90=vertical) — extension field
+  "aspect",               # Aspect in degrees clockwise from N — extension field
+  "topographic_position"  # Qualitative: ridge/upper slope/mid slope/lower slope/valley — extension field
+)
+
+# ── BIEN Field Definitions (Help tab reference table) ────────────────────────
+BIEN_FIELD_DEFS <- c(
+  scrubbed_species_binomial    = "Accepted species binomial after TNRS name-scrubbing (BIEN DB: scrubbed_species_binomial)",
+  verbatim_scientific_name     = "Original species name as submitted, before any TNRS correction. Never overwritten.",
+  scrubbed_family              = "Accepted family name after TNRS scrubbing",
+  scrubbed_genus               = "Accepted genus after TNRS scrubbing",
+  scrubbed_author              = "Authorship of the accepted name from TNRS",
+  scrubbed_taxonomic_status    = "TNRS taxonomic status: accepted, synonym, etc.",
+  latitude                     = "Decimal latitude in WGS84. Must be in [-90, 90]. Negative = south.",
+  longitude                    = "Decimal longitude in WGS84. Must be in [-180, 180]. Negative = west.",
+  is_centroid                  = "GVS centroid flag: 1 = coordinate matches a political centroid; 0 = checked, not centroid; blank = not checked.",
+  date_collected               = "Collection or observation date. Accepts common date formats (YYYY-MM-DD preferred).",
+  dataset                      = "Dataset or project name this record belongs to.",
+  datasource                   = "Source institution or data repository.",
+  dataowner                    = "Person or organization owning the dataset; often the lead collector.",
+  collection_code              = "Voucher, herbarium, or catalog number for the record.",
+  locality                     = "Textual description of the collection locality.",
+  country                      = "Country name (standardized by GNRS).",
+  state_province               = "State or province name (standardized by GNRS).",
+  county                       = "County or parish name (standardized by GNRS).",
+  plot_name                    = "Plot or site identifier. Used to link observations to plot metadata.",
+  occurrenceID                 = "Globally unique identifier for the occurrence record (Darwin Core).",
+  basisOfRecord                = "Nature of the record: HumanObservation, PreservedSpecimen, etc.",
+  native_status                = "NSR native status: N=native, I=introduced, NI=native+introduced, UNK=unknown.",
+  native_status_reason         = "Basis for NSR native status assignment.",
+  native_status_country        = "Country used to evaluate native status.",
+  native_status_state_province = "State/province used to evaluate native status.",
+  native_status_county_parish  = "County/parish used to evaluate native status.",
+  is_introduced                = "1 if taxon is introduced in the specified region; 0 if not.",
+  is_cultivated_observation    = "1 if this record represents a cultivated individual; generally excluded from range/SDM analyses.",
+  verbatimLocality             = "Verbatim locality string as recorded in the field (not standardized).",
+  verbatimElevation            = "Verbatim elevation as recorded in the field (not converted).",
+  elevation_min                = "Minimum elevation of the collection locality in meters.",
+  elevation_max                = "Maximum elevation of the collection locality in meters.",
+  # Plot structure
+  cover                        = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Percent cover of the taxon within the plot (0-100).",
+  cover_total                  = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Total vegetation cover in the plot (0-100); stand-level aggregate.",
+  relative_cover               = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Cover of the taxon relative to all taxa in the plot (0-100).",
+  individual_count             = "BIEN plot view (view_full_occurrence_individual): number of individuals of the taxon recorded in the plot.",
+  stem_count                   = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Number of stems counted (may differ from individual_count for clonal taxa).",
+  plot_area_ha                 = "BIEN plot view (view_full_occurrence_individual): plot surveyed area in hectares (preferred BIEN unit).",
+  plot_size_m2                 = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Plot area in square meters; convert to ha for BIEN ingest.",
+  basal_area_m2ha              = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Stand basal area in m2/ha (plot-level aggregate, not per-taxon).",
+  coord_uncertainty_m          = "BIEN plot view (view_full_occurrence_individual): coordinate uncertainty in meters around the reported lat/lon.",
+  sampling_protocol            = "BIEN plot view (view_full_occurrence_individual): sampling protocol or methodology used for the plot survey.",
+  # Individual plant metrics
+  height_m                     = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Plant height in meters.",
+  dbh_cm                       = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Diameter at breast height (measured at 1.3 m above ground) in centimeters.",
+  stratum                      = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Vertical stratum of the individual: canopy, subcanopy, shrub, herb, or ground.",
+  subplot                      = "BIEN plot view (view_full_occurrence_individual): subplot or sub-quadrat identifier within the main plot.",
+  # Topography
+  slope                        = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Terrain slope in degrees from horizontal (0 = flat, 90 = vertical cliff).",
+  aspect                       = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Terrain aspect in degrees clockwise from north (0/360=N, 90=E, 180=S, 270=W).",
+  topographic_position         = "Extension field (not in BIEN view_full_occurrence_individual; preserved as pass-through for plot/community datasets). Qualitative topographic position: ridge, upper slope, mid slope, lower slope, or valley."
+)
+
+BIEN_FIELD_CATEGORY <- c(
+  scrubbed_species_binomial    = "Taxonomy",
+  verbatim_scientific_name     = "Taxonomy",
+  scrubbed_family              = "Taxonomy",
+  scrubbed_genus               = "Taxonomy",
+  scrubbed_author              = "Taxonomy",
+  scrubbed_taxonomic_status    = "Taxonomy",
+  latitude                     = "Coordinates",
+  longitude                    = "Coordinates",
+  is_centroid                  = "Coordinates",
+  date_collected               = "Temporal",
+  dataset                      = "Provenance",
+  datasource                   = "Provenance",
+  dataowner                    = "Provenance",
+  collection_code              = "Provenance",
+  sampling_protocol            = "Provenance",
+  locality                     = "Geography",
+  country                      = "Geography",
+  state_province               = "Geography",
+  county                       = "Geography",
+  plot_name                    = "Geography",
+  occurrenceID                 = "Identifiers",
+  basisOfRecord                = "Identifiers",
+  native_status                = "NSR Status",
+  native_status_reason         = "NSR Status",
+  native_status_country        = "NSR Status",
+  native_status_state_province = "NSR Status",
+  native_status_county_parish  = "NSR Status",
+  is_introduced                = "NSR Status",
+  is_cultivated_observation    = "NSR Status",
+  verbatimLocality             = "Verbatim",
+  verbatimElevation            = "Verbatim",
+  elevation_min                = "Elevation",
+  elevation_max                = "Elevation",
+  cover                        = "Plot Structure",
+  cover_total                  = "Plot Structure",
+  relative_cover               = "Plot Structure",
+  individual_count             = "Plot Structure",
+  stem_count                   = "Plot Structure",
+  plot_area_ha                 = "Plot Structure",
+  plot_size_m2                 = "Plot Structure",
+  basal_area_m2ha              = "Plot Structure",
+  coord_uncertainty_m          = "Plot Structure",
+  height_m                     = "Plant Metrics",
+  dbh_cm                       = "Plant Metrics",
+  stratum                      = "Plant Metrics",
+  subplot                      = "Plant Metrics",
+  slope                        = "Topography",
+  aspect                       = "Topography",
+  topographic_position         = "Topography"
 )
 
 DWC_TERMS <- c(
@@ -179,7 +309,38 @@ BIEN_ALIASES <- c(
   transect = "plot_name", station = "plot_name", quadrat = "plot_name",
   voucher = "collection_code", voucher_number = "collection_code",
   catalog_number = "collection_code", specimen_id = "collection_code",
-  locality_description = "verbatimLocality", habitat_notes = "verbatimLocality"
+  locality_description = "verbatimLocality", habitat_notes = "verbatimLocality",
+  # ── Verbatim name aliases ─────────────────────────────────────────────────
+  verbatim_name = "verbatim_scientific_name", verbatim_species = "verbatim_scientific_name",
+  original_name = "verbatim_scientific_name", submitted_name = "verbatim_scientific_name",
+  # ── Plot structure aliases ────────────────────────────────────────────────
+  cover_pct = "cover", pct_cover = "cover", percent_cover = "cover", pct_cov = "cover",
+  cover_total_pct = "cover_total", total_cover = "cover_total",
+  rel_cover = "relative_cover", relative_abundance = "relative_cover",
+  n_individuals = "individual_count", count = "individual_count",
+  abundance_count = "individual_count", ind_count = "individual_count",
+  n_stems = "stem_count", stems = "stem_count", stem_number = "stem_count",
+  area_ha = "plot_area_ha", plot_area = "plot_area_ha", survey_area_ha = "plot_area_ha",
+  plot_size = "plot_size_m2", quadrat_size_m2 = "plot_size_m2",
+  subplot_size_m2 = "plot_size_m2", area_m2 = "plot_size_m2",
+  ba_m2ha = "basal_area_m2ha", stand_ba = "basal_area_m2ha",
+  basal_area = "basal_area_m2ha",
+  coord_uncertainty = "coord_uncertainty_m", coordinate_uncertainty_m = "coord_uncertainty_m",
+  coordinateuncertaintyinmeters = "coord_uncertainty_m",
+  protocol = "sampling_protocol", method = "sampling_protocol",
+  samplingprotocol = "sampling_protocol", survey_method = "sampling_protocol",
+  # ── Individual plant metric aliases ───────────────────────────────────────
+  ht_m = "height_m", plant_height = "height_m", height = "height_m",
+  canopy_height_m = "height_m", tree_height_m = "height_m",
+  dbh = "dbh_cm", stem_diameter_cm = "dbh_cm", diameter_cm = "dbh_cm",
+  layer = "stratum", canopy_layer = "stratum", vegetation_layer = "stratum",
+  subplot_name = "subplot", sub_plot = "subplot", quadrat_id = "subplot",
+  # ── Topography aliases ────────────────────────────────────────────────────
+  slope_deg = "slope", terrain_slope = "slope", slope_degrees = "slope",
+  aspect_deg = "aspect", terrain_aspect = "aspect", exposure = "aspect",
+  aspect_degrees = "aspect",
+  topo = "topographic_position", topo_position = "topographic_position",
+  position = "topographic_position", landform = "topographic_position"
 )
 
 # ── Vectorized auto-suggest ───────────────────────────────────────────────────
@@ -220,6 +381,15 @@ build_staging <- function(merged_df, mapping) {
     fld <- m$bien_field[i]
     if (src %in% names(merged_df) && fld %in% BIEN_STAGING_FIELDS) {
       staged[[fld]] <- as.character(merged_df[[src]])
+    }
+  }
+
+  # ── Capture verbatim_scientific_name before TNRS can overwrite scrubbed name ──
+  # verbatim_scientific_name is intentionally NOT overwritten by TNRS
+  if (all(is.na(staged$verbatim_scientific_name) | staged$verbatim_scientific_name == "")) {
+    spp_row <- m[m$bien_field == "scrubbed_species_binomial", , drop=FALSE]
+    if (nrow(spp_row) > 0 && spp_row$source_col[1] %in% names(merged_df)) {
+      staged$verbatim_scientific_name <- as.character(merged_df[[spp_row$source_col[1]]])
     }
   }
 
@@ -305,6 +475,34 @@ run_qc <- function(staged) {
         severity=sev, example_fail=NA_character_, stringsAsFactors=FALSE)
     }
   }
+
+  # ── Plot field range QC (only fires for rows where field is populated) ──
+  plot_range_check <- function(label, field, lo, hi, sev_fail) {
+    if (!field %in% names(staged)) return(NULL)
+    vals <- as.character(staged[[field]])
+    populated <- !is.na(vals) & trimws(vals) != ""
+    n_pop <- sum(populated)
+    if (n_pop == 0) return(NULL)  # field not populated — skip silently
+    n_vals <- suppressWarnings(as.numeric(vals[populated]))
+    pass_populated <- !is.na(n_vals) & n_vals >= lo & n_vals <= hi
+    n_pass <- sum(pass_populated)
+    n_fail <- n_pop - n_pass
+    ex_fail <- vals[populated][which(!pass_populated)[1]]
+    data.frame(field=field, check=label,
+               n_records=n_pop, n_pass=n_pass, n_fail=n_fail,
+               severity=if(n_fail==0) "PASS" else sev_fail,
+               example_fail=if(is.na(ex_fail)) NA_character_ else ex_fail,
+               stringsAsFactors=FALSE)
+  }
+  rows[["cover"]]       <- plot_range_check("Cover in range [0, 100] %",           "cover",        0, 100, "WARN")
+  rows[["cover_tot"]]   <- plot_range_check("Cover total in range [0, 100] %",      "cover_total",  0, 100, "WARN")
+  rows[["rel_cover"]]   <- plot_range_check("Relative cover in range [0, 100] %",   "relative_cover", 0, 100, "WARN")
+  rows[["slope_qc"]]    <- plot_range_check("Slope in range [0, 90] degrees",        "slope",        0,  90, "WARN")
+  rows[["aspect_qc"]]   <- plot_range_check("Aspect in range [0, 360] degrees",      "aspect",       0, 360, "WARN")
+  rows[["dbh_qc"]]      <- plot_range_check("DBH non-negative (>= 0 cm)",            "dbh_cm",       0, 1e4, "WARN")
+  rows[["height_qc"]]   <- plot_range_check("Height non-negative (>= 0 m)",          "height_m",     0, 200, "WARN")
+  rows[["plotarea_qc"]] <- plot_range_check("Plot area non-negative (>= 0 ha)",       "plot_area_ha", 0, 1e6, "WARN")
+  rows[["ind_cnt_qc"]]  <- plot_range_check("Individual count non-negative (>= 0)",  "individual_count", 0, 1e6, "WARN")
 
   qc <- do.call(rbind, Filter(Negate(is.null), rows))
   if (!is.null(qc)) row.names(qc) <- NULL
@@ -956,6 +1154,17 @@ ui <- navbarPage(
 
         tags$hr(style = "border-color:#d0dce8; margin-bottom:24px;"),
 
+        # ── BIEN Staging Field Reference ──────────────────────────────────────
+        tags$h3("BIEN Staging Field Reference",
+          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:6px;"),
+        tags$p(style = "font-size:0.88rem; color:#666; margin-bottom:12px;",
+          "All recognized BIEN staging fields, their data category, and a plain-language definition.
+           Search or scroll to find any field. This table drives the auto-mapping in Tab 2."),
+        DT::dataTableOutput("help_field_ref"),
+        tags$br(),
+
+        tags$hr(style = "border-color:#d0dce8; margin-bottom:24px;"),
+
         # About / Credits
         tags$h3("About",
           style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
@@ -1258,6 +1467,27 @@ server <- function(input, output, session) {
         "Go to \u20181 \u2022 Upload & Merge\u2019 and click Prepare Dataset.")
     }
   })
+
+  # ── Help tab: Field Reference table ───────────────────────────────────────
+  output$help_field_ref <- DT::renderDataTable({
+    flds <- names(BIEN_FIELD_DEFS)
+    df <- data.frame(
+      Field      = flds,
+      Category   = unname(BIEN_FIELD_CATEGORY[flds]),
+      Definition = unname(BIEN_FIELD_DEFS[flds]),
+      stringsAsFactors = FALSE
+    )
+    DT::datatable(
+      df,
+      rownames = FALSE,
+      colnames = c("BIEN Field", "Category", "Definition"),
+      options  = list(pageLength=15, scrollX=TRUE, dom='frtip',
+        columnDefs=list(list(width='180px', targets=0),
+                        list(width='120px', targets=1),
+                        list(className='dt-wrap', targets=2))),
+      class    = "stripe hover compact"
+    )
+  }, server=FALSE)
 
   # ── Step 2: Mapping table (editable DT) ───────────────────────────────────
   output$mapping_table <- DT::renderDataTable({
