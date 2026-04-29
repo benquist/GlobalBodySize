@@ -230,11 +230,21 @@ for (row_index in seq_len(nrow(supported))) {
   )
 
   tabular_paths <- extract_res$paths
+  filter_res    <- dryad_filter_trait_archive_paths(tabular_paths)
+  tabular_paths <- filter_res$kept
+  if (length(filter_res$filtered) > 0L) {
+    message("  Filtered ", length(filter_res$filtered), " archive noise file(s).")
+  }
   if (!length(tabular_paths)) {
+    skip_msg <- if (length(filter_res$filtered) > 0L && !length(filter_res$kept)) {
+      paste0("all_", length(filter_res$filtered), "_paths_filtered_as_archive_noise")
+    } else {
+      extract_res$message %||% "no_tabular_files_found"
+    }
     first_log <- append_log_row(list(
       provider_dataset_id = ds_id, provider_file_id = file_id,
       file_path = file_name, action = "extract", status = "skipped",
-      message = extract_res$message %||% "no_tabular_files_found",
+      message = skip_msg,
       rows_in = 0L, rows_out = 0L, timestamp_utc = ts
     ), first_log)
     processed_ids <- c(processed_ids, file_id)

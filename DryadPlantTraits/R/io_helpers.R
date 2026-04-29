@@ -288,3 +288,15 @@ dryad_read_supported_inputs <- function(path) {
     log = do.call(rbind, log_rows)
   )
 }
+
+dryad_filter_trait_archive_paths <- function(paths) {
+  blocklist <- "hobo|logger|sensor|balance|metadata|readme"
+  allowlist <- "trait|sla|leaf|species|plant|functional|burn"
+  is_allowed <- grepl(allowlist, paths, ignore.case = TRUE)
+  is_blocked <- grepl(blocklist, paths, ignore.case = TRUE)
+  keep <- is_allowed | !is_blocked
+  list(
+    kept     = paths[keep],
+    filtered = paths[!keep]
+  )
+}
