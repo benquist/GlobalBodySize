@@ -97,12 +97,16 @@ all_dat <- rbindlist(dat_list, use.names = TRUE, fill = TRUE)
 # -- Coordinate validity
 all_dat[, lat_num := suppressWarnings(as.numeric(latitude))]
 all_dat[, lon_num := suppressWarnings(as.numeric(longitude))]
-all_dat[, has_coord := is.finite(lat_num) & is.finite(lon_num)]
+all_dat[, has_coord := is.finite(lat_num) & is.finite(lon_num) &
+                    lat_num >= -90 & lat_num <= 90 &
+                    lon_num >= -180 & lon_num <= 180]
 
 for (k in names(dat_list)) {
   dat_list[[k]][, lat_num := suppressWarnings(as.numeric(latitude))]
   dat_list[[k]][, lon_num := suppressWarnings(as.numeric(longitude))]
-  dat_list[[k]][, has_coord := is.finite(lat_num) & is.finite(lon_num)]
+  dat_list[[k]][, has_coord := is.finite(lat_num) & is.finite(lon_num) &
+                          lat_num >= -90 & lat_num <= 90 &
+                          lon_num >= -180 & lon_num <= 180]
 }
 ```
 
@@ -547,54 +551,76 @@ if (requireNamespace("leaflet", quietly = TRUE)) {
 
   total_georef <- nrow(coord_dat)
 
-  set.seed(42)
-  samp_list <- lapply(unique(coord_dat$provider), function(prov) {
-    sub <- coord_dat[provider == prov]
-    if (nrow(sub) > 10000) sub <- sub[sample(.N, 10000)]
-    sub
-  })
-  map_dat <- rbindlist(samp_list, fill = TRUE)
-
-  esc <- function(x) htmltools::htmlEscape(ifelse(is.na(x), "", as.character(x)))
-  map_dat[, popup_text := paste0(
-    "<b>", esc(scrubbed_species_binomial), "</b><br>",
-    ifelse(is.na(trait_name), "", paste0(esc(trait_name), ": ")),
-    esc(trait_value), " ", esc(unit), "<br>",
-    "Source: ", esc(source_title), "<br>",
-    "Country: ", esc(country)
-  )]
-
-  map_providers <- unique(map_dat$provider)
-  pal <- leaflet::colorFactor(
-    palette = c("DataDryad" = "#1f77b4", "Zenodo" = "#ff7f0e",
-                "Scientific Data" = "#2ca02c"),
-    domain  = c("DataDryad", "Zenodo", "Scientific Data"),
-    na.color = "#999999"
-  )
-
-  map_out <- leaflet::leaflet(map_dat) |>
-    leaflet::addTiles() |>
-    leaflet::addCircleMarkers(
-      lng         = ~lon_num,
-      lat         = ~lat_num,
-      radius      = 4,
-      color       = ~pal(provider),
-      fillColor   = ~pal(provider),
-      opacity     = 0.7,
-      fillOpacity = 0.5,
-      popup       = ~popup_text
-    ) |>
-    leaflet::addLegend(
-      position = "bottomright",
-      pal      = pal,
-      values   = ~provider,
-      title    = "Provider"
+  if (total_georef == 0L) {
+    cat(
+      "> **Map note:** No valid coordinate rows are available after coordinate filtering. Displaying a base map with no points.\n\n"
     )
+    leaflet::leaflet() |>
+      leaflet::addTiles()
+  } else {
 
-  cat("> **Map note:** Displaying a random sample of up to 10,000 records per provider for performance.",
-      "Total georeferenced records:", formatC(total_georef, format = "d", big.mark = ","), "\n\n")
+    set.seed(42)
+    samp_list <- lapply(unique(coord_dat$provider), function(prov) {
+      sub <- coord_dat[provider == prov]
+      if (nrow(sub) > 10000) sub <- sub[sample(.N, 10000)]
+      sub
+    })
+    map_dat <- rbindlist(samp_list, fill = TRUE)
+    plotted_n <- nrow(map_dat)
 
-  map_out
+    if (plotted_n == 0L || !all(c("lat_num", "lon_num", "provider") %in% names(map_dat))) {
+      cat(
+        "> **Map note:** No mappable sampled points were produced after filtering/sampling. Displaying a base map with no points.",
+        "Total georeferenced records:", formatC(total_georef, format = "d", big.mark = ","),
+        "| Plotted points:", formatC(plotted_n, format = "d", big.mark = ","), "\n\n"
+      )
+      leaflet::leaflet() |>
+        leaflet::addTiles()
+    } else {
+
+      esc <- function(x) htmltools::htmlEscape(ifelse(is.na(x), "", as.character(x)))
+      map_dat[, popup_text := paste0(
+        "<b>", esc(scrubbed_species_binomial), "</b><br>",
+        ifelse(is.na(trait_name), "", paste0(esc(trait_name), ": ")),
+        esc(trait_value), " ", esc(unit), "<br>",
+        "Source: ", esc(source_title), "<br>",
+        "Country: ", esc(country)
+      )]
+
+      map_providers <- unique(map_dat$provider)
+      pal <- leaflet::colorFactor(
+        palette = c("DataDryad" = "#1f77b4", "Zenodo" = "#ff7f0e",
+                    "Scientific Data" = "#2ca02c"),
+        domain  = c("DataDryad", "Zenodo", "Scientific Data"),
+        na.color = "#999999"
+      )
+
+      map_out <- leaflet::leaflet(map_dat) |>
+        leaflet::addTiles() |>
+        leaflet::addCircleMarkers(
+          lng         = ~lon_num,
+          lat         = ~lat_num,
+          radius      = 4,
+          color       = ~pal(provider),
+          fillColor   = ~pal(provider),
+          opacity     = 0.7,
+          fillOpacity = 0.5,
+          popup       = ~popup_text
+        ) |>
+        leaflet::addLegend(
+          position = "bottomright",
+          pal      = pal,
+          values   = ~provider,
+          title    = "Provider"
+        )
+
+      cat("> **Map note:** Displaying a random sample of up to 10,000 records per provider for performance.",
+        "Total georeferenced records:", formatC(total_georef, format = "d", big.mark = ","),
+        "| Plotted points:", formatC(plotted_n, format = "d", big.mark = ","), "\n\n")
+
+      map_out
+    }
+  }
 } else {
   cat("> **Note:** `leaflet` is not installed. Interactive map skipped.",
       "Install with `install.packages('leaflet')` and re-render.\n")
@@ -772,7 +798,23 @@ ggplot(flag_df, aes(x = reorder(flag_code, count), y = count / 1e3)) +
 
 ---
 
-## 10 Session Info {#session-info}
+## 10 Pending Sources — Manual Intake Queue {#pending-sources}
+
+These are user-supplied sources queued for review and potential ingestion into the pipeline. They are tracked in `data/manual_source_intake.csv` and have not yet been formally harvested or deduplicated against existing provider outputs.
+
+```{r pending-sources-table, message=FALSE}
+message(Sys.time(), " - loaded [pending-sources-table]")
+manual_intake <- data.table::fread(file.path(proj_root, "data", "manual_source_intake.csv"))
+cols_show <- c("display_name", "source_group", "canonical_url_or_doi",
+               "related_publication", "harvest_status", "next_action")
+DT::datatable(manual_intake[, ..cols_show], rownames = FALSE, options = list(scrollX = TRUE))
+```
+
+All 6 sources are at status `pending_review`. Three are files supplied directly by Jesse Miller (data contact for the Spasojevic et al. 2016 Ozark trait study). One is the ShrubHub TraitHub GitHub repository (Bjorkman et al. 2018 Nature). One is email context from the same Jesse Miller. One is field data from Pablo Peri's BEPSP Patagonia network (Peri et al. 2016 J. Nature Conservation).
+
+---
+
+## 11 Session Info {#session-info}
 
 ```{r session-info}
 message(Sys.time(), " - loaded [session-info]")
