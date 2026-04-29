@@ -3,6 +3,9 @@ library(DT)
 library(httr)
 library(jsonlite)
 
+# Allow larger uploads on shinyapps while keeping in-app warnings for large files.
+options(shiny.maxRequestSize = 100 * 1024^2)
+
 # ── Cloudflare Worker relay URLs (replace YOUR_SUBDOMAIN with your workers.dev account name) ──
 TNRS_URL <- "https://bien-relay-tnrs.benquist.workers.dev"
 GNRS_URL <- "https://bien-relay-gnrs.benquist.workers.dev"
@@ -58,6 +61,63 @@ DWC_TERMS <- c(
 
 canonicalize <- function(x) {
   gsub("_+", "_", gsub("[^a-z0-9]+", "_", tolower(trimws(as.character(x)))))
+}
+
+blank_row_filter <- function(df) {
+  if (nrow(df) == 0L || ncol(df) == 0L) return(df)
+  not_blank <- Reduce(`|`, lapply(df, function(col) {
+    s <- trimws(as.character(col))
+    !is.na(col) & nzchar(s) & s != "NA"
+  }))
+  df[not_blank, , drop = FALSE]
+}
+
+safe_read_csv_with_fallbacks <- function(path, file_label = basename(path)) {
+  sniffed_sep <- tryCatch({
+    hdr <- readLines(path, n = 1L, warn = FALSE, encoding = "UTF-8")
+    n_comma <- nchar(hdr) - nchar(gsub(",", "", hdr, fixed = TRUE))
+    n_semi  <- nchar(hdr) - nchar(gsub(";", "", hdr, fixed = TRUE))
+    if (n_semi > n_comma) ";" else ","
+  }, error = function(e) NULL)
+
+  sep_candidates <- if (!is.null(sniffed_sep))
+    c(sniffed_sep, setdiff(c(",", ";"), sniffed_sep))
+  else c(",", ";")
+
+  attempts <- expand.grid(
+    sep          = sep_candidates,
+    fileEncoding = c("UTF-8", "latin1"),
+    stringsAsFactors = FALSE
+  )
+  errors <- character(0)
+
+  for (i in seq_len(nrow(attempts))) {
+    sep_i <- attempts$sep[i]
+    enc_i <- attempts$fileEncoding[i]
+    res <- tryCatch(
+      utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE,
+                      sep = sep_i, fileEncoding = enc_i),
+      error = function(e) e
+    )
+
+    if (!inherits(res, "error")) {
+      if (ncol(res) == 1L) {
+        hdr <- names(res)[1]
+        wrong_sep <- (sep_i == "," && grepl(";", hdr, fixed = TRUE)) ||
+                     (sep_i == ";" && grepl(",", hdr, fixed = TRUE))
+        if (isTRUE(wrong_sep)) {
+          errors <- c(errors, paste0("sep='", sep_i, "', enc=", enc_i, ": one-column parse"))
+          next
+        }
+      }
+      return(res)
+    }
+
+errors <- c(errors, paste0("sep='", sep_i, "', enc=", enc_i, ": ", conditionMessage(res)))
+  }
+
+  stop(paste0("Could not read '", file_label, "'. Tried comma/semicolon separators and UTF-8/Latin-1. Errors: ",
+              paste(errors, collapse = " | ")), call. = FALSE)
 }
 
 # ── Mapping lookup tables (built once at load time) ───────────────────────────
@@ -518,8 +578,10 @@ ui <- navbarPage(
         tags$div(class="bl-card",
           tags$span(class="step-badge", "2"),
           tags$strong("Review and adjust field mappings"),
-          tags$span(style="color:#555; font-size:0.9em; margin-left:8px;",
-            "Edit any cell in the table below, then click Apply."),
+          tags$div(style="color:#4f6272; font-size:0.9em; margin-top:6px;",
+            "Choose mappings from the dropdowns for approved Darwin Core and BIEN fields.",
+            tags$br(),
+            "Do not type or invent Darwin Core/BIEN field strings. Leave a mapping blank to skip that source column, then click Apply Mapping."),
           tags$br(), tags$br(),
           actionButton("btn_apply_mapping", "Apply Mapping \u25b6", class="btn-primary"),
           tags$span(style="margin-left:12px;"),
@@ -955,6 +1017,29 @@ server <- function(input, output, session) {
     NULL
   }
 
+  approved_mapping_choices <- list(
+    dwc = c("", DWC_TERMS),
+    bien = c("", BIEN_STAGING_FIELDS)
+  )
+
+  build_mapping_select_html <- function(selected, choices, select_class, row_idx) {
+    selected_val <- if (is.null(selected) || is.na(selected)) "" else as.character(selected)
+    option_tags <- vapply(choices, function(choice) {
+      label <- if (nzchar(choice)) choice else " "
+      paste0(
+        "<option value=\"", htmltools::htmlEscape(choice), "\"",
+        if (identical(choice, selected_val)) " selected" else "",
+        ">", htmltools::htmlEscape(label), "</option>"
+      )
+    }, character(1))
+    paste0(
+      "<select class='form-control input-sm ", select_class, "' data-row='", row_idx,
+      "' style='min-width:220px;'>",
+      paste(option_tags, collapse = ""),
+      "</select>"
+    )
+  }
+
   # ── Load raw files whenever source changes (for column detection only) ──────
   observe({
     # Clear all downstream state when source switches
@@ -977,26 +1062,66 @@ server <- function(input, output, session) {
         "plot_metadata.csv" = read.csv(meta_path, stringsAsFactors=FALSE, check.names=FALSE)
       )
       # Strip completely blank rows from demo data
-      rv$raw_files <- lapply(rv$raw_files, function(df) {
-        df[rowSums(!is.na(df) & trimws(as.matrix(df)) != "") > 0, , drop=FALSE]
-      })
+      rv$raw_files <- lapply(rv$raw_files, blank_row_filter)
     } else if (!is.null(input$files)) {
+      too_large <- input$files$name[input$files$size > 100 * 1024 * 1024]
+      if (length(too_large) > 0) {
+        rv$raw_files <- NULL
+        showNotification(
+          paste0(
+            "Upload rejected: file(s) exceed app maximum upload size (100 MB): ",
+            paste(too_large, collapse = ", "),
+            "."
+          ),
+          type = "error", duration = 12
+        )
+        return()
+      }
+
+      total_bytes <- sum(input$files$size)
+      if (total_bytes > 200 * 1024^2) {
+        rv$raw_files <- NULL
+        showNotification(
+          paste0("Upload rejected: combined size (", round(total_bytes / 1024^2, 1),
+                 " MB) exceeds the 200 MB aggregate limit. Upload fewer or smaller files."),
+          type = "error", duration = 12
+        )
+        return()
+      }
+
       # Basic file size guard: warn if any file > 50 MB
       large <- input$files$name[input$files$size > 50 * 1024 * 1024]
       if (length(large) > 0) {
         showNotification(paste0("Large file(s) detected (> 50 MB): ",
-          paste(large, collapse=", "), ". Loading may be slow."),
+          paste(large, collapse=", "), ". Loading may be slow. App upload limit is 100 MB per file."),
           type="warning", duration=10)
       }
-      rv$raw_files <- setNames(
-        lapply(input$files$datapath,
-               function(p) {
-                 df <- read.csv(p, stringsAsFactors=FALSE, check.names=FALSE)
-                 # Strip completely blank rows (e.g. trailing empty line in CSV)
-                 df[rowSums(!is.na(df) & trimws(as.matrix(df)) != "") > 0, , drop=FALSE]
-               }),
-        input$files$name
+
+      loaded <- tryCatch(
+        {
+          setNames(
+            lapply(seq_along(input$files$datapath), function(i) {
+              p <- input$files$datapath[[i]]
+              n <- input$files$name[[i]]
+              df <- safe_read_csv_with_fallbacks(p, file_label = n)
+              blank_row_filter(df)
+            }),
+            input$files$name
+          )
+        },
+        error = function(e) e
       )
+
+      if (inherits(loaded, "error")) {
+        rv$raw_files <- NULL
+        showNotification(
+          paste0("Upload failed. Please check CSV delimiter/encoding and retry. ", conditionMessage(loaded)),
+          type = "error", duration = 12
+        )
+        return()
+      }
+
+      rv$raw_files <- loaded
     }
   })
 
@@ -1077,6 +1202,17 @@ server <- function(input, output, session) {
       rv$tnrs_result   <- NULL
       rv$gnrs_result   <- NULL
       rv$gvs_result    <- NULL
+
+      showModal(modalDialog(
+        title = "Step 1 complete",
+        tags$p("Your dataset is prepared."),
+        tags$p("Why this matters: mapping each source column to approved Darwin Core and BIEN fields ensures a valid schema and reliable staging outputs."),
+        easyClose = TRUE,
+        footer = tagList(
+          actionButton("btn_go_map", "Go to 2 \u2022 Map Fields \u2192", class = "btn btn-primary"),
+          modalButton("Close")
+        )
+      ))
       rv$nsr_result    <- NULL
     }, error = function(e) {
       showNotification(
@@ -1094,7 +1230,10 @@ server <- function(input, output, session) {
       tags$br(),
       paste0(nrow(rv$merged), " rows \u00d7 ", ncol(rv$merged), " columns"),
       tags$br(),
-      paste0("Files: ", paste(names(rv$raw_files), collapse=", "))
+      paste0("Files: ", paste(names(rv$raw_files), collapse=", ")),
+      tags$hr(style="margin:8px 0;"),
+      tags$span(style="color:#36556e;",
+        "Next: Click '2 \u2022 Map Fields' to confirm how your source columns map to approved Darwin Core and BIEN fields before staging.")
     )
   })
 
@@ -1123,25 +1262,66 @@ server <- function(input, output, session) {
   # ── Step 2: Mapping table (editable DT) ───────────────────────────────────
   output$mapping_table <- DT::renderDataTable({
     req(rv$mapping_draft)
+    mapping_view <- rv$mapping_draft
+    mapping_view$dwc_term <- vapply(seq_len(nrow(mapping_view)), function(i) {
+      build_mapping_select_html(
+        selected = mapping_view$dwc_term[i],
+        choices = approved_mapping_choices$dwc,
+        select_class = "map-dwc",
+        row_idx = i
+      )
+    }, character(1))
+    mapping_view$bien_field <- vapply(seq_len(nrow(mapping_view)), function(i) {
+      build_mapping_select_html(
+        selected = mapping_view$bien_field[i],
+        choices = approved_mapping_choices$bien,
+        select_class = "map-bien",
+        row_idx = i
+      )
+    }, character(1))
     DT::datatable(
-      rv$mapping_draft,
-      editable = list(target="cell", disable=list(columns=0L)),
+      mapping_view,
+      editable = FALSE,
+      escape = FALSE,
       rownames = FALSE,
       colnames = c("Source Column", "Suggested DWC Term", "Suggested BIEN Field"),
       options  = list(pageLength=30, scrollX=TRUE, dom='frtip'),
-      caption  = "Edit 'Suggested DWC Term' or 'Suggested BIEN Field' cells directly (Source Column is locked), then click Apply Mapping."
+      caption  = "Use dropdowns only: choose approved Darwin Core and BIEN fields (or leave blank). Do not type or invent BIEN/Darwin field strings. Then click Apply Mapping.",
+      callback = DT::JS(
+        "table.on('change', 'select.map-dwc', function() {",
+        "  var row = $(this).data('row');",
+        "  Shiny.setInputValue('mapping_dwc_change', {row: row, value: this.value, nonce: Math.random()}, {priority: 'event'});",
+        "});",
+        "table.on('change', 'select.map-bien', function() {",
+        "  var row = $(this).data('row');",
+        "  Shiny.setInputValue('mapping_bien_change', {row: row, value: this.value, nonce: Math.random()}, {priority: 'event'});",
+        "});"
+      )
     )
   }, server=FALSE)
 
-  observeEvent(input$mapping_table_cell_edit, {
-    info <- input$mapping_table_cell_edit
-    df   <- rv$mapping_draft
-    # DT 0-indexed col: +1 for R 1-indexed, but rownames=FALSE means col 0 = source_col (col 1 in df)
-    col_idx <- info$col + 1L
-    if (col_idx >= 1L && col_idx <= ncol(df)) {
-      df[info$row, col_idx] <- info$value
-      rv$mapping_draft <- df
-    }
+  observeEvent(input$mapping_dwc_change, {
+    req(rv$mapping_draft)
+    info <- input$mapping_dwc_change
+    row_idx <- suppressWarnings(as.integer(info$row))
+    if (is.na(row_idx) || row_idx < 1 || row_idx > nrow(rv$mapping_draft)) return()
+    val <- if (is.null(info$value)) "" else as.character(info$value)
+    if (!(val %in% approved_mapping_choices$dwc)) return()
+    df <- rv$mapping_draft
+    df$dwc_term[row_idx] <- if (nzchar(val)) val else NA_character_
+    rv$mapping_draft <- df
+  })
+
+  observeEvent(input$mapping_bien_change, {
+    req(rv$mapping_draft)
+    info <- input$mapping_bien_change
+    row_idx <- suppressWarnings(as.integer(info$row))
+    if (is.na(row_idx) || row_idx < 1 || row_idx > nrow(rv$mapping_draft)) return()
+    val <- if (is.null(info$value)) "" else as.character(info$value)
+    if (!(val %in% approved_mapping_choices$bien)) return()
+    df <- rv$mapping_draft
+    df$bien_field[row_idx] <- if (nzchar(val)) val else NA_character_
+    rv$mapping_draft <- df
   })
 
   observeEvent(input$btn_apply_mapping, {
@@ -1174,6 +1354,29 @@ server <- function(input, output, session) {
         )
       })
     }
+
+    if (!is.null(rv$mapping) && !is.null(rv$staged)) {
+      showModal(modalDialog(
+        title = "Step 2 complete",
+        "Mapping has been applied.",
+        tags$p("Reason: this mapping created BIEN staging and Darwin Core outputs for review before export."),
+        easyClose = TRUE,
+        footer = tagList(
+          actionButton("btn_go_stage", "Go to 3 \u2022 Stage & Validate \u2192", class = "btn btn-primary"),
+          modalButton("Close")
+        )
+      ))
+    }
+  })
+
+  observeEvent(input$btn_go_map, {
+    removeModal()
+    updateNavbarPage(session, "tabs", selected = "2 \u2022 Map Fields")
+  })
+
+  observeEvent(input$btn_go_stage, {
+    removeModal()
+    updateNavbarPage(session, "tabs", selected = "3 \u2022 Stage & Validate")
   })
 
   output$step2_status_inline <- renderUI({
@@ -1181,7 +1384,7 @@ server <- function(input, output, session) {
     n_dwc  <- sum(!is.na(rv$mapping$dwc_term) & nzchar(trimws(rv$mapping$dwc_term)))
     n_bien <- sum(!is.na(rv$mapping$bien_field) & nzchar(trimws(rv$mapping$bien_field)))
     tags$span(style="color:#27ae60; font-weight:600;",
-      paste0("Mapping applied \u2014 ", n_dwc, " DWC terms, ", n_bien, " BIEN fields mapped"))
+      paste0("Mapping applied \u2014 ", n_dwc, " DWC terms, ", n_bien, " BIEN fields mapped. Next: open '3 \u2022 Stage & Validate'."))
   })
 
   # ── Tab 3 gating ─────────────────────────────────────────────────────────
@@ -1190,6 +1393,10 @@ server <- function(input, output, session) {
       tags$div(class="bl-card bl-card-warn",
         tags$strong("Complete Step 2 first: "),
         "Go to \u20182 \u2022 Map Fields\u2019 and click Apply Mapping.")
+    } else {
+      tags$div(class="bl-card",
+        tags$strong("Next in Step 3: "),
+        "Review the staging table and QC details here, then continue to '4 \u2022 Export' when everything looks correct.")
     }
   })
 
@@ -1206,7 +1413,7 @@ server <- function(input, output, session) {
     card_cls <- if (n_block > 0) "bl-card bl-card-block" else
                 if (n_warn  > 0) "bl-card bl-card-warn"  else "bl-card bl-card-pass"
 
-    verdict <- if (n_block > 0) "Export blocked \u2014 fix BLOCK issues" else
+    verdict <- if (n_block > 0) "Export caution \u2014 review BLOCK issues" else
                if (n_warn  > 0) "Ready with warnings" else "All checks passed"
 
     tags$div(class=card_cls,
@@ -1331,9 +1538,10 @@ server <- function(input, output, session) {
           "Name_submitted" %in% names(rv$tnrs_result)) {
         tnrs <- rv$tnrs_result
         stg  <- rv$staged
+        stg_names_key <- trimws(stg$scrubbed_species_binomial)
         for (i in seq_len(nrow(tnrs))) {
           submitted <- tnrs$Name_submitted[i]
-          rows <- which(trimws(stg$scrubbed_species_binomial) == trimws(submitted))
+          rows <- which(stg_names_key == trimws(submitted))
           if (length(rows) == 0) next
           # Accepted name (prefer Accepted_name, fall back to Name_matched)
           acc <- NA_character_
@@ -1901,7 +2109,9 @@ server <- function(input, output, session) {
       tags$div(class = "bl-card bl-card-pass", style = "margin-bottom:12px;",
         tags$p(style = "margin:0; font-size:0.9rem; color:#1a5c35;",
           tags$strong("The BIEN Staging Table is ready for export."),
-          " It contains the original columns alongside reconciled BIEN schema fields.")
+          " It contains the original columns alongside reconciled BIEN schema fields."),
+        tags$p(style = "margin:8px 0 0 0; font-size:0.86rem; color:#1a5c35;",
+          "After review, click 'Go to Export (Tab 4) \u2192' to continue.")
       ),
 
       # Science review reminder
@@ -2004,23 +2214,30 @@ server <- function(input, output, session) {
   # ── TNRS upload-back ──────────────────────────────────────────────────────
   observeEvent(input$upload_tnrs, {
     req(input$upload_tnrs)
+    if (input$upload_tnrs$size > 20 * 1024^2) {
+      showNotification("Upload rejected: TNRS results file exceeds 20 MB. Confirm you selected the correct results CSV.", type = "error", duration = 10)
+      return()
+    }
     if (is.null(rv$staged)) {
       showNotification("No staging table — complete Steps 1-3 before uploading TNRS results.",
                        type="error", duration=10)
       return()
     }
     tryCatch({
-      df <- utils::read.csv(input$upload_tnrs$datapath, stringsAsFactors=FALSE,
-                            check.names=FALSE)
+      df <- safe_read_csv_with_fallbacks(
+        input$upload_tnrs$datapath,
+        file_label = input$upload_tnrs$name
+      )
       if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
       rv$tnrs_result <- df
 
       if ("Name_submitted" %in% names(df) && !"note" %in% names(df)) {
         tnrs <- df
         stg  <- rv$staged
+        stg_names_key <- trimws(stg$scrubbed_species_binomial)
         for (i in seq_len(nrow(tnrs))) {
           submitted <- tnrs$Name_submitted[i]
-          rows <- which(trimws(stg$scrubbed_species_binomial) == trimws(submitted))
+          rows <- which(stg_names_key == trimws(submitted))
           if (length(rows) == 0) next
           for (col in c("Accepted_name","Name_matched")) {
             if (col %in% names(tnrs) && !is.na(tnrs[[col]][i]) && nzchar(trimws(tnrs[[col]][i]))) {
@@ -2065,14 +2282,20 @@ server <- function(input, output, session) {
   # ── GNRS upload-back ──────────────────────────────────────────────────────
   observeEvent(input$upload_gnrs, {
     req(input$upload_gnrs)
+    if (input$upload_gnrs$size > 20 * 1024^2) {
+      showNotification("Upload rejected: GNRS results file exceeds 20 MB. Confirm you selected the correct results CSV.", type = "error", duration = 10)
+      return()
+    }
     if (is.null(rv$staged)) {
       showNotification("No staging table — complete Steps 1-3 before uploading GNRS results.",
                        type="error", duration=10)
       return()
     }
     tryCatch({
-      df <- utils::read.csv(input$upload_gnrs$datapath, stringsAsFactors=FALSE,
-                            check.names=FALSE)
+      df <- safe_read_csv_with_fallbacks(
+        input$upload_gnrs$datapath,
+        file_label = input$upload_gnrs$name
+      )
       if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
       rv$gnrs_result <- df
 
@@ -2120,14 +2343,20 @@ server <- function(input, output, session) {
   # ── GVS upload-back ───────────────────────────────────────────────────────
   observeEvent(input$upload_gvs, {
     req(input$upload_gvs)
+    if (input$upload_gvs$size > 20 * 1024^2) {
+      showNotification("Upload rejected: GVS results file exceeds 20 MB. Confirm you selected the correct results CSV.", type = "error", duration = 10)
+      return()
+    }
     if (is.null(rv$staged)) {
       showNotification("No staging table — complete Steps 1-3 before uploading GVS results.",
                        type="error", duration=10)
       return()
     }
     tryCatch({
-      df <- utils::read.csv(input$upload_gvs$datapath, stringsAsFactors=FALSE,
-                            check.names=FALSE)
+      df <- safe_read_csv_with_fallbacks(
+        input$upload_gvs$datapath,
+        file_label = input$upload_gvs$name
+      )
       if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
       rv$gvs_result <- df
 
@@ -2173,14 +2402,20 @@ server <- function(input, output, session) {
   # ── NSR upload-back ───────────────────────────────────────────────────────
   observeEvent(input$upload_nsr, {
     req(input$upload_nsr)
+    if (input$upload_nsr$size > 20 * 1024^2) {
+      showNotification("Upload rejected: NSR results file exceeds 20 MB. Confirm you selected the correct results CSV.", type = "error", duration = 10)
+      return()
+    }
     if (is.null(rv$staged)) {
       showNotification("No staging table — complete Steps 1-3 before uploading NSR results.",
                        type="error", duration=10)
       return()
     }
     tryCatch({
-      df <- utils::read.csv(input$upload_nsr$datapath, stringsAsFactors=FALSE,
-                            check.names=FALSE)
+      df <- safe_read_csv_with_fallbacks(
+        input$upload_nsr$datapath,
+        file_label = input$upload_nsr$name
+      )
       if (nrow(df) == 0) stop("Uploaded CSV has no rows.")
       rv$nsr_result <- df
 
@@ -2234,115 +2469,6 @@ server <- function(input, output, session) {
       showNotification(paste0("NSR upload failed: ", conditionMessage(e)),
                        type="error", duration=10)
     })
-  })
-
-  # ── Validation-complete modal (fires when all 4 services succeed) ─────────
-  observe({
-    t <- rv$tnrs_result; g <- rv$gnrs_result
-    v <- rv$gvs_result;  n <- rv$nsr_result
-    all_ran <- !is.null(t) && !is.null(g) && !is.null(v) && !is.null(n)
-    all_ok  <- all_ran &&
-      !"note" %in% names(t) &&
-      !"note" %in% names(g) &&
-      !"note" %in% names(v) &&
-      !"note" %in% names(n)
-    if (!all_ok) return()
-
-    showModal(modalDialog(
-      title = tags$span(
-        style = "color:#27ae60; font-size:1.25em; font-weight:700;",
-        "\u2713  BIEN Validation Complete"
-      ),
-
-      # ── Service checklist ──────────────────────────────────────────────────
-      tags$div(class = "bl-card bl-card-pass",
-        style = "margin-bottom:16px;",
-        tags$p(
-          style = "margin:0 0 10px 0; font-weight:600; color:#1a6640;",
-          "All four BIEN web services completed successfully:"
-        ),
-        tags$table(
-          style = "width:100%; border-collapse:collapse; font-size:0.9em;",
-          tags$tr(
-            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
-                    tags$strong("TNRS")),
-            tags$td(style="color:#555;",
-                    "Taxonomic Name Resolution Service — scientific names resolved against WCVP / WFO")
-          ),
-          tags$tr(
-            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
-                    tags$strong("GNRS")),
-            tags$td(style="color:#555;",
-                    "Geographic Name Resolution Service — country, state, and county names standardized")
-          ),
-          tags$tr(
-            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
-                    tags$strong("GVS")),
-            tags$td(style="color:#555;",
-                    "Geographic Validation Service — coordinate centroid precision issues flagged")
-          ),
-          tags$tr(
-            tags$td(style="padding:4px 10px 4px 0; white-space:nowrap;",
-                    tags$strong("NSR")),
-            tags$td(style="color:#555;",
-                    "Native Species Resolver — native, introduced, and cultivated status assigned per region")
-          )
-        )
-      ),
-
-      # ── Staging table ready ────────────────────────────────────────────────
-      tags$div(class = "bl-card bl-card-pass",
-        style = "margin-bottom:16px;",
-        tags$p(
-          style = "margin:0; font-weight:600; color:#1a6640;",
-          "BIEN Staging Table is built and ready to export."
-        )
-      ),
-
-      # ── Review reminder ────────────────────────────────────────────────────
-      tags$div(class = "bl-card bl-card-warn",
-        style = "margin-bottom:4px;",
-        tags$p(
-          style = "margin:0 0 6px 0; font-weight:600;",
-          "\u26a0\ufe0f  Before exporting, review each service\u2019s results tab:"
-        ),
-        tags$ul(
-          style = "margin:0; padding-left:20px; color:#555; font-size:0.9em;",
-          tags$li(
-            tags$strong("TNRS Results:"),
-            " check for ambiguous or low-confidence name matches that may require manual curation."
-          ),
-          tags$li(
-            tags$strong("NSR Results:"),
-            " native / introduced / cultivated interpretations are region-specific and should be ",
-            "reviewed in the context of your collection method and intended use."
-          )
-        )
-      ),
-
-      footer = tagList(
-        actionButton(
-          "modal_go_export",
-          label   = tags$span(
-            tags$strong("Go to Export (Tab 4)"),
-            style = "font-size:0.95em;"
-          ),
-          style   = paste(
-            "background-color:#2f6fab; color:#fff; border:none;",
-            "padding:8px 20px; border-radius:4px; cursor:pointer;"
-          )
-        ),
-        tags$span(style = "display:inline-block; width:8px;"),
-        modalButton("Close")
-      ),
-      easyClose = TRUE,
-      size      = "m"
-    ))
-  }) |> bindEvent(rv$nsr_result, ignoreNULL = TRUE, ignoreInit = TRUE)
-
-  observeEvent(input$modal_go_export, {
-    removeModal()
-    updateNavbarPage(session, "tabs", selected = "4 \u2022 Export")
   })
 
   # ── Tab 4 gating ─────────────────────────────────────────────────────────

@@ -343,3 +343,14 @@
 - FIX 5 (LOW): Pre-hoisted `stg_names_key <- trimws(stg$scrubbed_species_binomial)` before both TNRS writeback loops to avoid repeated full-vector recompute per iteration.
 
 **Validation:** `parse(file='BIENDataLoader/app.R')` → PARSE_OK; `blank_row_filter` smoke test → BLANK_FILTER_OK.
+
+## 2026-04-29 — Guided step-flow UX refinement (Scandinavian direction)
+
+**Prompt:** Improve user guidance through BIEN Data Loader tabs: explicit Step 1 handoff to Tab 2 with rationale, stronger Tab 2 mapping instructions, dropdown-only approved Darwin Core/BIEN mapping choices, Step 2 modal handoff to Tab 3, and continued next-step guidance to Tab 4 without changing core data logic.
+
+**Summary:**
+- Added Step 1 completion modal with rationale and CTA navigation to `2 • Map Fields`.
+- Strengthened Tab 2 instruction copy and mapping caption to emphasize dropdown-only approved terms (no free-typed BIEN/DWC strings).
+- Kept Step 2 completion modal and added direct CTA navigation to `3 • Stage & Validate`.
+- Consolidated Step 3 completion path to a single canonical modal/observer flow and explicit export handoff to `4 • Export`.
+- Preserved core processing behavior; parse checks passed.

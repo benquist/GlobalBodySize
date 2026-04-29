@@ -309,8 +309,10 @@ ui <- navbarPage(
         tags$div(class="bl-card",
           tags$span(class="step-badge", "2"),
           tags$strong("Review and adjust field mappings"),
-          tags$span(style="color:#555; font-size:0.9em; margin-left:8px;",
-            "Edit any cell in the table below, then click Apply."),
+          tags$div(style="color:#4f6272; font-size:0.9em; margin-top:6px;",
+            "Choose mappings from the dropdowns for approved Darwin Core and BIEN fields.",
+            tags$br(),
+            "Do not type or invent Darwin Core/BIEN field strings. Leave a mapping blank to skip that source column, then click Apply Mapping."),
           tags$br(), tags$br(),
           actionButton("btn_apply_mapping", "Apply Mapping \u25b6", class="btn-primary"),
           tags$span(style="margin-left:12px;"),
@@ -412,7 +414,8 @@ server <- function(input, output, session) {
     dwc          = NULL,
     qc           = NULL,
     tnrs_result  = NULL,
-    gnrs_result  = NULL
+      gnrs_result  = NULL,
+      completion_modal_shown = FALSE
   )
 
   # ── Resolve demo data path reliably regardless of working directory ──────────
@@ -429,12 +432,36 @@ server <- function(input, output, session) {
     NULL
   }
 
+  approved_mapping_choices <- list(
+    dwc = c("", DWC_TERMS),
+    bien = c("", BIEN_STAGING_FIELDS)
+  )
+
+  build_mapping_select_html <- function(selected, choices, select_class, row_idx) {
+    selected_val <- if (is.null(selected) || is.na(selected)) "" else as.character(selected)
+    option_tags <- vapply(choices, function(choice) {
+      label <- if (nzchar(choice)) choice else " "
+      paste0(
+        "<option value=\"", htmltools::htmlEscape(choice), "\"",
+        if (identical(choice, selected_val)) " selected" else "",
+        ">", htmltools::htmlEscape(label), "</option>"
+      )
+    }, character(1))
+    paste0(
+      "<select class='form-control input-sm ", select_class, "' data-row='", row_idx,
+      "' style='min-width:220px;'>",
+      paste(option_tags, collapse = ""),
+      "</select>"
+    )
+  }
+
   # ── Load raw files whenever source changes (for column detection only) ──────
   observe({
     # Clear all downstream state when source switches
     rv$merged <- NULL; rv$mapping_draft <- NULL; rv$mapping <- NULL
     rv$staged <- NULL; rv$dwc <- NULL; rv$qc <- NULL
     rv$tnrs_result <- NULL; rv$gnrs_result <- NULL
+    rv$completion_modal_shown <- FALSE
 
     if (isTRUE(input$use_demo)) {
       obs_path  <- demo_data_path("observations.csv")
@@ -535,6 +562,18 @@ server <- function(input, output, session) {
     rv$qc            <- NULL
     rv$tnrs_result   <- NULL
     rv$gnrs_result   <- NULL
+    rv$completion_modal_shown <- FALSE
+
+    showModal(modalDialog(
+      title = "Step 1 complete",
+      tags$p("Your dataset is prepared."),
+      tags$p("Why this matters: mapping each source column to approved Darwin Core and BIEN fields ensures a valid schema and reliable staging outputs."),
+      easyClose = TRUE,
+      footer = tagList(
+        actionButton("btn_go_map", "Go to 2 \u2022 Map Fields \u2192", class = "btn btn-primary"),
+        modalButton("Close")
+      )
+    ))
   })
 
   output$step1_status <- renderUI({
@@ -544,7 +583,10 @@ server <- function(input, output, session) {
       tags$br(),
       paste0(nrow(rv$merged), " rows \u00d7 ", ncol(rv$merged), " columns"),
       tags$br(),
-      paste0("Files: ", paste(names(rv$raw_files), collapse=", "))
+      paste0("Files: ", paste(names(rv$raw_files), collapse=", ")),
+      tags$hr(style="margin:8px 0;"),
+      tags$span(style="color:#36556e;",
+        "Next: Click '2 \u2022 Map Fields' to confirm how your source columns map to approved Darwin Core and BIEN fields before staging.")
     )
   })
 
@@ -573,25 +615,66 @@ server <- function(input, output, session) {
   # ── Step 2: Mapping table (editable DT) ───────────────────────────────────
   output$mapping_table <- DT::renderDataTable({
     req(rv$mapping_draft)
+    mapping_view <- rv$mapping_draft
+    mapping_view$dwc_term <- vapply(seq_len(nrow(mapping_view)), function(i) {
+      build_mapping_select_html(
+        selected = mapping_view$dwc_term[i],
+        choices = approved_mapping_choices$dwc,
+        select_class = "map-dwc",
+        row_idx = i
+      )
+    }, character(1))
+    mapping_view$bien_field <- vapply(seq_len(nrow(mapping_view)), function(i) {
+      build_mapping_select_html(
+        selected = mapping_view$bien_field[i],
+        choices = approved_mapping_choices$bien,
+        select_class = "map-bien",
+        row_idx = i
+      )
+    }, character(1))
     DT::datatable(
-      rv$mapping_draft,
-      editable = list(target="cell", disable=list(columns=0L)),
+      mapping_view,
+      editable = FALSE,
+      escape = FALSE,
       rownames = FALSE,
       colnames = c("Source Column", "Suggested DWC Term", "Suggested BIEN Field"),
       options  = list(pageLength=30, scrollX=TRUE, dom='frtip'),
-      caption  = "Edit 'Suggested DWC Term' or 'Suggested BIEN Field' cells directly (Source Column is locked), then click Apply Mapping."
+      caption  = "Use dropdowns only: choose approved Darwin Core and BIEN fields (or leave blank). Do not type or invent BIEN/Darwin field strings. Then click Apply Mapping.",
+      callback = DT::JS(
+        "table.on('change', 'select.map-dwc', function() {",
+        "  var row = $(this).data('row');",
+        "  Shiny.setInputValue('mapping_dwc_change', {row: row, value: this.value, nonce: Math.random()}, {priority: 'event'});",
+        "});",
+        "table.on('change', 'select.map-bien', function() {",
+        "  var row = $(this).data('row');",
+        "  Shiny.setInputValue('mapping_bien_change', {row: row, value: this.value, nonce: Math.random()}, {priority: 'event'});",
+        "});"
+      )
     )
   }, server=FALSE)
 
-  observeEvent(input$mapping_table_cell_edit, {
-    info <- input$mapping_table_cell_edit
-    df   <- rv$mapping_draft
-    # DT 0-indexed col: +1 for R 1-indexed, but rownames=FALSE means col 0 = source_col (col 1 in df)
-    col_idx <- info$col + 1L
-    if (col_idx >= 1L && col_idx <= ncol(df)) {
-      df[info$row, col_idx] <- info$value
-      rv$mapping_draft <- df
-    }
+  observeEvent(input$mapping_dwc_change, {
+    req(rv$mapping_draft)
+    info <- input$mapping_dwc_change
+    row_idx <- suppressWarnings(as.integer(info$row))
+    if (is.na(row_idx) || row_idx < 1 || row_idx > nrow(rv$mapping_draft)) return()
+    val <- if (is.null(info$value)) "" else as.character(info$value)
+    if (!(val %in% approved_mapping_choices$dwc)) return()
+    df <- rv$mapping_draft
+    df$dwc_term[row_idx] <- if (nzchar(val)) val else NA_character_
+    rv$mapping_draft <- df
+  })
+
+  observeEvent(input$mapping_bien_change, {
+    req(rv$mapping_draft)
+    info <- input$mapping_bien_change
+    row_idx <- suppressWarnings(as.integer(info$row))
+    if (is.na(row_idx) || row_idx < 1 || row_idx > nrow(rv$mapping_draft)) return()
+    val <- if (is.null(info$value)) "" else as.character(info$value)
+    if (!(val %in% approved_mapping_choices$bien)) return()
+    df <- rv$mapping_draft
+    df$bien_field[row_idx] <- if (nzchar(val)) val else NA_character_
+    rv$mapping_draft <- df
   })
 
   observeEvent(input$btn_apply_mapping, {
@@ -601,6 +684,27 @@ server <- function(input, output, session) {
     rv$staged  <- build_staging(rv$merged, rv$mapping)
     rv$dwc     <- build_dwc(rv$merged, rv$mapping)
     rv$qc      <- run_qc(rv$staged)
+
+    showModal(modalDialog(
+      title = "Step 2 complete",
+      "Mapping has been applied.",
+      tags$p("Reason: this mapping created BIEN staging and Darwin Core outputs for review before export."),
+      easyClose = TRUE,
+      footer = tagList(
+        actionButton("btn_go_stage", "Go to 3 \u2022 Stage & Validate \u2192", class = "btn btn-primary"),
+        modalButton("Close")
+      )
+    ))
+  })
+
+  observeEvent(input$btn_go_map, {
+    removeModal()
+    updateNavbarPage(session, "tabs", selected = "2 \u2022 Map Fields")
+  })
+
+  observeEvent(input$btn_go_stage, {
+    removeModal()
+    updateNavbarPage(session, "tabs", selected = "3 \u2022 Stage & Validate")
   })
 
   output$step2_status_inline <- renderUI({
@@ -608,7 +712,7 @@ server <- function(input, output, session) {
     n_dwc  <- sum(!is.na(rv$mapping$dwc_term) & nzchar(trimws(rv$mapping$dwc_term)))
     n_bien <- sum(!is.na(rv$mapping$bien_field) & nzchar(trimws(rv$mapping$bien_field)))
     tags$span(style="color:#27ae60; font-weight:600;",
-      paste0("Mapping applied \u2014 ", n_dwc, " DWC terms, ", n_bien, " BIEN fields mapped"))
+      paste0("Mapping applied \u2014 ", n_dwc, " DWC terms, ", n_bien, " BIEN fields mapped. Next: open '3 \u2022 Stage & Validate'."))
   })
 
   # ── Tab 3 gating ─────────────────────────────────────────────────────────
@@ -617,7 +721,42 @@ server <- function(input, output, session) {
       tags$div(class="bl-card bl-card-warn",
         tags$strong("Complete Step 2 first: "),
         "Go to \u20182 \u2022 Map Fields\u2019 and click Apply Mapping.")
+    } else {
+      tags$div(class="bl-card",
+        tags$strong("Next in Step 3: "),
+        "Review the staging table and QC details here, then continue to '4 \u2022 Export' when everything looks correct.",
+        tags$br(),
+        tags$br(),
+        actionButton("btn_go_export_step3", "Go to 4 \u2022 Export \u2192", class="btn btn-primary btn-sm"))
     }
+  })
+
+  observeEvent(input$btn_go_export_step3, {
+    updateNavbarPage(session, "tabs", selected = "4 \u2022 Export")
+  })
+
+  observe({
+    all_done <- !is.null(rv$tnrs_result) && !"note" %in% names(rv$tnrs_result) &&
+                !is.null(rv$gnrs_result) && !"note" %in% names(rv$gnrs_result)
+    if (rv$completion_modal_shown || !all_done) return()
+    rv$completion_modal_shown <- TRUE
+
+    showModal(modalDialog(
+      title = "Step 3 complete",
+      tags$p("TNRS and GNRS results are ready."),
+      tags$p("Review the validation results in this tab, then continue to '4 \u2022 Export' to finish the guided workflow."),
+      easyClose = TRUE,
+      footer = tagList(
+        actionButton("modal_go_export", "Go to 4 \u2022 Export \u2192", class = "btn btn-primary"),
+        modalButton("Close")
+      )
+    ))
+  }) |> bindEvent(rv$tnrs_result, rv$gnrs_result,
+                  ignoreInit = TRUE, ignoreNULL = FALSE)
+
+  observeEvent(input$modal_go_export, {
+    removeModal()
+    updateNavbarPage(session, "tabs", selected = "4 \u2022 Export")
   })
 
   # ── QC summary ───────────────────────────────────────────────────────────
@@ -633,7 +772,7 @@ server <- function(input, output, session) {
     card_cls <- if (n_block > 0) "bl-card bl-card-block" else
                 if (n_warn  > 0) "bl-card bl-card-warn"  else "bl-card bl-card-pass"
 
-    verdict <- if (n_block > 0) "Export blocked \u2014 fix BLOCK issues" else
+    verdict <- if (n_block > 0) "Export caution \u2014 review BLOCK issues" else
                if (n_warn  > 0) "Ready with warnings" else "All checks passed"
 
     tags$div(class=card_cls,
@@ -895,7 +1034,8 @@ server <- function(input, output, session) {
       }, character(1))
     }
     s <- as.character(x)
-    ifelse(!is.na(s) & grepl("^[=+\\-@]", s), paste0("'", s), s)
+    is_numeric_like <- !is.na(suppressWarnings(as.numeric(s)))
+    ifelse(!is.na(s) & !is_numeric_like & grepl("^[=+@-]", s), paste0("'", s), s)
   }
   safe_write_csv <- function(df, file) {
     if (!is.data.frame(df)) {
