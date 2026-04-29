@@ -201,7 +201,8 @@ match_team <- match_on_source(bien_plot_source_patterns$TEAM)
 match_vegbank <- match_on_source(bien_plot_source_patterns$VegBank)
 
 # Assign duplicate flags and one deterministic reason per row.
-# Precedence is fixed so each row gets the same "best" reason every run.
+# Precedence is fixed and prioritized per request: SALVIAS, VegBank, CVS,
+# then remaining BIEN sources in deterministic order (CTFS, FIA, gillespie, TEAM).
 staging[, duplicate_source_in_bien :=
           match_ctfs |
           match_cvs |
@@ -212,26 +213,26 @@ staging[, duplicate_source_in_bien :=
           match_vegbank]
 
 staging[, duplicate_source_reason := fifelse(
-  match_ctfs,
-  "source in BIEN: CTFS",
+  match_salvias,
+  "source in BIEN: SALVIAS",
   fifelse(
-    match_cvs,
-    "source in BIEN: CVS",
+    match_vegbank,
+    "source in BIEN: VegBank",
     fifelse(
-      match_fia,
-      "source in BIEN: FIA",
+      match_cvs,
+      "source in BIEN: CVS",
       fifelse(
-        match_gillespie,
-        "source in BIEN: gillespie",
+        match_ctfs,
+        "source in BIEN: CTFS",
         fifelse(
-          match_salvias,
-          "source in BIEN: SALVIAS",
+          match_fia,
+          "source in BIEN: FIA",
           fifelse(
-            match_team,
-            "source in BIEN: TEAM",
+            match_gillespie,
+            "source in BIEN: gillespie",
             fifelse(
-              match_vegbank,
-              "source in BIEN: VegBank",
+              match_team,
+              "source in BIEN: TEAM",
               NA_character_
             )
           )
