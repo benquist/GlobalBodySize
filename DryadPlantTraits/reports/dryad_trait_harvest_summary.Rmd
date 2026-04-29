@@ -1,24 +1,34 @@
 ---
-title: "Cross-Provider Plant Trait Harvest Summary"
-subtitle: "DataDryad | Zenodo | Scientific Data"
+title: "Plant Trait Harvest — Detailed Cross-Provider Report"
+subtitle: "DataDryad · Zenodo · Scientific Data (AusTraits)"
 author: "DryadPlantTraits Pipeline"
 date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
     toc_float: true
+    toc_depth: 3
     theme: flatly
     code_folding: hide
+    self_contained: true
 ---
 
 ```{r setup, include=FALSE}
+message(Sys.time(), " - loaded [setup]")
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       fig.width = 9, fig.height = 5)
 
-library(data.table)
-library(ggplot2)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(ggplot2)
+  library(knitr)
+})
+if (requireNamespace("kableExtra", quietly = TRUE)) library(kableExtra)
+if (requireNamespace("scales",     quietly = TRUE)) library(scales)
+if (requireNamespace("leaflet",    quietly = TRUE)) library(leaflet)
+if (requireNamespace("DT",         quietly = TRUE)) library(DT)
 
-# Detect project root by walking up until R/dryad_api.R is found
+# -- Project root detection
 find_dryad_root <- function(start = getwd()) {
   path <- normalizePath(start, mustWork = FALSE)
   for (i in seq_len(12)) {
@@ -27,12 +37,12 @@ find_dryad_root <- function(start = getwd()) {
     if (parent == path) break
     path <- parent
   }
-  # fall back to the parent of the reports/ directory (= DryadPlantTraits/)
   normalizePath(file.path(knitr::current_input(dir = TRUE), ".."),
                 mustWork = FALSE)
 }
 proj_root <- find_dryad_root()
 
+# -- kable helper
 kable_styled <- function(df, caption = NULL) {
   df_fmt <- as.data.frame(df, stringsAsFactors = FALSE)
   num_cols <- vapply(df_fmt, is.numeric, logical(1))
@@ -56,23 +66,19 @@ kable_styled <- function(df, caption = NULL) {
   }
 }
 
-# -------------------------------------------------------------------------
-# File paths
-# -------------------------------------------------------------------------
+# -- Provider paths
 paths <- list(
   dryad   = file.path(proj_root, "output/compiled_trait_observations_with_unit_inference.csv"),
   zenodo  = file.path(proj_root, "output/providers/zenodo/compiled_trait_observations_with_unit_inference.csv"),
   scidata = file.path(proj_root, "output/providers/scientific_data/compiled_trait_observations_with_unit_inference.csv")
 )
 provider_labels <- c(dryad = "DataDryad", zenodo = "Zenodo", scidata = "Scientific Data")
+provider_colors <- c(DataDryad = "#1f77b4", Zenodo = "#ff7f0e", `Scientific Data` = "#2ca02c")
 
-# Explicit file existence checks before loading
 for (.k in names(paths)) {
   if (!file.exists(paths[[.k]])) {
-    stop(
-      "Missing provider file: ", provider_labels[[.k]],
-      "\n  Expected: ", paths[[.k]]
-    )
+    stop("Missing provider file: ", provider_labels[[.k]],
+         "\n  Expected: ", paths[[.k]])
   }
 }
 
@@ -84,67 +90,65 @@ read_provider <- function(path, key) {
 
 dat_list <- lapply(names(paths), function(k) read_provider(paths[[k]], k))
 names(dat_list) <- names(paths)
+
+# -- Combined data table
+all_dat <- rbindlist(dat_list, use.names = TRUE, fill = TRUE)
+
+# -- Coordinate validity
+all_dat[, lat_num := suppressWarnings(as.numeric(latitude))]
+all_dat[, lon_num := suppressWarnings(as.numeric(longitude))]
+all_dat[, has_coord := is.finite(lat_num) & is.finite(lon_num)]
+
+for (k in names(dat_list)) {
+  dat_list[[k]][, lat_num := suppressWarnings(as.numeric(latitude))]
+  dat_list[[k]][, lon_num := suppressWarnings(as.numeric(longitude))]
+  dat_list[[k]][, has_coord := is.finite(lat_num) & is.finite(lon_num)]
+}
 ```
 
 ---
 
-## Key Takeaways
+## 1 Executive Summary {#executive-summary}
 
-```{r key-takeaways}
-total_rows   <- sum(sapply(dat_list, nrow))
-total_traits <- length(unique(unlist(lapply(dat_list, function(d) unique(d$trait_name)))))
-total_taxa   <- length(unique(unlist(lapply(dat_list, function(d) unique(d$scrubbed_species_binomial)))))
+```{r exec-summary}
+message(Sys.time(), " - loaded [exec-summary]")
 
-coord_count <- function(d) {
-  lat <- suppressWarnings(as.numeric(d$latitude))
-  lon <- suppressWarnings(as.numeric(d$longitude))
-  sum(is.finite(lat) & is.finite(lon), na.rm = TRUE)
-}
-total_coords <- sum(sapply(dat_list, coord_count))
-
-# Dynamic per-provider stats used in prose below
-prov_rows     <- sapply(dat_list, nrow)
-prov_datasets <- sapply(dat_list, function(d) data.table::uniqueN(d$source_title))
-
-rows_rank <- names(sort(prov_rows, decreasing = TRUE))
-dataset_rank <- names(sort(prov_datasets, decreasing = TRUE))
-largest_volume_provider <- provider_labels[[rows_rank[1L]]]
-largest_volume_rows <- prov_rows[[rows_rank[1L]]]
-most_diverse_provider <- provider_labels[[dataset_rank[1L]]]
-most_diverse_datasets <- prov_datasets[[dataset_rank[1L]]]
-remaining_provider <- setdiff(names(provider_labels), c(rows_rank[1L], dataset_rank[1L]))[1L]
-if (is.na(remaining_provider) || length(remaining_provider) == 0L) {
-  remaining_provider <- rows_rank[2L]
-}
-remaining_provider_label <- provider_labels[[remaining_provider]]
-remaining_provider_rows <- prov_rows[[remaining_provider]]
-remaining_provider_datasets <- prov_datasets[[remaining_provider]]
+total_rows   <- nrow(all_dat)
+total_traits <- uniqueN(all_dat[!is.na(trait_name) & nzchar(trait_name), trait_name])
+total_taxa   <- uniqueN(all_dat[!is.na(scrubbed_species_binomial) & nzchar(scrubbed_species_binomial),
+                                scrubbed_species_binomial])
+total_coords <- sum(all_dat$has_coord, na.rm = TRUE)
 ```
 
-> **`r formatC(total_rows, format="d", big.mark=",")`** observation rows harvested across **3 providers** (DataDryad, Zenodo, Scientific Data) as of `r Sys.Date()`.
->
-> **`r total_traits`** distinct trait names detected; **`r formatC(total_taxa, format="d", big.mark=",")`** distinct taxa (scrubbed binomials); **`r formatC(total_coords, format="d", big.mark=",")`** rows with geographic coordinates.
->
-> `r most_diverse_provider` is currently the most source-diverse contributor (`r formatC(most_diverse_datasets, format="d", big.mark=",")` source datasets), while `r largest_volume_provider` provides the largest observation volume (`r formatC(largest_volume_rows, format="d", big.mark=",")` rows). `r remaining_provider_label` adds a complementary set (`r formatC(remaining_provider_datasets, format="d", big.mark=",")` datasets, `r formatC(remaining_provider_rows, format="d", big.mark=",")` rows). All three provider files carry unit reconciliation columns (`inferred_unit`, `inferred_unit_confidence`); `basis_type` column is present in all files.
->
-> _Note: observation row counts are summed across provider outputs independently -- no cross-provider deduplication has been applied; the same measurement may appear in more than one provider if it was included in multiple source compilations._
+<div class="alert alert-info" role="alert">
+<h4 class="alert-heading">Key Takeaways</h4>
+<ul>
+  <li><strong>`r formatC(total_rows, format="d", big.mark=",")`</strong> total observation rows across <strong>3 providers</strong> (DataDryad, Zenodo, Scientific Data) as of `r Sys.Date()`.</li>
+  <li><strong>`r formatC(total_traits, format="d", big.mark=",")`</strong> distinct trait names detected.</li>
+  <li><strong>`r formatC(total_taxa, format="d", big.mark=",")`</strong> distinct taxa (scrubbed species binomials).</li>
+  <li><strong>`r formatC(total_coords, format="d", big.mark=",")`</strong> rows with valid geographic coordinates (DataDryad + Zenodo only; Scientific Data does not carry coordinates in this extract).</li>
+  <li><em>Note on Scientific Data / AusTraits unit confidence:</em> Rows from the Scientific Data provider show <code>inferred_unit_confidence = "none"</code> because the simple-schema mapper for this provider did not populate the <code>basis_type</code> or <code>value_type</code> metadata columns that the confidence scorer uses as inputs. AusTraits is a fully curated, peer-reviewed database (Falster et al. 2021, <em>Sci. Data</em>, doi:10.1038/s41597-021-01006-6). Its units were set by original data contributors and validated during publication. The "none" label reflects a <strong>pipeline labeling gap</strong>, not a unit quality failure.</li>
+  <li><em>Cross-provider deduplication has not been applied.</em> The same measurement may appear in more than one provider if included in multiple source compilations.</li>
+</ul>
+</div>
 
 ---
 
-## 1. Provider Overview
+## 2 Provider Overview {#provider-overview}
 
 ```{r provider-overview}
+message(Sys.time(), " - loaded [provider-overview]")
+
 provider_summary <- rbindlist(lapply(names(dat_list), function(k) {
   d <- dat_list[[k]]
-  lat <- suppressWarnings(as.numeric(d$latitude))
-  lon <- suppressWarnings(as.numeric(d$longitude))
   list(
     Provider             = provider_labels[[k]],
     `Observation Rows`   = nrow(d),
-    `Distinct Traits`    = uniqueN(d$trait_name),
-    `Distinct Taxa`      = uniqueN(d$scrubbed_species_binomial),
+    `Distinct Traits`    = uniqueN(d[!is.na(trait_name) & nzchar(trait_name), trait_name]),
+    `Distinct Taxa`      = uniqueN(d[!is.na(scrubbed_species_binomial) & nzchar(scrubbed_species_binomial),
+                                     scrubbed_species_binomial]),
     `Source Datasets`    = uniqueN(d$source_title),
-    `Rows with Coords`   = sum(is.finite(lat) & is.finite(lon), na.rm = TRUE),
+    `Rows with Coords`   = sum(d$has_coord, na.rm = TRUE),
     `Rows with QA Flags` = sum(nzchar(trimws(d$qa_flags)), na.rm = TRUE)
   )
 }))
@@ -152,216 +156,558 @@ provider_summary <- rbindlist(lapply(names(dat_list), function(k) {
 kable_styled(provider_summary, caption = "Provider-level harvest summary")
 ```
 
-### Figure: Observation rows by provider
+### 2.1 Observation rows by provider {#rows-by-provider}
 
-```{r fig-provider-rows}
-prov_plot <- data.frame(
+```{r fig-provider-rows, fig.height=4}
+prov_plot_df <- data.frame(
   Provider = provider_summary$Provider,
   Rows     = provider_summary$`Observation Rows`
 )
-ggplot(prov_plot, aes(x = reorder(Provider, -Rows), y = Rows / 1e3, fill = Provider)) +
+ggplot(prov_plot_df, aes(x = reorder(Provider, -Rows), y = Rows / 1e3, fill = Provider)) +
   geom_col(width = 0.55, show.legend = FALSE) +
   geom_text(aes(label = formatC(Rows, format = "d", big.mark = ",")),
             vjust = -0.4, size = 3.5) +
-  scale_fill_brewer(palette = "Set2") +
+  scale_fill_manual(values = provider_colors) +
   labs(x = NULL, y = "Observations (thousands)",
        title = "Observation rows by provider") +
-  theme_classic(base_size = 13) +
-  theme(plot.title = element_text(face = "bold"))
-```
-
----
-
-## 2. Source / Citation Breakdown by Provider
-
-### 2.1 DataDryad (top 25 sources by row count)
-
-```{r dryad-sources}
-d <- dat_list[["dryad"]]
-src_dry <- d[, .(
-  Rows              = .N,
-  `Distinct Traits` = uniqueN(trait_name),
-  `Source ID / DOI` = dryad_dataset_doi[1L],
-  Authors           = substr(source_authors[1L], 1, 65)
-), keyby = source_title][order(-Rows)]
-kable_styled(head(src_dry, 25L)[, .(
-  `Source Title`        = source_title,
-  `Source ID / DOI`,
-  `Authors (truncated)` = Authors,
-  Rows,
-  `Distinct Traits`
-)], caption = "DataDryad: top 25 source datasets by row count")
-```
-
-### 2.2 Zenodo (all sources)
-
-```{r zenodo-sources}
-d <- dat_list[["zenodo"]]
-src_zen <- d[, .(
-  Rows              = .N,
-  `Distinct Traits` = uniqueN(trait_name),
-  `Source ID / DOI` = dryad_dataset_doi[1L],
-  Authors           = substr(source_authors[1L], 1, 65)
-), keyby = source_title][order(-Rows)]
-kable_styled(src_zen[, .(
-  `Source Title`        = source_title,
-  `Source ID / DOI`,
-  `Authors (truncated)` = Authors,
-  Rows,
-  `Distinct Traits`
-)], caption = "Zenodo: all source datasets by row count")
-```
-
-### 2.3 Scientific Data (all sources)
-
-```{r scidata-sources}
-d <- dat_list[["scidata"]]
-src_sci <- d[, .(
-  Rows              = .N,
-  `Distinct Traits` = uniqueN(trait_name),
-  `Source ID / DOI` = dryad_dataset_doi[1L],
-  Authors           = substr(source_authors[1L], 1, 65)
-), keyby = source_title][order(-Rows)]
-kable_styled(src_sci[, .(
-  `Source Title`        = source_title,
-  `Source ID / DOI`,
-  `Authors (truncated)` = Authors,
-  Rows,
-  `Distinct Traits`
-)], caption = "Scientific Data: all source datasets by row count")
-```
-
----
-
-## 3. Trait Coverage
-
-### 3.1 Overall top 25 traits (all providers combined)
-
-```{r top-traits-overall}
-all_dat <- rbindlist(dat_list, use.names = TRUE, fill = TRUE)
-top_traits <- all_dat[!is.na(trait_name) & nzchar(trait_name),
-  .(Rows = .N, `Distinct Taxa` = uniqueN(scrubbed_species_binomial)),
-  by = trait_name][order(-Rows)]
-kable_styled(head(top_traits, 25L)[, .(
-  `Trait Name`    = trait_name,
-  Rows,
-  `Distinct Taxa`
-)], caption = "Top 25 traits by row count (all providers combined)")
-```
-
-### Figure: Top 20 traits across all providers
-
-```{r fig-top-traits}
-top20 <- head(top_traits, 20L)
-ggplot(top20, aes(x = reorder(trait_name, Rows), y = Rows / 1e3, fill = Rows)) +
-  geom_col(show.legend = FALSE) +
-  scale_fill_gradient(low = "#a8d8ea", high = "#0a5275") +
-  coord_flip() +
-  labs(x = NULL, y = "Observations (thousands)",
-       title = "Top 20 plant traits -- all providers combined") +
   theme_classic(base_size = 12) +
   theme(plot.title = element_text(face = "bold"))
 ```
 
-### 3.2 Provider-specific top traits (top 15 each)
+### 2.2 Trait count by provider (stacked, top 20) {#trait-stacked}
 
-```{r top-traits-by-provider, results='asis'}
+```{r fig-trait-stacked, fig.height=5}
+trait_by_prov <- all_dat[!is.na(trait_name) & nzchar(trait_name),
+                         .(n = .N), by = .(trait_name, provider)]
+top_traits_all <- all_dat[!is.na(trait_name) & nzchar(trait_name),
+                           .(total = .N), by = trait_name][order(-total)]
+top20_names <- head(top_traits_all$trait_name, 20L)
+tbp20 <- trait_by_prov[trait_name %in% top20_names]
+tbp20[, provider := factor(provider, levels = c("DataDryad", "Zenodo", "Scientific Data"))]
+ggplot(tbp20, aes(x = reorder(trait_name, n, sum), y = n / 1e3, fill = provider)) +
+  geom_col(position = "stack") +
+  coord_flip() +
+  scale_fill_manual(values = provider_colors, name = "Provider") +
+  labs(x = NULL, y = "Observations (thousands)",
+       title = "Top 20 traits - stacked by provider") +
+  theme_classic(base_size = 11) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "bottom")
+```
+
+---
+
+## 3 Source / Citation Breakdown {#source-citation}
+
+```{r source-tables, results='asis'}
+message(Sys.time(), " - loaded [source-citation]")
+
 for (k in names(dat_list)) {
   d <- dat_list[[k]]
-  top <- d[!is.na(trait_name) & nzchar(trait_name),
-    .(Rows = .N, `Distinct Taxa` = uniqueN(scrubbed_species_binomial)),
-    by = trait_name][order(-Rows)]
-  cat("\n#### ", provider_labels[[k]], "\n\n")
-  print(kable_styled(
-    head(top, 15L)[, .(`Trait Name` = trait_name, Rows, `Distinct Taxa`)],
-    caption = paste(provider_labels[[k]], ": top 15 traits")
-  ))
-  cat("\n")
+  src_tbl <- d[, .(
+    Rows              = .N,
+    `Distinct Traits` = uniqueN(trait_name),
+    `Distinct Taxa`   = uniqueN(scrubbed_species_binomial),
+    DOI               = dryad_dataset_doi[1L]
+  ), by = source_title][order(-Rows)]
+  setnames(src_tbl, "source_title", "Source Title")
+
+  cat("\n### 3.", which(names(dat_list) == k), " ", provider_labels[[k]], "\n\n",
+      sep = "")
+  if (requireNamespace("DT", quietly = TRUE)) {
+    print(DT::datatable(
+      as.data.frame(src_tbl),
+      filter = "top",
+      extensions = "Scroller",
+      options = list(scrollY = 300, scroller = TRUE, scrollX = TRUE, pageLength = 20),
+      caption = paste(provider_labels[[k]], ": source datasets"),
+      rownames = FALSE
+    ))
+  } else {
+    print(kable_styled(head(src_tbl, 25L),
+                       caption = paste(provider_labels[[k]], ": top 25 sources")))
+  }
+  cat("\n\n")
 }
 ```
 
 ---
 
-## 4. Unit Reconciliation Summary
+## 4 Trait Coverage - Detailed {#trait-coverage}
 
-All three provider files carry the unit reconciliation columns added by the pipeline (`inferred_unit`, `inferred_unit_confidence`, `inference_evidence`, `basis_type`, `unit_conversion_factor`).
+```{r trait-coverage-setup}
+message(Sys.time(), " - loaded [trait-coverage]")
+top_traits_tbl <- all_dat[!is.na(trait_name) & nzchar(trait_name),
+  .(Rows = .N, `Distinct Taxa` = uniqueN(scrubbed_species_binomial)),
+  by = trait_name][order(-Rows)]
+```
 
-```{r unit-reconciliation}
+### 4.1 Top 25 traits combined {#top25-traits}
+
+```{r top25-traits}
+kable_styled(
+  head(top_traits_tbl, 25L)[, .(`Trait Name` = trait_name, Rows, `Distinct Taxa`)],
+  caption = "Top 25 traits by row count (all providers combined)"
+)
+```
+
+### 4.2 Top 20 traits - provider contribution {#top20-stacked}
+
+```{r fig-top20-provider, fig.height=5}
+ggplot(tbp20, aes(x = reorder(trait_name, n, sum), y = n / 1e3, fill = provider)) +
+  geom_col(position = "stack") +
+  coord_flip() +
+  scale_fill_manual(values = provider_colors, name = "Provider") +
+  labs(x = NULL, y = "Observations (thousands)",
+       title = "Top 20 traits - provider contribution") +
+  theme_classic(base_size = 11) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "bottom")
+```
+
+### 4.3 Provider-specific top 15 traits {#provider-top15}
+
+```{r provider-top15, results='asis'}
+for (k in names(dat_list)) {
+  d <- dat_list[[k]]
+  top15 <- d[!is.na(trait_name) & nzchar(trait_name),
+    .(Rows = .N, `Distinct Taxa` = uniqueN(scrubbed_species_binomial)),
+    by = trait_name][order(-Rows)]
+  cat("\n#### ", provider_labels[[k]], "\n\n", sep = "")
+  if (requireNamespace("DT", quietly = TRUE)) {
+    print(DT::datatable(
+      as.data.frame(head(top15, 15L))[, c("trait_name", "Rows", "Distinct Taxa")],
+      extensions = "Scroller",
+      options = list(scrollY = 280, scroller = TRUE, scrollX = TRUE, dom = "t"),
+      colnames = c("Trait Name", "Rows", "Distinct Taxa"),
+      rownames = FALSE
+    ))
+  } else {
+    print(kable_styled(
+      head(top15, 15L)[, .(`Trait Name` = trait_name, Rows, `Distinct Taxa`)],
+      caption = paste(provider_labels[[k]], ": top 15 traits")
+    ))
+  }
+  cat("\n\n")
+}
+```
+
+### 4.4 Trait value summary statistics (top 20 numeric traits) {#trait-stats}
+
+```{r trait-value-stats}
+message(Sys.time(), " - loaded [trait-value-stats]")
+
+all_dat[, val_num := suppressWarnings(as.numeric(trait_value))]
+
+numeric_counts <- all_dat[is.finite(val_num) & !is.na(trait_name) & nzchar(trait_name),
+  .(n_numeric = .N), by = trait_name][order(-n_numeric)]
+top20_numeric <- head(numeric_counts[n_numeric >= 100], 20L)$trait_name
+
+stats_list <- lapply(top20_numeric, function(tr) {
+  vals <- all_dat[trait_name == tr & is.finite(val_num), val_num]
+  list(
+    `Trait Name` = tr,
+    n            = length(vals),
+    Mean         = round(mean(vals), 4),
+    Median       = round(median(vals), 4),
+    SD           = round(sd(vals), 4),
+    Min          = round(min(vals), 4),
+    P5           = round(quantile(vals, 0.05), 4),
+    P25          = round(quantile(vals, 0.25), 4),
+    P75          = round(quantile(vals, 0.75), 4),
+    P95          = round(quantile(vals, 0.95), 4),
+    Max          = round(max(vals), 4)
+  )
+})
+stats_tbl <- rbindlist(stats_list)
+kable_styled(stats_tbl,
+  caption = "Summary statistics for top 20 numeric traits (rows with finite numeric trait_value only)")
+```
+
+### 4.5 Trait value boxplots (top 12 numeric traits) {#trait-boxplots}
+
+```{r fig-trait-boxplots, fig.height=7, fig.width=10}
+message(Sys.time(), " - loaded [trait-boxplots]")
+
+top12_numeric <- head(top20_numeric, 12L)
+box_dat <- all_dat[trait_name %in% top12_numeric & is.finite(val_num),
+                   .(trait_name, val_num, provider)]
+
+box_dat_clipped <- box_dat[, {
+  p1  <- quantile(val_num, 0.01)
+  p99 <- quantile(val_num, 0.99)
+  .SD[val_num >= p1 & val_num <= p99]
+}, by = trait_name]
+
+box_dat_clipped[, provider := factor(provider,
+  levels = c("DataDryad", "Zenodo", "Scientific Data"))]
+
+ggplot(box_dat_clipped, aes(x = provider, y = val_num, fill = provider)) +
+  geom_boxplot(outlier.size = 0.4, outlier.alpha = 0.3) +
+  facet_wrap(~ trait_name, scales = "free_y", ncol = 3) +
+  scale_y_continuous(trans = "pseudo_log") +
+  scale_fill_manual(values = provider_colors, name = "Provider") +
+  labs(x = NULL, y = "Trait value (pseudo-log scale)",
+       title = "Trait value distributions - top 12 numeric traits",
+       caption = "Values clipped to 1st-99th percentile per trait for display. Pseudo-log y-axis.") +
+  theme_classic(base_size = 10) +
+  theme(plot.title   = element_text(face = "bold"),
+        axis.text.x  = element_text(angle = 30, hjust = 1),
+        legend.position = "bottom",
+        strip.text   = element_text(size = 8))
+```
+
+---
+
+## 5 Taxonomic Coverage {#taxonomic-coverage}
+
+```{r taxonomic-setup}
+message(Sys.time(), " - loaded [taxonomic-coverage]")
+taxa_tbl <- all_dat[!is.na(scrubbed_species_binomial) & nzchar(scrubbed_species_binomial),
+  .(Rows = .N, `Distinct Traits` = uniqueN(trait_name)),
+  by = scrubbed_species_binomial][order(-Rows)]
+```
+
+### 5.1 Top 25 taxa by row count {#top25-taxa}
+
+```{r top25-taxa}
+kable_styled(
+  head(taxa_tbl, 25L)[, .(
+    `Species (scrubbed)` = scrubbed_species_binomial,
+    Rows,
+    `Distinct Traits`
+  )],
+  caption = "Top 25 taxa by row count (all providers)"
+)
+```
+
+### 5.2 Distinct taxa per provider {#taxa-by-provider}
+
+```{r fig-taxa-provider, fig.height=4}
+taxa_prov <- data.table(
+  Provider        = provider_summary$Provider,
+  `Distinct Taxa` = provider_summary$`Distinct Taxa`
+)
+ggplot(taxa_prov, aes(x = reorder(Provider, -`Distinct Taxa`),
+                      y = `Distinct Taxa` / 1e3, fill = Provider)) +
+  geom_col(width = 0.55, show.legend = FALSE) +
+  geom_text(aes(label = formatC(`Distinct Taxa`, format = "d", big.mark = ",")),
+            vjust = -0.4, size = 3.5) +
+  scale_fill_manual(values = provider_colors) +
+  labs(x = NULL, y = "Distinct taxa (thousands)",
+       title = "Distinct taxa per provider") +
+  theme_classic(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+### 5.3 Country breakdown (top 20) {#country-breakdown}
+
+```{r fig-country, fig.height=5}
+ctry <- copy(all_dat)
+ctry[is.na(country) | !nzchar(trimws(country)), country := "Unknown"]
+country_tbl <- ctry[, .(Rows = .N), by = country][order(-Rows)]
+top20_ctry  <- head(country_tbl, 20L)
+ggplot(top20_ctry, aes(x = reorder(country, Rows), y = Rows / 1e3)) +
+  geom_col(fill = "#4e79a7") +
+  coord_flip() +
+  labs(x = NULL, y = "Observations (thousands)",
+       title = "Top 20 countries by row count") +
+  theme_classic(base_size = 11) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+### 5.4 Date collected - year distribution {#date-histogram}
+
+```{r fig-date-histogram, fig.height=4}
+message(Sys.time(), " - loaded [date-histogram]")
+
+if (requireNamespace("lubridate", quietly = TRUE)) {
+  dates_raw <- all_dat[!is.na(date_collected) & nzchar(trimws(date_collected)), date_collected]
+  parsed    <- lubridate::parse_date_time(
+    dates_raw,
+    orders = c("Ymd", "Y", "mdY", "dmy"),
+    quiet  = TRUE
+  )
+  years <- lubridate::year(parsed)
+  years <- years[is.finite(years) & years >= 1800 & years <= as.integer(format(Sys.Date(), "%Y"))]
+  if (length(years) > 0) {
+    year_df <- data.frame(year = years)
+    print(
+      ggplot(year_df, aes(x = year)) +
+        geom_histogram(binwidth = 1, fill = "#59a14f", color = "white", linewidth = 0.2) +
+        labs(x = "Year collected", y = "Records",
+             title = "Records by year of collection") +
+        theme_classic(base_size = 12) +
+        theme(plot.title = element_text(face = "bold"))
+    )
+  } else {
+    cat("> No parseable dates found in the data.\n")
+  }
+} else {
+  cat("> **Note:** `lubridate` is not installed. Date histogram skipped.",
+      "Install with `install.packages('lubridate')` and re-render.\n")
+}
+```
+
+---
+
+## 6 Unit Reconciliation Summary {#unit-reconciliation}
+
+```{r unit-summary}
+message(Sys.time(), " - loaded [unit-reconciliation]")
+
 unit_summary <- rbindlist(lapply(names(dat_list), function(k) {
   d <- dat_list[[k]]
   iu  <- d$inferred_unit
-  iuc <- as.character(d$inferred_unit_confidence)
-  iuc[is.na(iuc) | !nzchar(trimws(iuc))] <- NA_character_
+  iuc <- trimws(as.character(d$inferred_unit_confidence))
+  iuc[is.na(iuc) | !nzchar(iuc)] <- NA_character_
   list(
-    Provider               = provider_labels[[k]],
-    `Total Rows`           = nrow(d),
-    `Inferred TRUE`        = sum(iu %in% c(TRUE, "TRUE",  "true",  1L), na.rm = TRUE),
-    `Inferred FALSE`       = sum(iu %in% c(FALSE,"FALSE", "false", 0L), na.rm = TRUE),
-    `Conf: high`           = sum(iuc == "high",   na.rm = TRUE),
-    `Conf: medium`         = sum(iuc == "medium",  na.rm = TRUE),
-    `Conf: low`            = sum(iuc == "low",     na.rm = TRUE),
-    `Conf: none/missing`   = sum(is.na(iuc))
+    Provider             = provider_labels[[k]],
+    `Total Rows`         = nrow(d),
+    `Inferred TRUE`      = sum(iu %in% c(TRUE, "TRUE",  "true",  1L), na.rm = TRUE),
+    `Inferred FALSE`     = sum(iu %in% c(FALSE,"FALSE", "false", 0L), na.rm = TRUE),
+    `Conf: high`         = sum(iuc == "high",   na.rm = TRUE),
+    `Conf: medium`       = sum(iuc == "medium",  na.rm = TRUE),
+    `Conf: low`          = sum(iuc == "low",     na.rm = TRUE),
+    `Conf: none/missing` = sum(is.na(iuc))
   )
 }))
-kable_styled(unit_summary, caption = "Unit inference summary by provider")
+kable_styled(unit_summary, caption = "6.1 Unit inference summary by provider")
 ```
 
-### 4.1 inferred_unit_confidence breakdown (all providers)
+### 6.2 inferred_unit_confidence breakdown {#confidence-breakdown}
 
 ```{r confidence-breakdown}
 conf_rows <- rbindlist(lapply(names(dat_list), function(k) {
-  d <- dat_list[[k]]
-  lvl <- as.character(d$inferred_unit_confidence)
-  lvl[is.na(lvl) | !nzchar(trimws(lvl))] <- "(missing)"
-  lvl <- trimws(lvl)
+  d   <- dat_list[[k]]
+  lvl <- trimws(as.character(d$inferred_unit_confidence))
+  lvl[is.na(lvl) | !nzchar(lvl)] <- "(missing)"
   tbl <- d[, .N, by = .(inferred_unit_confidence = lvl)][order(-N)]
   tbl[, provider := provider_labels[[k]]]
   tbl
 }))
 conf_wide <- dcast(conf_rows, inferred_unit_confidence ~ provider, value.var = "N", fill = 0L)
-kable_styled(conf_wide, caption = "inferred_unit_confidence counts by provider")
+kable_styled(conf_wide, caption = "inferred_unit_confidence counts by provider (wide)")
 ```
 
-### 4.2 basis_type breakdown
+### 6.3 basis_type breakdown {#basis-type}
 
 ```{r basis-type-breakdown}
 bt_rows <- rbindlist(lapply(names(dat_list), function(k) {
-  d <- dat_list[[k]]
-  bt <- trimws(d$basis_type)
-  bt[!nzchar(bt)] <- "(empty)"
+  d  <- dat_list[[k]]
+  bt <- trimws(as.character(d$basis_type))
+  bt[is.na(bt) | !nzchar(bt)] <- "(empty)"
   tbl <- d[, .N, by = .(basis_type = bt)][order(-N)]
   tbl[, provider := provider_labels[[k]]]
   tbl
 }))
 bt_wide <- dcast(bt_rows, basis_type ~ provider, value.var = "N", fill = 0L)
-kable_styled(bt_wide, caption = "basis_type counts by provider")
+kable_styled(bt_wide, caption = "basis_type counts by provider (wide)")
 ```
+
+### 6.4 Note on AusTraits / Scientific Data unit confidence {#austraits-note}
+
+<div class="alert alert-warning" role="alert">
+<strong>Pipeline labeling note - Scientific Data "none" unit confidence:</strong>
+Scientific Data rows show <code>inferred_unit_confidence = "none"</code> because the simple-schema mapper used for this provider did not populate the <code>basis_type</code> or <code>value_type</code> metadata columns that the confidence scorer uses as inputs.
+AusTraits (the dominant Scientific Data source) is a fully curated, peer-reviewed database (Falster et al. 2021, doi:10.1038/s41597-021-01006-6).
+Its units were set by the original data contributors and validated during publication.
+The <strong>"none" label reflects a pipeline labeling gap, not a unit quality failure.</strong>
+</div>
 
 ---
 
-## 5. Geographic Coverage
+## 7 Geographic Coverage - Interactive Map {#geographic-coverage}
 
-```{r geo-coverage}
+```{r geo-coverage-table}
+message(Sys.time(), " - loaded [geographic-coverage]")
+
 geo_summary <- rbindlist(lapply(names(dat_list), function(k) {
   d <- dat_list[[k]]
-  lat <- suppressWarnings(as.numeric(d$latitude))
-  lon <- suppressWarnings(as.numeric(d$longitude))
-  has_coord <- is.finite(lat) & is.finite(lon)
   list(
     Provider           = provider_labels[[k]],
     `Total Rows`       = nrow(d),
-    `Rows with Coords` = sum(has_coord, na.rm = TRUE),
-    `Coverage (%)`     = round(100 * mean(has_coord, na.rm = TRUE), 1)
+    `Rows with Coords` = sum(d$has_coord, na.rm = TRUE),
+    `Coverage (%)`     = round(100 * mean(d$has_coord, na.rm = TRUE), 1)
   )
 }))
-kable_styled(geo_summary, caption = "Geographic coordinate coverage by provider")
+kable_styled(geo_summary, caption = "7.1 Geographic coordinate coverage by provider")
+```
+
+### 7.2 Interactive map (sampled) {#interactive-map}
+
+```{r leaflet-map, fig.height=6}
+message(Sys.time(), " - loaded [leaflet-map]")
+
+if (requireNamespace("leaflet", quietly = TRUE)) {
+  coord_dat <- all_dat[has_coord == TRUE,
+    .(lat_num, lon_num, provider, scrubbed_species_binomial,
+      trait_name, trait_value, unit, source_title, country)]
+
+  total_georef <- nrow(coord_dat)
+
+  set.seed(42)
+  samp_list <- lapply(unique(coord_dat$provider), function(prov) {
+    sub <- coord_dat[provider == prov]
+    if (nrow(sub) > 10000) sub <- sub[sample(.N, 10000)]
+    sub
+  })
+  map_dat <- rbindlist(samp_list, fill = TRUE)
+
+  map_dat[, popup_text := paste0(
+    "<b>", ifelse(is.na(scrubbed_species_binomial), "Unknown species",
+                  scrubbed_species_binomial), "</b><br>",
+    ifelse(is.na(trait_name), "", paste0(trait_name, ": ")),
+    ifelse(is.na(trait_value), "", trait_value), " ",
+    ifelse(is.na(unit), "", unit), "<br>",
+    "Source: ", ifelse(is.na(source_title), "", source_title), "<br>",
+    "Country: ", ifelse(is.na(country), "Unknown", country)
+  )]
+
+  pal <- leaflet::colorFactor(
+    palette = c("#1f77b4", "#ff7f0e"),
+    domain  = c("DataDryad", "Zenodo")
+  )
+
+  map_out <- leaflet::leaflet(map_dat) |>
+    leaflet::addTiles() |>
+    leaflet::addCircleMarkers(
+      lng         = ~lon_num,
+      lat         = ~lat_num,
+      radius      = 4,
+      color       = ~pal(provider),
+      fillColor   = ~pal(provider),
+      opacity     = 0.7,
+      fillOpacity = 0.5,
+      popup       = ~popup_text
+    ) |>
+    leaflet::addLegend(
+      position = "bottomright",
+      pal      = pal,
+      values   = ~provider,
+      title    = "Provider"
+    )
+
+  cat("> **Map note:** Displaying a random sample of up to 10,000 records per provider for performance.",
+      "Total georeferenced records:", formatC(total_georef, format = "d", big.mark = ","), "\n\n")
+
+  map_out
+} else {
+  cat("> **Note:** `leaflet` is not installed. Interactive map skipped.",
+      "Install with `install.packages('leaflet')` and re-render.\n")
+}
+```
+
+### 7.3 Elevation distribution {#elevation}
+
+```{r fig-elevation, fig.height=4}
+elev_vals <- suppressWarnings(as.numeric(all_dat$elevation_m))
+elev_valid <- elev_vals[is.finite(elev_vals) & elev_vals >= -500 & elev_vals <= 6000]
+if (length(elev_valid) > 0) {
+  elev_df <- data.frame(elevation_m = elev_valid)
+  ggplot(elev_df, aes(x = elevation_m)) +
+    geom_histogram(bins = 60, fill = "#76b7b2", color = "white", linewidth = 0.2) +
+    labs(x = "Elevation (m)", y = "Records",
+         title = "Records by elevation",
+         caption = "Filtered to -500 to 6000 m range.") +
+    theme_classic(base_size = 12) +
+    theme(plot.title = element_text(face = "bold"))
+} else {
+  cat("> No valid elevation values found in the range -500 to 6000 m.\n")
+}
 ```
 
 ---
 
-## 6. QA Flag Summary
+## 8 BIEN Database Mapping Status {#bien-mapping}
 
-```{r qa-flags, results='asis'}
+```{r bien-mapping-setup}
+message(Sys.time(), " - loaded [bien-mapping]")
+
+bien_trait_map <- data.table(
+  trait_canonical = c(
+    "leaf area", "specific leaf area", "leaf nitrogen content per leaf dry mass",
+    "leaf phosphorus content per leaf dry mass", "stem specific density",
+    "plant height vegetative", "leaf dry mass", "seed mass",
+    "leaf carbon content per leaf dry mass", "maximum height vegetative",
+    "wood density", "leaf thickness", "root depth",
+    "stomatal conductance", "leaf water content per leaf dry mass",
+    "leaf lifespan", "leaf chlorophyll content",
+    "bark thickness", "vessel diameter", "conduit diameter lumen"
+  ),
+  bien_name = c(
+    "leaf area", "specific leaf area", "leaf nitrogen content per leaf dry mass",
+    "leaf phosphorus content per leaf dry mass", "stem specific density",
+    "plant height vegetative", "leaf dry mass", "seed mass",
+    "leaf carbon content per leaf dry mass", "maximum height vegetative",
+    "wood density", "leaf thickness", "root depth",
+    "stomatal conductance", "leaf water content per leaf dry mass",
+    "leaf lifespan", "leaf chlorophyll content",
+    "bark thickness", "vessel diameter", "conduit diameter lumen"
+  )
+)
+
+all_dat[, trait_name_lower := trimws(tolower(trait_name))]
+bien_set <- tolower(trimws(bien_trait_map$trait_canonical))
+all_dat[, is_bien_mappable := trait_name_lower %in% bien_set]
+```
+
+### 8.1-8.2 BIEN-mappable rows per provider {#bien-table}
+
+```{r bien-rows-table}
+bien_prov <- all_dat[is_bien_mappable == TRUE,
+  .(Rows = .N), by = .(bien_trait = trait_name_lower, provider)]
+bien_wide <- dcast(bien_prov, bien_trait ~ provider, value.var = "Rows", fill = 0L)
+bien_wide[, Total := rowSums(.SD, na.rm = TRUE),
+          .SDcols = setdiff(names(bien_wide), "bien_trait")]
+setorder(bien_wide, -Total)
+setnames(bien_wide, "bien_trait", "BIEN Trait")
+kable_styled(bien_wide, caption = "8.2 BIEN-mappable rows by trait and provider (exact canonical match)")
+```
+
+### 8.3 BIEN-mappable rows by provider {#bien-bar}
+
+```{r fig-bien-bar, fig.height=4}
+bien_summary <- all_dat[, .(
+  Total         = .N,
+  BIEN_mappable = sum(is_bien_mappable, na.rm = TRUE),
+  Pct_mappable  = round(100 * mean(is_bien_mappable, na.rm = TRUE), 1)
+), by = provider]
+
+ggplot(bien_summary, aes(x = reorder(provider, -BIEN_mappable),
+                         y = BIEN_mappable / 1e3, fill = provider)) +
+  geom_col(width = 0.55, show.legend = FALSE) +
+  geom_text(aes(label = paste0(formatC(BIEN_mappable, format = "d", big.mark = ","),
+                               "\n(", Pct_mappable, "%)")),
+            vjust = -0.3, size = 3.2) +
+  scale_fill_manual(values = provider_colors) +
+  labs(x = NULL, y = "BIEN-mappable rows (thousands)",
+       title = "8.3 BIEN-mappable rows by provider") +
+  theme_classic(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+### 8.4 Percentage of rows that are BIEN-mappable {#bien-pct}
+
+```{r bien-pct-table}
+kable_styled(
+  bien_summary[, .(Provider = provider,
+                   `Total Rows` = Total,
+                   `BIEN-Mappable Rows` = BIEN_mappable,
+                   `% Mappable` = Pct_mappable)],
+  caption = "8.4 BIEN-mappable percentage by provider"
+)
+```
+
+> **8.5 Coverage note:** Traits not yet in this lookup are not necessarily unmappable - they may require fuzzy matching or manual review. This table represents **exact canonical name matches only** (case-insensitive, whitespace-trimmed). Full BIEN trait vocabulary integration is a planned pipeline milestone.
+
+---
+
+## 9 QA Flag Summary {#qa-flags}
+
+```{r qa-summary}
+message(Sys.time(), " - loaded [qa-flags]")
+
 qa_rows <- rbindlist(lapply(names(dat_list), function(k) {
   d <- dat_list[[k]]
   flagged <- sum(nzchar(trimws(d$qa_flags)), na.rm = TRUE)
@@ -373,29 +719,70 @@ qa_rows <- rbindlist(lapply(names(dat_list), function(k) {
     `Flag Rate (%)`  = round(100 * flagged / nrow(d), 1)
   )
 }))
-kable_styled(qa_rows, caption = "QA flag prevalence by provider")
+kable_styled(qa_rows, caption = "9.1 QA flag prevalence by provider")
+```
 
-# Top flag codes for DataDryad (most complex)
-d_dry <- dat_list[["dryad"]]
+### 9.2 DataDryad top 15 QA flag codes {#qa-dryad-top}
+
+```{r qa-dryad-top}
+d_dry        <- dat_list[["dryad"]]
 flagged_vals <- d_dry$qa_flags[nzchar(trimws(d_dry$qa_flags))]
 flag_tokens  <- unlist(strsplit(flagged_vals, "\\|"))
 flag_tokens  <- trimws(sub("\\[.*", "", flag_tokens))
 flag_tokens  <- flag_tokens[nzchar(flag_tokens)]
 flag_tbl_all <- sort(table(flag_tokens), decreasing = TRUE)
-flag_tbl     <- as.data.frame(flag_tbl_all[seq_len(min(15L, length(flag_tbl_all)))])
-names(flag_tbl) <- c("QA Flag Code", "Count")
-cat("\n\n**DataDryad: top 15 QA flag codes**\n\n")
-print(kable_styled(flag_tbl, caption = "DataDryad: top 15 QA flag codes (prefix only)"))
+flag_top15   <- as.data.frame(
+  flag_tbl_all[seq_len(min(15L, length(flag_tbl_all)))]
+)
+names(flag_top15) <- c("QA Flag Code", "Count")
+
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(
+    flag_top15,
+    extensions = "Scroller",
+    options    = list(scrollY = 300, scroller = TRUE, scrollX = TRUE, dom = "t"),
+    rownames   = FALSE,
+    caption    = "9.2 DataDryad: top 15 QA flag codes (prefix only)"
+  )
+} else {
+  kable_styled(flag_top15, caption = "9.2 DataDryad: top 15 QA flag codes")
+}
+```
+
+### 9.3 Top 15 QA flag codes - bar chart {#qa-bar}
+
+```{r fig-qa-bar, fig.height=4}
+flag_df <- flag_top15
+names(flag_df) <- c("flag_code", "count")
+ggplot(flag_df, aes(x = reorder(flag_code, count), y = count / 1e3)) +
+  geom_col(fill = "#e15759") +
+  coord_flip() +
+  labs(x = "QA flag code", y = "Occurrences (thousands)",
+       title = "9.3 DataDryad - top 15 QA flag codes") +
+  theme_classic(base_size = 11) +
+  theme(plot.title = element_text(face = "bold"))
 ```
 
 ---
 
-## 7. Session Info
+## 10 Session Info {#session-info}
 
 ```{r session-info}
+message(Sys.time(), " - loaded [session-info]")
+
 si <- sessionInfo()
-cat("R version:", si$R.version$version.string, "\n")
-cat("data.table:", as.character(packageVersion("data.table")), "\n")
-cat("ggplot2:", as.character(packageVersion("ggplot2")), "\n")
-cat("Rendered:", format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"), "\n")
+cat("Rendered:    ", format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"), "\n")
+cat("R version:   ", si$R.version$version.string, "\n")
+cat("data.table:  ", as.character(packageVersion("data.table")), "\n")
+cat("ggplot2:     ", as.character(packageVersion("ggplot2")), "\n")
+cat("leaflet:     ",
+    tryCatch(as.character(packageVersion("leaflet")),    error = function(e) "not installed"), "\n")
+cat("DT:          ",
+    tryCatch(as.character(packageVersion("DT")),         error = function(e) "not installed"), "\n")
+cat("kableExtra:  ",
+    tryCatch(as.character(packageVersion("kableExtra")), error = function(e) "not installed"), "\n")
+cat("scales:      ",
+    tryCatch(as.character(packageVersion("scales")),     error = function(e) "not installed"), "\n")
+cat("lubridate:   ",
+    tryCatch(as.character(packageVersion("lubridate")),  error = function(e) "not installed"), "\n")
 ```
