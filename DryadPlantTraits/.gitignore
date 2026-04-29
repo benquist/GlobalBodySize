@@ -24,3 +24,5 @@ output/spot_check_log.csv
 .RData
 .Rproj.user/
 *.Rproj
+output/providers/occurrences/**/raw/*.zip
+output/providers/occurrences/compiled_occurrences_all.csv
