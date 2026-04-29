@@ -101,6 +101,13 @@ Prompt: Implement Fix 2 for DryadPlantTraits with the smallest safe change set.
 Source session: current workspace session
 Outcome: Updated R/io_helpers.R so dryad_read_supported_inputs() expands Excel workbooks into one table per readable sheet with stable `#sheet=` path markers and per-sheet read/skip log rows, while leaving non-Excel reads unchanged; validated the real Zenodo workbook probe returned 4 tables and parse-check passed.
 
+14. Date: 2026-04-28
+Prompt: Implement Fix 3 for DryadPlantTraits — add archive path filter to block HOBO logger/sensor CSV noise files from Zenodo zip ingest.
+Source session: current workspace session
+Commit: d0c788e
+Review: code-checker PASS, code-verifier APPROVED
+Outcome: Added dryad_filter_trait_archive_paths() helper to R/io_helpers.R; integrated after extraction in compile_zenodo_traits.R; all-filtered skip log message now says all_N_paths_filtered_as_archive_noise for audit clarity. Pushed to origin/master as d0c788e.
+
 13. Date: 2026-04-28
 Prompt: Apply a narrow repair for the multi-sheet Excel fix in DryadPlantTraits so Excel workbook table entries keep the real file path, expose sheet metadata for display/logging, and leave non-Excel behavior unchanged.
 Source session: current workspace session
