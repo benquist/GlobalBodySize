@@ -596,17 +596,25 @@ if (requireNamespace("leaflet", quietly = TRUE)) {
         na.color = "#999999"
       )
 
-      map_out <- leaflet::leaflet(map_dat) |>
-        leaflet::addTiles() |>
+      map_out <- leaflet::leaflet(as.data.frame(map_dat)) |>
+        leaflet::addProviderTiles("CartoDB.Positron",
+          options = leaflet::providerTileOptions(noWrap = FALSE)) |>
+        leaflet::addTiles(group = "OpenStreetMap") |>
         leaflet::addCircleMarkers(
           lng         = ~lon_num,
           lat         = ~lat_num,
-          radius      = 4,
+          radius      = 5,
           color       = ~pal(provider),
           fillColor   = ~pal(provider),
-          opacity     = 0.7,
-          fillOpacity = 0.5,
-          popup       = ~popup_text
+          opacity     = 0.9,
+          fillOpacity = 0.7,
+          popup       = ~popup_text,
+          group       = "Observations"
+        ) |>
+        leaflet::addLayersControl(
+          baseGroups = c("CartoDB.Positron", "OpenStreetMap"),
+          overlayGroups = "Observations",
+          options = leaflet::layersControlOptions(collapsed = FALSE)
         ) |>
         leaflet::addLegend(
           position = "bottomright",
