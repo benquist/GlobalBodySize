@@ -819,9 +819,9 @@ cols_show <- c("display_name", "source_group", "canonical_url_or_doi",
 DT::datatable(manual_intake[, ..cols_show], rownames = FALSE, options = list(scrollX = TRUE))
 ```
 
-All 35 sources are at status `pending_review`. The original 6 entries cover the ShrubHub TraitHub repository (Bjorkman et al. 2018 Nature), three files supplied directly by Jesse Miller (Spasojevic et al. 2016 Ozark trait study), email context from Jesse Miller, and field data from Pablo Peri's BEPSP Patagonia network (Peri et al. 2016 J. Nature Conservation).
+All 54 sources are at status `pending_review`. The original 6 entries cover the ShrubHub TraitHub repository (Bjorkman et al. 2018 Nature), three files supplied directly by Jesse Miller (Spasojevic et al. 2016 Ozark trait study), email context from Jesse Miller, and field data from Pablo Peri's BEPSP Patagonia network (Peri et al. 2016 J. Nature Conservation).
 
-The additional 29 entries (added 2025) expand coverage across underrepresented regions and include both primary occurrence datasets and checklist backbones:
+The 29 entries added in the first 2025 expansion cover underrepresented regions:
 
 - **Central Africa (3)**: RAINBIO tropical Africa mega-database (Dauby et al. 2016), ECAT expert-validated tree distribution dataset (Tack et al. 2022), Herbier National du Gabon GBIF occurrences
 - **Russia / Central Asia (7)**: Flora of Russia iNaturalist dataset (Seregin et al. 2020), Oxytropis Asian Russia (Sandanov et al. 2022), Virtual Herbarium ALTB Altai region (Vaganov et al. 2021), Fleroff georeferenced historical records (Seregin & Basov 2021), two Kyrgyzstan alien/vascular plant checklists (Sennikov & Lazkov 2021/2025 — Dryad DwC-ready), Flora of Mongolia iNaturalist (Baasanmunkh et al. 2025)
@@ -830,7 +830,16 @@ The additional 29 entries (added 2025) expand coverage across underrepresented r
 - **Amazon / South America (4)**: Amazon species list (Cardoso et al. 2017), Colombia bioregions useful plants (Bystriakova et al. 2021), Theobroma/Herrania specimen occurrences (Colli-Silva et al. 2023)
 - **Chile (5)**: PUCV Herbarium BDJ paper + GBIF dataset (Cordero et al. 2022), Chile vascular plant diversity 181K occurrences (Luebert et al. 2022), High Andes elevation gradient plot data (Arroyo et al. 2024), sub-Antarctic Aysen/Magallanes dataset (DOI pending)
 
-GBIF occurrence datasets (`intake_type = gbif_occurrence_dataset`) are directly ingestible via the GBIF API. Dryad datasets with Darwin Core format (e.g., Kyrgyzstan, Dryad DOI 10.5061/dryad.x3ffbg7wt) are high-priority compile targets. Checklist-only entries are tagged in `notes` for use as taxonomic backbones rather than primary occurrence sources.
+The 19 entries added in the second 2026 expansion focus on **vegetation plot networks, national forest inventories, and aggregator portals**:
+
+- **Arctic & boreal (3)**: Arctic Vegetation Archive (~31000 plots), CAFF Flora Group national-database aggregator, Russian Arctic Vegetation Archive (Walker et al. 2023, 2873 plots)
+- **Latin America (5)**: SYNTREESYS CESAB synthetic tree plot database, DryFlor seasonally dry tropical forest network, Amazon Tree Diversity Network (ATDN), HERBase Amazon herbs, Argentina Red de Parcelas Permanentes + Inventario Nacional de Bosques Nativos
+- **Trait sources (1)**: Rasgos-CL Chilean trait database (Dylan Craven)
+- **Eurasia & Central Africa (3)**: TUBIVES Turkish plant database, DarkDivNet global presence/absence plot network, CAFRIPLOT Central African plot network (233 plots + traits + herbarium)
+- **North America & global aggregators (5)**: Canadian National Forest Inventory, Enquist Lab Forest Macrosystems & additional Gentry plots, Global Forest Biodiversity Initiative Science-i platform, GIVD Global Index of Vegetation Plot Databases, GLORIA Alpine plant network
+- **Asia (2)**: ASEAN RBIM dashboard (likely checklist-only — to verify), Turkish TUBIVES (above)
+
+GBIF occurrence datasets (`intake_type = gbif_occurrence_dataset`) are directly ingestible via the GBIF API. Dryad datasets with Darwin Core format (e.g., Kyrgyzstan, Dryad DOI 10.5061/dryad.x3ffbg7wt) are high-priority compile targets. Vegetation plot networks (`source_group = vegetation_plot_database`) require coordination with their respective consortia (sPlot/EVA deduplication is essential). Checklist-only entries are tagged in `notes` for use as taxonomic backbones rather than primary occurrence sources. Aggregator/registry entries (CAFF, GIVD) should be used to enumerate further individual datasets rather than ingested directly.
 
 ---
 
