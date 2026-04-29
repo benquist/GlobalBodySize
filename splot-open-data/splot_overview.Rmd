@@ -18,11 +18,13 @@ suppressPackageStartupMessages({
   library(leaflet)
   library(knitr)
   library(lubridate)
+  library(RColorBrewer)
+  library(scales)
 })
 
-ZIP <- here::here("data", "iDiv Data Repository_3474_v55__20260429.zip")
-# Fallback to absolute path if here is unavailable
-if (!requireNamespace("here", quietly = TRUE)) {
+if (requireNamespace("here", quietly = TRUE)) {
+  ZIP <- here::here("data", "iDiv Data Repository_3474_v55__20260429.zip")
+} else {
   ZIP <- "/Users/brianjenquist/VSCode/splot-open-data/data/iDiv Data Repository_3474_v55__20260429.zip"
 }
 ```
@@ -66,8 +68,9 @@ sPlotOpen is an environmentally-balanced, open-access subset of the full sPlot v
 n_plots    <- nrow(header)
 n_obs      <- nrow(DT)
 n_spp      <- uniqueN(DT[!is.na(Species) & Species != "", Species])
-date_min   <- suppressWarnings(min(ymd(header$Date_of_recording), na.rm = TRUE))
-date_max   <- suppressWarnings(max(ymd(header$Date_of_recording), na.rm = TRUE))
+date_min <- suppressWarnings(min(lubridate::ymd(header$Date_of_recording, quiet=TRUE), na.rm=TRUE))
+date_max <- suppressWarnings(max(lubridate::ymd(header$Date_of_recording, quiet=TRUE), na.rm=TRUE))
+date_range_str <- if (is.finite(as.numeric(date_min))) paste(date_min, "to", date_max) else "Not available"
 n_datasets <- uniqueN(header$Dataset)
 
 summary_df <- data.frame(
@@ -75,16 +78,14 @@ summary_df <- data.frame(
     "Number of plots",
     "Species × plot records",
     "Unique species (binomials)",
-    "Earliest recording",
-    "Latest recording",
+    "Recording date range",
     "Contributing datasets"
   ),
   Value = c(
     format(n_plots, big.mark = ","),
     format(n_obs, big.mark = ","),
     format(n_spp, big.mark = ","),
-    as.character(date_min),
-    as.character(date_max),
+    date_range_str,
     format(n_datasets, big.mark = ",")
   )
 )
@@ -126,11 +127,7 @@ cont_pal    <- colorFactor(
   domain  = continents
 )
 
-# Subsample for rendering speed (max 40 000 pts in leaflet)
-set.seed(42)
-plot_sample <- if (nrow(map_dt) > 40000) map_dt[sample(.N, 40000)] else map_dt
-
-leaflet(plot_sample) %>%
+leaflet(map_dt) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addCircleMarkers(
     lng        = ~Longitude,
@@ -155,7 +152,7 @@ leaflet(plot_sample) %>%
   )
 ```
 
-> **Note:** Up to 40,000 plots are shown for rendering performance; all `r format(n_plots, big.mark=",")` plots are included in analyses.
+> **Note:** All valid plot coordinates (non-missing latitude/longitude) are shown with marker clustering enabled for performance.
 
 ---
 
@@ -357,6 +354,205 @@ if ("Resample_1_consensus" %in% names(header)) {
   cat("Resample_1_consensus column not found in header.\n")
 }
 ```
+
+---
+
+## 8. Plot Sizes (Relevé Area)
+
+Each sPlotOpen plot has a recorded **relevé area** (m²) — the physical size of the sampled vegetation patch. Plot sizes span several orders of magnitude, from tiny phytosociological micro-relevés (~0.03 m²) to large permanent forest plots (up to 40,000 m²). The distribution is highly right-skewed: most plots are standard phytosociological relevés of 20–400 m².
+
+```{r plot-size-summary}
+area_dt <- header[!is.na(Releve_area) & Releve_area > 0]
+n_with_area    <- nrow(area_dt)
+n_without_area <- nrow(header) - n_with_area
+
+size_summary <- data.frame(
+  Statistic = c("Plots with area data", "Plots without area data",
+                "Minimum (m²)", "1st quartile (m²)", "Median (m²)",
+                "Mean (m²)", "3rd quartile (m²)", "Maximum (m²)"),
+  Value = c(
+    format(n_with_area,    big.mark = ","),
+    format(n_without_area, big.mark = ","),
+    round(min(area_dt$Releve_area,    na.rm = TRUE), 2),
+    round(quantile(area_dt$Releve_area, 0.25, na.rm = TRUE), 1),
+    round(median(area_dt$Releve_area, na.rm = TRUE), 1),
+    round(mean(area_dt$Releve_area,   na.rm = TRUE), 1),
+    round(quantile(area_dt$Releve_area, 0.75, na.rm = TRUE), 1),
+    round(max(area_dt$Releve_area,    na.rm = TRUE), 0)
+  )
+)
+kable(size_summary, caption = "Table 5. Relevé area (m²) summary statistics.")
+```
+
+```{r plot-size-hist}
+ggplot(area_dt, aes(x = Releve_area)) +
+  geom_histogram(bins = 60, fill = "#6baed6", colour = "white", linewidth = 0.2) +
+  scale_x_log10(labels = scales::comma,
+                breaks  = c(0.1, 1, 10, 100, 400, 1000, 10000, 40000)) +
+  geom_vline(xintercept = median(area_dt$Releve_area, na.rm = TRUE),
+             colour = "#d73027", linetype = "dashed", linewidth = 0.8) +
+  annotate("text", x = median(area_dt$Releve_area, na.rm = TRUE) * 1.5,
+           y = Inf, label = paste0("Median = ",
+             round(median(area_dt$Releve_area, na.rm = TRUE), 0), " m²"),
+           vjust = 1.5, hjust = 0, size = 3.2, colour = "#d73027") +
+  labs(
+    title = paste0("Plot (relevé) area distribution (n = ",
+                   format(n_with_area, big.mark = ","), " plots; log10 x-axis)"),
+    x = "Relevé area (m²)",
+    y = "Number of plots"
+  ) +
+  theme_minimal()
+```
+
+### Plot size by biome
+
+```{r plot-size-biome}
+area_biome <- header[!is.na(Releve_area) & Releve_area > 0 & !is.na(Biome)]
+area_biome[, Biome_short := gsub("Tropical & Subtropical ", "Trop. ", Biome)]
+area_biome[, Biome_short := gsub("Temperate ", "Temp. ", Biome_short)]
+area_biome[, Biome_short := gsub(" Forests", " For.", Biome_short)]
+area_biome[, Biome_short := gsub(" Grasslands, Savannas & Shrublands", " Grass./Shrub.", Biome_short)]
+# Order biomes by median area
+biome_order <- area_biome[, .(med = median(Releve_area, na.rm = TRUE)), by = Biome_short][order(med), Biome_short]
+area_biome[, Biome_short := factor(Biome_short, levels = biome_order)]
+
+ggplot(area_biome, aes(x = Biome_short, y = Releve_area)) +
+  geom_boxplot(fill = "#9ecae1", outlier.size = 0.5, outlier.alpha = 0.3) +
+  scale_y_log10(labels = scales::comma) +
+  coord_flip() +
+  labs(
+    title = "Relevé area by biome (log10 y-axis)",
+    x     = NULL,
+    y     = "Relevé area (m²)"
+  ) +
+  theme_minimal()
+```
+
+---
+
+## 9. Survey Methods
+
+The `Plant_recorded` field describes the taxonomic scope of each plot survey — whether all vascular plants, only woody plants, dominant species, or other sub-sets were recorded. This is critical for interpreting species-richness and occurrence data: plots recording only woody plants ≥ 10 cm DBH will appear species-poor relative to complete vascular-plant relevés, even in the same habitat.
+
+```{r survey-methods-bar}
+meth_dt <- header[, .N, by = Plant_recorded]
+meth_dt[is.na(Plant_recorded), Plant_recorded := "Not recorded / NA"]
+meth_dt[, Plant_recorded := trimws(Plant_recorded)]
+meth_dt <- meth_dt[order(-N)]
+meth_dt[, pct := 100 * N / sum(N)]
+meth_dt[, Plant_recorded := factor(Plant_recorded, levels = rev(Plant_recorded))]
+
+ggplot(meth_dt, aes(x = Plant_recorded, y = N)) +
+  geom_col(fill = "#74c476") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Survey method (Plant_recorded) breakdown",
+    x     = NULL,
+    y     = "Number of plots"
+  ) +
+  theme_minimal()
+```
+
+```{r survey-methods-table}
+meth_tbl <- copy(meth_dt)[order(-N)]
+meth_tbl[, Plant_recorded := as.character(Plant_recorded)]
+meth_tbl <- meth_tbl[, .(
+  `Survey scope`  = Plant_recorded,
+  `Plot count`    = format(N, big.mark = ","),
+  `% of all plots`= paste0(round(pct, 1), "%")
+)]
+kable(meth_tbl, caption = "Table 6. Survey method breakdown (Plant_recorded field).")
+```
+
+> **Interpretive note:** "Not specified" (74% of plots) typically indicates full vascular-plant surveys according to Sabatini et al. 2021, but users should verify this assumption against individual dataset documentation before using these plots in richness analyses.
+
+---
+
+## 10. Data Providers & Citations
+
+sPlotOpen aggregates data from **`r uniqueN(header$GIVD_ID)` source databases** registered in the [Global Index of Vegetation-Plot Databases (GIVD)](http://www.givd.info/). Each database has a stable GIVD identifier and an associated bibliographic reference.
+
+```{r load-metadata, cache=TRUE}
+meta <- fread(
+  cmd        = paste0("unzip -p '", ZIP, "' 'sPlotOpen_metadata(1).txt'"),
+  sep        = "\t",
+  na.strings = c("", "NA", "N/A"),
+  select     = c("PlotObservationID", "GIVD_ID", "DB_BIBTEXKEY", "Biblioreference")
+)
+```
+
+```{r provider-table}
+# Join metadata to header to get Dataset name and plot count per GIVD
+prov <- header[, .N, by = .(Dataset, GIVD_ID, Continent)][order(-N)]
+
+# Get one citation per GIVD_ID (most common non-NA Biblioreference)
+cite_tbl <- meta[!is.na(Biblioreference) & nzchar(trimws(Biblioreference)),
+  .(Biblioreference = names(sort(table(Biblioreference), decreasing = TRUE))[1],
+    DB_BIBTEXKEY   = names(sort(table(DB_BIBTEXKEY),   decreasing = TRUE))[1]),
+  by = GIVD_ID]
+
+prov_full <- cite_tbl[prov, on = "GIVD_ID"]
+setorder(prov_full, -N)
+
+prov_display <- prov_full[, .(
+  `Dataset name`   = Dataset,
+  `GIVD ID`        = GIVD_ID,
+  Continent        = Continent,
+  `Plot count`     = format(N, big.mark = ","),
+  `Key reference`  = fifelse(is.na(Biblioreference) | !nzchar(trimws(Biblioreference)),
+                             "—", substr(trimws(Biblioreference), 1, 120))
+)]
+
+kable(prov_display[1:40],
+      caption = "Table 7. Top 40 data providers by plot count with key bibliographic references (truncated to 120 characters). Full references in sPlotOpen_references.bib.")
+```
+
+### Plot count by continent (all providers)
+
+```{r provider-continent-bar}
+cont_prov <- header[, .N, by = Continent][order(-N)]
+cont_prov[, Continent := factor(Continent, levels = rev(Continent))]
+
+ggplot(cont_prov, aes(x = Continent, y = N)) +
+  geom_col(fill = "#e6550d") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Total plots by continent (all providers combined)",
+    x     = NULL,
+    y     = "Number of plots"
+  ) +
+  theme_minimal()
+```
+
+### Top 20 providers (bar chart)
+
+```{r provider-bar}
+top20 <- prov_full[1:20]
+top20[, Dataset := factor(Dataset, levels = rev(Dataset))]
+
+ggplot(top20, aes(x = Dataset, y = N, fill = Continent)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    title = "Top 20 data providers by plot count",
+    x     = NULL,
+    y     = "Number of plots",
+    fill  = "Continent"
+  ) +
+  theme_minimal()
+```
+
+### Master citation
+
+All use of sPlotOpen data should cite:
+
+> Sabatini FM, Lenoir J, Hattab T, Arnst EA, Chytrý M, Dengler J, De Ruffray P, Hennekens SM, Jandt U, Jansen F, Jiménez-Alfaro B, Kattge J, Lecerf R, Pillar VD, Purschke O, Sandel B, Svenning J-C, Thuiller W, Wirth C, Zizka A, Beierkuhnlein C, Aćić S, Agrillo E, Alvarez M, Apostolides N, et al. (2021). **sPlotOpen — An environmentally-balanced, open-access, global dataset of vegetation plots.** *Global Ecology and Biogeography*, 30(9), 1740–1764. <https://doi.org/10.1111/geb.13346>
+
+Individual datasets contributing to sPlotOpen should additionally be cited via their `DB_BIBTEXKEY` reference in the bundled `sPlotOpen_references.bib` file.
 
 ---
 
