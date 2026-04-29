@@ -2,7 +2,7 @@
 # splot-open-data/R/01_build_bien_staging.R
 #
 # Reads sPlotOpen header + DT from the zip archive, applies QA filters and
-# flags, maps to BIEN staging schema, and writes two output CSVs.
+# flags, maps to BIEN staging schema, and writes two output TSVs.
 #
 # Reference: Sabatini et al. 2021, Global Ecology and Biogeography,
 #            doi:10.1111/geb.13346
@@ -48,6 +48,7 @@ DT <- fread(
   na.strings = c("", "NA", "N/A"),
   select     = DT_COLS
 )
+DT[, source_row_index := .I]
 message("  DT rows loaded: ", format(nrow(DT), big.mark = ","))
 
 # ── 2. Join DT to header ──────────────────────────────────────────────────────
@@ -56,6 +57,10 @@ message("[3/8] Joining DT to header on PlotObservationID...")
 setkeyv(header, "PlotObservationID")
 setkeyv(DT,     "PlotObservationID")
 joined <- header[DT, nomatch = 0L]
+joined[, Resample_1_consensus := as.logical(Resample_1_consensus)]
+joined[, Resample_1 := as.logical(Resample_1)]
+joined[, Resample_2 := as.logical(Resample_2)]
+joined[, Resample_3 := as.logical(Resample_3)]
 message("  Rows after inner join: ", format(nrow(joined), big.mark = ","))
 
 # ── 3. Filters and flags ──────────────────────────────────────────────────────
@@ -101,12 +106,17 @@ joined[, year_collected := year(date_collected)]
 joined[is.na(year_collected),
        year_collected := suppressWarnings(as.integer(substr(as.character(Date_of_recording), 1, 4)))]
 
-# occurrenceID: unique across all rows
-joined[, occurrenceID := paste(PlotObservationID, Species, seq_len(.N), sep = "-")]
-
 staging <- joined[, .(
   scrubbed_species_binomial        = Species,
   scrubbed_species_binomial_splot  = Species,
+  tnrs_submitted_name              = Species,
+  tnrs_matched_name                = NA_character_,
+  tnrs_taxon_id                    = NA_character_,
+  tnrs_authority                   = NA_character_,
+  tnrs_match_score                 = NA_real_,
+  tnrs_match_method                = NA_character_,
+  tnrs_name_changed                = as.logical(NA),
+  taxon_resolution_status          = "pending_tnrs",
   verbatim_scientific_name         = Original_species,
   latitude                         = Latitude,
   longitude                        = Longitude,
@@ -114,8 +124,10 @@ staging <- joined[, .(
   verbatim_date_collected          = as.character(Date_of_recording),
   year_collected,
   country                          = Country,
+  plot_observation_id              = as.character(PlotObservationID),
+  source_row_index                 = source_row_index,
+  source_archive                   = basename(ZIP),
   plot_name                        = as.character(PlotObservationID),
-  occurrenceID,
   basisOfRecord                    = "HumanObservation",
   dataset                          = "sPlotOpen",
   datasource                       = "iDiv sPlotOpen v2.0",
@@ -140,6 +152,114 @@ staging <- joined[, .(
   location_uncertainty_m           = Location_uncertainty
 )]
 
+# Heuristic source matching for BIEN plot-source overlap triage.
+# This is not definitive deduplication; expected false positives and false
+# negatives remain, and flagged rows should be reviewed downstream.
+normalize_source_text <- function(x) {
+  tolower(trimws(gsub("[^[:alnum:]]+", " ", as.character(x))))
+}
+
+# Primary identifiers first (most specific source fields).
+source_text_primary <- normalize_source_text(paste(
+  staging$verbatim_collection_name,
+  staging$collection_code,
+  sep = " "
+))
+
+# Secondary context only for conservative BIEN-coverage fallback.
+source_text_secondary <- normalize_source_text(paste(
+  staging$dataset,
+  staging$datasource,
+  sep = " "
+))
+
+# BIEN plot sources from BIEN_plot_list_datasource:
+# CTFS, CVS, FIA, gillespie, SALVIAS, TEAM, VegBank.
+# Short acronyms require whole-token matches with optional common prefix tokens.
+bien_plot_source_patterns <- list(
+  CTFS = "\\b(?:usa\\s+)?ctfs\\b",
+  CVS = "\\b(?:usa\\s+)?cvs\\b|\\b(?:usa\\s+)?c\\s+v\\s+s\\b",
+  FIA = "\\b(?:usa\\s+)?fia\\b",
+  gillespie = "\\bgillespie\\b",
+  SALVIAS = "\\bsalvias\\b",
+  TEAM = "\\b(?:usa\\s+)?team\\b",
+  VegBank = "\\b(?:usa\\s+)?veg\\s*bank\\b|\\b(?:usa\\s+)?vegbank\\b"
+)
+
+match_on_source <- function(pattern) {
+  primary_hit <- grepl(pattern, source_text_primary, perl = TRUE)
+  secondary_hit <- grepl(pattern, source_text_secondary, perl = TRUE)
+  primary_hit | (!primary_hit & secondary_hit)
+}
+
+match_ctfs <- match_on_source(bien_plot_source_patterns$CTFS)
+match_cvs <- match_on_source(bien_plot_source_patterns$CVS)
+match_fia <- match_on_source(bien_plot_source_patterns$FIA)
+match_gillespie <- match_on_source(bien_plot_source_patterns$gillespie)
+match_salvias <- match_on_source(bien_plot_source_patterns$SALVIAS)
+match_team <- match_on_source(bien_plot_source_patterns$TEAM)
+match_vegbank <- match_on_source(bien_plot_source_patterns$VegBank)
+
+# Assign duplicate flags and one deterministic reason per row.
+# Precedence is fixed so each row gets the same "best" reason every run.
+staging[, duplicate_source_in_bien :=
+          match_ctfs |
+          match_cvs |
+          match_fia |
+          match_gillespie |
+          match_salvias |
+          match_team |
+          match_vegbank]
+
+staging[, duplicate_source_reason := fifelse(
+  match_ctfs,
+  "source in BIEN: CTFS",
+  fifelse(
+    match_cvs,
+    "source in BIEN: CVS",
+    fifelse(
+      match_fia,
+      "source in BIEN: FIA",
+      fifelse(
+        match_gillespie,
+        "source in BIEN: gillespie",
+        fifelse(
+          match_salvias,
+          "source in BIEN: SALVIAS",
+          fifelse(
+            match_team,
+            "source in BIEN: TEAM",
+            fifelse(
+              match_vegbank,
+              "source in BIEN: VegBank",
+              NA_character_
+            )
+          )
+        )
+      )
+    )
+  )
+)]
+
+staging[, occurrenceID := paste(
+  plot_observation_id,
+  gsub(" +", "_", trimws(scrubbed_species_binomial)),
+  source_row_index,
+  sep = "-"
+)]
+
+unique_names_path <- file.path(OUTPUT_DIR, "splot_unique_names_for_tnrs.tsv")
+tnrs_queue <- staging[
+  !is.na(scrubbed_species_binomial_splot) & trimws(scrubbed_species_binomial_splot) != "",
+  .(n_records = .N),
+  by = .(submitted_name = scrubbed_species_binomial_splot)
+]
+setorder(tnrs_queue, submitted_name)
+tnrs_queue[, taxon_resolution_status := "pending_tnrs"]
+fwrite(tnrs_queue, file = unique_names_path, sep = "\t", na = "")
+message("  Wrote TNRS unique-name queue: ", unique_names_path,
+        " (", format(nrow(tnrs_queue), big.mark = ","), " unique names)")
+
 # ── 5. Verify occurrenceID uniqueness ─────────────────────────────────────────
 
 message("[6/8] Verifying occurrenceID uniqueness...")
@@ -154,8 +274,8 @@ message("  occurrenceID uniqueness check: PASS")
 
 message("[7/8] Writing output files...")
 
-full_path     <- file.path(OUTPUT_DIR, "splot_bien_staging_full.csv")
-balanced_path <- file.path(OUTPUT_DIR, "splot_bien_staging_balanced.csv")
+full_path     <- file.path(OUTPUT_DIR, "splot_bien_staging_full.tsv")
+balanced_path <- file.path(OUTPUT_DIR, "splot_bien_staging_balanced.tsv")
 
 fwrite(staging, file = full_path, sep = "\t", na = "")
 message("  Wrote full staging table: ", full_path)
@@ -171,11 +291,29 @@ message("  Rows — full staging table:          ", format(nrow(staging),       
 message("  Rows — balanced subset:             ", format(nrow(staging_balanced), big.mark = ","))
 message("  Unique species:                     ", format(uniqueN(staging$scrubbed_species_binomial), big.mark = ","))
 message("  Unique plots:                       ", format(uniqueN(staging$plot_name), big.mark = ","))
+message("  Rows pending TNRS resolution:       ", format(sum(staging$taxon_resolution_status == "pending_tnrs", na.rm = TRUE), big.mark = ","))
+message("  TNRS queue file:                    ", unique_names_path)
+message("  TNRS queue unique names:            ", format(nrow(tnrs_queue), big.mark = ","))
 message("  coord_uncertainty_flag == TRUE:     ", format(sum(staging$coord_uncertainty_flag, na.rm = TRUE), big.mark = ","))
 message("  null_island_flag == TRUE:           ", format(sum(staging$null_island_flag, na.rm = TRUE), big.mark = ","))
 message("  Rows with NA date_collected:        ", format(sum(is.na(staging$date_collected)), big.mark = ","))
 message("  Rows with NA latitude:              ", format(sum(is.na(staging$latitude)), big.mark = ","))
 message("  Rows with NA longitude:             ", format(sum(is.na(staging$longitude)), big.mark = ","))
+
+message("  Duplicate rows flagged (BIEN plot sources): ",
+        format(sum(staging$duplicate_source_in_bien, na.rm = TRUE), big.mark = ","))
+duplicate_reason_counts <- staging[duplicate_source_in_bien == TRUE,
+                                   .N,
+                                   by = duplicate_source_reason][order(duplicate_source_reason)]
+if (nrow(duplicate_reason_counts) > 0L) {
+  message("  Duplicate rows by reason:")
+  for (i in seq_len(nrow(duplicate_reason_counts))) {
+    message("    ", duplicate_reason_counts$duplicate_source_reason[i],
+            ": ", format(duplicate_reason_counts$N[i], big.mark = ","))
+  }
+} else {
+  message("  Duplicate rows by reason: none flagged")
+}
 
 # ── Batch chunking note ────────────────────────────────────────────────────────
 #
