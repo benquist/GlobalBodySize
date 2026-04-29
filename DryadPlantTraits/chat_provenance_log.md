@@ -101,6 +101,13 @@ Prompt: Implement Fix 2 for DryadPlantTraits with the smallest safe change set.
 Source session: current workspace session
 Outcome: Updated R/io_helpers.R so dryad_read_supported_inputs() expands Excel workbooks into one table per readable sheet with stable `#sheet=` path markers and per-sheet read/skip log rows, while leaving non-Excel reads unchanged; validated the real Zenodo workbook probe returned 4 tables and parse-check passed.
 
+15. Date: 2026-04-28
+Prompt: Implement Fix 4 for DryadPlantTraits — add HTTP 403 fallback in zenodo_fetch_files() via record JSON endpoint.
+Source session: current workspace session
+Commit: 44a5fae
+Review: code-checker PASS, code-verifier APPROVED
+Outcome: Added zenodo_fetch_record_json() and zenodo_files_from_record_json() helpers to zenodo_api.R; zenodo_fetch_files() now falls back to /api/records/{id} JSON files array on 403 instead of returning silently empty; warns with file_discovery_failed_403 message when fallback also yields 0 files. Pushed to origin/master as 44a5fae.
+
 14. Date: 2026-04-28
 Prompt: Implement Fix 3 for DryadPlantTraits — add archive path filter to block HOBO logger/sensor CSV noise files from Zenodo zip ingest.
 Source session: current workspace session
