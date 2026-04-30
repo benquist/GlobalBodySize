@@ -4,6 +4,21 @@ Tracks prompts that created or changed work under this project folder.
 
 ## Entries
 
+27. Date: 2026-04-29
+Prompt: Fix the two warnings in reports/dryad_trait_harvest_summary.Rmd by splitting detected compiled_occurrences outputs from truly compiled manual sources, guarding the per-file fread georeference summary against malformed or empty files, re-rendering the HTML, verifying the corrected compiled-source count and totals, and updating provenance logs without commit/push.
+Source session: current workspace session
+Outcome: Updated Section 10.1 to compute a safe detected-output summary first, restrict compiled-manual narrative/table totals to rows with harvest_status = compiled and non-zero occurrence rows, preserve georeferenced-row counting logic, and re-rendered the report with the corrected compiled-source count.
+
+26. Date: 2026-04-29
+Prompt: Update Section 10 of reports/dryad_trait_harvest_summary.Rmd so the rendered report explicitly shows how many compiled manual-occurrence observations have valid geographic coordinates per source, replacing the simple row-count logic with per-source georeferenced counts from decimalLatitude/decimalLongitude, adding Georeferenced Rows and % Georeferenced to the 10.1 table plus a short coverage note, re-rendering the HTML, verifying the required totals and source IDs, and updating provenance logs without commit/push.
+Source session: current workspace session
+Outcome: Replaced the Section 10 compiled-manual-occurrence summary with a data.table aggregation that reads decimalLatitude and decimalLongitude from each compiled occurrence file, counts valid finite in-range coordinates per source, adds georeferenced totals and percentages to the 10.1 narrative and table, and re-rendered the HTML with the required totals and source IDs present.
+
+25. Date: 2026-04-29
+Prompt: Update reports/dryad_trait_harvest_summary.Rmd Section 10 so it clearly answers what sources still need to be ingested, add a new subsection after 10.1 for rows where harvest_status != "compiled" with total and status counts plus a remaining-source table ordered by pending_manual_access then pending_review, explicitly note CAFRIPLOT/HERBase/Red Argentina blockers if present, re-render the HTML, verify counts and required source IDs, and update provenance logs.
+Source session: current workspace session
+Outcome: Added a new Section 10.2 remaining-source summary driven by data/manual_source_intake.csv, preserved the existing registry and compiled-manual-occurrence tables, rendered reports/dryad_trait_harvest_summary.html, and verified the expected remaining-source counts and blocker source IDs in the HTML output.
+
 24. Date: 2026-04-29
 Prompt: Start the next ingestion phase by creating a strict shortlist from the existing queue file (output/providers/manual_intake/priority_queue_observation_sources.csv): keep rows where priority_tier == "P1" and likely_already_in_bien == "no"; add deterministic batch_order column; create next_ingest_batch_p1_not_in_bien.csv and next_ingest_batch_p1_not_in_bien_README.md; run validation snippet reporting row count, distinct source_id count, and source_id + queue_reason + recommended_next_action; update provenance logs.
 Source session: current workspace session

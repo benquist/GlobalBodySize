@@ -826,32 +826,81 @@ manual_status_summary <- paste(
 manual_occurrence_files <- Sys.glob(file.path(
   proj_root, "output", "providers", "occurrences", "*", "compiled_occurrences.csv"
 ))
-compiled_manual_occurrences <- data.table::data.table(
-  source_id = basename(dirname(manual_occurrence_files)),
-  compiled_occurrence_rows = vapply(
-    manual_occurrence_files,
-    function(path) nrow(data.table::fread(path, showProgress = FALSE)),
-    integer(1)
-  )
+safe_occurrence_file_summary <- function(path) {
+  tryCatch({
+    occurrence_dt <- data.table::fread(
+      path,
+      select = c("decimalLatitude", "decimalLongitude"),
+      showProgress = FALSE
+    )
+    lat <- suppressWarnings(as.numeric(occurrence_dt$decimalLatitude))
+    lon <- suppressWarnings(as.numeric(occurrence_dt$decimalLongitude))
+    georeferenced_rows <- sum(
+      !is.na(lat) & !is.na(lon) &
+        is.finite(lat) & is.finite(lon) &
+        lat >= -90 & lat <= 90 &
+        lon >= -180 & lon <= 180,
+      na.rm = TRUE
+    )
+    data.table::data.table(
+      compiled_occurrence_rows = nrow(occurrence_dt),
+      georeferenced_rows = georeferenced_rows
+    )
+  }, error = function(e) {
+    data.table::data.table(
+      compiled_occurrence_rows = 0L,
+      georeferenced_rows = 0L
+    )
+  })
+}
+detected_manual_occurrences <- data.table::rbindlist(
+  lapply(manual_occurrence_files, function(path) {
+    summary_dt <- safe_occurrence_file_summary(path)
+    data.table::data.table(
+      source_id = basename(dirname(path)),
+      compiled_occurrence_rows = summary_dt$compiled_occurrence_rows,
+      georeferenced_rows = summary_dt$georeferenced_rows
+    )
+  }),
+  fill = TRUE
 )
-if (nrow(compiled_manual_occurrences)) {
-  compiled_manual_occurrences <- manual_intake[
-    compiled_manual_occurrences,
+if (nrow(detected_manual_occurrences)) {
+  detected_manual_occurrences <- manual_intake[
+    detected_manual_occurrences,
     on = "source_id"
   ][
-    , .(source_id, display_name, source_group, harvest_status, compiled_occurrence_rows)
-  ][order(-compiled_occurrence_rows, source_id)]
+    , .(
+      source_id,
+      display_name,
+      source_group,
+      harvest_status,
+      compiled_occurrence_rows,
+      georeferenced_rows,
+      georeferenced_pct = fifelse(
+        compiled_occurrence_rows > 0,
+        100 * georeferenced_rows / compiled_occurrence_rows,
+        0
+      )
+    )
+  ][order(-georeferenced_rows, -compiled_occurrence_rows, source_id)]
 } else {
-  compiled_manual_occurrences <- data.table::data.table(
+  detected_manual_occurrences <- data.table::data.table(
     source_id = character(),
     display_name = character(),
     source_group = character(),
     harvest_status = character(),
-    compiled_occurrence_rows = integer()
+    compiled_occurrence_rows = integer(),
+    georeferenced_rows = integer(),
+    georeferenced_pct = numeric()
   )
 }
+compiled_manual_occurrences <- detected_manual_occurrences[
+  harvest_status == "compiled" & compiled_occurrence_rows > 0
+]
+detected_manual_source_count <- nrow(detected_manual_occurrences)
 compiled_manual_source_count <- nrow(compiled_manual_occurrences)
 compiled_manual_occurrence_total <- sum(compiled_manual_occurrences$compiled_occurrence_rows)
+compiled_manual_georeferenced_total <- sum(compiled_manual_occurrences$georeferenced_rows)
 cols_show <- c("display_name", "source_group", "canonical_url_or_doi",
                "related_publication", "harvest_status", "next_action")
 if (requireNamespace("DT", quietly = TRUE)) {
@@ -868,7 +917,9 @@ The manual intake registry currently tracks `r formatC(nrow(manual_intake), form
 
 ### 10.1 Compiled manual occurrence sources {#compiled-manual-occurrences}
 
-The occurrence harvest currently includes `r formatC(compiled_manual_source_count, format = "d", big.mark = ",")` compiled manual sources totaling `r formatC(compiled_manual_occurrence_total, format = "d", big.mark = ",")` occurrence records.
+The occurrence harvest currently includes `r formatC(compiled_manual_source_count, format = "d", big.mark = ",")` compiled manual sources totaling `r formatC(compiled_manual_occurrence_total, format = "d", big.mark = ",")` occurrence records, of which `r formatC(compiled_manual_georeferenced_total, format = "d", big.mark = ",")` have valid geographic coordinates.
+
+`r if (detected_manual_source_count > compiled_manual_source_count) paste0("The pipeline currently detects ", formatC(detected_manual_source_count, format = "d", big.mark = ","), " compiled_occurrences.csv outputs on disk, but only the ", formatC(compiled_manual_source_count, format = "d", big.mark = ","), " sources with harvest_status = 'compiled' and >0 occurrence rows are counted in the compiled manual-source totals above.")`
 
 ```{r compiled-manual-occurrence-table}
 if (nrow(compiled_manual_occurrences)) {
@@ -878,14 +929,65 @@ if (nrow(compiled_manual_occurrences)) {
       `Display Name` = fifelse(is.na(display_name) | !nzchar(display_name), source_id, display_name),
       `Source Group` = source_group,
       `Harvest Status` = harvest_status,
-      `Occurrence Rows` = compiled_occurrence_rows
+      `Occurrence Rows` = compiled_occurrence_rows,
+      `Georeferenced Rows` = georeferenced_rows,
+      `% Georeferenced` = sprintf("%.1f%%", georeferenced_pct)
     )],
-    caption = "Compiled manual occurrence sources detected under output/providers/occurrences"
+    caption = "Compiled manual occurrence sources"
   )
 } else {
   cat("No compiled manual occurrence sources were detected under output/providers/occurrences.")
 }
 ```
+
+This table shows the geographic-coordinate coverage of compiled manual occurrence sources with `harvest_status = "compiled"` and non-zero occurrence rows.
+
+### 10.2 Sources still to ingest {#sources-still-to-ingest}
+
+```{r remaining-manual-intake-table}
+remaining_manual_intake <- manual_intake[harvest_status != "compiled"]
+remaining_manual_intake <- remaining_manual_intake[
+  order(match(harvest_status, c("pending_manual_access", "pending_review")), source_id)
+]
+remaining_manual_status_counts <- remaining_manual_intake[, .N, by = harvest_status]
+remaining_manual_count <- nrow(remaining_manual_intake)
+remaining_pending_review_count <- remaining_manual_status_counts[
+  harvest_status == "pending_review", sum(N)
+]
+remaining_pending_manual_access_count <- remaining_manual_status_counts[
+  harvest_status == "pending_manual_access", sum(N)
+]
+if (!length(remaining_pending_review_count) || is.na(remaining_pending_review_count)) {
+  remaining_pending_review_count <- 0L
+}
+if (!length(remaining_pending_manual_access_count) || is.na(remaining_pending_manual_access_count)) {
+  remaining_pending_manual_access_count <- 0L
+}
+manual_access_blockers <- remaining_manual_intake[
+  source_id %in% c(
+    "manual_central_african_plot_network_cafriplot",
+    "manual_herbase_amazon_herbs",
+    "manual_red_argentina_parcelas_permanentes"
+  )
+]
+kable_styled(
+  remaining_manual_intake[, .(
+    source_id,
+    display_name,
+    source_group,
+    harvest_status,
+    canonical_url_or_doi,
+    next_action
+  )],
+  caption = "Manual intake sources still to ingest"
+)
+```
+
+`r formatC(remaining_manual_count, format = "d", big.mark = ",")` manual-intake sources still need ingestion based on the current registry rows where `harvest_status != "compiled"`.
+
+Of those remaining sources, `r formatC(remaining_pending_manual_access_count, format = "d", big.mark = ",")` are `pending_manual_access` and `r formatC(remaining_pending_review_count, format = "d", big.mark = ",")` are `pending_review`.
+
+`r if (nrow(manual_access_blockers)) paste0("The currently identified manual-access blockers are ", paste(manual_access_blockers$display_name, collapse = ", "), ".")`
 
 The original 6 entries cover the ShrubHub TraitHub repository (Bjorkman et al. 2018 Nature), three files supplied directly by Jesse Miller (Spasojevic et al. 2016 Ozark trait study), email context from Jesse Miller, and field data from Pablo Peri's BEPSP Patagonia network (Peri et al. 2016 J. Nature Conservation).
 
