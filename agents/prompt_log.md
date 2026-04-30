@@ -1673,3 +1673,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Project: DryadPlantTraits
 - Prompt: Mandatory gate failed due parse error in `leaflet-map` chunk near `map_out`; apply minimal fix, render, commit required Dryad report files, and push to origin+datadryad.
 - Task: Removed duplicated nested `cat()` call in reports/dryad_trait_harvest_summary.Rmd causing `unexpected symbol` parse failure near `map_out`; rendered successfully via `rmarkdown::render('reports/dryad_trait_harvest_summary.Rmd', quiet=TRUE)`.
+
+## 2026-04-29 — DryadPlantTraits push provider expansion (commit b1c6b54)
+- Project: DryadPlantTraits
+- Prompt: Update the github repo.
+- Task: Staged and pushed new fred, scientific_data, manual_intake providers; new zenodo parser registry and discover script; updated standardize_records/dryad_api/search_terms; re-rendered harvest summary Rmd/HTML; extended .gitignore to exclude provider downloads/ and large compiled outputs (4.5GB zenodo downloads excluded). Pushed cc8b780..b1c6b54 to origin/master.
