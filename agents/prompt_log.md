@@ -1702,3 +1702,7 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - sPlot_BIENdb_Loading.git: pushed pipeline robustness (ragged TSV rows, tab/newline sanitization, GVS empty-response fallback) (6a8edd9 on master).
 - Literature_Data_To_BIENdb: pushed inspect_columns.R helper (d7b57fe on main).
 - enquistlab-site-migration: already in sync.
+
+## 2026-04-29 — README update request on GitHub
+- Prompt: lets update the README file on github
+- Task: Updated README content in both DryadPlantTraits and Literature_Data_To_BIENdb contexts and pushed those README updates to their respective GitHub remotes.
