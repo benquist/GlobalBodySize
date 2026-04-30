@@ -1575,3 +1575,22 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Root cause recorded: Gallery/photos content existed, but Gallery link had been omitted from `_pages/nav-lab.md` children.
 - Files changed: `enquistlab-site-migration/chat_provenance_log.md`
 - Status: Pushed to origin/main as b2bf30b.
+
+## 2026-04-29 — enquistlab-site-migration people.md double-HR fix (commit a72656a)
+- Project: enquistlab-site-migration
+- Prompt: "On the https://enquistlab.github.io/people/ there is a gap and three lines separating Graduate Students and Lab Team & Technical Staff. I would like these to be much closer in space. suggest potential changes to this page"
+- Task: Moved the `---` divider before `{% if visiting_students %}` inside the conditional block so only one `<hr>` appears between Graduate Students and Lab Team when visiting_students is empty.
+- File changed: `_pages/people.md`
+- Status: Pushed to origin/main as a72656a.
+
+## 2026-04-29 — DryadPlantTraits P1 not-in-BIEN batch ingest script
+- Project: DryadPlantTraits
+- Prompt: "Write a new R ingest script for 5 P1 non-BIEN manual occurrence sources."
+- Created: `providers/manual_intake/scripts/download_p1_not_in_bien_batch.R`
+- Sources and outcomes:
+  1. manual_arroyo_high_andes_chile — Zenodo search hit (zenodo.19902487) → 2637 rows compiled
+  2. manual_central_african_plot_network_cafriplot — No download link on cafriplot.net → 0-row placeholder, contact_required
+  3. manual_herbase_amazon_herbs — Zenodo search returned candidate CSV → 50809 rows (possible false positive; flagged for review)
+  4. manual_red_argentina_parcelas_permanentes — Zenodo + Dryad search returned nothing → 0-row placeholder, contact_required
+  5. manual_russian_arctic_vegetation_archive — Dryad search hit (10.5061/dryad.5tb2rbp8d) → 160 rows compiled
+- Script uses data.table/httr/jsonlite only; resumable; 90s download timeout; never overwrites non-empty with 0 rows
