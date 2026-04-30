@@ -215,3 +215,7 @@ Outcome: Revised README scope language to trait-only providers (DataDryad, Zenod
 Prompt: Mandatory gate failed due Rmd parse error in Dryad report. Fix `leaflet-map` chunk parse error near map_out with minimal change, re-render, and push.
 Source session: current workspace session
 Outcome: Fixed a duplicated nested cat() call in reports/dryad_trait_harvest_summary.Rmd `leaflet-map` chunk that caused parse failure near `map_out`; re-rendered reports/dryad_trait_harvest_summary.Rmd successfully.
+29. Date: 2026-04-30
+Prompt: Start the manual trait ingestion path for DryadPlantTraits by adding staging and ingest scripts for user-supplied Ozark files; document the expected data placement and run commands.
+Source session: current workspace session
+Outcome: Added providers/manual_intake/README.md, providers/manual_intake/scripts/stage_manual_trait_sources.R, and providers/manual_intake/scripts/ingest_manual_trait_source.R; validated staging and failure-on-missing-source behavior.
