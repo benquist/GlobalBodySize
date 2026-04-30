@@ -1183,6 +1183,121 @@ Of those remaining sources, `r formatC(remaining_pending_manual_access_count, fo
 
 `r if (nrow(manual_access_blockers)) paste0("The currently identified manual-access blockers are ", paste(manual_access_blockers$display_name, collapse = ", "), ".")`
 
+### 10.3 Access-path classification of pending sources {#access-path-classification}
+
+The `r formatC(remaining_manual_count, format = "d", big.mark = ",")` remaining sources are bucketed by how they can actually be retrieved. This drives the ingestion roadmap.
+
+```{r access-path-classification}
+access_path_rules <- list(
+  list(
+    label = "P1 — GBIF DOI auto-fetch (already wired)",
+    description = "Resolvable to a GBIF dataset UUID via DOI; ingestible through the existing `download_occurrence_sources.R` helper. All currently registered P1 sources are already compiled.",
+    ids = character()
+  ),
+  list(
+    label = "P2 — Direct dataset download (Dryad / Zenodo / BDJ supp / PhytoKeys / Data in Brief)",
+    description = "Open dataset deposit with stable URL; per-source parser required for column → Darwin Core mapping. Active work front.",
+    ids = c(
+      "manual_ecat_central_africa",
+      "manual_oxytropis_asian_russia",
+      "manual_altb_virtual_herbarium",
+      "manual_fleroff_georef_records",
+      "manual_flora_russia_inaturalist",
+      "manual_lesser_sunda_endemics",
+      "manual_theobroma_occurrences",
+      "manual_pucv_herbarium_chile_bdj",
+      "manual_rasgos_cl_chile_traits",
+      "manual_luebert_chile_diversity",
+      "manual_colombia_bioregions_bystriakova"
+    )
+  ),
+  list(
+    label = "P3 — Checklists / taxonomic backbones",
+    description = "Primarily species lists without point coordinates; ingest as taxonomic reference rather than occurrence rows.",
+    ids = c(
+      "manual_myanmar_vascular_checklist",
+      "manual_tubives_turkish_plants",
+      "manual_asean_biodiversity_rbim",
+      "manual_sunda_sahul_checklist",
+      "manual_sunda_sahul_suppl_dataset",
+      "manual_amazon_checklist_cardoso"
+    )
+  ),
+  list(
+    label = "P4 — Discovery registries / aggregators",
+    description = "Portals/indexes that point to many constituent databases; require per-database enumeration before ingest.",
+    ids = c(
+      "manual_caff_flora_group_arctic",
+      "manual_givd_global_index_vegetation_databases",
+      "manual_science_i_global_forest_biodiversity",
+      "manual_darkdivnet",
+      "manual_gloria_alpine_plant_network",
+      "manual_dryflor_seasonally_dry_tropical_forest"
+    )
+  ),
+  list(
+    label = "P5 — Coordination required (closed/contact/registration)",
+    description = "Data are not openly downloadable; require team contact, registration, or data-sharing agreements.",
+    ids = c(
+      "manual_amazon_tree_diversity_network_atdn",
+      "manual_enquist_macrosystems_gentry_plots",
+      "manual_canadian_forest_inventory",
+      "manual_inventario_nacional_bosques_nativos_argentina",
+      "manual_red_argentina_parcelas_permanentes",
+      "manual_central_african_plot_network_cafriplot",
+      "manual_syntreesys_cesab",
+      "manual_flora_mongolia_inaturalist",
+      "manual_arctic_vegetation_archive_ava",
+      "manual_subantarctic_chile_potential",
+      "manual_herbase_amazon_herbs",
+      "manual_southern_islands_flora_paper",
+      "manual_paciflora_bdj"
+    )
+  ),
+  list(
+    label = "P6 — Original 6 entries (legacy intake; trait-only or context)",
+    description = "ShrubHub TraitHub, Ozark trait files, Jesse Miller email context, and Pablo Peri Patagonia BEPSP. Trait-table ingest paths rather than DwC occurrence ingest.",
+    ids = c(
+      "manual_shrubhub_traithub_repo",
+      "manual_alltraits_phynames_csv",
+      "manual_oztrait_data_joe_csv",
+      "manual_ozark_trait_metadata2_xlsx",
+      "manual_re_data_for_bien_eml",
+      "manual_bepsp_pablo_peri_xlsx"
+    )
+  )
+)
+all_remaining_ids <- remaining_manual_intake$source_id
+classified_ids <- unlist(lapply(access_path_rules, `[[`, "ids"))
+unclassified_ids <- setdiff(all_remaining_ids, classified_ids)
+access_path_rows <- data.table::rbindlist(lapply(access_path_rules, function(rule) {
+  matched <- intersect(rule$ids, all_remaining_ids)
+  data.table::data.table(
+    `Tier` = rule$label,
+    `Description` = rule$description,
+    `Sources matched in registry` = length(matched),
+    `Source IDs` = if (length(matched)) paste(matched, collapse = ", ") else "(none)"
+  )
+}))
+if (length(unclassified_ids)) {
+  access_path_rows <- rbind(
+    access_path_rows,
+    data.table::data.table(
+      `Tier` = "Unclassified",
+      `Description` = "Pending sources not matched by any access-path rule above; review and reassign.",
+      `Sources matched in registry` = length(unclassified_ids),
+      `Source IDs` = paste(unclassified_ids, collapse = ", ")
+    )
+  )
+}
+kable_styled(
+  access_path_rows,
+  caption = "Access-path classification of remaining manual-intake sources"
+)
+```
+
+**Roadmap implication.** Tier P1 (GBIF DOI auto-fetch) is already wired through `providers/manual_intake/scripts/download_occurrence_sources.R` and can be batched in a single resumable run. **Tier P2 is the next active work front**: each entry needs a short per-source download + Darwin Core mapping script written under `providers/manual_intake/scripts/<source_id>.R`, producing `output/providers/occurrences/<source_id>/compiled_occurrences.csv` with the standard `DWC_COLS` schema (including `decimalLatitude`, `decimalLongitude`, `eventDate`, `basisOfRecord`, `source_doi`, `qa_flags`). Trait payloads, where present, write to a sibling `compiled_traits.csv` for the trait-coverage pipeline. Tier P3 sources contribute taxonomic-backbone rows only. Tier P4 requires enumeration into individual intake entries before ingest. Tier P5 awaits team coordination and is not ingestible from this script alone.
+
 The original 6 entries cover the ShrubHub TraitHub repository (Bjorkman et al. 2018 Nature), three files supplied directly by Jesse Miller (Spasojevic et al. 2016 Ozark trait study), email context from Jesse Miller, and field data from Pablo Peri's BEPSP Patagonia network (Peri et al. 2016 J. Nature Conservation).
 
 The 29 entries added in the first 2025 expansion cover underrepresented regions:
