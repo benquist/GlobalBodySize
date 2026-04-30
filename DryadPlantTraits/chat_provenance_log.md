@@ -4,6 +4,11 @@ Tracks prompts that created or changed work under this project folder.
 
 ## Entries
 
+28. Date: 2026-04-29
+Prompt: Update reports/dryad_trait_harvest_summary.Rmd and rendered HTML so Manual Occurrence records are broken out alongside other providers, including setup-time manual occurrence aggregation, Executive Summary/provider-overview integration, provider-row plot inclusion, and a Section 2 manual source breakdown table.
+Source session: current workspace session
+Outcome: Added a robust setup-time manual occurrence summary pipeline reading output/providers/occurrences/*/compiled_occurrences.csv with unreadable/empty-file guards, valid-coordinate counting, per-source source_id + optional datasetName rollups, and an aggregated "Manual Occurrences" provider row; updated Section 1 totals/wording to include manual occurrence harvest rows and coordinates without claiming manual trait coverage; appended a "Manual Occurrences" row to Section 2 provider summary and provider-rows plot with a distinct color; made trait-only stacked/boxplot provider factor levels dynamic for resilience; added Section 2.3 manual occurrence source breakdown table (Rows, Rows with Coords, Coverage); and re-rendered reports/dryad_trait_harvest_summary.html successfully.
+
 27. Date: 2026-04-29
 Prompt: Fix the two warnings in reports/dryad_trait_harvest_summary.Rmd by splitting detected compiled_occurrences outputs from truly compiled manual sources, guarding the per-file fread georeference summary against malformed or empty files, re-rendering the HTML, verifying the corrected compiled-source count and totals, and updating provenance logs without commit/push.
 Source session: current workspace session

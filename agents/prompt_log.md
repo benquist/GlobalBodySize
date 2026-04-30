@@ -1,3 +1,5 @@
+2026-04-29 | "You are the coder agent. Update DryadPlantTraits report so both the .Rmd and rendered .html break down Manual Occurrence records alongside other sources..." — Updated DryadPlantTraits/reports/dryad_trait_harvest_summary.Rmd to compute a robust manual occurrence provider summary from output/providers/occurrences/*/compiled_occurrences.csv (skip unreadable/empty files, count total and valid-coordinate rows, preserve per-source source_id + optional datasetName), integrated Manual Occurrences into Executive Summary and Provider Overview totals, appended a Manual Occurrences provider row to Section 2 table/plot with a distinct color, kept trait charts limited to trait providers with dynamic level handling, added Section 2.3 manual occurrence source breakdown table, rendered reports/dryad_trait_harvest_summary.html successfully, and prepared provenance + git updates.
+
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Fix the two warnings in reports/dryad_trait_harvest_summary.Rmd by separating detected manual occurrence outputs from truly compiled manual sources, guarding the per-file fread georeference summary with tryCatch so malformed/empty files yield 0 rows instead of failing, re-render the HTML, verify the report shows 10 compiled sources and totals 165,155 / 144,389, and update provenance logs without commit/push."
 
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Start the next ingestion phase by creating a strict shortlist from the existing queue file (priority_queue_observation_sources.csv): keep P1 rows where likely_already_in_bien == 'no'; add deterministic batch_order; create next_ingest_batch_p1_not_in_bien.csv and README; run validation snippet; update provenance logs."
@@ -1624,3 +1626,19 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Project: enquistlab-site-migration
 - Prompt: "I see it now. On the Shuffle make sure to shuffle the themes too"
 - Task: Updated `_pages/gallery.md` to wrap 6 thematic sections in `.gallery-theme-block` divs inside `#gallery-themes-container`; JS `shuffleAll()` now randomizes both theme-block order and photos within each grid. Commit 9df59e5 pushed to origin/main. No Rmd or R package files changed.
+
+## 2026-04-29 — enquistlab-site-migration Lab Life gallery block (commit 51a38f9)
+- Project: enquistlab-site-migration
+- Prompt: "Lets add some more lab photos for the gallery"
+- Task: Added `assets/img/lab/.gitkeep` (new directory placeholder) and a "Lab Life" gallery theme block to `_pages/gallery.md` with 20 photo entries referencing `assets/img/lab/` images (scaffolded; user to populate image files). Commit 51a38f9 pushed to origin/main. No Rmd or R package files changed.
+
+## 2026-04-29 — Literature_Data_To_BIENdb re-render overview (commit a10f386)
+- Project: Literature_Data_To_BIENdb
+- Prompt: Re-render `reports/literature_data_overview.Rmd` to map all 14,325 georeferenced records (no sampling).
+- Task: Rendered `reports/literature_data_overview.html` (8.4 MB; 14,325 valid lat/lon points mapped). Committed and pushed to origin/main as a10f386. No R package files changed.
+
+## 2026-04-29 — DryadPlantTraits leaflet map adds manual occurrence layer
+- Project: DryadPlantTraits
+- Prompt: Add manual occurrence source points to the leaflet interactive map in `reports/dryad_trait_harvest_summary.Rmd` (`leaflet-map` chunk). Glob `../output/providers/occurrences/*/compiled_occurrences.csv`, read with fread (select 5 cols), coerce coords, sample up to 10k total, bind with trait coord_dat via rbindlist(fill=TRUE), add "Manual Occurrences" = "#9467bd" to palette, update popup to show source_id when source_title is NA.
+- Files changed: reports/dryad_trait_harvest_summary.Rmd, reports/dryad_trait_harvest_summary.html
+- Commit: 583e082 pushed to origin/master. No R package build required.
