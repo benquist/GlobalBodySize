@@ -1,3 +1,5 @@
+2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Start the next ingestion phase by creating a strict shortlist from the existing queue file (priority_queue_observation_sources.csv): keep P1 rows where likely_already_in_bien == 'no'; add deterministic batch_order; create next_ingest_batch_p1_not_in_bien.csv and README; run validation snippet; update provenance logs."
+
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. User issue: the rendered HTML report does not show the 8 compiled manual occurrence sources and their row counts. Edit only reports/dryad_trait_harvest_summary.Rmd to add a Section 10 subsection/table that reads data/manual_source_intake.csv, scans output/providers/occurrences/*/compiled_occurrences.csv, summarizes rows per source_id, joins display_name and source_group where available, shows total compiled sources and total occurrence records, fixes the stale pending_review narrative dynamically from current harvest_status counts, keeps the existing pending/manual-intake table, re-renders reports/dryad_trait_harvest_summary.html, validates the HTML contains manual_gabon_gbif_ipt, manual_paciflora_dryad, and 138,748 or 138748, and updates required provenance logs." 
 
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Modify the FRED ingest pipeline so compiled trait rows are flagged when the source study or row is likely already represented in BIEN and when observations may also be present in GBIF. Tighten the logic so sequence-like and non-observation/model outputs are more clearly flagged for downstream exclusion/review, while keeping changes minimal and local to providers/fred/scripts/download_and_compile_fred_traits.R. Add deterministic study- and row-level qa_flags heuristics, conservative filename-based manifest excludes, an end-of-script qa_flag summary, validate with a narrow Rscript -e helper probe, and report files changed, flags added, validation result, and residual risks." 
@@ -1566,3 +1568,10 @@ Record each user prompt that led to creation, direction, or alteration of agent 
   - adding robust wrapping rules in `_sass/_lab-redesign.scss`
 - Preserved requested News behavior: Munch hero retained; category shuffle button near top with category-order shuffle logic.
 - Pushed to origin/main as fc5c9fa.
+
+## 2026-04-29 — enquistlab-site-migration provenance follow-up (commit b2bf30b)
+- Project: enquistlab-site-migration
+- Task: Add explicit root-cause explanation for Gallery tab/photos issue and summarize watermark/CV overflow fixes in project provenance.
+- Root cause recorded: Gallery/photos content existed, but Gallery link had been omitted from `_pages/nav-lab.md` children.
+- Files changed: `enquistlab-site-migration/chat_provenance_log.md`
+- Status: Pushed to origin/main as b2bf30b.

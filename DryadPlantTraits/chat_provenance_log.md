@@ -4,6 +4,11 @@ Tracks prompts that created or changed work under this project folder.
 
 ## Entries
 
+24. Date: 2026-04-29
+Prompt: Start the next ingestion phase by creating a strict shortlist from the existing queue file (output/providers/manual_intake/priority_queue_observation_sources.csv): keep rows where priority_tier == "P1" and likely_already_in_bien == "no"; add deterministic batch_order column; create next_ingest_batch_p1_not_in_bien.csv and next_ingest_batch_p1_not_in_bien_README.md; run validation snippet reporting row count, distinct source_id count, and source_id + queue_reason + recommended_next_action; update provenance logs.
+Source session: current workspace session
+Outcome: Created output/providers/manual_intake/next_ingest_batch_p1_not_in_bien.csv (5 rows, all direct_observation, sorted by source_id ascending) and accompanying README.md. Validation confirmed 5 rows, 5 distinct source_ids.
+
 23. Date: 2026-04-29
 Prompt: Fix the new Section 10 manual-intake occurrence-summary chunk in reports/dryad_trait_harvest_summary.Rmd so DT::datatable is only used when DT is available, with a same-columns fallback when DT is unavailable, then re-render and validate the HTML output.
 Source session: current workspace session
