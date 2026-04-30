@@ -219,6 +219,8 @@
 
 2026-04-24 | papers.bib: added Vasseur et al. 2025 (From organism traits to ecosystem processes) — missing bib entry was preventing Metabolic Scaling tab classification.
 
+2026-04-29 | "Task: In /Users/brianjenquist/VSCode/enquistlab-site-migration, update the News page so shuffle behavior randomizes ordering of news categories (section.news-theme blocks), place shuffle button near the top immediately after the Munch hero, preserve current hero and hidden section-jump-nav style, replace fragile swap logic with robust Fisher-Yates plus append-back approach, keep button click handler and auto-shuffle on DOMContentLoaded, optionally tune shuffle-button mobile styling, run quick validation that button is before first section and inline JS has no syntax issues, and avoid unrelated changes."
+
 2026-04-24 | publications.md: added Metabolic Scaling matchers for Vasseur 2025, Cruz 2025, Enquist 2024, Castorena 2022, Brummer 2021. conservation-impacts.md: added Krieger et al. 2022. research.md: linked Gallagher et al. 2020.
 
 2026-04-25 | BIENDataLoader/README.md revision: biodiversity-informatics-checker (fix TNRS input column bug, GVS description, scrubbed_* attribution, GNRS→NSR dependency, score thresholds, is_cultivated_observation clarification, CRS requirement, GNRS fields); ecology-user (add 160M records BIEN context, Maitner 2018 citation, user audience list, Mason demo context, use case table, infraspecific note); design-atelier (reorder sections: About first, caveats before field reference; blockquote callout style; emoji step headers; pipeline diagram; hero nav links). Committed c64adbb to BIEN_Data_Loader/main and a350799 to monorepo/master.
@@ -1542,3 +1544,11 @@ Record each user prompt that led to creation, direction, or alteration of agent 
   - References: removed WordPress link, added https://enquistlab.github.io/, added Bluesky https://bsky.app/profile/bjenquist.bsky.social with fa-brands fa-bluesky icon
 - Files: _data/cv.yml, _layouts/cv.liquid, _sass/_lab-redesign.scss, chat_provenance_log.md
 - Status: Pushed to origin/main as ce27d90; GitHub Actions deploy in progress
+
+## 2026-04-29 — DryadPlantTraits observation-priority queue (manual intake)
+- Project: DryadPlantTraits
+- Task: Produced pending-source observation-focused priority queue and removed BIEN-duplicate RAINBIO from intake registry.
+- Data change: Deleted `manual_rainbio_central_africa` row from `data/manual_source_intake.csv`.
+- New artifact: `output/providers/manual_intake/priority_queue_observation_sources.csv` with explicit tiering and BIEN-overlap heuristic fields.
+- New docs: `output/providers/manual_intake/README_priority_queue.md` (scope, columns, caveat, date).
+- Validation run: pending count after deletion, tier counts in queue output, and top-20 queue preview with BIEN-overlap flag.

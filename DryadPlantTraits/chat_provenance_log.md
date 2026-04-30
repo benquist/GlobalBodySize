@@ -168,3 +168,10 @@ Outcome: Updated providers/zenodo/R/zenodo_parser_registry.R so species blanks a
 Prompt: In DryadPlantTraits, create a committed manual-source registry for newly supplied external studies/files, add the current user-supplied items as separate rows, note that generated output candidate manifests are not the durable home, update README and provenance logs, and validate the new registry references.
 Source session: current workspace session
 Outcome: Added data/manual_source_intake.csv as the committed registry for manual and user-supplied external sources; registered the six currently supplied items with conservative provenance and harvest-status fields; documented that this registry is distinct from generated output candidate manifests; and updated project and agent prompt provenance.
+
+## 2026-04-29 — Observation-focused pending source priority queue and BIEN-overlap triage
+- Removed `manual_rainbio_central_africa` from `data/manual_source_intake.csv` (explicitly already represented in BIEN).
+- Created `output/providers/manual_intake/priority_queue_observation_sources.csv` from `pending_review` intake rows, keeping only observation-likely or salvageable records.
+- Added queue annotations: `priority_tier`, `observation_readiness`, `likely_already_in_bien`, `likely_bien_reason`, `queue_reason`, `recommended_next_action`.
+- Excluded checklist/non-observational sources from top ingest tiers and retained only plausible salvage leads in P3.
+- Added `output/providers/manual_intake/README_priority_queue.md` documenting scope, columns, heuristics, and generation date.
