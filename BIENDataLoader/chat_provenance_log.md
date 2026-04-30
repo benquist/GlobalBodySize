@@ -369,3 +369,6 @@
 - No changes to: existing service action observers (`btn_tnrs/gnrs/gvs/nsr`), upload observers, download handlers, Step 1/2/3 completion modals, QC code, field lists, mapping table, or sanitizer.
 - All 4 service buttons, 4 download buttons, 4 upload inputs, and 4 status outputs retain unchanged IDs.
 - `Rscript -e "invisible(parse(file='app.R'))"` prints PARSE_OK.
+
+## 2026-04-29 — Header GitHub + README links
+- Added two right-aligned links in the page header: GitHub repo (https://github.com/benquist/BIEN_Data_Loader) and README. Each uses an inline SVG icon (no external asset). New `.bien-header-links` and `.header-link` CSS rules. UI-only; no server logic touched. Parse OK.
