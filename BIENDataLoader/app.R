@@ -518,21 +518,38 @@ ui <- navbarPage(
     tags$head(
       tags$style(HTML("
         :root {
-          --bien-blue: #2f79b7;
-          --bien-blue-deep: #1f5b8f;
-          --bien-green: #74b64a;
-          --bien-green-deep: #4e8c2c;
-          --bien-sky: #e9f4ff;
-          --bien-mint: #eef9e8;
-          --panel-border: #cfe2f3;
-          --text-ink: #24445f;
+          --bien-blue:#2f79b7;
+          --bien-blue-deep:#1f5b8f;
+          --bien-green:#5b8a4c;
+          --bien-green-deep:#46703b;
+          --bien-warm-bg:#f7f4ee;
+          --bien-surface:#fffdf8;
+          --bien-line:#e6dfd2;
+          --bien-ink:#1f3344;
+          --bien-muted:#5a6e7e;
+          --bien-warn-bg:#fbf3df;
+          --bien-warn-line:#d8c281;
+          --bien-pass-bg:#eaf2dd;
+          --bien-pass-line:#b3c98d;
+          --bien-block-bg:#f8e2db;
+          --bien-block-line:#c98a76;
         }
 
+        html { font-size: 16px; }
         body {
+          font-family: Inter, system-ui, -apple-system, \"Segoe UI\", Arial, sans-serif;
+          color: var(--bien-ink);
+          background: var(--bien-warm-bg);
+          line-height: 1.55;
           padding: 0;
-          font-family: 'Segoe UI', Arial, sans-serif;
-          color: var(--text-ink);
-          background: linear-gradient(180deg, #f7fbff 0%, #fbfef9 100%);
+        }
+
+        .container-fluid,
+        .navbar > .container-fluid {
+          max-width: clamp(960px, 92vw, 1240px);
+          margin: 0 auto;
+          padding-left: 32px;
+          padding-right: 32px;
         }
 
         .navbar {
@@ -558,43 +575,10 @@ ui <- navbarPage(
           flex: 0 0 auto;
         }
         .navbar-nav > li > a {
-          padding: 14px 20px !important;
-          font-size: 0.95em !important;
+          padding: 16px 22px !important;
+          font-size: 1rem !important;
           font-weight: 500 !important;
-          letter-spacing: 0.02em;
-        }
-        .page-header {
-          padding: 20px 24px;
-          background: linear-gradient(180deg, #ffffff 0%, #f2f9ff 100%);
-          border-bottom: 1px solid var(--panel-border);
-          margin: 0;
-          box-shadow: none;
-        }
-        .bien-header-brand {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-        .bien-logo {
-          height: 62px;
-          width: auto;
-          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
-        }
-        .page-header h1 {
-          color: var(--bien-blue-deep);
-          font-size: 2em;
-          font-weight: 700;
-          line-height: 1.2;
-          margin-top: 0;
-          margin-bottom: 8px;
-        }
-        .page-header p {
-          color: #426988;
-          font-size: 1.05em;
-          line-height: 1.4;
-          margin-bottom: 0;
-          max-width: 920px;
+          letter-spacing: 0.01em;
         }
         .navbar-brand, .navbar-nav > li > a {
           color: #ffffff !important;
@@ -616,12 +600,46 @@ ui <- navbarPage(
           font-weight: 600;
         }
 
+        .page-header {
+          padding: 28px 32px;
+          background: var(--bien-surface);
+          border-bottom: 1px solid var(--bien-line);
+          margin: 0;
+          box-shadow: none;
+        }
+        .bien-header-brand {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .bien-logo {
+          height: 56px;
+          width: auto;
+          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+        }
+        .page-header h1 {
+          font-size: 2.25rem;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          color: var(--bien-blue-deep);
+          margin: 0 0 8px;
+          line-height: 1.15;
+        }
+        .page-header p {
+          font-size: 1.05rem;
+          color: var(--bien-muted);
+          max-width: 720px;
+          margin: 0;
+          line-height: 1.5;
+        }
+
         a:focus-visible,
         button:focus-visible,
         .btn:focus-visible,
         .navbar-nav > li > a:focus-visible,
         .nav > li > a:focus-visible {
-          outline: 3px solid rgba(116, 182, 74, 0.95) !important;
+          outline: 2px solid var(--bien-green);
           outline-offset: 2px;
           border-radius: 4px;
         }
@@ -642,33 +660,124 @@ ui <- navbarPage(
         #cold-overlay p  { font-size:1.1em; color:var(--bien-blue); font-weight:600; margin:0 0 6px; }
         #cold-overlay small { color:#777; font-size:0.85em; }
 
+        /* Sidebar / wells */
+        .well {
+          background: var(--bien-surface);
+          border: 1px solid var(--bien-line);
+          border-radius: 6px;
+          box-shadow: none;
+          padding: 22px 22px;
+        }
+        .well .control-label, .well label {
+          font-size: 0.95rem;
+          font-weight: 500;
+          color: var(--bien-ink);
+        }
+        .well p, .well .help-block {
+          font-size: 0.9rem;
+          color: var(--bien-muted);
+          line-height: 1.5;
+        }
+
+        /* Inputs */
+        .shiny-input-container { margin-bottom: 14px; }
+        .form-control { font-size: 0.95rem; }
+
         /* Info cards */
         .bl-card {
-          background: linear-gradient(160deg, #ffffff 0%, #f4faff 100%);
-          border: 1px solid var(--panel-border);
+          background: var(--bien-surface);
+          border: 1px solid var(--bien-line);
           border-left: 4px solid var(--bien-blue);
-          padding:12px 16px;
-          margin:10px 0;
-          border-radius:10px;
-          box-shadow: 0 8px 18px rgba(36, 68, 95, 0.09);
+          padding: 20px 24px;
+          margin: 16px 0;
+          border-radius: 6px;
+          box-shadow: none;
+          font-size: 0.95rem;
+          line-height: 1.55;
         }
-        .bl-card-warn  { border-left-color:#e6a817; background:#fffaf0; }
-        .bl-card-block { border-left-color:#c0392b; background:#fff6f6; }
-        .bl-card-pass  { border-left-color:#27ae60; background:#f2fff6; }
+        .bl-card-warn {
+          background: var(--bien-warn-bg);
+          border-color: var(--bien-warn-line);
+          border-left-color: #b08a2a;
+        }
+        .bl-card-pass {
+          background: var(--bien-pass-bg);
+          border-color: var(--bien-pass-line);
+          border-left-color: var(--bien-green-deep);
+        }
+        .bl-card-block {
+          background: var(--bien-block-bg);
+          border-color: var(--bien-block-line);
+          border-left-color: #9c5a44;
+        }
 
         /* Step badges */
         .step-badge {
-          display:inline-block; width:28px; height:28px; border-radius:50%;
-          background:var(--bien-blue); color:#fff; font-weight:700;
-          text-align:center; line-height:28px; margin-right:8px; font-size:0.9em;
+          width: 30px;
+          height: 30px;
+          line-height: 30px;
+          font-size: 1rem;
+          font-weight: 600;
+          border-radius: 50%;
+          display: inline-block;
+          text-align: center;
+          background: var(--bien-blue);
+          color: #fff;
+          margin-right: 10px;
         }
-        .step-done { background:#27ae60; }
+        .step-done { background: var(--bien-green-deep); }
 
         /* QC severity colours in tables */
-        .qc-PASS  { color:#27ae60; font-weight:700; }
-        .qc-WARN  { color:#e6a817; font-weight:700; }
-        .qc-BLOCK { color:#c0392b; font-weight:700; }
+        .qc-PASS  { color: var(--bien-green-deep); font-weight: 600; }
+        .qc-WARN  { color: #a07514; font-weight: 600; }
+        .qc-BLOCK { color: #9c4a34; font-weight: 600; }
 
+        /* Headings inside tab content */
+        h2 {
+          font-size: 1.5rem;
+          font-weight: 600;
+          margin: 24px 0 12px;
+          color: var(--bien-ink);
+        }
+        h3 {
+          font-size: 1.15rem;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          color: var(--bien-ink);
+          margin: 20px 0 10px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid var(--bien-line);
+        }
+        h4 {
+          font-size: 1rem;
+          font-weight: 600;
+          color: var(--bien-ink);
+          margin: 16px 0 8px;
+        }
+
+        /* Generic body text in tab panels */
+        .tab-content p, .tab-content li {
+          font-size: 0.95rem;
+          line-height: 1.55;
+        }
+        .tab-content small, .help-text {
+          font-size: 0.85rem;
+          color: var(--bien-muted);
+        }
+
+        hr {
+          border-color: var(--bien-line);
+          border-top-width: 1px;
+          margin: 18px 0;
+        }
+
+        /* Buttons */
+        .btn {
+          font-size: 0.95rem;
+          padding: 8px 16px;
+          border-radius: 4px;
+          font-weight: 500;
+        }
         .btn-primary {
           background: linear-gradient(180deg, var(--bien-blue) 0%, var(--bien-blue-deep) 100%);
           border-color: #194a72;
@@ -690,13 +799,44 @@ ui <- navbarPage(
           border-color: #365f1f;
         }
 
-        /* Spacing */
-        .shiny-input-container { margin-bottom:8px; }
+        /* DT tables */
+        table.dataTable { font-size: 0.92rem; }
+        table.dataTable thead th {
+          font-weight: 600;
+          background: var(--bien-surface);
+          border-bottom: 2px solid var(--bien-line);
+        }
+
+        /* Modal dialogs */
+        .modal-content {
+          border: 1px solid var(--bien-line);
+          border-radius: 6px;
+          box-shadow: 0 12px 32px rgba(31,51,68,0.18);
+        }
+        .modal-header {
+          border-bottom: 1px solid var(--bien-line);
+          padding: 20px 24px;
+        }
+        .modal-title {
+          font-size: 1.25rem;
+          font-weight: 600;
+        }
+        .modal-body {
+          padding: 24px;
+          font-size: 1rem;
+          line-height: 1.55;
+        }
+        .modal-footer {
+          border-top: 1px solid var(--bien-line);
+          padding: 16px 24px;
+        }
 
         @media (max-width: 768px) {
-          .bien-logo { height: 44px; }
-          .page-header h1 { font-size: 1.4em; }
-          .navbar-nav > li > a { padding: 12px 10px !important; font-size: 0.82em !important; }
+          html { font-size: 15px; }
+          .container-fluid { padding-left: 16px; padding-right: 16px; }
+          .page-header { padding: 20px 16px; }
+          .page-header h1 { font-size: 1.6rem; }
+          .navbar-nav > li > a { padding: 12px 14px !important; font-size: 0.95rem !important; }
         }
       ")),
       tags$script(HTML("
@@ -734,7 +874,7 @@ ui <- navbarPage(
         tags$div(class="bl-card",
           tags$span(class="step-badge", "1"),
           tags$strong("Load Data"),
-          tags$hr(style="margin:8px 0"),
+          tags$hr(style="margin:14px 0"),
           checkboxInput("use_demo", "Use built-in demo data (12 obs + 6 plots)", value=TRUE),
           conditionalPanel("!input.use_demo",
             tags$div(
@@ -752,7 +892,7 @@ ui <- navbarPage(
               )
             )
           ),
-          tags$hr(style="margin:8px 0"),
+          tags$hr(style="margin:14px 0"),
           uiOutput("primary_file_ui"),
           uiOutput("join_key_ui"),
           tags$br(),
@@ -803,62 +943,62 @@ ui <- navbarPage(
         tags$br(),
         tags$div(class="bl-card bl-card-warn",
           tags$strong("BIEN Web Services (Required for BIEN Schema Mapping)"),
-          tags$p(style="font-size:0.85em; margin:4px 0 6px;",
+          tags$p(class="help-text", style="margin:6px 0 10px;",
             "Run these services sequentially for BIEN-schema-ready outputs: TNRS -> GNRS -> GVS -> NSR. These steps populate and standardize BIEN fields and should be completed before final export to the BIEN staging table."),
-          tags$p(style="font-size:0.8em; color:#7f8c8d; margin:0 0 8px;",
+          tags$p(class="help-text", style="margin:6px 0 10px;",
             HTML("<strong>Cloud timeout warning:</strong> Download the validation scripts below and run them locally in R when possible. ",
                  "The in-app buttons contact external servers that may be unreachable from cloud hosting ",
                  "(shinyapps.io runs on AWS; external APIs may block cloud IPs). ",
                  "If an in-app check times out after ~25s, the local script is the reliable path. ",
                  "For BIEN schema mapping, complete TNRS -> GNRS -> GVS -> NSR before final export.")),
 
-          tags$hr(style="margin:6px 0;"),
+          tags$hr(style="margin:14px 0;"),
           downloadButton("dl_tnrs_script", "\u2b07 Download TNRS validation script (.R)",
                          class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+                         style="width:100%; margin-bottom:10px;"),
           actionButton("btn_tnrs", "Try TNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
           fileInput("upload_tnrs", "Upload TNRS results CSV",
             accept=".csv", buttonLabel="Browse", placeholder="tnrs_results.csv",
             width="100%"),
           uiOutput("tnrs_status_ui"),
-          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 8px;",
+          tags$p(class="help-text", style="margin:6px 0 10px;",
             "TNRS matches submitted scientific names to accepted names (WCVP/WFO), standardizes spelling/authorship where possible, and writes scrubbed taxonomy fields."),
-          tags$hr(style="margin:6px 0;"),
+          tags$hr(style="margin:14px 0;"),
           downloadButton("dl_gnrs_script", "\u2b07 Download GNRS validation script (.R)",
                          class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+                         style="width:100%; margin-bottom:10px;"),
           actionButton("btn_gnrs", "Try GNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
           fileInput("upload_gnrs", "Upload GNRS results CSV",
             accept=".csv", buttonLabel="Browse", placeholder="gnrs_results.csv",
             width="100%"),
           uiOutput("gnrs_status_ui"),
-          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 8px;",
+          tags$p(class="help-text", style="margin:6px 0 10px;",
             "GNRS standardizes political geography (country/state/county) and helps catch misspellings and inconsistent region strings."),
-          tags$hr(style="margin:6px 0;"),
+          tags$hr(style="margin:14px 0;"),
           downloadButton("dl_gvs_script", "\u2b07 Download GVS validation script (.R)",
                          class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+                         style="width:100%; margin-bottom:10px;"),
           actionButton("btn_gvs", "Try GVS in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
           fileInput("upload_gvs", "Upload GVS results CSV",
             accept=".csv", buttonLabel="Browse", placeholder="gvs_results.csv",
             width="100%"),
           uiOutput("gvs_status_ui"),
-          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 8px;",
+          tags$p(class="help-text", style="margin:6px 0 10px;",
             "GVS checks whether lat/lon appear to be political centroids and flags potential georeferencing precision issues; it does not delete records."),
-          tags$hr(style="margin:6px 0;"),
+          tags$hr(style="margin:14px 0;"),
           downloadButton("dl_nsr_script", "\u2b07 Download NSR validation script (.R)",
                          class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:6px; font-size:0.85em;"),
+                         style="width:100%; margin-bottom:10px;"),
           actionButton("btn_nsr", "Try NSR in app (may timeout from cloud)", class="btn-warning btn-sm",
                        style="width:100%; margin-bottom:4px;"),
           fileInput("upload_nsr", "Upload NSR results CSV",
             accept=".csv", buttonLabel="Browse", placeholder="nsr_results.csv",
             width="100%"),
           uiOutput("nsr_status_ui"),
-          tags$p(style="font-size:0.8em; color:#555; margin:4px 0 0;",
+          tags$p(class="help-text", style="margin:6px 0 10px;",
             "NSR estimates native/introduced/cultivated status by taxon plus region, useful for filtering non-native or cultivated observations in downstream analyses.")
         )
       ),
@@ -884,7 +1024,7 @@ ui <- navbarPage(
         tags$div(class="bl-card",
           tags$span(class="step-badge", "4"),
           tags$strong("Download Outputs"),
-          tags$hr(style="margin:8px 0"),
+          tags$hr(style="margin:14px 0"),
           downloadButton("dl_staged",  "BIEN Staging Table (.csv)",
                          style="width:100%; margin-bottom:8px;"),
           downloadButton("dl_dwc",     "Darwin Core Table (.csv)",
@@ -902,7 +1042,7 @@ ui <- navbarPage(
       column(8,
         tags$div(class="bl-card",
           tags$strong("Export Summary"),
-          tags$hr(style="margin:8px 0"),
+          tags$hr(style="margin:14px 0"),
           verbatimTextOutput("export_summary")
         )
       )
@@ -927,9 +1067,8 @@ ui <- navbarPage(
         tags$hr(style = "border-color:#d0dce8; margin-bottom:28px;"),
 
         # CSV File Format
-        tags$h3("CSV File Format",
-          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
-        tags$p(style = "font-size:0.9rem; color:#555; margin-bottom:12px;",
+        tags$h3("CSV File Format"),
+        tags$p(class="help-text", style="margin-bottom:14px;",
           "The app accepts one or two CSV files. Only one file is required. Each file should
            have column headers in the first row."),
 
@@ -938,10 +1077,10 @@ ui <- navbarPage(
             tags$div(class = "bl-card", style = "margin-bottom:16px;",
               tags$strong("File 1 \u2014 Observation Records (required)",
                 style = "font-size:0.93rem; color:#1a1a2e;"),
-              tags$p(style = "margin:8px 0 6px 0; font-size:0.88rem; color:#3a3a3a; line-height:1.6;",
+              tags$p(style = "margin:10px 0;",
                 "One row per observation. Must include at minimum a species name column.
                  Any other columns are optional but will be auto-mapped if recognized."),
-              tags$p(style = "margin:4px 0 4px 0; font-size:0.82rem; color:#555;",
+              tags$p(class="help-text", style="margin:6px 0;",
                 tags$strong("Example columns:")),
               tags$ul(
                 style = "margin:0; padding-left:18px; font-size:0.83rem; color:#3a3a3a; line-height:1.9;",
@@ -964,11 +1103,11 @@ ui <- navbarPage(
             tags$div(class = "bl-card", style = "margin-bottom:16px;",
               tags$strong("File 2 \u2014 Metadata or Plot Data (optional)",
                 style = "font-size:0.93rem; color:#1a1a2e;"),
-              tags$p(style = "margin:8px 0 6px 0; font-size:0.88rem; color:#3a3a3a; line-height:1.6;",
+              tags$p(style = "margin:10px 0;",
                 "Any supplementary table you want joined to the observation records \u2014
                  plot metadata, site attributes, survey details, etc. The two files are
                  joined on a shared key column you select."),
-              tags$p(style = "margin:4px 0 4px 0; font-size:0.82rem; color:#555;",
+              tags$p(class="help-text", style="margin:6px 0;",
                 tags$strong("Example use cases:")),
               tags$ul(
                 style = "margin:0; padding-left:18px; font-size:0.83rem; color:#3a3a3a; line-height:1.9;",
@@ -1005,8 +1144,7 @@ ui <- navbarPage(
         tags$hr(style = "border-color:#d0dce8; margin-bottom:24px;"),
 
         # What This App Does
-        tags$h3("What This App Does",
-          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
+        tags$h3("What This App Does"),
         tags$div(class = "bl-card", style = "margin-bottom:24px;",
           tags$p(style = "margin:0; font-size:0.93rem; line-height:1.65; color:#2c2c2c;",
             "Upload one or two CSV files of field observation records, map your column names
@@ -1017,8 +1155,7 @@ ui <- navbarPage(
         ),
 
         # Four-Step Workflow
-        tags$h3("Four-Step Workflow",
-          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:16px;"),
+        tags$h3("Four-Step Workflow"),
         fluidRow(
           column(6,
             tags$div(class = "bl-card", style = "margin-bottom:16px; min-height:110px;",
@@ -1076,8 +1213,7 @@ ui <- navbarPage(
         tags$hr(style = "border-color:#d0dce8; margin:8px 0 24px 0;"),
 
         # Scientific Caveats
-        tags$h3("Scientific Caveats",
-          style = "font-size:1.1rem; font-weight:600; color:#8a6000; margin-bottom:12px;"),
+        tags$h3("Scientific Caveats"),
         tags$div(class = "bl-card-warn", style = "margin-bottom:24px;",
           tags$ul(
             style = "margin:0; padding-left:20px; font-size:0.88rem; line-height:1.8; color:#3a2800;",
@@ -1119,8 +1255,7 @@ ui <- navbarPage(
         ),
 
         # Technical Notes
-        tags$h3("Technical Notes",
-          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
+        tags$h3("Technical Notes"),
         tags$div(
           style = "background:#f4f6f8; border-radius:6px; padding:16px 20px; margin-bottom:24px;",
           tags$ul(
@@ -1155,9 +1290,8 @@ ui <- navbarPage(
         tags$hr(style = "border-color:#d0dce8; margin-bottom:24px;"),
 
         # ── BIEN Staging Field Reference ──────────────────────────────────────
-        tags$h3("BIEN Staging Field Reference",
-          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:6px;"),
-        tags$p(style = "font-size:0.88rem; color:#666; margin-bottom:12px;",
+        tags$h3("BIEN Staging Field Reference"),
+        tags$p(class="help-text", style="margin-bottom:12px;",
           "All recognized BIEN staging fields, their data category, and a plain-language definition.
            Search or scroll to find any field. This table drives the auto-mapping in Tab 2."),
         DT::dataTableOutput("help_field_ref"),
@@ -1166,8 +1300,7 @@ ui <- navbarPage(
         tags$hr(style = "border-color:#d0dce8; margin-bottom:24px;"),
 
         # About / Credits
-        tags$h3("About",
-          style = "font-size:1.1rem; font-weight:600; color:#2f6fab; margin-bottom:12px;"),
+        tags$h3("About"),
         tags$div(class = "bl-card", style = "margin-bottom:40px;",
           tags$p(style = "margin:0 0 8px 0; font-size:0.9rem; line-height:1.65; color:#2c2c2c;",
             "Built for the ",

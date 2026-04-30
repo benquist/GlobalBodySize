@@ -1552,3 +1552,17 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - New artifact: `output/providers/manual_intake/priority_queue_observation_sources.csv` with explicit tiering and BIEN-overlap heuristic fields.
 - New docs: `output/providers/manual_intake/README_priority_queue.md` (scope, columns, caveat, date).
 - Validation run: pending count after deletion, tier counts in queue output, and top-20 queue preview with BIEN-overlap flag.
+
+## 2026-04-29 — BIENDataLoader UX-only typography & spacing refresh (Scandinavian palette, CSS + inline-style pass; no logic changes; parse OK)
+
+## 2026-04-29 — enquistlab-site-migration watermarks/gallery/CV overflow + news shuffle placement (commit fc5c9fa)
+- Project: enquistlab-site-migration
+- Removed all remaining watermark injection behavior by deleting watermark JS block in `assets/js/common.js`.
+- Restored Gallery tab visibility in lab navigation by adding Gallery child to `_pages/nav-lab.md`.
+- Clarified root cause: gallery content/photos existed; only nav linkage was missing.
+- Fixed CV references overflow at bottom by:
+  - converting raw profile URLs to labeled markdown links in `_data/cv.yml`
+  - splitting references onto separate lines in `_includes/cv/references.liquid`
+  - adding robust wrapping rules in `_sass/_lab-redesign.scss`
+- Preserved requested News behavior: Munch hero retained; category shuffle button near top with category-order shuffle logic.
+- Pushed to origin/main as fc5c9fa.

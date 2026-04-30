@@ -326,3 +326,36 @@
 - Added BIEN Staging Field Reference DT to Help tab (`output$help_field_ref` + UI block before About).
 - Did NOT port: orange BETA badge, beta banner copy, Step 1/2/3 guidance (already in main from c0c3cf9).
 - Parse: PASS (`Rscript -e "invisible(parse(file='app.R')); cat('PARSE_OK\n')"`).
+
+## 2026-04-29 — Scandinavian typography & spacing refresh (UX-only CSS pass)
+- File: app.R
+- Replaced the entire `tags$style(HTML(...))` block in `header = tagList(tags$head(...))` with a refreshed Scandinavian-style stylesheet:
+  - New `:root` token palette (--bien-blue/-deep, --bien-green/-deep, warm earthen --bien-warm-bg/--bien-surface/--bien-line/--bien-ink/--bien-muted, plus --bien-warn-/-pass-/-block- bg/line tokens).
+  - `html { font-size:16px }`, Inter system stack, 1.55 line-height, warm background.
+  - `.container-fluid` clamped to 960–1240px, 32px gutters.
+  - Page header on warm surface with 2.25rem title, muted lede; `.bien-logo` 56px.
+  - Navbar tabs 16px×22px padding, 1rem 500-weight, no text-shadow, green underline on active.
+  - Wells: surface fill, 22px padding, no shadow; standardized label/help typography.
+  - Inputs: `.shiny-input-container` 14px bottom margin, `.form-control` 0.95rem.
+  - `.bl-card` and pass/warn/block variants moved to earthen tones with 4px accent border and no shadow.
+  - `.step-badge` 30px circle, 1rem 600-weight; `.step-done` uses --bien-green-deep.
+  - QC severity classes restyled to earthen tones (PASS green-deep, WARN #a07514, BLOCK #9c4a34).
+  - Tab-content typography: h2/h3/h4, `.tab-content p`/`li`, `.tab-content small` & `.help-text`.
+  - `hr` standardized to `--bien-line` 1px, 18px vertical margin.
+  - Buttons sized to 0.95rem with 8×16 padding, 4px radius; focus ring is now 2px solid --bien-green.
+  - DT tables: 0.92rem with surface header background and 2px header bottom border.
+  - Modal styling: surface, soft shadow, padded header/body/footer, 1.25rem title.
+  - Mobile @media (≤768px): 15px root, tighter container padding, 1.6rem H1, compact navbar tabs.
+  - Preserved all existing `#cold-overlay`, `.bien-header-brand`, navbar gradient brand, hidden navbar-brand, and focus-visible behavior.
+- Inline-style pass (Step 3 BIEN Web Services sidebar + Help tab):
+  - 5 `tags$p(style="font-size:0.8em…")` / `0.85em` paragraphs in Step 3 → `class="help-text", style="margin:6px 0 10px;"`.
+  - 4 Step-3 download buttons → removed `font-size:0.85em`, bottom margin set to 10px.
+  - 4 Step-3 `tags$hr(style="margin:6px 0;")` → `margin:14px 0;`.
+  - 4 sidebar `tags$hr(style="margin:8px 0")` (Tab 1 ×2, Tab 4 ×2) → `margin:14px 0`.
+  - Help-tab section `tags$h3` headers (CSV File Format, What This App Does, Four-Step Workflow, Scientific Caveats, Technical Notes, BIEN Staging Field Reference, About) → inline style removed so global `h3` rule applies.
+  - Help-tab intro paragraph (`font-size:0.9rem; color:#555; margin-bottom:12px;`) → `class="help-text", style="margin-bottom:14px;"`.
+  - Help-tab bl-card paragraph styles (`margin:8px 0 6px 0; font-size:0.88rem; color:#3a3a3a; line-height:1.6;`) → `style = "margin:10px 0;"` (×2).
+  - Help-tab "Example…" small `tags$p` (`margin:4px 0 4px 0; font-size:0.82rem; color:#555;`) → `class="help-text", style="margin:6px 0;"` (×2).
+  - Help-tab "BIEN Staging Field Reference" intro paragraph → `class="help-text", style="margin-bottom:12px;"`.
+- Validation: `Rscript -e "invisible(parse(file='app.R'))"` printed `PARSE_OK`.
+- No logic touched: no observers, server callbacks, reactive expressions, field lists, mappings, modals, or QC behavior were modified. Only the CSS stylesheet block and inline `style=`/`class=` attributes on a small set of presentational tags were changed.
