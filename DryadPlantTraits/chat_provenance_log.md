@@ -205,3 +205,8 @@ Outcome: Added data/manual_source_intake.csv as the committed registry for manua
 Prompt: Complete migration of clearly non-trait pending literature sources out of DryadPlantTraits into Literature_Data_To_BIENdb; keep only the 7 specified trait sources in Dryad registry; move/remove occurrence-intake scripts from Dryad scope; preserve local untracked occurrence artifacts.
 Source session: current workspace session
 Outcome: Re-validated Dryad manual_source_intake.csv has exactly the 7 specified trait source_id rows; removed tracked occurrence-intake scripts from Dryad path (download_occurrence_sources.R, download_p1_not_in_bien_batch.R, download_gbif_3_missing.R, stage_physical_files.R); left untracked output/providers/occurrences artifacts untouched.
+
+29. Date: 2026-04-29
+Prompt: Update README.md to reflect project split so DryadPlantTraits is explicitly trait-only, remove wording that occurrence/manual intake is in Dryad operational scope, keep provider status including FRED partial note, and add pointer to migrated occurrence-only program in Literature_Data_To_BIENdb.
+Source session: current workspace session
+Outcome: Revised README scope language to trait-only providers (DataDryad, Zenodo, Scientific Data/AusTraits, TraitHub, FRED), removed manual occurrence registry/status blocks from Pipeline Status, added migration pointer to Literature_Data_To_BIENdb occurrence paths, and preserved the existing workflow sections.

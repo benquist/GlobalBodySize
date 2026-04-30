@@ -1642,3 +1642,21 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Prompt: Add manual occurrence source points to the leaflet interactive map in `reports/dryad_trait_harvest_summary.Rmd` (`leaflet-map` chunk). Glob `../output/providers/occurrences/*/compiled_occurrences.csv`, read with fread (select 5 cols), coerce coords, sample up to 10k total, bind with trait coord_dat via rbindlist(fill=TRUE), add "Manual Occurrences" = "#9467bd" to palette, update popup to show source_id when source_title is NA.
 - Files changed: reports/dryad_trait_harvest_summary.Rmd, reports/dryad_trait_harvest_summary.html
 - Commit: 583e082 pushed to origin/master. No R package build required.
+
+## 2026-04-29 — enquistlab-site-migration Lab Life image path repair (commit 378631a)
+- Project: enquistlab-site-migration
+- Prompt: "Lab Life photos are not rendering"
+- Task: Updated only the `data-theme="lab-life"` block in `_pages/gallery.md`, replacing all 20 broken `/assets/img/lab/...` references with existing assets from `/assets/img/transplant/`, `/assets/img/field/`, and `/assets/img/team/`. Verified existence for all 20 paths. Committed and pushed to `origin/main` as `378631a`. No Rmd or R package files changed.
+
+## 2026-04-29 — DryadPlantTraits add access-path classification to harvest summary (commit d583b39)
+- Project: DryadPlantTraits
+- Prompt: Update Rmd/HTML to reflect current pending-source state; suggest P2 direct-download ingest plan for 16 listed sources.
+- Task: Added Section 10.3 "Access-path classification of pending sources" to reports/dryad_trait_harvest_summary.Rmd with rule-driven P1-P6 classification (CSV-driven). Re-rendered HTML (8.4 MB). Committed and pushed to origin/master as d583b39. Of the user's 16 P2 candidates, 5 are already compiled (Kyrgyzstan Dryad, SIVFLORA Zenodo, PacIFlora Dryad, Walker Russian Arctic, High-Andes Arroyo); 11 remain as P2 active work front.
+
+## 2026-04-29 — Update GitHub READMEs and push to datadryad remote
+- Prompt: "Have the github repositories been updated? The README files should be detailed and give detailed breakdowns of the workflow, status, contents of the data etc. Also github repositories should have the .rmd and .html files"
+- Task: Updated DryadPlantTraits/README.md with current pipeline status and row counts per provider; updated Literature_Data_To_BIENdb/README.md for multi-paper scope; pushed DryadPlantTraits to datadryad remote (447 commits, force-with-lease); committed and pushed all changes.
+
+2026-04-29 | "Complete the migration now, incorporating the latest user request: Also move any pending literature sources to Literature_Data_To_BIENdb that are clearly not trait sources." — Re-validated split state (Dryad trait registry = 7 specified source_id rows; Literature occurrence registry = 46 rows), ensured moved occurrence-intake scripts are present in Literature and patched writeback path in scripts/occurrence_intake/download_occurrence_sources.R to use data/occurrence_source_intake.csv, removed the four tracked occurrence scripts from Dryad path only, preserved untracked Dryad occurrence artifacts, then committed/pushed Dryad-scoped and Literature-scoped changes and recorded hashes/status.
+
+2026-04-29 | "Update README files and push so GitHub reflects the project split clearly. Scope: DryadPlantTraits/README.md and Literature_Data_To_BIENdb/README.md. Dryad README must be trait-only with pointer to migrated occurrence-only sources in Literature_Data_To_BIENdb; keep trait provider status and FRED partial note; keep workflow sections intact otherwise. Literature README must include migrated occurrence program status (46 total sources: 10 compiled, 33 pending_review, 3 pending_manual_access; 165,155 rows and 144,389 georeferenced; locations scripts/occurrence_intake/, data/occurrences/, data/occurrence_source_intake.csv). Commit/push each repo with README-only commit intent (Dryad to origin master and datadryad master; Literature to origin main), append project provenance entries, and report changed files, commit hashes, push status, and README deltas."
