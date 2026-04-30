@@ -219,3 +219,7 @@ Outcome: Fixed a duplicated nested cat() call in reports/dryad_trait_harvest_sum
 Prompt: Start the manual trait ingestion path for DryadPlantTraits by adding staging and ingest scripts for user-supplied Ozark files; document the expected data placement and run commands.
 Source session: current workspace session
 Outcome: Added providers/manual_intake/README.md, providers/manual_intake/scripts/stage_manual_trait_sources.R, and providers/manual_intake/scripts/ingest_manual_trait_source.R; validated staging and failure-on-missing-source behavior.
+30. Date: 2026-04-30
+Prompt: Add a dedicated OzTrait JoE manual ingestion mapper to DryadPlantTraits and document its usage in the manual intake README.
+Source session: current workspace session
+Outcome: Added providers/manual_intake/scripts/map_manual_oztrait_data_joe_to_final_schema.R and updated providers/manual_intake/README.md with direct ingest guidance for the OzTrait JoE source.

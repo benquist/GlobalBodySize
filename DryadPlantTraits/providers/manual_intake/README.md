@@ -16,6 +16,7 @@ This provider directory contains manual ingestion support for user-supplied trai
 3. Run a source-specific ingest mapping once the raw trait file structure is confirmed:
    - `Rscript providers/manual_intake/scripts/ingest_manual_trait_source.R --source=manual_oztrait_data_joe_csv`
    - `Rscript providers/manual_intake/scripts/ingest_manual_trait_source.R --source=manual_alltraits_phynames_csv`
+   - `Rscript providers/manual_intake/scripts/map_manual_oztrait_data_joe_to_final_schema.R`
 
 Note: `manual_ozark_trait_metadata2_xlsx` is currently handled as a metadata-staging artifact and does not have a dedicated ingestion mapping stage yet.
 
