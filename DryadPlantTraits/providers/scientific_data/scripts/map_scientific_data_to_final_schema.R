@@ -54,6 +54,11 @@ if (requireNamespace("data.table", quietly = TRUE)) {
 message(sprintf("Loaded %d Scientific Data compiled rows from %s", nrow(raw), input_path))
 
 sdata_map_to_base_schema <- function(df, input_path) {
+  required_input_cols <- c("taxon_name", "trait_name", "value", "unit",
+                            "source_doi", "source_provider", "source_paper", "compiled_timestamp")
+  missing_input <- setdiff(required_input_cols, names(df))
+  if (length(missing_input) > 0)
+    stop("Input CSV missing required columns: ", paste(missing_input, collapse = ", "), call. = FALSE)
   n <- nrow(df)
   out <- data.frame(
     scrubbed_species_binomial  = as.character(df$taxon_name),
@@ -149,6 +154,11 @@ if (!file.exists(schema_reference_path)) {
 schema_header <- utils::read.csv(schema_reference_path, stringsAsFactors = FALSE, check.names = FALSE, nrows = 1)
 final_columns <- names(schema_header)
 
+if (length(final_columns) < 58L)
+  stop("Schema reference has only ", length(final_columns),
+       " columns; expected >= 58. Is --schema-reference pointing to the correct final output?",
+       call. = FALSE)
+
 missing_from_schema <- setdiff(required_reconciliation_cols, final_columns)
 if (length(missing_from_schema) > 0) {
   stop(
@@ -163,12 +173,17 @@ for (col_name in setdiff(final_columns, names(mapped))) {
   mapped[[col_name]] <- NA
 }
 
+missing_before_reorder <- setdiff(final_columns, names(mapped))
+extra_before_reorder   <- setdiff(names(mapped), final_columns)
+if (length(missing_before_reorder) > 0 || length(extra_before_reorder) > 0) {
+  stop("Column mismatch before final reorder. Missing: ",
+       paste(missing_before_reorder, collapse = ", "),
+       " | Extra: ",
+       paste(extra_before_reorder, collapse = ", "),
+       call. = FALSE)
+}
 mapped <- mapped[, final_columns, drop = FALSE]
-
-dryad_cols <- final_columns
-sdata_cols <- names(mapped)
-header_parity <- identical(dryad_cols, sdata_cols)
-message(sprintf("HEADER_PARITY: %s (Dryad cols: %d, SData cols: %d)", header_parity, length(dryad_cols), length(sdata_cols)))
+message(sprintf("HEADER_PARITY: TRUE (schema columns: %d)", length(final_columns)))
 
 out_dir <- dirname(output_path)
 if (!dir.exists(out_dir)) {

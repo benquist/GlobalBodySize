@@ -210,3 +210,8 @@ Outcome: Re-validated Dryad manual_source_intake.csv has exactly the 7 specified
 Prompt: Update README.md to reflect project split so DryadPlantTraits is explicitly trait-only, remove wording that occurrence/manual intake is in Dryad operational scope, keep provider status including FRED partial note, and add pointer to migrated occurrence-only program in Literature_Data_To_BIENdb.
 Source session: current workspace session
 Outcome: Revised README scope language to trait-only providers (DataDryad, Zenodo, Scientific Data/AusTraits, TraitHub, FRED), removed manual occurrence registry/status blocks from Pipeline Status, added migration pointer to Literature_Data_To_BIENdb occurrence paths, and preserved the existing workflow sections.
+
+30. Date: 2026-04-29
+Prompt: Mandatory gate failed due Rmd parse error in Dryad report. Fix `leaflet-map` chunk parse error near map_out with minimal change, re-render, and push.
+Source session: current workspace session
+Outcome: Fixed a duplicated nested cat() call in reports/dryad_trait_harvest_summary.Rmd `leaflet-map` chunk that caused parse failure near `map_out`; re-rendered reports/dryad_trait_harvest_summary.Rmd successfully.

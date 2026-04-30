@@ -1663,3 +1663,13 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 
 ## 2026-04-29 — BIENDataLoader header GitHub + README links
 - Project: BIENDataLoader; UI-only addition of two header links (GitHub repo + README) with inline SVG icons. No server logic modified.
+
+## 2026-04-29 — sPlot_BIENdb_Loading add splot_overview report (commit f78862f)
+- Project: sPlot_BIENdb_Loading
+- Prompt: Include the splot_overview .Rmd and .html (with geographic plot-location viewer) in https://github.com/benquist/sPlot_BIENdb_Loading and update README.
+- Task: Copied splot_overview.Rmd (21KB) and self-contained splot_overview.html (12MB) from splot-open-data/ into repo root. Added .gitignore (excludes data/*.zip — source archive is ~100MB and not committed — plus knitr cache and regenerable output TSVs). Prepended a "Dataset Overview Report" section to README with re-render instructions and listed the new files in Repository Layout. Committed (f78862f) and pushed to origin/master after raising http.postBuffer for the 12MB HTML. Did not re-render the HTML (source zip not committed; the existing self-contained HTML was shipped as-is).
+
+## 2026-04-29 — Dryad Rmd parse fix in leaflet-map chunk
+- Project: DryadPlantTraits
+- Prompt: Mandatory gate failed due parse error in `leaflet-map` chunk near `map_out`; apply minimal fix, render, commit required Dryad report files, and push to origin+datadryad.
+- Task: Removed duplicated nested `cat()` call in reports/dryad_trait_harvest_summary.Rmd causing `unexpected symbol` parse failure near `map_out`; rendered successfully via `rmarkdown::render('reports/dryad_trait_harvest_summary.Rmd', quiet=TRUE)`.

@@ -52,7 +52,20 @@ dryad_search_seed_terms <- function() {
       '"grass traits"',
       '"tree traits" tropical',
       '"shrub traits"',
-      '"tropical forest" plant traits'
+      '"tropical forest" plant traits',
+      # --- Data paper specific terms ---
+      '"plant trait" dataset',
+      '"global database" plant traits',
+      '"plant functional trait" data',
+      '"leaf economics spectrum" data',
+      '"trait database" plants',
+      '"plant morphology" measurements dataset',
+      '"wood anatomy" dataset',
+      '"plant hydraulics" dataset',
+      '"trait variation" plant species',
+      '"intraspecific variation" plant trait',
+      '"plant diversity" trait data',
+      '"flora" trait measurements'
     ),
     theme = c(
       "broad_trait_discovery",
@@ -67,7 +80,11 @@ dryad_search_seed_terms <- function() {
       "whole_plant", "whole_plant", "whole_plant",
       "abbreviation", "abbreviation", "abbreviation", "abbreviation", "abbreviation",
       "community_ecology", "community_ecology", "community_ecology",
-      "taxon_scoped", "taxon_scoped", "taxon_scoped", "taxon_scoped"
+      "taxon_scoped", "taxon_scoped", "taxon_scoped", "taxon_scoped",
+      "data_paper_discovery", "data_paper_discovery", "data_paper_discovery",
+      "data_paper_discovery", "data_paper_discovery", "data_paper_discovery",
+      "data_paper_discovery", "data_paper_discovery", "data_paper_discovery",
+      "data_paper_discovery", "data_paper_discovery", "data_paper_discovery"
     ),
     trait_focus = c(
       "mixed",
@@ -83,6 +100,10 @@ dryad_search_seed_terms <- function() {
       "specific_leaf_area", "leaf_mass_per_area", "leaf_dry_matter_content",
       "photosynthetic_rate", "stem_hydraulic_conductivity",
       "mixed", "mixed", "mixed",
+      "mixed", "mixed", "mixed", "mixed",
+      "mixed", "mixed", "mixed",
+      "leaf_economics_spectrum", "mixed", "mixed",
+      "wood_anatomy", "hydraulics",
       "mixed", "mixed", "mixed", "mixed"
     ),
     stringsAsFactors = FALSE

@@ -74,7 +74,7 @@ paths <- list(
   traithub  = file.path(proj_root, "output/providers/traithub/compiled_trait_observations.csv")
 )
 provider_labels <- c(dryad = "DataDryad", zenodo = "Zenodo", scidata = "Scientific Data", traithub = "TraitHub (tundra)")
-provider_colors <- c(DataDryad = "#1f77b4", Zenodo = "#ff7f0e", `Scientific Data` = "#2ca02c", `TraitHub (tundra)` = "#9467bd", `Manual Occurrences` = "#d62728")
+provider_colors <- c(DataDryad = "#1f77b4", Zenodo = "#ff7f0e", `Scientific Data` = "#2ca02c", `TraitHub (tundra)` = "#9467bd")
 
 for (.k in names(paths)) {
   if (!file.exists(paths[[.k]])) {
@@ -110,112 +110,6 @@ for (k in names(dat_list)) {
                           lon_num >= -180 & lon_num <= 180]
 }
 
-# -- Manual occurrence summary from compiled occurrence files
-manual_occurrence_files <- Sys.glob(file.path(
-  proj_root, "output/providers/occurrences", "*", "compiled_occurrences.csv"
-))
-
-safe_manual_occurrence_summary <- function(path) {
-  tryCatch({
-    header <- names(fread(path, nrows = 0L, showProgress = FALSE))
-    if (!length(header)) return(NULL)
-    cols <- intersect(
-      c("source_id", "datasetName", "species", "decimalLatitude", "decimalLongitude"),
-      header
-    )
-    d <- if (length(cols)) {
-      fread(path, select = cols, data.table = TRUE, showProgress = FALSE)
-    } else {
-      fread(path, data.table = TRUE, showProgress = FALSE)
-    }
-    if (!nrow(d)) return(NULL)
-
-    lat <- if ("decimalLatitude" %in% names(d)) suppressWarnings(as.numeric(d$decimalLatitude)) else rep(NA_real_, nrow(d))
-    lon <- if ("decimalLongitude" %in% names(d)) suppressWarnings(as.numeric(d$decimalLongitude)) else rep(NA_real_, nrow(d))
-    has_coord <- is.finite(lat) & is.finite(lon) &
-      lat >= -90 & lat <= 90 &
-      lon >= -180 & lon <= 180
-
-    sid <- if ("source_id" %in% names(d)) {
-      vals <- unique(trimws(as.character(d$source_id)))
-      vals <- vals[nzchar(vals)]
-      if (length(vals)) vals[[1L]] else basename(dirname(path))
-    } else {
-      basename(dirname(path))
-    }
-
-    dname <- if ("datasetName" %in% names(d)) {
-      vals <- unique(trimws(as.character(d$datasetName)))
-      vals <- vals[nzchar(vals)]
-      if (length(vals)) vals[[1L]] else NA_character_
-    } else {
-      NA_character_
-    }
-
-    taxa_n <- if ("species" %in% names(d)) {
-      uniqueN(trimws(as.character(d$species))[nzchar(trimws(as.character(d$species)))])
-    } else {
-      NA_integer_
-    }
-
-    data.table(
-      source_id = sid,
-      datasetName = dname,
-      Rows = nrow(d),
-      `Rows with Coords` = sum(has_coord, na.rm = TRUE),
-      `Distinct Taxa` = taxa_n
-    )
-  }, error = function(e) NULL)
-}
-
-manual_occurrence_source_summary <- rbindlist(
-  lapply(manual_occurrence_files, safe_manual_occurrence_summary),
-  fill = TRUE
-)
-manual_occurrence_source_summary <- manual_occurrence_source_summary[
-  !is.na(Rows) & Rows > 0
-]
-
-if (nrow(manual_occurrence_source_summary)) {
-  manual_occurrence_source_summary <- manual_occurrence_source_summary[
-    , .(
-      Rows = sum(Rows, na.rm = TRUE),
-      `Rows with Coords` = sum(`Rows with Coords`, na.rm = TRUE),
-      `Distinct Taxa` = max(`Distinct Taxa`, na.rm = TRUE),
-      datasetName = if (all(is.na(datasetName) | !nzchar(trimws(datasetName)))) NA_character_ else datasetName[which.max(nchar(trimws(ifelse(is.na(datasetName), "", datasetName))))]
-    ),
-    by = source_id
-  ]
-  manual_occurrence_source_summary[
-    !is.finite(`Distinct Taxa`), `Distinct Taxa` := NA_integer_
-  ]
-  manual_occurrence_source_summary[
-    , `Coverage (%)` := round(100 * `Rows with Coords` / pmax(Rows, 1), 1)
-  ]
-}
-
-manual_occurrence_total_rows <- if (nrow(manual_occurrence_source_summary)) {
-  sum(manual_occurrence_source_summary$Rows, na.rm = TRUE)
-} else 0L
-manual_occurrence_coord_rows <- if (nrow(manual_occurrence_source_summary)) {
-  sum(manual_occurrence_source_summary$`Rows with Coords`, na.rm = TRUE)
-} else 0L
-manual_occurrence_species_values <- unlist(lapply(manual_occurrence_files, function(path) {
-  tryCatch({
-    header <- names(fread(path, nrows = 0L, showProgress = FALSE))
-    if (!"species" %in% header) return(character(0))
-    s <- fread(path, select = "species", data.table = TRUE, showProgress = FALSE)$species
-    s <- trimws(as.character(s))
-    s[nzchar(s)]
-  }, error = function(e) character(0))
-}), use.names = FALSE)
-manual_occurrence_taxa <- if (length(manual_occurrence_species_values)) {
-  uniqueN(manual_occurrence_species_values)
-} else {
-  NA_integer_
-}
-manual_occurrence_dataset_count <- nrow(manual_occurrence_source_summary)
-
 trait_provider_levels <- unname(provider_labels[names(dat_list)])
 ```
 
@@ -231,17 +125,15 @@ total_traits <- uniqueN(all_dat[!is.na(trait_name) & nzchar(trait_name), trait_n
 total_taxa   <- uniqueN(all_dat[!is.na(scrubbed_species_binomial) & nzchar(scrubbed_species_binomial),
                                 scrubbed_species_binomial])
 total_coords <- sum(all_dat$has_coord, na.rm = TRUE)
-total_harvest_rows <- total_rows + manual_occurrence_total_rows
-total_harvest_coords <- total_coords + manual_occurrence_coord_rows
 ```
 
 <div class="alert alert-info" role="alert">
 <h4 class="alert-heading">Key Takeaways</h4>
 <ul>
-  <li><strong>`r formatC(total_harvest_rows, format="d", big.mark=",")`</strong> total harvested observation rows across <strong>4 providers</strong> (DataDryad, Zenodo, Scientific Data, Manual Occurrences) as of `r Sys.Date()`. Trait rows are from DataDryad, Zenodo, and Scientific Data.</li>
+  <li><strong>`r formatC(total_rows, format="d", big.mark=",")`</strong> total trait observation rows across <strong>3 providers</strong> (DataDryad, Zenodo, Scientific Data) as of `r Sys.Date()`.</li>
   <li><strong>`r formatC(total_traits, format="d", big.mark=",")`</strong> distinct trait names detected.</li>
   <li><strong>`r formatC(total_taxa, format="d", big.mark=",")`</strong> distinct taxa (scrubbed species binomials).</li>
-  <li><strong>`r formatC(total_harvest_coords, format="d", big.mark=",")`</strong> rows with valid geographic coordinates across trait providers plus Manual Occurrences.</li>
+  <li><strong>`r formatC(total_coords, format="d", big.mark=",")`</strong> rows with valid geographic coordinates.</li>
   <li><em>Note on Scientific Data / AusTraits unit confidence:</em> Rows from the Scientific Data provider show <code>inferred_unit_confidence = "none"</code> because the simple-schema mapper for this provider did not populate the <code>basis_type</code> or <code>value_type</code> metadata columns that the confidence scorer uses as inputs. AusTraits is a fully curated, peer-reviewed database (Falster et al. 2021, <em>Sci. Data</em>, doi:10.1038/s41597-021-01006-6). Its units were set by original data contributors and validated during publication. The "none" label reflects a <strong>pipeline labeling gap</strong>, not a unit quality failure.</li>
   <li><em>Cross-provider deduplication has not been applied.</em> The same measurement may appear in more than one provider if included in multiple source compilations.</li>
 </ul>
@@ -267,19 +159,6 @@ provider_summary <- rbindlist(lapply(names(dat_list), function(k) {
     `Rows with QA Flags` = sum(nzchar(trimws(d$qa_flags)), na.rm = TRUE)
   )
 }))
-
-provider_summary <- rbindlist(list(
-  provider_summary,
-  data.table(
-    Provider = "Manual Occurrences",
-    `Observation Rows` = manual_occurrence_total_rows,
-    `Distinct Traits` = NA_integer_,
-    `Distinct Taxa` = manual_occurrence_taxa,
-    `Source Datasets` = manual_occurrence_dataset_count,
-    `Rows with Coords` = manual_occurrence_coord_rows,
-    `Rows with QA Flags` = NA_integer_
-  )
-), fill = TRUE)
 
 kable_styled(provider_summary, caption = "Provider-level harvest summary")
 ```
@@ -321,28 +200,6 @@ ggplot(tbp20, aes(x = reorder(trait_name, n, sum), y = n / 1e3, fill = provider)
   theme_classic(base_size = 11) +
   theme(plot.title = element_text(face = "bold"),
         legend.position = "bottom")
-```
-
-### 2.3 Manual occurrence source breakdown {#manual-occurrence-breakdown}
-
-```{r manual-occurrence-source-breakdown}
-manual_breakdown <- copy(manual_occurrence_source_summary)
-
-if (nrow(manual_breakdown)) {
-  setorder(manual_breakdown, -Rows, source_id)
-  kable_styled(
-    manual_breakdown[, .(
-      source_id,
-      datasetName,
-      Rows,
-      `Rows with Coords`,
-      `Coverage (%)` = sprintf("%.1f%%", `Coverage (%)`)
-    )],
-    caption = "Manual occurrence source breakdown"
-  )
-} else {
-  cat("No non-empty manual occurrence files were detected in output/providers/occurrences.")
-}
 ```
 
 ---
@@ -692,57 +549,13 @@ message(Sys.time(), " - loaded [leaflet-map]")
 
 if (requireNamespace("leaflet", quietly = TRUE)) {
 
-  # --- Manual occurrence records ---
-  occ_files <- Sys.glob("../output/providers/occurrences/*/compiled_occurrences.csv")
-  occ_list <- lapply(occ_files, function(f) {
-    d <- tryCatch(
-      fread(f, select = c("source_id", "decimalLatitude", "decimalLongitude",
-                          "species", "country"), showProgress = FALSE),
-      error = function(e) NULL
-    )
-    if (is.null(d) || nrow(d) == 0L) return(NULL)
-    d[, decimalLatitude  := suppressWarnings(as.numeric(decimalLatitude))]
-    d[, decimalLongitude := suppressWarnings(as.numeric(decimalLongitude))]
-    d <- d[!is.na(decimalLatitude) & !is.na(decimalLongitude) &
-             decimalLatitude  >= -90  & decimalLatitude  <= 90 &
-             decimalLongitude >= -180 & decimalLongitude <= 180]
-    if (nrow(d) == 0L) return(NULL)
-    d
-  })
-  occ_list <- Filter(Negate(is.null), occ_list)
-
-  if (length(occ_list) > 0L) {
-    occ_raw <- rbindlist(occ_list, fill = TRUE)
-    setnames(occ_raw,
-             c("decimalLatitude", "decimalLongitude", "species"),
-             c("lat_num",          "lon_num",           "scrubbed_species_binomial"))
-    occ_raw[, provider    := "Manual Occurrences"]
-    occ_raw[, trait_name  := NA_character_]
-    occ_raw[, trait_value := NA_character_]
-    occ_raw[, unit        := NA_character_]
-    occ_raw[, source_title := NA_character_]
-    set.seed(42)
-    if (nrow(occ_raw) > 10000L)
-      occ_raw <- occ_raw[sample(.N, 10000L)]
-    occ_dat <- occ_raw[, .(lat_num, lon_num, provider, scrubbed_species_binomial,
-                            source_id, country,
-                            trait_name, trait_value, unit, source_title)]
-  } else {
-    occ_dat <- data.table(lat_num = numeric(0), lon_num = numeric(0),
-                          provider = character(0),
-                          scrubbed_species_binomial = character(0),
-                          source_id = character(0), country = character(0),
-                          trait_name = character(0), trait_value = character(0),
-                          unit = character(0), source_title = character(0))
-  }
-
   # --- Trait coordinate records ---
   trait_coord <- all_dat[has_coord == TRUE,
     .(lat_num, lon_num, provider, scrubbed_species_binomial,
       trait_name, trait_value, unit, source_title, country)]
   trait_coord[, source_id := NA_character_]
 
-  coord_dat <- rbindlist(list(trait_coord, occ_dat), fill = TRUE)
+  coord_dat <- trait_coord
   total_georef <- nrow(coord_dat)
 
   if (total_georef == 0L) {
@@ -782,11 +595,11 @@ if (requireNamespace("leaflet", quietly = TRUE)) {
       )]
 
       pal <- leaflet::colorFactor(
-        palette = c("DataDryad"         = "#1f77b4",
-                    "Zenodo"            = "#ff7f0e",
-                    "Scientific Data"   = "#2ca02c",
-                    "Manual Occurrences"= "#9467bd"),
-        domain  = c("DataDryad", "Zenodo", "Scientific Data", "Manual Occurrences"),
+        palette = c("DataDryad"       = "#1f77b4",
+                    "Zenodo"          = "#ff7f0e",
+                    "Scientific Data" = "#2ca02c",
+                    "TraitHub (tundra)" = "#9467bd"),
+        domain  = c("DataDryad", "Zenodo", "Scientific Data", "TraitHub (tundra)"),
         na.color = "#999999"
       )
 
@@ -817,7 +630,7 @@ if (requireNamespace("leaflet", quietly = TRUE)) {
           title    = "Provider"
         )
 
-      cat("> **Map note:** Displaying a random sample of up to 10,000 records per provider (trait data) and up to 10,000 total manual occurrence points.",
+      cat("> **Map note:** Displaying a random sample of up to 10,000 trait records per provider.",
         "Total georeferenced records:", formatC(total_georef, format = "d", big.mark = ","),
         "| Plotted points:", formatC(plotted_n, format = "d", big.mark = ","), "\n\n")
 

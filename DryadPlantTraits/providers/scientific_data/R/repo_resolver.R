@@ -70,14 +70,54 @@ sdata_empty_file_table <- function() {
 }
 
 
+# Resolve a Figshare collection DOI (10.6084/m9.figshare.c.XXXXX) into files.
+# Fetches all articles in the collection, then resolves each article's files.
+sdata_resolve_figshare_collection <- function(collection_doi) {
+  empty <- sdata_empty_file_table()
+
+  raw <- trimws(as.character(collection_doi))
+  # Extract numeric collection ID from DOI like 10.6084/m9.figshare.c.3843841
+  coll_id <- sub(".*10\\.6084/m9\\.figshare\\.c\\.([0-9]+).*", "\\1", raw, perl = TRUE)
+  if (!nzchar(coll_id) || coll_id == raw) {
+    warning(sprintf("sdata_resolve_figshare_collection: cannot extract collection ID from '%s'", raw))
+    return(empty)
+  }
+
+  # Get collection articles list
+  articles_url <- paste0("https://api.figshare.com/v2/collections/", coll_id, "/articles?limit=100")
+  result <- sdata_curl_with_retry(articles_url)
+  parsed <- sdata_parse_json(result, paste0("figshare_collection:", coll_id))
+  if (is.null(parsed)) return(empty)
+
+  if (!is.list(parsed) || !length(parsed)) return(empty)
+
+  # Resolve each article in the collection
+  all_rows <- lapply(parsed, function(art) {
+    article_id <- as.character(art$id %||% "")
+    if (!nzchar(article_id)) return(empty)
+    Sys.sleep(0.3)
+    sdata_resolve_figshare(article_id)
+  })
+  all_rows <- all_rows[!vapply(all_rows, function(d) is.null(d) || nrow(d) == 0L, logical(1))]
+  if (!length(all_rows)) return(empty)
+  do.call(rbind, all_rows)
+}
+
+
 # Resolve a Figshare DOI or article ID into a table of downloadable files.
 # Input: DOI like "10.6084/m9.figshare.30940019" or numeric/string article ID.
+# Also handles collection DOIs (10.6084/m9.figshare.c.XXXXX) by delegating.
 # Returns data.frame: repo_type, repo_id, file_name, download_url, file_size, mime_type
 sdata_resolve_figshare <- function(figshare_doi_or_id) {
   empty <- sdata_empty_file_table()
 
-  # Extract numeric article ID from DOI or use as-is
+  # Delegate collection DOIs to collection resolver
   raw <- trimws(as.character(figshare_doi_or_id))
+  if (grepl("10\\.6084/m9\\.figshare\\.c\\.[0-9]", raw, perl = TRUE)) {
+    return(sdata_resolve_figshare_collection(raw))
+  }
+
+  # Extract numeric article ID from DOI or use as-is
   if (grepl("10\\.6084/m9\\.figshare\\.", raw, perl = TRUE)) {
     # Take the last numeric component (before any version suffix like .v2)
     last_comp <- sub(".*10\\.6084/m9\\.figshare\\.([0-9]+).*", "\\1", raw, perl = TRUE)

@@ -40,6 +40,7 @@ source(file.path(project_root, "R", "candidate_filter.R"),     local = FALSE)
 source(file.path(project_root, "R", "standardize_records.R"),  local = FALSE)
 source(file.path(project_root, "R", "qa_checks.R"),            local = FALSE)
 source(file.path(project_root, "providers", "zenodo", "R", "zenodo_api.R"), local = FALSE)
+source(file.path(project_root, "providers", "zenodo", "R", "zenodo_parser_registry.R"), local = FALSE)
 
 # ---------------------------------------------------------------------------
 # CLI args
@@ -138,6 +139,36 @@ append_log_row <- function(row_list, first_flag) {
 
 zenodo_log_path <- function(table_entry) {
   table_entry$display_path %||% table_entry$path
+}
+
+zenodo_truncate_error <- function(message_text, width = 120L) {
+  if (is.null(message_text) || !length(message_text) || is.na(message_text)) {
+    return(NA_character_)
+  }
+
+  text <- trimws(as.character(message_text)[[1]])
+  if (!nzchar(text)) return(NA_character_)
+  if (nchar(text, type = "chars") <= width) return(text)
+  paste0(substr(text, 1L, max(1L, width - 3L)), "...")
+}
+
+zenodo_no_trait_message <- function(registry_error = NA_character_, fallback_error = NA_character_) {
+  registry_error <- zenodo_truncate_error(registry_error)
+  fallback_error <- zenodo_truncate_error(fallback_error)
+
+  if (all(is.na(c(registry_error, fallback_error)))) {
+    return("no_trait_observation_fields")
+  }
+
+  parts <- c("no_trait_observation_fields")
+  if (!is.na(registry_error)) {
+    parts <- c(parts, paste0("registry_error=", registry_error))
+  }
+  if (!is.na(fallback_error)) {
+    parts <- c(parts, paste0("fallback_error=", fallback_error))
+  }
+
+  paste(parts, collapse = "; ")
 }
 
 # Download a single file by URL into download_dir.
@@ -269,29 +300,51 @@ for (row_index in seq_len(nrow(supported))) {
 
     for (table_entry in read_result$tables) {
       log_file_path <- zenodo_log_path(table_entry)
-      standardized <- tryCatch(
-        dryad_standardize_records(
-          table_entry$data,
-          provenance = list(
-            dryad_dataset_doi        = ds_id,
-            dryad_version_id         = NA_integer_,
-            dryad_file_id            = file_id,
-            source_title             = row$source_title[[1]],
-            source_authors           = row$source_authors[[1]],
-            source_subjects          = row$source_subjects[[1]],
-            source_abstract          = row$source_abstract[[1]],
-            download_timestamp_utc   = ts,
-            source_file_path         = table_entry$path
-          )
-        ),
-        error = function(e) NULL
+      provenance <- list(
+        dryad_dataset_doi        = ds_id,
+        dryad_version_id         = NA_integer_,
+        dryad_file_id            = file_id,
+        source_title             = row$source_title[[1]],
+        source_authors           = row$source_authors[[1]],
+        source_subjects          = row$source_subjects[[1]],
+        source_abstract          = row$source_abstract[[1]],
+        download_timestamp_utc   = ts,
+        source_file_path         = table_entry$path
       )
+
+      registry_error <- NA_character_
+      registry_standardized <- tryCatch(
+        zenodo_apply_parser_registry(
+          table_entry$data,
+          provenance = provenance
+        ),
+        error = function(e) {
+          registry_error <<- conditionMessage(e)
+          NULL
+        }
+      )
+
+      if (!is.null(registry_standardized) && nrow(registry_standardized)) {
+        standardized <- registry_standardized
+      } else {
+        fallback_error <- NA_character_
+        standardized <- tryCatch(
+          dryad_standardize_records(
+            table_entry$data,
+            provenance = provenance
+          ),
+          error = function(e) {
+            fallback_error <<- conditionMessage(e)
+            NULL
+          }
+        )
+      }
 
       if (is.null(standardized) || !nrow(standardized)) {
         first_log <- append_log_row(list(
           provider_dataset_id = ds_id, provider_file_id = file_id,
           file_path = log_file_path, action = "standardize", status = "skipped",
-          message = "no_trait_observation_fields", rows_in = nrow(table_entry$data),
+          message = zenodo_no_trait_message(registry_error, fallback_error), rows_in = nrow(table_entry$data),
           rows_out = 0L, timestamp_utc = ts
         ), first_log)
         next

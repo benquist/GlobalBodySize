@@ -88,7 +88,15 @@ dryad_run_curl <- function(url, headers = NULL, destfile = NULL, header_file = N
   }
 
   args <- c(args, "--write-out", "__DRYAD_STATUS__:%{http_code}", url)
-  output <- suppressWarnings(system2(curl_bin, args = args, stdout = TRUE, stderr = TRUE))
+
+  # Use system() with shQuote() on every argument rather than system2().
+  # system2() always invokes /bin/sh -c (popen) when capturing stdout, so '&'
+  # in query-string URLs gets interpreted as a shell background operator and
+  # parameters after the first '&' are silently dropped.  shQuote() wraps
+  # each token in single quotes, making the whole URL a single safe argument.
+  cmd_parts <- c(shQuote(curl_bin), vapply(args, shQuote, character(1L)))
+  cmd_str   <- paste(cmd_parts, collapse = " ")
+  output <- suppressWarnings(system(cmd_str, intern = TRUE, ignore.stderr = FALSE))
   curl_status <- attr(output, "status")
   if (is.null(curl_status)) {
     curl_status <- 0L

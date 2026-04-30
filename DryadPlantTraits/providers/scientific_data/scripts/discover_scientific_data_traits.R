@@ -64,9 +64,14 @@ args           <- provider_parse_named_args(commandArgs(trailingOnly = TRUE))
 base_output_dir <- args$`output-dir`      %||% args$output_dir     %||%
                   file.path(project_root, "output")
 output_dir <- file.path(base_output_dir, "providers", "scientific_data")
-pages_per_term <- as.integer(args$`pages-per-term` %||% "3")
-per_page       <- as.integer(args$`per-page`       %||% "20")
+per_page       <- as.integer(args$`per-page` %||% "100")
 resume         <- identical(args$resume, "TRUE")
+
+# CrossRef's offset pagination for ISSN-filtered queries is broken — it returns
+# the same ~34 papers regardless of what offset you request. The fix is
+# month-scoped date-range chunking: each request uses from-pub-date/until-pub-date
+# for one calendar month. CrossRef correctly returns different papers for different
+# date windows, and each month has ≤ ~100 papers so can be fully paginated.
 
 # ---------------------------------------------------------------------------
 # Prepare output directory
@@ -75,72 +80,131 @@ resume         <- identical(args$resume, "TRUE")
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 # ---------------------------------------------------------------------------
-# Load search terms
-# ---------------------------------------------------------------------------
-
-search_terms <- dryad_search_seed_terms()
-query_terms  <- unique(search_terms$query_term)
-
-# ---------------------------------------------------------------------------
-# Phase 1: CrossRef search — collect candidate datasets
+# Phase 1: Fetch ALL Scientific Data papers via month-scoped date-range chunks,
+#           score locally. Scientific Data started in 2014.
 # ---------------------------------------------------------------------------
 
 dataset_checkpoint_path <- file.path(output_dir, "sdata_search_checkpoint.csv")
 dataset_rows    <- list()
-fetched_combos  <- character(0)
+seen_dois       <- character(0)
 first_ds_write  <- TRUE
+completed_chunks <- character(0)   # "YYYY-MM" strings already fully fetched
 
 if (resume && file.exists(dataset_checkpoint_path)) {
   existing_ds <- utils::read.csv(dataset_checkpoint_path, stringsAsFactors = FALSE, check.names = FALSE)
-  if (nrow(existing_ds) && all(c("query_term", "fetch_page") %in% names(existing_ds))) {
-    fetched_combos <- paste(existing_ds$query_term, existing_ds$fetch_page, sep = "\t")
+  if (nrow(existing_ds) && "doi" %in% names(existing_ds)) {
+    seen_dois      <- unique(existing_ds$doi)
     dataset_rows   <- list(existing_ds)
     first_ds_write <- FALSE
-    message(sprintf("Resuming: loaded %d existing dataset rows from checkpoint.", nrow(existing_ds)))
+    if ("fetch_chunk" %in% names(existing_ds)) {
+      completed_chunks <- unique(existing_ds$fetch_chunk)
+    }
+    message(sprintf("Resuming: %d unique DOIs from %d month-chunks already fetched.",
+                    length(seen_dois), length(completed_chunks)))
   }
 }
 
-for (query_term in query_terms) {
-  total_results <- Inf
+# Build list of month-chunks: 2014-01 through current month
+current_year  <- as.integer(format(Sys.Date(), "%Y"))
+current_month <- as.integer(format(Sys.Date(), "%m"))
+month_chunks  <- character(0)
+for (yr in 2014:current_year) {
+  max_mo <- if (yr == current_year) current_month else 12L
+  for (mo in seq_len(max_mo)) {
+    month_chunks <- c(month_chunks, sprintf("%04d-%02d", yr, mo))
+  }
+}
+pending_chunks <- month_chunks[!month_chunks %in% completed_chunks]
 
-  for (page_index in seq_len(pages_per_term)) {
-    combo_key <- paste(query_term, page_index, sep = "\t")
-    if (combo_key %in% fetched_combos) next
+message(sprintf(
+  "Scientific Data month-chunks: %d total, %d completed, %d pending.",
+  length(month_chunks), length(completed_chunks), length(pending_chunks)
+))
 
-    offset <- (page_index - 1L) * per_page
-    if (is.finite(total_results) && offset >= total_results) break
+for (chunk in pending_chunks) {
+  yr_mo_filter <- paste0(
+    "issn:", SDATA_ISSN,
+    ",from-pub-date:", chunk,
+    ",until-pub-date:", chunk
+  )
 
-    message(sprintf("Searching CrossRef: '%s' page %d (offset %d)", query_term, page_index, offset))
-    payload <- sdata_crossref_search(query_term, rows = per_page, offset = offset)
+  chunk_offset <- 0L
+  chunk_page   <- 1L
+  chunk_total  <- NA_integer_
+  chunk_new    <- 0L
 
-    # Update total results from first successful response
-    if (!is.null(payload) && !is.null(payload[["message"]][["total-results"]])) {
-      total_results <- as.integer(payload[["message"]][["total-results"]])
+  repeat {
+    if (!is.na(chunk_total) && chunk_offset >= chunk_total) break
+
+    message(sprintf("  Chunk %s page %d (offset %d)", chunk, chunk_page, chunk_offset))
+
+    page_url <- paste0(
+      SDATA_CROSSREF_BASE,
+      "?filter=", utils::URLencode(yr_mo_filter, reserved = TRUE),
+      "&rows=", as.integer(per_page),
+      "&offset=", as.integer(chunk_offset),
+      "&select=", utils::URLencode(
+        "DOI,title,abstract,author,published,link,relation,subject", reserved = TRUE),
+      "&mailto=", utils::URLencode(SDATA_CROSSREF_MAILTO, reserved = TRUE)
+    )
+
+    Sys.sleep(1)
+    result <- tryCatch(dryad_run_curl(page_url), error = function(e) NULL)
+
+    if (is.null(result) || result$http_code != 200L) {
+      warning(sprintf("Fetch failed (HTTP %s) for chunk %s offset %d — skipping chunk.",
+                      if (!is.null(result)) result$http_code else "NULL",
+                      chunk, chunk_offset))
+      break
     }
 
-    rows <- sdata_flatten_crossref_results(payload, query_term = query_term)
-    if (is.null(rows) || nrow(rows) == 0L) next
+    parsed <- tryCatch(
+      jsonlite::fromJSON(result$body, simplifyVector = FALSE), error = function(e) NULL)
+    if (is.null(parsed)) break
 
-    # Score candidates
-    score_list <- lapply(seq_len(nrow(rows)), function(i) {
-      sdata_score_candidate(rows$title[[i]], rows$abstract[[i]], rows$source_subjects[[i]])
-    })
-    rows$candidate_score    <- vapply(score_list, function(s) as.numeric(s$candidate_score), numeric(1))
-    rows$candidate_keep     <- vapply(score_list, function(s) as.logical(s$candidate_keep),  logical(1))
-    rows$candidate_rationale <- vapply(score_list, function(s) as.character(s$candidate_rationale), character(1))
-    rows$fetch_page          <- page_index
+    if (is.na(chunk_total)) {
+      chunk_total <- as.integer(parsed$message[["total-results"]] %||% 0L)
+    }
 
-    dataset_rows[[length(dataset_rows) + 1L]] <- rows
-    utils::write.table(
-      rows, dataset_checkpoint_path,
-      sep = ",", row.names = FALSE, na = "",
-      append = !first_ds_write, col.names = first_ds_write,
-      qmethod = "double"
-    )
-    first_ds_write <- FALSE
+    items  <- parsed$message$items
+    actual_n <- length(items %||% list())
+    if (actual_n == 0L) break
 
-    if (is.finite(total_results) && (offset + per_page) >= total_results) break
+    rows <- sdata_flatten_crossref_results(parsed, query_term = chunk)
+    if (!is.null(rows) && nrow(rows) > 0L) {
+      new_rows <- rows[!rows$doi %in% seen_dois, , drop = FALSE]
+      if (nrow(new_rows) > 0L) {
+        score_list <- lapply(seq_len(nrow(new_rows)), function(i) {
+          sdata_score_candidate(new_rows$title[[i]], new_rows$abstract[[i]], new_rows$source_subjects[[i]])
+        })
+        new_rows$candidate_score     <- vapply(score_list, function(s) as.numeric(s$candidate_score), numeric(1))
+        new_rows$candidate_keep      <- vapply(score_list, function(s) as.logical(s$candidate_keep),  logical(1))
+        new_rows$candidate_rationale <- vapply(score_list, function(s) as.character(s$candidate_rationale), character(1))
+        new_rows$fetch_chunk         <- chunk
+
+        seen_dois <- c(seen_dois, new_rows$doi)
+        chunk_new <- chunk_new + nrow(new_rows)
+        dataset_rows[[length(dataset_rows) + 1L]] <- new_rows
+        utils::write.table(
+          new_rows, dataset_checkpoint_path,
+          sep = ",", row.names = FALSE, na = "",
+          append = !first_ds_write, col.names = first_ds_write,
+          qmethod = "double"
+        )
+        first_ds_write <- FALSE
+      }
+    }
+
+    chunk_offset <- chunk_offset + actual_n
+    chunk_page   <- chunk_page + 1L
+    if (chunk_offset >= 10000L) break   # CrossRef hard cap
   }
+
+  if (!is.na(chunk_total)) {
+    message(sprintf("  Chunk %s done: total=%d, new DOIs=%d (cumulative: %d)",
+                    chunk, chunk_total, chunk_new, length(seen_dois)))
+  }
+  completed_chunks <- c(completed_chunks, chunk)
 }
 
 all_datasets <- if (length(dataset_rows)) {

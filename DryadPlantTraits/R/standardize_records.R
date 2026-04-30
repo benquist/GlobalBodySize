@@ -598,6 +598,17 @@ dryad_standardize_wide_records <- function(df, guesses, provenance, trait_lookup
     return(NULL)
   }
 
+  # Skip boolean flag columns (>50% of non-NA values are "yes"/"no"/"true"/"false")
+  BOOL_FLAG_TOKENS <- c("yes", "no", "true", "false", "y", "n")
+  trait_columns <- Filter(function(col) {
+    vals <- trimws(tolower(as.character(df[[col]])))
+    vals <- vals[nzchar(vals) & vals != "na"]
+    if (!length(vals)) return(FALSE)
+    bool_frac <- mean(vals %in% BOOL_FLAG_TOKENS)
+    bool_frac < 0.5
+  }, trait_columns)
+  if (!length(trait_columns)) return(NULL)
+
   total_rows <- nrow(df) * length(trait_columns)
   output <- dryad_make_observation_table(total_rows)
   out_index <- 1L

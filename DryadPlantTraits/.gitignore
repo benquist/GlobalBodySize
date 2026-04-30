@@ -26,3 +26,19 @@ output/spot_check_log.csv
 *.Rproj
 output/providers/occurrences/**/raw/*.zip
 output/providers/occurrences/compiled_occurrences_all.csv
+
+# Provider downloads (large raw archives — reproducible from scripts)
+output/providers/*/downloads/
+output/providers/zenodo/qa_post_compile/
+output/providers/zenodo/compiled_trait_observations.csv
+output/providers/zenodo/compiled_trait_observations_with_unit_inference.csv
+output/providers/zenodo/spot_check_log.csv
+output/providers/scientific_data/compiled_trait_observations.csv
+output/providers/scientific_data/compiled_trait_observations_with_unit_inference.csv
+output/providers/scientific_data/compiled_sdata_traits.csv
+output/providers/scientific_data/compile_sdata_log.csv
+output/providers/scientific_data/spot_check_log.csv
+output/providers/fred/compiled_trait_observations.csv
+output/providers/fred/processing_log.csv
+nohup.out
+.Rproj.user/
