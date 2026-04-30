@@ -1678,3 +1678,27 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 - Project: DryadPlantTraits
 - Prompt: Update the github repo.
 - Task: Staged and pushed new fred, scientific_data, manual_intake providers; new zenodo parser registry and discover script; updated standardize_records/dryad_api/search_terms; re-rendered harvest summary Rmd/HTML; extended .gitignore to exclude provider downloads/ and large compiled outputs (4.5GB zenodo downloads excluded). Pushed cc8b780..b1c6b54 to origin/master.
+
+## 2026-04-29 — Literature_Data_To_BIENdb generalize README beyond Jennings
+- Project: Literature_Data_To_BIENdb
+- Prompt: README only discusses Jennings and not all the other files/data sources; make it general and applicable to all data; give a summary breakdown of data included.
+- Task: Rewrote README.md as paper-agnostic. Added pipeline-status block (11 papers configured, 6 staged, 5 pending). Added "Data Sources Included" section with three tables: (A) 6 staged literature papers with paper_id/region/type/publisher/rows/DOI summing to 176,150 rows; (B) 5 pending papers with blocker reasons; (C) migrated 46-source DryadPlantTraits occurrence-intake registry. Replaced Jennings-only "First Paper Bootstrap" + "Jennings 2026 Extraction Design" sections with general Workflow, Output Schema, Adding A New Paper, Repository Layout, Reports, and Provenance sections. Schema description (DwC normalized + BIEN staging) is now generic across all papers, not Jennings-specific. Added BIEN_Data_Loader handoff alignment note.
+
+## 2026-04-29 — DataDryad repo cleanup: rewrite to Dryad-only history (force push)
+- Project: DryadPlantTraits
+- Prompt: User reported https://github.com/benquist/DataDryad contained material from other projects ("HELP! this is a disaster") and asked it to be restricted to DryadPlantTraits content only.
+- Root cause: /Users/brianjenquist/VSCode is a single monorepo (one .git) with multiple per-project remotes configured. Pushes to the `datadryad` remote were sending the full monorepo (BIENDataLoader, BIEN-SpeciesShinyApp, calipoppySDM, splot-open-data, agents/, etc.), not just DryadPlantTraits/.
+- Fix:
+  1. `git subtree split --prefix=DryadPlantTraits HEAD -b dryad-only-clean` → produced 72-commit Dryad-only history (tip dec888e), down from 451 polluted commits.
+  2. `git push datadryad dryad-only-clean:master --force` → replaced remote master (c288fbd → dec888e). GitHub warned about two >50MB CSVs (output/providers/{traithub,zenodo}/compiled_trait_observations.csv); not blocking, accepted as-is.
+  3. Deleted polluted remote tags v1-traits-full and v1-traits-qa.
+  4. Verified remote root tree is now only: .gitignore, R/, README.md, chat_provenance_log.md, data/, output/, providers/, reports/, scripts/.
+- Outstanding risk (not addressed in this prompt): the same monorepo-push pollution likely affects the other per-project remotes also configured on this repo: `bien` (BIEN-SpeciesShinyApp.git), `contamination` (ScalingContamination.git), `poppy` (CaliPoppySDM), `random_BIEN_species_Climate`. Recommend the same subtree-split-and-force-push remediation for each, or migrate each project to its own standalone clone.
+
+## 2026-04-29 — Push pending changes to each project's own GitHub repo
+- Prompt: Push the others to BUT ONLY TO THE CORRECT github repo.
+- BIEN_Data_Loader.git: pushed UX header GitHub+README links + cf-workers stubs + .gitignore (commits d389710, 2fe4d37, e6f1f14 on main). NOTE: wrangler-account.json (Cloudflare account id) was inadvertently included in d389710 and removed in e6f1f14; account id remains in git history.
+- BIEN_Trait_Shiny_App.git: pushed agents/prompt_log.md update (b26c46f on main).
+- sPlot_BIENdb_Loading.git: pushed pipeline robustness (ragged TSV rows, tab/newline sanitization, GVS empty-response fallback) (6a8edd9 on master).
+- Literature_Data_To_BIENdb: pushed inspect_columns.R helper (d7b57fe on main).
+- enquistlab-site-migration: already in sync.
