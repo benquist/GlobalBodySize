@@ -359,3 +359,13 @@
   - Help-tab "BIEN Staging Field Reference" intro paragraph → `class="help-text", style="margin-bottom:12px;"`.
 - Validation: `Rscript -e "invisible(parse(file='app.R'))"` printed `PARSE_OK`.
 - No logic touched: no observers, server callbacks, reactive expressions, field lists, mappings, modals, or QC behavior were modified. Only the CSS stylesheet block and inline `style=`/`class=` attributes on a small set of presentational tags were changed.
+
+## 2026-04-29 — Tab 3 sidebar stepper + tabset overflow + per-service guidance modals
+- UI-only restructure of Tab 3 (Stage & Validate) in `app.R`:
+  - Right pane: shortened inner tabset labels (Staging, Darwin Core, QC, TNRS, GNRS, GVS, NSR), wrapped in `.stage-tabs-wrap` with horizontal-scroll CSS and right-edge fade.
+  - Left pane: split into compact "QC Summary" card (now containing `qc_summary_ui`) and a `.service-stepper` `tabsetPanel(type="pills")` with one panel per BIEN service (TNRS / GNRS / GVS / NSR). Each panel contains its own orange `Try in app` CTA, download-script button, upload input, status output, and one-line description.
+- Added CSS rules for `.stage-tabs-wrap` and `.service-stepper` / `.service-panel` (placed before existing `@media (max-width: 768px)` block).
+- Added `rv$tab3_intro_seen` and `rv$svc_seen` flags plus two one-shot `showModal` observers (Tab 3 intro on landing, per-service nudge on first pill open).
+- No changes to: existing service action observers (`btn_tnrs/gnrs/gvs/nsr`), upload observers, download handlers, Step 1/2/3 completion modals, QC code, field lists, mapping table, or sanitizer.
+- All 4 service buttons, 4 download buttons, 4 upload inputs, and 4 status outputs retain unchanged IDs.
+- `Rscript -e "invisible(parse(file='app.R'))"` prints PARSE_OK.

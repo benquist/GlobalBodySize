@@ -1,3 +1,5 @@
+2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Fix the two warnings in reports/dryad_trait_harvest_summary.Rmd by separating detected manual occurrence outputs from truly compiled manual sources, guarding the per-file fread georeference summary with tryCatch so malformed/empty files yield 0 rows instead of failing, re-render the HTML, verify the report shows 10 compiled sources and totals 165,155 / 144,389, and update provenance logs without commit/push."
+
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Start the next ingestion phase by creating a strict shortlist from the existing queue file (priority_queue_observation_sources.csv): keep P1 rows where likely_already_in_bien == 'no'; add deterministic batch_order; create next_ingest_batch_p1_not_in_bien.csv and README; run validation snippet; update provenance logs."
 
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. User issue: the rendered HTML report does not show the 8 compiled manual occurrence sources and their row counts. Edit only reports/dryad_trait_harvest_summary.Rmd to add a Section 10 subsection/table that reads data/manual_source_intake.csv, scans output/providers/occurrences/*/compiled_occurrences.csv, summarizes rows per source_id, joins display_name and source_group where available, shows total compiled sources and total occurrence records, fixes the stale pending_review narrative dynamically from current harvest_status counts, keeps the existing pending/manual-intake table, re-renders reports/dryad_trait_harvest_summary.html, validates the HTML contains manual_gabon_gbif_ipt, manual_paciflora_dryad, and 138,748 or 138748, and updates required provenance logs." 
@@ -5,6 +7,9 @@
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Modify the FRED ingest pipeline so compiled trait rows are flagged when the source study or row is likely already represented in BIEN and when observations may also be present in GBIF. Tighten the logic so sequence-like and non-observation/model outputs are more clearly flagged for downstream exclusion/review, while keeping changes minimal and local to providers/fred/scripts/download_and_compile_fred_traits.R. Add deterministic study- and row-level qa_flags heuristics, conservative filename-based manifest excludes, an end-of-script qa_flag summary, validate with a narrow Rscript -e helper probe, and report files changed, flags added, validation result, and residual risks." 
 
 2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Fix one local warning in reports/dryad_trait_harvest_summary.Rmd introduced by the new Section 10 occurrence summary: make the pending-sources chunk use DT::datatable only when DT is available, add a simple fallback such as kable_styled on the same columns when DT is unavailable, re-render reports/dryad_trait_harvest_summary.html, validate the HTML still contains manual_gabon_gbif_ipt and 138,748, use apply_patch, and avoid unrelated file changes."
+2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Update reports/dryad_trait_harvest_summary.Rmd Section 10 so it clearly answers what data sources still need to be ingested: keep the existing registry and compiled-manual-occurrence tables, add a new subsection after 10.1 summarizing rows where harvest_status != 'compiled' with total/status counts and a remaining-sources kable ordered pending_manual_access then pending_review, explicitly note CAFRIPLOT/HERBase/Red Argentina manual-access blockers if present, re-render reports/dryad_trait_harvest_summary.html, verify the HTML content/counts/source IDs, and update provenance logs without commit/push."
+
+2026-04-29 | "Work in /Users/brianjenquist/VSCode/DryadPlantTraits. Update Section 10 of reports/dryad_trait_harvest_summary.Rmd so the rendered report explicitly shows how many compiled manual-occurrence observations have valid geographic coordinates per source, replacing the simple row-count logic with per-source georeferenced counts from decimalLatitude/decimalLongitude, adding Georeferenced Rows and % Georeferenced to the 10.1 table plus a short coverage note, re-rendering reports/dryad_trait_harvest_summary.html, verifying the HTML contains Georeferenced Rows, totals 165,155 and 144,389, and source IDs manual_paciflora_dryad and manual_russian_arctic_vegetation_archive, and updating provenance logs without commit/push."
 
 2026-04-28 | "Task: Update /Users/brianjenquist/VSCode/Literature_Data_To_BIENdb pipeline for Jennings 2026 to include richer occurrence extraction and trait separation. Requirements: inspect source/scripts; expand normalized+staging occurrence fields for ViewFullOccurance alignment; include GNRS political units; create separate habit/growth-form trait output (or explicit empty file); update README mapping notes; rerun jennings_2026 and report non-missing counts for lat/lon/elev/political/habit; update provenance logs."
 
@@ -1594,3 +1599,28 @@ Record each user prompt that led to creation, direction, or alteration of agent 
   4. manual_red_argentina_parcelas_permanentes — Zenodo + Dryad search returned nothing → 0-row placeholder, contact_required
   5. manual_russian_arctic_vegetation_archive — Dryad search hit (10.5061/dryad.5tb2rbp8d) → 160 rows compiled
 - Script uses data.table/httr/jsonlite only; resumable; 90s download timeout; never overwrites non-empty with 0 rows
+2026-04-29 | "You are a coder agent. Fix the ingest script at /Users/brianjenquist/VSCode/DryadPlantTraits/providers/manual_intake/scripts/download_p1_not_in_bien_batch.R for three sources that produced bad outputs. Then delete the wrong output directories, run the script, and verify results."
+
+## 2026-04-29 — DryadPlantTraits P1/not-in-BIEN batch ingest (commit f8b59c1)
+- Project: DryadPlantTraits
+- Prompt: "yes, lets start ingesting these" (referring to next_ingest_batch_p1_not_in_bien.csv, 5 P1/not-in-BIEN sources)
+- Task: Wrote and ran download_p1_not_in_bien_batch.R to ingest 5 P1/not-in-BIEN manual occurrence sources.
+  - manual_arroyo_high_andes_chile: 977 rows compiled from Mendeley Data XLSX (openpyxl conversion), DMS->decimal coord parsing, species×elevation pivot
+  - manual_russian_arctic_vegetation_archive: 25430 rows compiled from Dryad ZIP, paired *_species_data.csv + *_habitat_data.csv parsing, long pivot join
+  - manual_herbase_amazon_herbs: 0-row placeholder (no verified download; qa_flags=needs_manual_access|no_verified_download_found)
+  - manual_central_african_plot_network_cafriplot: 0-row placeholder (contact required)
+  - manual_red_argentina_parcelas_permanentes: 0-row placeholder (no URL/DOI available)
+- Updated data/manual_source_intake.csv: 10 compiled, 3 pending_manual_access, 40 pending_review
+- Code-checker: no CRITICAL issues; 4 WARNINGs (resumable skip, coord range, Python encoding, network retry); fixed Python UTF-8 encoding + coord range QA flag
+- Pushed to origin/master as f8b59c1.
+
+2026-07-06 | "Rewrite enquistlab-site-migration/_pages/gallery.md: organize all 125 photos into 7 thematic sections (Tropical Forests, Andean Elevations, Rocky Mountains & Alpine, Climate Experiments, Arid & Desert Landscapes, Field Landscapes, People & Field Work), per-section Fisher-Yates shuffle on page load, single #gallery-shuffle-btn in moss-green (#3a6b40) Scandinavian style, uppercase letter-spaced theme headers with thin warm-gray bottom rule, Lightbox2 per-section data-lightbox slugs. File previously corrupted; rebuilt from scratch via /tmp/build_gallery.py Python script."
+2026-04-29 | "suggest changes in the organization of https://enquistlab.github.io/gallery/ maybe have the photos randomly shuffle in real time? Maybe organize them into themes? work with coder agent" — enquistlab-site-migration: reorganized _pages/gallery.md into themed sections with shuffle behavior; commit 98aeb5d pushed to origin/main. Rmd N/A, R package N/A, git push confirmed.
+
+## 2026-04-29 — BIENDataLoader Tab 3 UX restructure
+- Project: BIENDataLoader; UI-only Tab 3 restructure (vertical pill stepper for BIEN web services, shortened inner tabset labels with horizontal-scroll CSS, one-shot Tab 3 intro + per-service guidance modals via new `rv$tab3_intro_seen` / `rv$svc_seen` flags). No server logic, observers, downloads, uploads, QC, or field lists touched. Parse OK.
+
+## 2026-04-29 — enquistlab-site-migration gallery theme shuffle (commit 9df59e5)
+- Project: enquistlab-site-migration
+- Prompt: "I see it now. On the Shuffle make sure to shuffle the themes too"
+- Task: Updated `_pages/gallery.md` to wrap 6 thematic sections in `.gallery-theme-block` divs inside `#gallery-themes-container`; JS `shuffleAll()` now randomizes both theme-block order and photos within each grid. Commit 9df59e5 pushed to origin/main. No Rmd or R package files changed.

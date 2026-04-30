@@ -831,6 +831,118 @@ ui <- navbarPage(
           padding: 16px 24px;
         }
 
+        /* Tab 3 inner tabset: keep on one line, scroll horizontally if needed */
+        .stage-tabs-wrap { position: relative; }
+        .stage-tabs-wrap .nav-tabs {
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          border-bottom: 1px solid var(--bien-line);
+        }
+        .stage-tabs-wrap .nav-tabs > li { flex: 0 0 auto; }
+        .stage-tabs-wrap .nav-tabs > li > a {
+          white-space: nowrap;
+          padding: 10px 16px;
+          font-size: 0.95rem;
+          font-weight: 500;
+          color: var(--bien-muted);
+          border: none;
+          border-bottom: 2px solid transparent;
+          border-radius: 0;
+          margin-right: 0;
+        }
+        .stage-tabs-wrap .nav-tabs > li.active > a,
+        .stage-tabs-wrap .nav-tabs > li.active > a:hover,
+        .stage-tabs-wrap .nav-tabs > li.active > a:focus {
+          color: var(--bien-blue-deep);
+          background: transparent;
+          border: none;
+          border-bottom: 2px solid var(--bien-blue);
+          font-weight: 600;
+        }
+        .stage-tabs-wrap .nav-tabs > li > a:hover {
+          background: transparent;
+          color: var(--bien-ink);
+          border-bottom-color: var(--bien-line);
+        }
+        /* Soft right-edge fade hint when scrollable */
+        .stage-tabs-wrap::after {
+          content: \"\";
+          position: absolute;
+          top: 0; right: 0;
+          width: 24px; height: 42px;
+          background: linear-gradient(90deg, rgba(247,244,238,0) 0%, var(--bien-warm-bg) 100%);
+          pointer-events: none;
+        }
+
+        /* Tab 3 sidebar: compact, no-scroll vertical stepper */
+        .stage-summary-card { margin-bottom: 14px; }
+        .stage-summary-card .step-badge { margin-right: 8px; vertical-align: middle; }
+        .stage-services-card { padding-bottom: 18px; }
+        .service-stepper .nav-pills {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 14px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid var(--bien-line);
+        }
+        .service-stepper .nav-pills > li { float: none; flex: 1 1 auto; min-width: 60px; }
+        .service-stepper .nav-pills > li > a {
+          text-align: center;
+          padding: 8px 6px;
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: var(--bien-muted);
+          background: var(--bien-warm-bg);
+          border: 1px solid var(--bien-line);
+          border-radius: 4px;
+          white-space: nowrap;
+        }
+        .service-stepper .nav-pills > li.active > a,
+        .service-stepper .nav-pills > li.active > a:hover,
+        .service-stepper .nav-pills > li.active > a:focus {
+          background: var(--bien-blue);
+          color: #fff;
+          border-color: var(--bien-blue-deep);
+        }
+        .service-stepper .nav-pills > li:not(.active) > a:hover {
+          background: var(--bien-surface);
+          color: var(--bien-ink);
+        }
+        .service-panel { padding-top: 4px; }
+        .service-panel .service-desc {
+          margin: 0 0 14px 0;
+          padding: 10px 12px;
+          background: var(--bien-warm-bg);
+          border-left: 3px solid var(--bien-line);
+          border-radius: 4px;
+        }
+        .service-panel .service-cta {
+          width: 100%;
+          font-size: 1rem;
+          font-weight: 600;
+          padding: 12px 16px;
+          margin-bottom: 10px;
+          background: linear-gradient(180deg, #e89a3a 0%, #d4801f 100%);
+          border-color: #b06a18;
+          color: #fff;
+        }
+        .service-panel .service-cta:hover,
+        .service-panel .service-cta:focus {
+          background: linear-gradient(180deg, #d4801f 0%, #b06a18 100%);
+          border-color: #8e5413;
+          color: #fff;
+        }
+        .service-panel .service-dl {
+          width: 100%;
+          font-size: 0.9rem;
+          margin-bottom: 12px;
+        }
+        .service-panel .shiny-input-container { margin-bottom: 10px; }
+
         @media (max-width: 768px) {
           html { font-size: 15px; }
           .container-fluid { padding-left: 16px; padding-right: 16px; }
@@ -935,82 +1047,90 @@ ui <- navbarPage(
     uiOutput("tab3_gating"),
     fluidRow(
       column(4,
-        tags$div(class="bl-card",
+        tags$div(class="bl-card stage-summary-card",
           tags$span(class="step-badge", "3"),
-          tags$strong("QC Summary")
+          tags$strong("QC Summary"),
+          uiOutput("qc_summary_ui")
         ),
-        uiOutput("qc_summary_ui"),
-        tags$br(),
-        tags$div(class="bl-card bl-card-warn",
-          tags$strong("BIEN Web Services (Required for BIEN Schema Mapping)"),
-          tags$p(class="help-text", style="margin:6px 0 10px;",
-            "Run these services sequentially for BIEN-schema-ready outputs: TNRS -> GNRS -> GVS -> NSR. These steps populate and standardize BIEN fields and should be completed before final export to the BIEN staging table."),
-          tags$p(class="help-text", style="margin:6px 0 10px;",
-            HTML("<strong>Cloud timeout warning:</strong> Download the validation scripts below and run them locally in R when possible. ",
-                 "The in-app buttons contact external servers that may be unreachable from cloud hosting ",
-                 "(shinyapps.io runs on AWS; external APIs may block cloud IPs). ",
-                 "If an in-app check times out after ~25s, the local script is the reliable path. ",
-                 "For BIEN schema mapping, complete TNRS -> GNRS -> GVS -> NSR before final export.")),
-
-          tags$hr(style="margin:14px 0;"),
-          downloadButton("dl_tnrs_script", "\u2b07 Download TNRS validation script (.R)",
-                         class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:10px;"),
-          actionButton("btn_tnrs", "Try TNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
-                       style="width:100%; margin-bottom:4px;"),
-          fileInput("upload_tnrs", "Upload TNRS results CSV",
-            accept=".csv", buttonLabel="Browse", placeholder="tnrs_results.csv",
-            width="100%"),
-          uiOutput("tnrs_status_ui"),
-          tags$p(class="help-text", style="margin:6px 0 10px;",
-            "TNRS matches submitted scientific names to accepted names (WCVP/WFO), standardizes spelling/authorship where possible, and writes scrubbed taxonomy fields."),
-          tags$hr(style="margin:14px 0;"),
-          downloadButton("dl_gnrs_script", "\u2b07 Download GNRS validation script (.R)",
-                         class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:10px;"),
-          actionButton("btn_gnrs", "Try GNRS in app (may timeout from cloud)", class="btn-warning btn-sm",
-                       style="width:100%; margin-bottom:4px;"),
-          fileInput("upload_gnrs", "Upload GNRS results CSV",
-            accept=".csv", buttonLabel="Browse", placeholder="gnrs_results.csv",
-            width="100%"),
-          uiOutput("gnrs_status_ui"),
-          tags$p(class="help-text", style="margin:6px 0 10px;",
-            "GNRS standardizes political geography (country/state/county) and helps catch misspellings and inconsistent region strings."),
-          tags$hr(style="margin:14px 0;"),
-          downloadButton("dl_gvs_script", "\u2b07 Download GVS validation script (.R)",
-                         class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:10px;"),
-          actionButton("btn_gvs", "Try GVS in app (may timeout from cloud)", class="btn-warning btn-sm",
-                       style="width:100%; margin-bottom:4px;"),
-          fileInput("upload_gvs", "Upload GVS results CSV",
-            accept=".csv", buttonLabel="Browse", placeholder="gvs_results.csv",
-            width="100%"),
-          uiOutput("gvs_status_ui"),
-          tags$p(class="help-text", style="margin:6px 0 10px;",
-            "GVS checks whether lat/lon appear to be political centroids and flags potential georeferencing precision issues; it does not delete records."),
-          tags$hr(style="margin:14px 0;"),
-          downloadButton("dl_nsr_script", "\u2b07 Download NSR validation script (.R)",
-                         class="btn-success btn-sm",
-                         style="width:100%; margin-bottom:10px;"),
-          actionButton("btn_nsr", "Try NSR in app (may timeout from cloud)", class="btn-warning btn-sm",
-                       style="width:100%; margin-bottom:4px;"),
-          fileInput("upload_nsr", "Upload NSR results CSV",
-            accept=".csv", buttonLabel="Browse", placeholder="nsr_results.csv",
-            width="100%"),
-          uiOutput("nsr_status_ui"),
-          tags$p(class="help-text", style="margin:6px 0 10px;",
-            "NSR estimates native/introduced/cultivated status by taxon plus region, useful for filtering non-native or cultivated observations in downstream analyses.")
+        tags$div(class="bl-card bl-card-warn stage-services-card",
+          tags$strong("BIEN Web Services"),
+          tags$p(class="help-text", style="margin:6px 0 12px;",
+            "Run sequentially for BIEN-schema-ready outputs. ",
+            tags$strong("Click the orange button"), " on each step to run in app, or ",
+            tags$strong("download the local script"), " if cloud times out."),
+          tags$div(class="service-stepper",
+            tabsetPanel(id="service_tabs", type="pills",
+              tabPanel("1 \u00b7 TNRS",
+                tags$div(class="service-panel",
+                  tags$p(class="help-text service-desc",
+                    "Match submitted scientific names to accepted names (WCVP/WFO); standardize spelling/authorship; write scrubbed taxonomy fields."),
+                  actionButton("btn_tnrs", "Try TNRS in app",
+                    class="btn-warning btn-block service-cta"),
+                  downloadButton("dl_tnrs_script", "\u2b07 Download TNRS script (.R)",
+                    class="btn-default btn-block service-dl"),
+                  fileInput("upload_tnrs", "Upload TNRS results CSV",
+                    accept=".csv", buttonLabel="Browse", placeholder="tnrs_results.csv",
+                    width="100%"),
+                  uiOutput("tnrs_status_ui")
+                )
+              ),
+              tabPanel("2 \u00b7 GNRS",
+                tags$div(class="service-panel",
+                  tags$p(class="help-text service-desc",
+                    "Standardize political geography (country/state/county); catch misspellings and inconsistent region strings."),
+                  actionButton("btn_gnrs", "Try GNRS in app",
+                    class="btn-warning btn-block service-cta"),
+                  downloadButton("dl_gnrs_script", "\u2b07 Download GNRS script (.R)",
+                    class="btn-default btn-block service-dl"),
+                  fileInput("upload_gnrs", "Upload GNRS results CSV",
+                    accept=".csv", buttonLabel="Browse", placeholder="gnrs_results.csv",
+                    width="100%"),
+                  uiOutput("gnrs_status_ui")
+                )
+              ),
+              tabPanel("3 \u00b7 GVS",
+                tags$div(class="service-panel",
+                  tags$p(class="help-text service-desc",
+                    "Check whether lat/lon appear to be political centroids; flag georeferencing-precision issues (non-destructive)."),
+                  actionButton("btn_gvs", "Try GVS in app",
+                    class="btn-warning btn-block service-cta"),
+                  downloadButton("dl_gvs_script", "\u2b07 Download GVS script (.R)",
+                    class="btn-default btn-block service-dl"),
+                  fileInput("upload_gvs", "Upload GVS results CSV",
+                    accept=".csv", buttonLabel="Browse", placeholder="gvs_results.csv",
+                    width="100%"),
+                  uiOutput("gvs_status_ui")
+                )
+              ),
+              tabPanel("4 \u00b7 NSR",
+                tags$div(class="service-panel",
+                  tags$p(class="help-text service-desc",
+                    "Estimate native/introduced/cultivated status by taxon + region for downstream filtering."),
+                  actionButton("btn_nsr", "Try NSR in app",
+                    class="btn-warning btn-block service-cta"),
+                  downloadButton("dl_nsr_script", "\u2b07 Download NSR script (.R)",
+                    class="btn-default btn-block service-dl"),
+                  fileInput("upload_nsr", "Upload NSR results CSV",
+                    accept=".csv", buttonLabel="Browse", placeholder="nsr_results.csv",
+                    width="100%"),
+                  uiOutput("nsr_status_ui")
+                )
+              )
+            )
+          )
         )
       ),
       column(8,
-        tabsetPanel(id="stage_tabs",
-          tabPanel("Staging Table",  DT::dataTableOutput("staged_table")),
-          tabPanel("DWC (Darwin Core) Table", DT::dataTableOutput("dwc_table")),
-          tabPanel("QC Details",     DT::dataTableOutput("qc_table")),
-          tabPanel("TNRS Results",   DT::dataTableOutput("tnrs_table")),
-          tabPanel("GNRS Results",   DT::dataTableOutput("gnrs_table")),
-          tabPanel("GVS Results",    DT::dataTableOutput("gvs_table")),
-          tabPanel("NSR Results",    DT::dataTableOutput("nsr_table"))
+        tags$div(class="stage-tabs-wrap",
+          tabsetPanel(id="stage_tabs",
+            tabPanel("Staging",     DT::dataTableOutput("staged_table")),
+            tabPanel("Darwin Core", DT::dataTableOutput("dwc_table")),
+            tabPanel("QC",          DT::dataTableOutput("qc_table")),
+            tabPanel("TNRS",        DT::dataTableOutput("tnrs_table")),
+            tabPanel("GNRS",        DT::dataTableOutput("gnrs_table")),
+            tabPanel("GVS",         DT::dataTableOutput("gvs_table")),
+            tabPanel("NSR",         DT::dataTableOutput("nsr_table"))
+          )
         )
       )
     )
@@ -1342,7 +1462,9 @@ server <- function(input, output, session) {
     gnrs_result  = NULL,
     gvs_result   = NULL,
     nsr_result   = NULL,
-    completion_modal_shown = FALSE
+    completion_modal_shown = FALSE,
+    tab3_intro_seen = FALSE,
+    svc_seen = list(tnrs = FALSE, gnrs = FALSE, gvs = FALSE, nsr = FALSE)
   )
 
   # ── Resolve demo data path reliably regardless of working directory ──────────
@@ -1741,6 +1863,60 @@ server <- function(input, output, session) {
     removeModal()
     updateNavbarPage(session, "tabs", selected = "3 \u2022 Stage & Validate")
   })
+
+  # ── Tab 3 one-shot guidance modals ────────────────────────────────────────
+  observeEvent(input$tabs, {
+    if (identical(input$tabs, "3 \u2022 Stage & Validate") && isFALSE(rv$tab3_intro_seen)) {
+      rv$tab3_intro_seen <- TRUE
+      # Pre-mark TNRS pill as seen so the intro modal isn't immediately overwritten
+      # by the per-service nudge when service_tabs emits its initial value.
+      rv$svc_seen$tnrs <- TRUE
+      showModal(modalDialog(
+        title = tags$div(tags$span(class="step-badge", "3"), "Stage & Validate \u2014 BIEN web services walkthrough"),
+        tags$p("Run the four BIEN web services in order: ",
+               tags$strong("TNRS \u2192 GNRS \u2192 GVS \u2192 NSR"),
+               ". Each service standardizes a part of your record so it lines up with the BIEN schema."),
+        tags$ul(
+          tags$li(tags$strong("TNRS"), " \u2014 accepted scientific names"),
+          tags$li(tags$strong("GNRS"), " \u2014 standardized country/state/county"),
+          tags$li(tags$strong("GVS"),  " \u2014 coordinate centroid check"),
+          tags$li(tags$strong("NSR"),  " \u2014 native / introduced / cultivated status")
+        ),
+        tags$p("Use the orange ", tags$strong("Try in app"), " button on each step. ",
+               "If the cloud times out, download the local R script for that step instead."),
+        easyClose = TRUE,
+        footer = modalButton("Start with TNRS")
+      ))
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$service_tabs, {
+    svc_label <- input$service_tabs
+    svc_key <- if (grepl("TNRS", svc_label)) "tnrs"
+               else if (grepl("GNRS", svc_label)) "gnrs"
+               else if (grepl("GVS",  svc_label)) "gvs"
+               else if (grepl("NSR",  svc_label)) "nsr"
+               else NA_character_
+    if (is.na(svc_key)) return()
+    if (isTRUE(rv$svc_seen[[svc_key]])) return()
+    rv$svc_seen[[svc_key]] <- TRUE
+    title_map <- c(tnrs="TNRS \u2014 Taxonomic Name Resolution",
+                   gnrs="GNRS \u2014 Geographic Name Resolution",
+                   gvs ="GVS \u2014 Geographic Validation",
+                   nsr ="NSR \u2014 Native Status Resolver")
+    next_map <- c(tnrs="Next: GNRS", gnrs="Next: GVS",
+                  gvs ="Next: NSR",  nsr ="Next: 4 \u2022 Export")
+    showModal(modalDialog(
+      title = title_map[[svc_key]],
+      tags$p("Click the ", tags$strong("orange button"),
+             " above to run this service. If the cloud version times out, ",
+             "use the download-script + upload-CSV path instead."),
+      tags$p(class="help-text", "When status reads ",
+             tags$em("Complete"), " or you have uploaded a results CSV, advance to the next step."),
+      easyClose = TRUE,
+      footer = modalButton(next_map[[svc_key]])
+    ))
+  }, ignoreInit = TRUE)
 
   output$step2_status_inline <- renderUI({
     if (is.null(rv$mapping)) return(NULL)
