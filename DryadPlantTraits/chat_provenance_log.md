@@ -200,3 +200,8 @@ Outcome: Added data/manual_source_intake.csv as the committed registry for manua
 - Added queue annotations: `priority_tier`, `observation_readiness`, `likely_already_in_bien`, `likely_bien_reason`, `queue_reason`, `recommended_next_action`.
 - Excluded checklist/non-observational sources from top ingest tiers and retained only plausible salvage leads in P3.
 - Added `output/providers/manual_intake/README_priority_queue.md` documenting scope, columns, heuristics, and generation date.
+
+29. Date: 2026-04-29
+Prompt: Complete migration of clearly non-trait pending literature sources out of DryadPlantTraits into Literature_Data_To_BIENdb; keep only the 7 specified trait sources in Dryad registry; move/remove occurrence-intake scripts from Dryad scope; preserve local untracked occurrence artifacts.
+Source session: current workspace session
+Outcome: Re-validated Dryad manual_source_intake.csv has exactly the 7 specified trait source_id rows; removed tracked occurrence-intake scripts from Dryad path (download_occurrence_sources.R, download_p1_not_in_bien_batch.R, download_gbif_3_missing.R, stage_physical_files.R); left untracked output/providers/occurrences artifacts untouched.
