@@ -1,6 +1,8 @@
 # DryadPlantTraits
 
-DryadPlantTraits is an R-based pipeline for harvesting plant functional trait data from the Dryad Digital Repository (datadryad.org), Zenodo, Scientific Data / AusTraits, TraitHub (tundra), the Fine Root Ecology Database (FRED), and user-supplied manual occurrence sources. It discovers candidate datasets through programmatic API search, downloads and compiles individual trait observations into a provenance-rich, BIEN-style row-level table, and applies a multi-stage quality assurance (QA) workflow including a decision-tree algorithm for inferring and validating trait measurement units against published global reference ranges.
+DryadPlantTraits is an R-based pipeline for harvesting plant functional trait data from the Dryad Digital Repository (datadryad.org), Zenodo, Scientific Data / AusTraits, TraitHub (tundra), and the Fine Root Ecology Database (FRED). It discovers candidate datasets through programmatic API search, downloads and compiles individual trait observations into a provenance-rich, BIEN-style row-level table, and applies a multi-stage quality assurance (QA) workflow including a decision-tree algorithm for inferring and validating trait measurement units against published global reference ranges.
+
+Occurrence-only intake work has been migrated to Literature_Data_To_BIENdb and is tracked there under `scripts/occurrence_intake/`, `data/occurrences/`, and `data/occurrence_source_intake.csv`.
 
 This project is intentionally a harvesting and triage pipeline, not a claim of full automatic harmonization across arbitrary study schemas. Expert scientific review of compiled outputs — particularly for traits where unit confidence is low or unresolved — is expected and required before use in downstream analyses.
 
@@ -20,29 +22,9 @@ This project is intentionally a harvesting and triage pipeline, not a claim of f
 
 > **FRED note:** 635 of 681 FRED dataset files are currently unavailable (ZIP archives not accessible via API). Fix is in progress; the 16,926 rows represent the 46 files that could be downloaded. Full FRED coverage will be added in a future run.
 
-### Manual occurrence records (Darwin Core, separate from trait observations)
+### Occurrence-only migration note
 
-- **10 sources compiled**, **165,155 total rows**, **144,389 georeferenced**
-- Georeferenced records are mapped in an interactive leaflet map in `reports/dryad_trait_harvest_summary.html`
-
-| Source | Rows |
-|---|---|
-| PacIFlora (Pacific Islands Flora) | 81,731 |
-| Russian Arctic Vegetation Archive | 25,430 |
-| SIVFLORA | 14,598 |
-| Flora of Sumatra GBIF | 10,200 |
-| PUCV Herbarium Chile | 10,200 |
-| Gabon GBIF | 7,981 |
-| Batang Toru Sumatra | 3,682 |
-| Arroyo High Andes Chile | 977 |
-| Kyrgyzstan Dryad | 156 |
-
-### Manual source intake registry (`data/manual_source_intake.csv`)
-
-- **53 total sources tracked**
-- **10 compiled**
-- **3 pending manual access** — CAFRIPLOT, HERBase, Red Argentina (institutional outreach required)
-- **40 pending review** — 18 DOI auto-ingestible, 17 URL-based, 5 user-supplied files on disk
+Occurrence-only ingestion sources and scripts were moved out of this project to `Literature_Data_To_BIENdb` to keep DryadPlantTraits focused on trait harvesting and QA.
 
 ### Interactive harvest summary report
 
@@ -231,7 +213,6 @@ scripts/
   generate_audit_report.R             # Audit report generation
 
 data/
-  manual_source_intake.csv           # Committed registry for user-supplied/manual external sources
   trait_dictionary_starter.csv        # Trait name crosswalk (source label → canonical name + unit)
 
 providers/
