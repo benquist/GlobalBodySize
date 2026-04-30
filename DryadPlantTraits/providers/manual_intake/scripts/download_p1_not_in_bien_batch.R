@@ -461,141 +461,170 @@ results <- list()
 
 # ===========================================================================
 # Source 1: manual_arroyo_high_andes_chile
-# DOI: 10.1016/j.dib.2024.111128  (Data in Brief)
-# Strategy: crossref → relation/link DOI → Zenodo search → GBIF → placeholder
+# DOI: 10.17632/8zvjvcyv79.1 (Mendeley Data)
+# Strategy: direct Mendeley XLSX download -> Python openpyxl conversion -> DWC mapping
 # ===========================================================================
 cat("\n=== Source 1: manual_arroyo_high_andes_chile ===\n")
 s1_id    <- "manual_arroyo_high_andes_chile"
-s1_doi   <- "10.1016/j.dib.2024.111128"
+s1_doi   <- "10.17632/8zvjvcyv79.1"
 s1_dir   <- file.path(out_root, s1_id)
 s1_out   <- file.path(s1_dir, "compiled_occurrences.csv")
+s1_url   <- "https://data.mendeley.com/public-files/datasets/8zvjvcyv79/files/84bb7046-b6e9-4f99-8f94-1ac3b08dde7b/file_downloaded"
 
 results[[s1_id]] <- tryCatch({
+  skip_result <- NULL
   if (file.exists(s1_out)) {
-    cat("  [SKIP] Already compiled:", s1_out, "\n")
     dt <- fread(s1_out, showProgress = FALSE)
-    list(nrow = nrow(dt), status = "skipped")
+    if (nrow(dt) > 0) {
+      cat("  [SKIP] Already compiled with non-empty output:", s1_out, "\n")
+      skip_result <- list(nrow = nrow(dt), status = "skipped")
+    } else {
+      cat("  Existing output is empty; rebuilding from source data\n")
+      file.remove(s1_out)
+    }
+  }
+  if (!is.null(skip_result)) {
+    skip_result
   } else {
     dir.create(s1_dir, recursive = TRUE, showWarnings = FALSE)
-    dt_out <- NULL
+    raw_dir <- file.path(s1_dir, "raw")
+    dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
+    xlsx_path <- file.path(raw_dir, "arroyo_mendeley.xlsx")
+    csv_path <- file.path(raw_dir, "arroyo_mendeley_occurrences.csv")
 
-    # Step 1: crossref relation/link scan
-    data_doi <- crossref_find_data_doi(s1_doi)
-
-    # Step 2: if data DOI points to Zenodo record, extract download
-    if (!is.na(data_doi) && grepl("zenodo", data_doi, ignore.case = TRUE)) {
-      zenodo_rec_id <- sub(".*zenodo\\.org/(record|records?)/", "", data_doi)
-      zenodo_rec_id <- sub("[/?#].*$", "", zenodo_rec_id)
-      # also try DOI numeric suffix
-      if (!grepl("^[0-9]+$", zenodo_rec_id)) {
-        zenodo_rec_id <- sub("^10\\.5281/zenodo\\.", "", data_doi)
-      }
-      cat("  Fetching Zenodo record:", zenodo_rec_id, "\n")
-      meta_resp <- safe_get(paste0("https://zenodo.org/api/records/", zenodo_rec_id))
-      if (!is.null(meta_resp)) {
-        meta <- tryCatch(fromJSON(rawToChar(meta_resp$content), simplifyVector = FALSE),
-                         error = function(e) NULL)
-        if (!is.null(meta)) {
-          file_list <- meta[["files"]]
-          for (f in file_list) {
-            fname <- f[["key"]]; if (is.null(fname)) fname <- f[["filename"]]
-            if (is.null(fname)) next
-            if (grepl("\\.csv$|\\.tsv$|\\.xlsx?$|\\.zip$", fname, ignore.case = TRUE)) {
-              lnk <- f[["links"]]
-              dl_url <- lnk[["self"]] %||% lnk[["download"]]
-              if (!is.null(dl_url)) {
-                raw_dt <- tryCatch(
-                  download_and_read(dl_url, file.path(s1_dir, "raw", fname)),
-                  error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-                )
-                if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-                  cat("  Raw dimensions:", nrow(raw_dt), "x", ncol(raw_dt), "\n")
-                  dt_out <- map_to_dwc(raw_dt, s1_id, s1_doi,
-                                       "Arroyo high Andes Chile flora",
-                                       bor = "HumanObservation")
-                  break
-                }
-              }
-            }
-          }
-        }
-      }
+    cat("  Downloading Mendeley XLSX...\n")
+    resp <- GET(s1_url, write_disk(xlsx_path, overwrite = TRUE), timeout(120))
+    if (status_code(resp) >= 400) {
+      stop("Failed to download Mendeley XLSX. HTTP status ", status_code(resp))
     }
 
-    # Step 3: try Zenodo keyword search
-    if (is.null(dt_out)) {
-      cat("  Trying Zenodo search...\n")
-      z <- zenodo_search_first_csv_url("arroyo high andes chile flora")
-      if (!is.na(z$url)) {
-        fname <- if (!is.null(z$fname)) z$fname else paste0(s1_id, "_zenodo.csv")
-        raw_dt <- tryCatch(
-          download_and_read(z$url, file.path(s1_dir, "raw", fname)),
-          error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-        )
-        if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-          cat("  Raw dimensions:", nrow(raw_dt), "x", ncol(raw_dt), "\n")
-          dt_out <- map_to_dwc(raw_dt, s1_id, z$record_doi,
-                               "Arroyo high Andes Chile flora",
-                               bor = "HumanObservation")
-        }
-      }
+    py_script <- tempfile(fileext = ".py")
+    py_code <- c(
+      "import openpyxl, csv, re, sys",
+      "xlsx_path = sys.argv[1]",
+      "out_path = sys.argv[2]",
+      "wb = openpyxl.load_workbook(xlsx_path)",
+      "ws_meta = wb['Plot_metadata']",
+      "rows_meta = list(ws_meta.iter_rows(values_only=True))",
+      "def dms_to_dd(dms_str):",
+      "    if not dms_str:",
+      "        return None, None",
+      "    parts = re.findall(r'[\\d.]+', dms_str)",
+      "    dirs = re.findall(r'[NSEW]', dms_str)",
+      "    if len(parts) < 6 or len(dirs) < 2:",
+      "        return None, None",
+      "    lat = float(parts[0]) + float(parts[1]) / 60.0 + float(parts[2]) / 3600.0",
+      "    lon = float(parts[3]) + float(parts[4]) / 60.0 + float(parts[5]) / 3600.0",
+      "    if dirs[0] == 'S':",
+      "        lat = -lat",
+      "    if dirs[1] == 'W':",
+      "        lon = -lon",
+      "    return lat, lon",
+      "plot_info = {}",
+      "for row in rows_meta[1:]:",
+      "    grad = row[0]",
+      "    elev = row[1]",
+      "    center = row[8]",
+      "    date = row[9]",
+      "    lat, lon = dms_to_dd(str(center) if center else '')",
+      "    if hasattr(date, 'date'):",
+      "        date_str = str(date.date())",
+      "    elif date is None:",
+      "        date_str = ''",
+      "    else:",
+      "        date_str = str(date)",
+      "    if grad and elev is not None:",
+      "        try:",
+      "            plot_info[(str(grad), int(float(elev)))] = (lat, lon, date_str)",
+      "        except Exception:",
+      "            pass",
+      "results = []",
+      "for sheet_name, grad_id in [('La_Parva_gradient', 'La Parva'), ('Valle_Nevado_gradient', 'Valle Nevado')]:",
+      "    ws = wb[sheet_name]",
+      "    all_rows = list(ws.iter_rows(values_only=True))",
+      "    if not all_rows:",
+      "        continue",
+      "    header = all_rows[0]",
+      "    elev_bands = header[1:]",
+      "    for data_row in all_rows[1:]:",
+      "        species = data_row[0]",
+      "        if not species:",
+      "            continue",
+      "        for i, elev in enumerate(elev_bands):",
+      "            if elev is None:",
+      "                continue",
+      "            val = data_row[i + 1] if i + 1 < len(data_row) else None",
+      "            try:",
+      "                present = (val is not None and float(val) > 0)",
+      "            except Exception:",
+      "                present = False",
+      "            if not present:",
+      "                continue",
+      "            try:",
+      "                elev_int = int(float(elev))",
+      "            except Exception:",
+      "                continue",
+      "            lat, lon, date_str = plot_info.get((grad_id, elev_int), (None, None, ''))",
+      "            results.append([str(species), grad_id, elev_int, lat, lon, date_str])",
+      "with open(out_path, 'w', newline='', encoding='utf-8') as f:",
+      "    w = csv.writer(f)",
+      "    w.writerow(['species', 'gradient_id', 'elevation_m', 'lat', 'lon', 'sampling_date'])",
+      "    w.writerows(results)",
+      "print('Wrote', len(results), 'rows')"
+    )
+    writeLines(py_code, py_script)
+    py_out <- system2("python3", c(py_script, xlsx_path, csv_path), stdout = TRUE, stderr = TRUE)
+    if (!file.exists(csv_path)) {
+      stop("Python conversion failed; no output CSV written. Output: ", paste(py_out, collapse = " | "))
     }
 
-    # Step 4: try GBIF registry lookup via Unpaywall to find GBIF key
-    if (is.null(dt_out)) {
-      cat("  Trying Unpaywall for open-access link...\n")
-      upw_url <- paste0("https://api.unpaywall.org/v2/", URLencode(s1_doi, reserved = FALSE),
-                        "?email=biodiversity@research.org")
-      upw_resp <- safe_get(upw_url)
-      if (!is.null(upw_resp)) {
-        upw <- tryCatch(fromJSON(rawToChar(upw_resp$content), simplifyVector = FALSE),
-                        error = function(e) NULL)
-        if (!is.null(upw)) {
-          oa_locs <- upw[["oa_locations"]]
-          for (loc in oa_locs) {
-            oa_url <- loc[["url"]]
-            if (!is.null(oa_url) && grepl("gbif\\.org/dataset/", oa_url)) {
-              ds_key <- sub(".*gbif\\.org/dataset/", "", oa_url)
-              ds_key <- sub("[/?#].*$", "", ds_key)
-              cat("  Found GBIF dataset key from Unpaywall:", ds_key, "\n")
-              dt_out <- ingest_from_gbif_key(s1_id, s1_doi, ds_key)
-              if (!is.null(dt_out)) dt_out[, gbif_datasetKey := ds_key]
-              break
-            }
-          }
-        }
-      }
+    raw_dt <- fread(csv_path, showProgress = FALSE)
+    if (nrow(raw_dt) == 0) {
+      stop("Converted Arroyo CSV had 0 rows")
     }
+    raw_dt[, `:=`(
+      species = as.character(species),
+      scientificName = as.character(species),
+      decimalLatitude = as.character(lat),
+      decimalLongitude = as.character(lon),
+      eventDate = as.character(sampling_date),
+      locality = paste0(as.character(gradient_id), ", ", as.character(elevation_m), "m")
+    )]
+    raw_dt[, occurrenceID := paste0(s1_id, ":", .I)]
 
-    # Step 5: try GBIF registry via DOI
-    if (is.null(dt_out)) {
-      cat("  Trying GBIF DOI registry...\n")
-      ds_key <- gbif_dataset_key(s1_doi)
-      if (!is.na(ds_key)) {
-        cat("  GBIF dataset key:", ds_key, "\n")
-        dt_out <- ingest_from_gbif_key(s1_id, s1_doi, ds_key)
-        if (!is.null(dt_out)) dt_out[, gbif_datasetKey := ds_key]
-      }
-    }
+    dt_out <- data.table(
+      source_id                     = s1_id,
+      occurrenceID                  = raw_dt$occurrenceID,
+      species                       = raw_dt$species,
+      scientificName                = raw_dt$scientificName,
+      taxonRank                     = NA_character_,
+      decimalLatitude               = raw_dt$decimalLatitude,
+      decimalLongitude              = raw_dt$decimalLongitude,
+      coordinateUncertaintyInMeters = NA_character_,
+      countryCode                   = "CL",
+      country                       = "Chile",
+      stateProvince                 = NA_character_,
+      locality                      = raw_dt$locality,
+      eventDate                     = raw_dt$eventDate,
+      year                          = NA_character_,
+      month                         = NA_character_,
+      day                           = NA_character_,
+      basisOfRecord                 = "HumanObservation",
+      institutionCode               = NA_character_,
+      collectionCode                = NA_character_,
+      catalogNumber                 = NA_character_,
+      recordedBy                    = NA_character_,
+      identifiedBy                  = NA_character_,
+      datasetName                   = "Arroyo et al. DIB High Andes Chile",
+      gbif_datasetKey               = NA_character_,
+      source_doi                    = s1_doi,
+      download_timestamp_utc        = TIMESTAMP,
+      qa_flags                      = NA_character_
+    )
 
-    # Step 6: placeholder
-    if (is.null(dt_out) || nrow(dt_out) == 0) {
-      cat("  [WARN] No downloadable data found — writing 0-row placeholder\n")
-      dt_out <- empty_dwc()
-      # annotate the placeholder CSV with a qa note via a README
-      writeLines(
-        c("qa_flags: needs_manual_access|no_deposit_found",
-          paste("source_doi:", s1_doi),
-          paste("checked:", TIMESTAMP),
-          "note: No Zenodo/Dryad/GBIF deposit found automatically for DOI 10.1016/j.dib.2024.111128."),
-        file.path(s1_dir, "needs_manual_access.txt")
-      )
-      safe_write_compiled(dt_out, s1_out)
-      list(nrow = 0L, status = "needs_manual_access|no_deposit_found")
-    } else {
-      safe_write_compiled(dt_out, s1_out)
-      list(nrow = nrow(dt_out), status = "compiled")
-    }
+    dt_out <- ensure_dwc_cols(dt_out, s1_id, s1_doi, TIMESTAMP, ds_key = NA_character_)
+    safe_write_compiled(dt_out, s1_out)
+    list(nrow = nrow(dt_out), status = "compiled")
   }
 }, error = function(e) {
   cat("  [ERROR]", conditionMessage(e), "\n")
@@ -714,7 +743,7 @@ results[[s2_id]] <- tryCatch({
 # ===========================================================================
 # Source 3: manual_herbase_amazon_herbs
 # URL: https://www.scielo.br/j/aa/a/9Tp47pFS4bMsjRT6LkPjcHQ/?lang=en
-# Strategy: fetch SciELO article HTML, grep for supplementary/data download links
+# Strategy: verified no trusted auto-download source; write explicit placeholder
 # ===========================================================================
 cat("\n=== Source 3: manual_herbase_amazon_herbs ===\n")
 s3_id  <- "manual_herbase_amazon_herbs"
@@ -724,123 +753,33 @@ s3_dir <- file.path(out_root, s3_id)
 s3_out <- file.path(s3_dir, "compiled_occurrences.csv")
 
 results[[s3_id]] <- tryCatch({
+  skip_result <- NULL
   if (file.exists(s3_out)) {
-    cat("  [SKIP] Already compiled:", s3_out, "\n")
     dt <- fread(s3_out, showProgress = FALSE)
-    list(nrow = nrow(dt), status = "skipped")
+    if (nrow(dt) > 0) {
+      cat("  [SKIP] Already compiled with non-empty output:", s3_out, "\n")
+      skip_result <- list(nrow = nrow(dt), status = "skipped")
+    } else {
+      cat("  Existing placeholder is empty; refreshing placeholder metadata\n")
+      file.remove(s3_out)
+    }
+  }
+  if (!is.null(skip_result)) {
+    skip_result
   } else {
     dir.create(s3_dir, recursive = TRUE, showWarnings = FALSE)
-    dt_out <- NULL
-
-    cat("  Fetching SciELO article page...\n")
-    html_resp <- safe_get(s3_url)
-
-    if (!is.null(html_resp)) {
-      html_text <- rawToChar(html_resp$content)
-
-      # Look for supplementary files, doi.org links, zenodo, dryad, direct CSV links
-      doi_hits <- regmatches(html_text,
-        gregexpr("10\\.[0-9]{4,}/[^ \"'<>&]+", html_text, perl = TRUE))[[1]]
-      doi_hits <- unique(doi_hits)
-      # Remove the article's own DOI-like fragments
-      doi_hits <- doi_hits[!grepl("9Tp47pFS4bMsjRT6LkPjcHQ", doi_hits)]
-      cat("  DOI candidates on page:", length(doi_hits), "\n")
-      for (d in doi_hits) cat("   ", d, "\n")
-
-      # Try Zenodo/Dryad DOIs first
-      for (d in doi_hits) {
-        if (grepl("zenodo|dryad|figshare", d, ignore.case = TRUE)) {
-          cat("  Trying related DOI:", d, "\n")
-          z_rec <- sub(".*zenodo\\.", "", d)
-          meta_resp <- safe_get(paste0("https://zenodo.org/api/records/", z_rec))
-          if (!is.null(meta_resp)) {
-            meta <- tryCatch(fromJSON(rawToChar(meta_resp$content), simplifyVector = FALSE),
-                             error = function(e) NULL)
-            if (!is.null(meta)) {
-              for (f in meta[["files"]]) {
-                fname <- f[["key"]]; if (is.null(fname)) fname <- f[["filename"]]
-                if (is.null(fname) || !grepl("\\.csv$|\\.tsv$|\\.xlsx?$", fname, ignore.case = TRUE)) next
-                lnk <- f[["links"]]
-                dl_url <- lnk[["self"]] %||% lnk[["download"]]
-                if (!is.null(dl_url)) {
-                  raw_dt <- tryCatch(
-                    download_and_read(dl_url, file.path(s3_dir, "raw", fname)),
-                    error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-                  )
-                  if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-                    dt_out <- map_to_dwc(raw_dt, s3_id, d,
-                                         "HERBase Amazon herbs",
-                                         bor = "HumanObservation")
-                    break
-                  }
-                }
-              }
-            }
-          }
-          if (!is.null(dt_out) && nrow(dt_out) > 0) break
-        }
-      }
-
-      # Direct CSV/supplementary href scan
-      if (is.null(dt_out)) {
-        href_matches <- regmatches(html_text,
-          gregexpr("href=\"([^\"]*\\.(csv|tsv|xlsx|zip)[^\"]*)\"",
-                   html_text, ignore.case = TRUE, perl = TRUE))[[1]]
-        for (href in href_matches) {
-          file_url <- regmatches(href, regexpr("\"[^\"]+\"", href))
-          file_url <- gsub("\"", "", file_url)
-          if (!grepl("^http", file_url)) {
-            file_url <- paste0("https://www.scielo.br", if (!startsWith(file_url, "/")) "/" else "", file_url)
-          }
-          fname <- basename(file_url)
-          raw_dt <- tryCatch(
-            download_and_read(file_url, file.path(s3_dir, "raw", fname)),
-            error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-          )
-          if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-            dt_out <- map_to_dwc(raw_dt, s3_id, s3_doi,
-                                 "HERBase Amazon herbs",
-                                 bor = "HumanObservation")
-            break
-          }
-        }
-      }
-
-      # Try Zenodo keyword search for HERBase
-      if (is.null(dt_out)) {
-        cat("  Trying Zenodo search for HERBase...\n")
-        z <- zenodo_search_first_csv_url("HERBase amazon herbs")
-        if (!is.na(z$url)) {
-          fname <- if (!is.null(z$fname)) z$fname else paste0(s3_id, "_zenodo.csv")
-          raw_dt <- tryCatch(
-            download_and_read(z$url, file.path(s3_dir, "raw", fname)),
-            error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-          )
-          if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-            dt_out <- map_to_dwc(raw_dt, s3_id, z$record_doi,
-                                 "HERBase Amazon herbs",
-                                 bor = "HumanObservation")
-          }
-        }
-      }
-    }
-
-    if (is.null(dt_out) || nrow(dt_out) == 0) {
-      cat("  [WARN] No downloadable data found — writing 0-row placeholder\n")
-      dt_out <- empty_dwc()
-      writeLines(
-        c("qa_flags: needs_manual_access|no_download_table_found",
-          paste("url:", s3_url),
-          paste("checked:", TIMESTAMP),
-          "note: No supplementary CSV or Zenodo deposit found automatically for HERBase Amazon herbs SciELO article."),
-        file.path(s3_dir, "needs_manual_access.txt")
-      )
-      safe_write_compiled(dt_out, s3_out)
-      list(nrow = 0L, status = "needs_manual_access|no_download_table_found")
-    } else {
-      safe_write_compiled(dt_out, s3_out)
-      list(nrow = nrow(dt_out), status = "compiled")
-    }
+    dt_out <- empty_dwc()
+    writeLines(
+      c(
+        "qa_flags: needs_manual_access|no_verified_download_found",
+        paste("url:", s3_url),
+        paste("checked:", TIMESTAMP),
+        "note: No verified auto-downloadable HERBase dataset source was found; manual access is required."
+      ),
+      file.path(s3_dir, "needs_manual_access.txt")
+    )
+    safe_write_compiled(dt_out, s3_out)
+    list(nrow = 0L, status = "needs_manual_access|no_verified_download_found")
   }
 }, error = function(e) {
   cat("  [ERROR]", conditionMessage(e), "\n")
@@ -948,177 +887,240 @@ results[[s4_id]] <- tryCatch({
 
 # ===========================================================================
 # Source 5: manual_russian_arctic_vegetation_archive
-# DOI: 10.1111/geb.13724  (Global Ecology and Biogeography paper)
-# Strategy: crossref → relation/supplement DOI → Zenodo search → Dryad search → placeholder
+# DOI: 10.5061/dryad.5tb2rbp8d
+# Strategy: parse extracted Dryad CSV pairs (*_species_data.csv + *_habitat_data.csv)
 # ===========================================================================
 cat("\n=== Source 5: manual_russian_arctic_vegetation_archive ===\n")
 s5_id    <- "manual_russian_arctic_vegetation_archive"
-s5_doi   <- "10.1111/geb.13724"
+s5_doi   <- "10.5061/dryad.5tb2rbp8d"
 s5_dir   <- file.path(out_root, s5_id)
 s5_out   <- file.path(s5_dir, "compiled_occurrences.csv")
 
 results[[s5_id]] <- tryCatch({
+  skip_result <- NULL
   if (file.exists(s5_out)) {
-    cat("  [SKIP] Already compiled:", s5_out, "\n")
     dt <- fread(s5_out, showProgress = FALSE)
-    list(nrow = nrow(dt), status = "skipped")
+    if (nrow(dt) > 0) {
+      cat("  [SKIP] Already compiled with non-empty output:", s5_out, "\n")
+      skip_result <- list(nrow = nrow(dt), status = "skipped")
+    } else {
+      cat("  Existing output is empty; rebuilding from extracted Dryad files\n")
+      file.remove(s5_out)
+    }
+  }
+  if (!is.null(skip_result)) {
+    skip_result
   } else {
     dir.create(s5_dir, recursive = TRUE, showWarnings = FALSE)
-    dt_out <- NULL
-
-    # Step 1: crossref relation scan
-    data_doi <- crossref_find_data_doi(s5_doi)
-
-    # Step 2: If data DOI found, attempt Zenodo/Dryad fetch
-    if (!is.na(data_doi)) {
-      cat("  Related data DOI found:", data_doi, "\n")
-      if (grepl("zenodo", data_doi, ignore.case = TRUE)) {
-        zenodo_rec_id <- sub("^10\\.5281/zenodo\\.", "", data_doi)
-        zenodo_rec_id <- sub("[/?#].*$", "", zenodo_rec_id)
-        cat("  Fetching Zenodo record:", zenodo_rec_id, "\n")
-        meta_resp <- safe_get(paste0("https://zenodo.org/api/records/", zenodo_rec_id))
-        if (!is.null(meta_resp)) {
-          meta <- tryCatch(fromJSON(rawToChar(meta_resp$content), simplifyVector = FALSE),
-                           error = function(e) NULL)
-          if (!is.null(meta)) {
-            for (f in meta[["files"]]) {
-              fname <- f[["key"]]; if (is.null(fname)) fname <- f[["filename"]]
-              if (is.null(fname) || !grepl("\\.csv$|\\.tsv$|\\.xlsx?$|\\.zip$", fname, ignore.case = TRUE)) next
-              lnk <- f[["links"]]
-              dl_url <- lnk[["self"]] %||% lnk[["download"]]
-              if (!is.null(dl_url)) {
-                raw_dt <- tryCatch(
-                  download_and_read(dl_url, file.path(s5_dir, "raw", fname)),
-                  error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-                )
-                if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-                  cat("  Raw dimensions:", nrow(raw_dt), "x", ncol(raw_dt), "\n")
-                  dt_out <- map_to_dwc(raw_dt, s5_id, data_doi,
-                                       "Russian Arctic Vegetation Archive",
-                                       bor = "HumanObservation")
-                  break
-                }
-              }
-            }
-          }
-        }
-      } else if (grepl("dryad", data_doi, ignore.case = TRUE)) {
-        dryad_doi <- sub("^doi:", "", data_doi, ignore.case = TRUE)
-        encoded_doi <- URLencode(paste0("doi:", dryad_doi), reserved = TRUE)
-        versions_url <- paste0("https://datadryad.org/api/v2/datasets/", encoded_doi, "/versions")
-        resp_ver <- safe_get(versions_url)
-        if (!is.null(resp_ver)) {
-          ver_parsed <- tryCatch(fromJSON(rawToChar(resp_ver$content), simplifyVector = FALSE),
-                                 error = function(e) NULL)
-          if (!is.null(ver_parsed)) {
-            version_list <- ver_parsed[["_embedded"]][["stash:versions"]]
-            if (!is.null(version_list) && length(version_list) > 0) {
-              latest_ver <- version_list[[length(version_list)]]
-              ver_id <- latest_ver[["id"]]
-              if (is.null(ver_id)) ver_id <- basename(latest_ver[["_links"]][["self"]][["href"]])
-              zip_path <- file.path(s5_dir, "raw", paste0(s5_id, "_dryad.zip"))
-              raw_dt <- tryCatch(
-                download_and_read(
-                  paste0("https://datadryad.org/api/v2/versions/", ver_id, "/download"),
-                  zip_path
-                ),
-                error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-              )
-              if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-                dt_out <- map_to_dwc(raw_dt, s5_id, dryad_doi,
-                                     "Russian Arctic Vegetation Archive",
-                                     bor = "HumanObservation")
-              }
-            }
-          }
-        }
+    extracted_dir <- file.path(s5_dir, "raw", paste0(s5_id, "_dryad.zip_extracted"))
+    raw_dir <- file.path(s5_dir, "raw")
+    dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
+    if (!dir.exists(extracted_dir)) {
+      cat("  Extracted Dryad folder not found; downloading and extracting DOI dataset...\n")
+      encoded_doi <- URLencode(paste0("doi:", s5_doi), reserved = TRUE)
+      versions_url <- paste0("https://datadryad.org/api/v2/datasets/", encoded_doi, "/versions")
+      resp_ver <- safe_get(versions_url)
+      if (is.null(resp_ver)) {
+        stop("Unable to retrieve Dryad versions API for ", s5_doi)
+      }
+      ver_parsed <- tryCatch(fromJSON(rawToChar(resp_ver$content), simplifyVector = FALSE),
+                             error = function(e) NULL)
+      if (is.null(ver_parsed) || is.null(ver_parsed[["_embedded"]][["stash:versions"]])) {
+        stop("Dryad versions payload missing for ", s5_doi)
+      }
+      version_list <- ver_parsed[["_embedded"]][["stash:versions"]]
+      if (!length(version_list)) {
+        stop("Dryad versions API returned no versions for ", s5_doi)
+      }
+      latest_ver <- version_list[[length(version_list)]]
+      ver_id <- latest_ver[["id"]]
+      if (is.null(ver_id)) {
+        ver_id <- basename(latest_ver[["_links"]][["self"]][["href"]])
+      }
+      zip_path <- file.path(raw_dir, paste0(s5_id, "_dryad.zip"))
+      dl_url <- paste0("https://datadryad.org/api/v2/versions/", ver_id, "/download")
+      resp_zip <- GET(dl_url, write_disk(zip_path, overwrite = TRUE), timeout(120))
+      if (status_code(resp_zip) >= 400) {
+        stop("Dryad ZIP download failed with HTTP ", status_code(resp_zip))
+      }
+      unzip(zip_path, exdir = extracted_dir)
+      if (!dir.exists(extracted_dir)) {
+        stop("Failed to extract Dryad ZIP into ", extracted_dir)
       }
     }
 
-    # Step 3: Try DOI redirect to GBIF
-    if (is.null(dt_out)) {
-      cat("  Trying GBIF DOI redirect for paper DOI...\n")
-      ds_key <- gbif_dataset_key(s5_doi)
-      if (!is.na(ds_key)) {
-        cat("  GBIF dataset key:", ds_key, "\n")
-        dt_out <- ingest_from_gbif_key(s5_id, s5_doi, ds_key)
-        if (!is.null(dt_out)) dt_out[, gbif_datasetKey := ds_key]
-      }
+    species_files <- list.files(extracted_dir, pattern = "_species_data\\.csv$", recursive = TRUE, full.names = TRUE)
+    if (!length(species_files)) {
+      stop("No *_species_data.csv files found in extracted Dryad directory")
+    }
+    cat("  Found species files:", length(species_files), "\n")
+
+    clean_chr <- function(x) {
+      trimws(iconv(as.character(x), from = "", to = "UTF-8", sub = ""))
     }
 
-    # Step 4: Zenodo keyword search
-    if (is.null(dt_out)) {
-      cat("  Trying Zenodo search...\n")
-      z <- zenodo_search_first_csv_url("russian arctic vegetation archive")
-      if (!is.na(z$url)) {
-        fname <- if (!is.null(z$fname)) z$fname else paste0(s5_id, "_zenodo.csv")
-        raw_dt <- tryCatch(
-          download_and_read(z$url, file.path(s5_dir, "raw", fname)),
-          error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-        )
-        if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-          cat("  Raw dimensions:", nrow(raw_dt), "x", ncol(raw_dt), "\n")
-          # Map plot-format data: plot_id → occurrenceID, species → species+scientificName, lat/lon, notes → locality
-          dt_out <- map_to_dwc(raw_dt, s5_id, z$record_doi,
-                               "Russian Arctic Vegetation Archive",
-                               bor = "HumanObservation")
-        }
-      }
+    parse_habitat_file <- function(path) {
+      raw <- fread(path, header = FALSE, fill = TRUE, sep = ",", quote = "\"", encoding = "Latin-1", showProgress = FALSE)
+      idx <- which(clean_chr(raw[[1]]) == "RELEVE_NR")
+      if (!length(idx)) return(NULL)
+      hdr <- clean_chr(unlist(raw[idx[1], ], use.names = FALSE))
+      hdr[is.na(hdr) | hdr == ""] <- paste0("V", which(is.na(hdr) | hdr == ""))
+      dat <- raw[(idx[1] + 1):nrow(raw)]
+      if (!nrow(dat)) return(NULL)
+      setnames(dat, hdr)
+      dat <- dat[clean_chr(RELEVE_NR) != ""]
+      dat
     }
 
-    # Step 5: Dryad keyword search
-    if (is.null(dt_out)) {
-      cat("  Trying Dryad search...\n")
-      dryad_doi <- dryad_search_first_result("russian arctic vegetation archive")
-      if (!is.na(dryad_doi)) {
-        cat("  Dryad hit DOI:", dryad_doi, "\n")
-        encoded_doi <- URLencode(paste0("doi:", dryad_doi), reserved = TRUE)
-        versions_url <- paste0("https://datadryad.org/api/v2/datasets/", encoded_doi, "/versions")
-        resp_ver <- safe_get(versions_url)
-        if (!is.null(resp_ver)) {
-          ver_parsed <- tryCatch(fromJSON(rawToChar(resp_ver$content), simplifyVector = FALSE),
-                                 error = function(e) NULL)
-          if (!is.null(ver_parsed)) {
-            version_list <- ver_parsed[["_embedded"]][["stash:versions"]]
-            if (!is.null(version_list) && length(version_list) > 0) {
-              latest_ver <- version_list[[length(version_list)]]
-              ver_id <- latest_ver[["id"]]
-              if (is.null(ver_id)) ver_id <- basename(latest_ver[["_links"]][["self"]][["href"]])
-              zip_path <- file.path(s5_dir, "raw", paste0(s5_id, "_dryad.zip"))
-              raw_dt <- tryCatch(
-                download_and_read(
-                  paste0("https://datadryad.org/api/v2/versions/", ver_id, "/download"),
-                  zip_path
-                ),
-                error = function(e) { cat("  [WARN]", conditionMessage(e), "\n"); NULL }
-              )
-              if (!is.null(raw_dt) && nrow(raw_dt) > 0) {
-                dt_out <- map_to_dwc(raw_dt, s5_id, dryad_doi,
-                                     "Russian Arctic Vegetation Archive",
-                                     bor = "HumanObservation")
-              }
-            }
-          }
-        }
-      }
-    }
+    parse_species_file <- function(path) {
+      raw <- fread(path, header = FALSE, fill = TRUE, sep = ",", quote = "\"", encoding = "Latin-1", showProgress = FALSE)
+      if (nrow(raw) == 0) return(NULL)
 
-    if (is.null(dt_out) || nrow(dt_out) == 0) {
-      cat("  [WARN] No deposit found automatically — writing 0-row placeholder\n")
-      dt_out <- empty_dwc()
-      writeLines(
-        c("qa_flags: needs_manual_access|no_deposit_found_automatically",
-          paste("source_doi:", s5_doi),
-          paste("checked:", TIMESTAMP),
-          "note: Crossref, Zenodo, Dryad, and GBIF searches returned no downloadable deposit for DOI 10.1111/geb.13724 (Russian Arctic Vegetation Archive)."),
-        file.path(s5_dir, "needs_manual_access.txt")
+      turb_idx <- which(clean_chr(raw[[3]]) == "TURBOVEG PLOT NUMBER")
+      head_idx <- which(clean_chr(raw[[1]]) == "PASL TAXON SCIENTIFIC NAME NO AUTHOR(S)")
+      if (!length(turb_idx) || !length(head_idx)) return(NULL)
+      turb_idx <- turb_idx[1]
+      head_idx <- head_idx[head_idx >= turb_idx][1]
+      if (is.na(head_idx)) return(NULL)
+
+      plot_ids <- clean_chr(unlist(raw[turb_idx, 4:ncol(raw)], use.names = FALSE))
+      keep_cols <- which(nzchar(plot_ids))
+      if (!length(keep_cols)) return(NULL)
+
+      dat <- raw[(head_idx + 1):nrow(raw)]
+      if (!nrow(dat)) return(NULL)
+      needed_cols <- c(1, 2, 3, keep_cols + 3)
+      needed_cols <- needed_cols[needed_cols <= ncol(dat)]
+      dat <- dat[, ..needed_cols]
+      col_names <- c("species", "scientificName", "dataset_taxon", plot_ids[keep_cols])
+      col_names <- col_names[seq_len(ncol(dat))]
+      setnames(dat, col_names)
+
+      dat[, species := clean_chr(species)]
+      dat[, scientificName := clean_chr(scientificName)]
+      dat <- dat[species != "" & !is.na(species)]
+      if (!nrow(dat) || ncol(dat) <= 3) return(NULL)
+
+      long <- melt(
+        dat,
+        id.vars = c("species", "scientificName", "dataset_taxon"),
+        variable.name = "RELEVE_NR",
+        value.name = "cover_value",
+        variable.factor = FALSE
       )
-      safe_write_compiled(dt_out, s5_out)
-      list(nrow = 0L, status = "needs_manual_access|no_deposit_found_automatically")
-    } else {
-      safe_write_compiled(dt_out, s5_out)
-      list(nrow = nrow(dt_out), status = "compiled")
+      long[, cover_value := clean_chr(cover_value)]
+      long <- long[
+        cover_value != "" & !is.na(cover_value) &
+          !cover_value %in% c("0", "0.0", "0.00")
+      ]
+      long
     }
+
+    map_country <- function(x) {
+      x_chr <- clean_chr(x)
+      x_up <- toupper(x_chr)
+      mapped <- fcase(
+        x_up == "RU", "Russia",
+        x_up == "NO", "Norway",
+        x_up == "SE", "Sweden",
+        x_up == "FI", "Finland",
+        x_up == "IS", "Iceland",
+        x_up == "US", "United States",
+        x_up == "CA", "Canada",
+        default = x_chr
+      )
+      mapped
+    }
+
+    all_rows <- list()
+    for (sp in species_files) {
+      hab <- sub("_species_data\\.csv$", "_habitat_data.csv", sp)
+      if (!file.exists(hab)) {
+        cat("  [WARN] Missing habitat pair for:", basename(sp), "\n")
+        next
+      }
+      cat("  Parsing pair:", basename(sp), "\n")
+      sp_long <- parse_species_file(sp)
+      hab_dt <- parse_habitat_file(hab)
+      if (is.null(sp_long) || !nrow(sp_long) || is.null(hab_dt) || !nrow(hab_dt)) {
+        cat("  [WARN] Empty parsed pair for:", basename(sp), "\n")
+        next
+      }
+
+      hab_dt[, RELEVE_NR := clean_chr(RELEVE_NR)]
+      sp_long[, RELEVE_NR := clean_chr(RELEVE_NR)]
+
+      keep_hab <- intersect(c("RELEVE_NR", "LATITUDE", "LONGITUDE", "DATE", "REGION", "LOCATION", "COUNTRY"), names(hab_dt))
+      if (!all(c("RELEVE_NR", "LATITUDE", "LONGITUDE") %in% keep_hab)) {
+        cat("  [WARN] Missing key habitat columns in:", basename(hab), "\n")
+        next
+      }
+      hab_use <- unique(hab_dt[, ..keep_hab])
+
+      joined <- merge(sp_long, hab_use, by = "RELEVE_NR", all.x = TRUE)
+      if (!nrow(joined)) next
+      joined[, source_file := clean_chr(basename(sp))]
+      all_rows[[length(all_rows) + 1L]] <- joined
+    }
+
+    if (!length(all_rows)) {
+      stop("No usable species/habitat pairs produced rows")
+    }
+
+    dt_raw <- rbindlist(all_rows, fill = TRUE, use.names = TRUE)
+    dt_raw[, locality := fifelse(
+      !is.na(REGION) & clean_chr(REGION) != "" &
+        !is.na(LOCATION) & clean_chr(LOCATION) != "",
+      paste0(clean_chr(REGION), ": ", clean_chr(LOCATION)),
+      clean_chr(REGION)
+    )]
+
+    dt_out <- data.table(
+      source_id                     = s5_id,
+      occurrenceID                  = paste0(s5_id, ":", dt_raw$source_file, ":", dt_raw$RELEVE_NR, ":", seq_len(nrow(dt_raw))),
+      species                       = as.character(dt_raw$species),
+      scientificName                = fifelse(
+        !is.na(dt_raw$scientificName) & clean_chr(dt_raw$scientificName) != "",
+        clean_chr(dt_raw$scientificName),
+        clean_chr(dt_raw$species)
+      ),
+      taxonRank                     = NA_character_,
+      decimalLatitude               = clean_chr(dt_raw$LATITUDE),
+      decimalLongitude              = clean_chr(dt_raw$LONGITUDE),
+      coordinateUncertaintyInMeters = NA_character_,
+      countryCode                   = clean_chr(dt_raw$COUNTRY),
+      country                       = map_country(dt_raw$COUNTRY),
+      stateProvince                 = clean_chr(dt_raw$REGION),
+      locality                      = dt_raw$locality,
+      eventDate                     = clean_chr(dt_raw$DATE),
+      year                          = NA_character_,
+      month                         = NA_character_,
+      day                           = NA_character_,
+      basisOfRecord                 = "HumanObservation",
+      institutionCode               = NA_character_,
+      collectionCode                = NA_character_,
+      catalogNumber                 = NA_character_,
+      recordedBy                    = NA_character_,
+      identifiedBy                  = NA_character_,
+      datasetName                   = "Russian Arctic Vegetation Archive",
+      gbif_datasetKey               = NA_character_,
+      source_doi                    = s5_doi,
+      download_timestamp_utc        = TIMESTAMP,
+      qa_flags                      = "braun_blanquet_cover_retained"
+    )
+
+    dt_out <- ensure_dwc_cols(dt_out, s5_id, s5_doi, TIMESTAMP, ds_key = NA_character_)
+    # Flag coordinates that are out of plausible range
+    lat_num <- suppressWarnings(as.numeric(dt_out$decimalLatitude))
+    lon_num <- suppressWarnings(as.numeric(dt_out$decimalLongitude))
+    bad_coords <- !is.na(lat_num) & (lat_num < -90 | lat_num > 90 |
+                                      lon_num < -180 | lon_num > 180)
+    if (any(bad_coords, na.rm = TRUE)) {
+      dt_out[bad_coords, qa_flags := paste0(qa_flags, "|out_of_range_coordinates")]
+      cat("  [WARN] Flagged", sum(bad_coords, na.rm = TRUE), "rows with out-of-range coordinates\n")
+    }
+    safe_write_compiled(dt_out, s5_out)
+    list(nrow = nrow(dt_out), status = "compiled")
   }
 }, error = function(e) {
   cat("  [ERROR]", conditionMessage(e), "\n")
