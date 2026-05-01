@@ -1,3 +1,10 @@
+[19] Date: 2026-05-01
+Source: active chat request
+Request summary: Add agent guidance for a Macroecology AI agent library, document selected agents and workflow prompts for new graduate students, and prepare the collection for synchronization with https://github.com/benquist/MacroecologyLab_Agents.
+Files affected: agents/README.md (created), README.md, AGENTS.md
+Action taken: Created agents/README.md with agent role descriptions, example prompts, and workflow guidance; updated README.md and AGENTS.md to reference the Macroecology agent library and the public repo target.
+Outcome: New documentation is available for students to learn how to use the agent library and to support future synchronization with the public MacroecologyLab_Agents repository.
+
 [18] Date: 2026-04-30
 Source: active chat request (biodiversity-science-guard mode)
 Request summary: Design a **systematic discovery and vetting strategy** for finding novel plant trait (2.3M rows, 7 pending) and occurrence data sources (165k rows, 46 pending) that meet BIEN publication/curation standards. Target gaps: tropics, southern hemisphere, Central Asia, North Africa; underrepresented traits: metabolic, hydraulic, reproductive allocation, root architecture.
@@ -1138,3 +1145,39 @@ Action taken:
 Outcome: Agent-folder provenance remains append-only and current for this literature-source progress task.
 
 2026-04-30 | source_data_progress_report.Rmd | Added Literature Paper Integration Status section: setup code for config/papers.csv + staging summaries + lit_georef_pts; new # section with exec sub-summary, DT table (11 papers), CartoDB leaflet map. Rendered HTML successfully.
+2026-05-01 | Created .github/agents/scholarly-rigor-reviewer.agent.md with detailed scholarly rigor reviewer instructions.
+2026-05-01 | Copied scholarly-rigor-reviewer.agent.md into agents/ for main agent folder visibility.
+2026-05-01 | Created scientific-implementation-agent.agent.md in both agents/ and .github/agents/ for the Scientific Implementation Agent.
+[20] Date: 2026-05-01
+Source: active chat request
+Request summary: Create a separate local MacroecologyLab_Agents mirror containing agent definitions and a README with suggested uses and prompts for the public agent library.
+Files affected: MacroecologyLab_Agents/README.md, MacroecologyLab_Agents/agents/*.agent.md, README.md, agents/README.md
+Action taken: Created a local MacroecologyLab_Agents mirror folder, copied agent definition files into it, added a public-facing README, and updated workspace documentation references.
+Outcome: Local staging area for MacroecologyLab_Agents is available and documented.
+
+[21] Date: 2026-05-01
+Source: active chat request
+Request summary: Fix the local MacroecologyLab_Agents mirror README so it matches the expected public library structure and clearly lists the agents, use cases, and workflow guidance.
+Files affected: MacroecologyLab_Agents/README.md
+Action taken: Updated the mirror README with a comprehensive agent list, priority agent recommendations, starter workflow, example prompts, and publishing/sync guidance.
+Outcome: The local MacroecologyLab_Agents mirror now contains a clearer public-facing README for the agent library.
+
+[22] Date: 2026-05-01
+Source: active chat request
+Request summary: Push the local MacroecologyLab_Agents mirror to the public repository so the updated README and agent files appear on GitHub.
+Files affected: MacroecologyLab_Agents/README.md, MacroecologyLab_Agents/agents/*.agent.md, agents/prompt_log.md, agents/agent_chat_provenance_log.txt
+Action taken: Committed the local mirror files in MacroecologyLab_Agents, renamed branch to main, and force-pushed to origin/main on the public repo. Recorded provenance in prompt and agent logs.
+Outcome: The public MacroecologyLab_Agents repository now contains the updated agent library mirror.
+
+2026-05-01 | Created scandinavian-design.agent.md alias for design-atelier.agent.md in both agents/ and .github/agents/.
+2026-05-01 | Created richard-telford.agent.md in agents/ and .github/agents/ to restore the Richard Telford visible agent.
+
+[23] Date: 2026-05-01
+Source: active chat request
+Request summary: Multi-agent review chain (scholarly-rigor-reviewer with input from ecology-user/optimizer/merow-ecology, then design-atelier, then scholarly-rigor-reviewer final audit) to rewrite MacroecologyLab_Agents README as a teaching document for PhD students on ethical scientific AI agent programming.
+Actions: Invoked optimizer, merow-ecology, scholarly-rigor-reviewer subagents to gather structured guidance (ecology-user agent not available in subagent registry; its framing was folded into the other reviewers' inputs). Coder drafted a 6-part teaching README with three Mermaid diagrams, worked SDM example, pitfalls table, evaluation checklist, ethics, FAIR/CARE coverage, AI-disclosure template, glossary, and verified citation block. Design-atelier review applied: front-loaded orientation, condensed 17 sections into 6 parts, single primary workflow diagram, verb-led headings, captions added. Final scholarly-rigor-reviewer audit returned PASS WITH MINOR with two broken file links → resolved by reframing provenance files as "(create in your project)". Public mirror commit: f7c9b6b on main.
+
+[24] Date: 2026-05-01
+Source: active chat request
+Request summary: Diversify README worked examples beyond SDM/Merow.
+Actions: Replaced single SDM worked example with four parallel worked examples (trait harmonization, GBIF occurrence cleaning, community ordination, SDM) sharing the same five-step pattern. Restructured pitfalls table into Cross-cutting, Trait & allometry, Occurrence & taxonomy, Modeling & inference (incl. SDM, ordination) sections. Public mirror commit: 208c0f1 on main.

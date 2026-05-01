@@ -38,7 +38,15 @@ If the task changed agent behavior or agent files, append a new entry to:
 	- Do not hide record caps, filters, QA losses, or fallback behavior.
 	- Preserve taxonomic reconciliation outputs and source/citation fields in exports.
 	- Treat native/introduced/cultivated interpretations as context-dependent, not absolute truth.
-- For complex multi-step work, route through specialist agents (for example `m`, `code-checker`, `code-verifier`, `biodiversity-science-guard`, `stats-specialist`, `bio-units-specialist`) before final gate.
+- For complex multi-step work, route through specialist agents (for example `m`, `code-checker`, `code-verifier`, `scientific-implementation-agent`, `scholarly-rigor-reviewer`, `biodiversity-science-guard`, `stats-specialist`, `bio-units-specialist`) before final gate.
+
+## Agent architecture
+- Use `scientific-implementation-agent` to build code, workflows, documentation, and reproducible project structure.
+- Use `scholarly-rigor-reviewer` to audit citations, statistical inference, reproducibility, and claims.
+
+## Macroecology agent library
+- This workspace is a local source of agent definitions intended to support biodiversity research and should be mirrored to `https://github.com/benquist/MacroecologyLab_Agents` for a public reusable library.
+- Advice and example prompts for the selected priority agents are documented in `agents/README.md`.
 
 ## Linked Docs
 - Workspace overview: `README.md`

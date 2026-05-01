@@ -1,7 +1,0 @@
-"metric","value"
-"Spatial CV AUC (mean)",0.56254182403705
-"Spatial CV AUC (sd)",0.032369391578906
-"Spatial CV TSS (mean)",0.12205736303674
-"Spatial CV TSS (sd)",0.0514947977945515
-"Current novelty fraction (>0)",0.232738203680087
-"Mean prediction SD (spatial CV)",0.0887396286972173

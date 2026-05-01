@@ -1,2 +1,0 @@
-source_dataset,source_description,source_endpoint,source_web,query_traits,query_time_utc
-Wikidata,Structured species traits queried from Wikidata SPARQL endpoint for taxa in family Cactaceae (Q14560).,https://query.wikidata.org/sparql,https://www.wikidata.org/,"height (P2048), diameter (P2386), mass (P2067), flower color (P2827)",2026-03-28 22:54:12 UTC
