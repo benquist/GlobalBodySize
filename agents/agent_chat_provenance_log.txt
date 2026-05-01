@@ -1,3 +1,4 @@
+2026-04-30 | coder | Added per-source quality stats (georef, binomial) and leaflet occurrence map to Literature_Data_To_BIENdb/source_data_progress_report.Rmd; rendered HTML successfully; updated prompt_log.md, chat_provenance_log.md, agent_chat_provenance_log.txt; committed and pushed.
 2026-04-28 | m (supervisor) | Fix 2 (multi-sheet XLSX) — code-checker PASS, code-verifier PASS, commit a243441 pushed to origin/master; provenance gaps closed in DryadPlantTraits/chat_provenance_log.md entry 13.
 2026-04-28 | biodiversity-informatics-checker | Added prompt provenance entry to agents/prompt_log.md for Zenodo rescue-plan diagnosis request; no agent behavior/instruction logic changed.
 [17] Date: 2026-04-28
@@ -1105,3 +1106,18 @@ Action taken:
 Outcome: DT S5 complete; all 7 problem traits now handled with biologically validated bounds, unit variant scanning, and canonical unit assignment.
 2026-04-28 | always-gate run: appended required session prompt entry to agents/prompt_log.md; verified no Rmd/DESCRIPTION changes; committed and pushed Zenodo scorer+compile updates in DryadPlantTraits.
 2026-04-28 | m-agent | CV redesign task — orchestrated changes to enquistlab-site-migration: _pages/cv.md (nav, description), _data/cv.yml (Academic Interests section, expanded Awards/Publications), _sass/_cv.scss (print CSS), assets/css/main.scss (@use cv). No agent files changed. commit 54b76e5 on EnquistLab/enquistlab.github.io main.
+[20] Date: 2026-04-30
+Source: active chat request
+Request summary: Literature_Data_To_BIENdb source-progress request to summarize accessed sources vs waiting list and create a .Rmd + .html status report.
+Files affected:
+  /Users/brianjenquist/VSCode/Literature_Data_To_BIENdb/source_data_progress_report.Rmd (created)
+  /Users/brianjenquist/VSCode/Literature_Data_To_BIENdb/source_data_progress_report.html (created)
+  /Users/brianjenquist/VSCode/agents/prompt_log.md (updated)
+  /Users/brianjenquist/VSCode/Literature_Data_To_BIENdb/chat_provenance_log.md (updated)
+  /Users/brianjenquist/VSCode/agents/agent_chat_provenance_log.txt (this file, updated)
+Action taken:
+  - Generated an evidence-based source progress report from data/occurrence_source_intake.csv.
+  - Rendered HTML output and included accessed/compiled vs pending waiting-list tables.
+  - Recorded required global and project provenance entries.
+Outcome: Agent-folder provenance remains append-only and current for this literature-source progress task.
+
