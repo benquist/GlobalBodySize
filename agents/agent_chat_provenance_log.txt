@@ -1121,3 +1121,4 @@ Action taken:
   - Recorded required global and project provenance entries.
 Outcome: Agent-folder provenance remains append-only and current for this literature-source progress task.
 
+2026-04-30 | source_data_progress_report.Rmd | Added Literature Paper Integration Status section: setup code for config/papers.csv + staging summaries + lit_georef_pts; new # section with exec sub-summary, DT table (11 papers), CartoDB leaflet map. Rendered HTML successfully.
