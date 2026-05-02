@@ -29,6 +29,7 @@ suppressPackageStartupMessages({
   library(caper)
   library(ape)
   library(phytools)
+  library(gridExtra)
 })
 # Resolve namespace conflict: maps::map (loaded as a transitive dependency of
 # ape/phytools) masks purrr::map. Explicitly bind purrr versions so that all
@@ -105,6 +106,82 @@ life form (woody/herbaceous), species, and dataset source for each record.
 
 ---
 
+# Scaling theory
+
+## WBE fractal network derivation of $R \propto M^{3/4}$
+
+The West–Brown–Enquist (WBE) model (West, Brown & Enquist 1997) derives the
+$^3\!/_4$-power metabolic scaling law from three geometric constraints on a
+hierarchical vascular network with $N$ branching levels, branching ratio $n$,
+and terminal conduit radius $r_c$ and length $l_c$ that are **size-invariant**:
+
+$$r_k \propto n^{-k/2}, \qquad l_k \propto n^{-k/3}, \qquad N_c = n^N$$
+
+where level $k = 0$ is the trunk/main stem and level $k = N$ is the capillary.
+The three constraints are:
+
+1. **Area-preserving branching:** at every node the summed daughter cross-section equals the parent cross-section, $n\, r_{k+1}^2 = r_k^2$, giving $r_k = r_c\, N_c^{1/2}\, n^{-k/2}$.
+2. **Space-filling fractal geometry:** the network spans the three-dimensional body, requiring segment lengths $l_k = l_c\, N_c^{1/3}\, n^{-k/3}$.
+3. **Size-invariant terminal units:** $r_c$ and $l_c$ are universal constants.
+
+Metabolic rate is proportional to the number of terminal units, each supplying a fixed metabolic quantum $b_c$:
+$$B = N_c\, b_c \propto N_c = n^N$$
+
+The main-stem (trunk) volume dominates conducting-tissue mass in woody plants (dead xylem = most of woody biomass), and at level $k = 0$:
+$$V_0 = \pi r_0^2 l_0 = \pi\bigl(r_c N_c^{1/2}\bigr)^2 \cdot \bigl(l_c N_c^{1/3}\bigr) = \pi r_c^2 l_c\, N_c^{4/3}$$
+
+Therefore $M \propto V_0 \propto N_c^{4/3}$, and inverting:
+
+$$\boxed{B \propto N_c \propto M^{3/4}}$$
+
+The exponent $3/4 = 1/(1 + 1/3)$ arises geometrically: area-preservation (fixing
+$r_0 \propto N_c^{1/2}$) and space-filling (fixing $l_0 \propto N_c^{1/3}$) together
+make trunk volume grow faster than $N_c^1$, so a given metabolic rate requires
+disproportionately less mass at large size.
+
+## Extension to organ-level absolute respiration
+
+Applying $R \propto M^{3/4}$ at the organ (shoot, root) level requires an additional
+assumption that the WBE derivation does not itself provide: the organ's **fractional
+allocation of total metabolic rate must be size-invariant**. If
+$R_{\rm organ} = f\cdot B$ where $f$ is the fraction of whole-plant carbon flux
+allocated to that organ, then $R_{\rm organ} \propto M^{3/4}$ holds only when $f$
+is constant across the size range. If allocation shifts with size — for example,
+if large woody plants invest proportionally less in fine roots (root:shoot ratio
+declines with size) — the organ-level exponent will deviate from $^3\!/_4$ even
+when the whole-plant exponent does not.
+
+## Competing null hypotheses
+
+Three benchmark exponents span the theoretically motivated hypothesis space:
+
+| Hypothesis | Exponent $\beta$ | Mechanistic basis |
+|---|:---:|---|
+| Rubner surface-area null | $2/3$ | Body surface $\propto M^{2/3}$ for geometrically similar organisms; heat dissipation or O$_2$/CO$_2$ diffusion limited by surface area (Rubner 1883) |
+| WBE / MST prediction | $3/4$ | Fractal vascular network optimisation; area-preserving branching + space-filling + size-invariant terminal units (West et al. 1997; Enquist et al. 1998) |
+| Isometric null | $1$ | Constant mass-specific respiration, $r = R/M = \text{const}$; expected if metabolism scales with total cytoplasmic volume without network constraint |
+
+## Key testable prediction: organ $\times$ life-form interaction
+
+WBE's constraints are geometric and apply to any vascular network regardless of
+its phylogenetic or morphological realisation. Therefore the theory predicts that
+$\hat{\beta}$ should be **identical for shoots and roots** across all life forms:
+the exponent is a network property, not a tissue-type property. Two departures
+are informative if observed:
+
+- **Shoot $\neq$ Root exponent:** implies the vascular architecture of shoots and
+  roots differs in a way that violates one of the three WBE constraints (e.g.
+  roots may not area-preserve at lateral junctions).
+- **Woody $\hat{\beta} \approx 3/4$ while herbaceous $\hat{\beta} > 3/4$:** would
+  suggest that the secondary xylem of woody plants instantiates the fractal
+  network more faithfully, while non-woody stems — lacking hierarchical vessel
+  size gradients — are governed more by cytoplasmic volume (isometry) or
+  surface-area diffusion (Rubner).
+
+These contrasts are tested by the slope-equality analyses in sections below.
+
+---
+
 # Data loading
 
 ```{r load-data}
@@ -168,6 +245,19 @@ if (USE_REAL_DATA) {
       # Standardise plant_part to title case
       plant_part = stringr::str_to_title(as.character(plant_part))
     )
+
+  # ── Mass-range QA ──────────────────────────────────────────────────────────
+  # The Dryad README declares units as "kg". A ×1000 conversion is applied here.
+  # Records > 1 tonne (1e6 g) per organ are flagged for manual verification.
+  mass_outliers <- dat |>
+    filter(fresh_mass_g > 1e6) |>
+    dplyr::select(species, life_form, plant_part, fresh_mass_kg, fresh_mass_g, dataset_source)
+  if (nrow(mass_outliers) > 0) {
+    cat("⚠ Mass outliers (fresh_mass_g > 1,000,000 g = 1 tonne) — verify units against original study:\n")
+    print(mass_outliers)
+  } else {
+    cat("Mass QA: no records > 1 tonne. Max fresh mass:", round(max(dat$fresh_mass_g, na.rm=TRUE) / 1000, 1), "kg.\n")
+  }
   if (!is.null(temp_col) && !is.na(temp_col) && temp_col %in% names(raw)) {
     dat <- left_join(dat, raw |>
                        rename(meas_temp_c = all_of(temp_col)) |>
@@ -599,10 +689,54 @@ where $\mathbf{V}$ is the Brownian-motion phylogenetic covariance matrix
 is estimated by maximum likelihood. $\lambda \approx 1$ indicates strong
 phylogenetic signal (Brownian motion); $\lambda \approx 0$ collapses to OLS.
 
+**Interpretation of Pagel's $\lambda$ for metabolic scaling** — four ecologically
+distinct scenarios:
+
+1. **$\lambda \approx 0$ (phylogenetically random residuals):** Metabolic residuals
+   are uncorrelated with shared ancestry; species converge on the same scaling
+   behaviour regardless of lineage. This is the expected outcome if WBE describes
+   a universal physical optimum: natural selection continuously drives all vascular
+   networks toward the same fractal geometry, erasing the phylogenetic signal in
+   residual metabolic rate.
+
+2. **$\lambda \approx 1$ (Brownian-motion conservatism):** Residual respiration
+   evolves as a random walk along phylogenetic branches; closely related species
+   have more similar absolute rates than chance predicts. This indicates
+   physiological conservatism — perhaps through shared enzyme concentrations,
+   membrane lipid composition, or ecological niche conservatism among the taxa
+   sampled.
+
+3. **Intermediate $\lambda$:** Partial phylogenetic signal, where both universal
+   geometric constraints and clade-specific biochemistry shape the data. This is
+   the most commonly observed pattern in broad metabolic-rate compilations
+   spanning multiple life forms (Glazier 2005) and is expected when WBE governs
+   the exponent while lineage-level physiology modulates the intercept.
+
+4. **High $\lambda$ combined with $\hat{\beta} \approx 3/4$ (strongest test):**
+   Phylogeny strongly predicts the *level* of respiration (intercept) but not the
+   *rate of change with mass* (exponent). This dissociation — evolutionary
+   conservatism in metabolic level yet convergence in the scaling exponent — is
+   precisely the WBE signature: geometry constrains the exponent universally while
+   biochemistry shapes the intercept clade-specifically. Observing
+   $\hat{\beta} = 3/4$ after removing phylogenetic covariance provides
+   substantially stronger support for WBE than the same estimate from an OLS fit
+   that ignores shared ancestry.
+
 > **Note:** PGLS uses GLS (Model I regression), not SMA. PGLS slopes are
 > expected to be slightly lower than SMA slopes due to attenuation bias when
 > predictor (log mass) carries measurement error. This systematic difference
 > should be taken into account when comparing methods.
+
+> **Phylogenetic analysis caveats:**
+>
+> 1. **Tree source:** Smith & Brown (2018) GBOTB megaphylogeny via V.PhyloMaker2 (Jin & Qian 2022). Covers seed plants only; ferns, bryophytes, and algae not placed. Intra-generic topology resolved by random polytomy splitting (Scenario S3, set.seed(42)).
+> 2. **Branch-length meaning:** Branch lengths are time-calibrated (millions of years) from Zanne et al. (2014) and Smith & Brown (2018). PGLS assumes trait evolution follows Brownian motion on these branch lengths; this assumption may not hold for metabolic rates under strong selective pressures.
+> 3. **Ultrametricity correction:** `phytools::force.ultrametric(method="extend")` was applied where needed. This method elongates the shortest tips, which can slightly inflate Pagel's λ by reducing tip-level residual variance. The magnitude of this effect should be checked by comparing λ with and without the correction.
+> 4. **Hybrid and uncertain taxa excluded from PGLS:** *Chrysanthemum* ×*morifolium*, *Fragaria* ×*ananassa*, and *Leucophyta brownii* could not be placed in the GBOTB backbone (hybrid genomes / uncertain placement). These three species are retained in OLS and SMA analyses but excluded from PGLS.
+> 5. **Singleton species (n_records = 1):** Included in species means but carry no within-species variance information. PGLS is sensitive to influential singleton tips; a sensitivity analysis excluding singletons is recommended before publication.
+> 6. **GLS predictor error (EIV bias):** PGLS assumes log mass is measured without error. Species-mean log mass inherits within-species variance and individual-level measurement error. This causes attenuation of PGLS slopes relative to the true scaling exponent by an amount proportional to the signal-to-noise ratio in log mass.
+> 7. **λ bounds:** Lambda is bounded at [1×10⁻⁶, 1]; values > 1 (stronger-than-BM covariance) cannot be detected. Blomberg's K is also reported; K > 1 indicates stronger-than-BM signal.
+> 8. **Family assignments:** Populated from the phylo.maker match table (APG IV via GBOTB). Verify assignments against GBIF Backbone or TNRS before publication use.
 
 ## Species means for PGLS
 
@@ -664,8 +798,14 @@ if (HAS_PHYLOMAKER) {
   if (!is.null(tree_out)) {
     pgls_tree <- tree_out$scenario.3
     # Validate and correct tree
+    # ⚠ force.ultrametric(method="extend") elongates short tips and can slightly
+    # inflate Pagel's λ by reducing tip-level residual variance. Check whether
+    # non-ultrametricity is from floating-point rounding (tol = 1e-3) before applying.
     if (!ape::is.ultrametric(pgls_tree, tol = 1e-5)) {
+      cat("Tree not ultrametric (max deviation:",
+          max(abs(diag(ape::vcv(pgls_tree)) - mean(diag(ape::vcv(pgls_tree))))), ")\n")
       pgls_tree <- phytools::force.ultrametric(pgls_tree, method = "extend")
+      cat("⚠ force.ultrametric(method='extend') applied — λ estimates may be slightly inflated.\n")
     }
     set.seed(42)
     pgls_tree <- ape::multi2di(pgls_tree, random = TRUE)
@@ -675,9 +815,38 @@ if (HAS_PHYLOMAKER) {
     cat("Is ultrametric:", ape::is.ultrametric(pgls_tree, tol = 1e-5), "\n")
     cat("Is binary:", ape::is.binary(pgls_tree), "\n")
 
-    # Match table
+    # BUG 3 FIX: Back-fill family from phylo.maker match.table (APG IV assignments).
+    # phylo.maker returns family_in_tree / family.in.tree for every genus, even when
+    # the input sp.list had NA families. Use these to populate sp_means and dat.
+    mt <- tree_out$match.table
+    fam_col <- intersect(c("family.in.tree", "family_in_tree", "family"), names(mt))
+    if (length(fam_col) > 0) {
+      fam_lookup <- mt |>
+        dplyr::select(genus, family_phylo = dplyr::all_of(fam_col[1])) |>
+        dplyr::distinct(genus, .keep_all = TRUE) |>
+        dplyr::filter(!is.na(family_phylo), nchar(trimws(family_phylo)) > 0)
+      sp_means <- sp_means |>
+        dplyr::left_join(fam_lookup, by = "genus") |>
+        dplyr::mutate(family = dplyr::coalesce(family, family_phylo)) |>
+        dplyr::select(-family_phylo)
+      dat <- dat |>
+        dplyr::left_join(fam_lookup, by = "genus") |>
+        dplyr::mutate(family = dplyr::coalesce(family, family_phylo)) |>
+        dplyr::select(-family_phylo)
+      cat("Family back-fill (APG IV via phylo.maker match.table):",
+          sum(!is.na(sp_means$family)), "/", nrow(sp_means), "species assigned.\n")
+    } else {
+      cat("⚠ Family column not found in phylo.maker match.table — family PGLS will be skipped.\n")
+    }
+
+    # Match summary
     sp_in_tree <- gsub(" ", "_", sp_list_pgls$species) %in% pgls_tree$tip.label
     cat("Species matched to tree:", sum(sp_in_tree), "/", nrow(sp_list_pgls), "\n")
+    unmatched <- sp_list_pgls$species[!sp_in_tree]
+    if (length(unmatched) > 0) {
+      cat("Unmatched taxa (hybrids / uncertain placements — excluded from PGLS, retained in OLS/SMA):\n")
+      cat(paste(" ", unmatched), sep = "\n")
+    }
 
     # Plot tree
     plot(pgls_tree, type = "fan", cex = 0.55, no.margin = TRUE,
@@ -716,7 +885,10 @@ if (HAS_TREE) {
     tr <- ape::keep.tip(tree, sp_sub$sp_tree)
     tr$node.label <- NULL
 
-    df           <- as.data.frame(sp_sub)
+    # BUG 1 FIX: restrict df to formula columns only.
+    # caper::na.omit.comparative.data checks ALL columns for NAs, so any ancillary
+    # column with NAs (e.g. family, sd_log_resp) will silently drop all rows.
+    df           <- as.data.frame(sp_sub)[, c("sp_tree", "log_resp_mean", "log_mass_mean")]
     rownames(df) <- df$sp_tree
 
     cd <- tryCatch(
@@ -771,43 +943,69 @@ if (HAS_TREE) {
         caper::pgls.confint(lam_prof, 0.95)$ci.val
       }, error = function(e) c(NA_real_, NA_real_))
       pgls_p_wbe  <- 2 * pt(abs((pgls_slope - 0.75) / pgls_se), pgls_n - 2, lower.tail = FALSE)
+      pgls_p_iso  <- 2 * pt(abs((pgls_slope - 1.00) / pgls_se), pgls_n - 2, lower.tail = FALSE)
     } else {
-      pgls_slope <- pgls_se <- pgls_r2 <- pgls_lambda <- pgls_p_wbe <- NA_real_
+      pgls_slope <- pgls_se <- pgls_r2 <- pgls_lambda <- pgls_p_wbe <- pgls_p_iso <- NA_real_
       pgls_ci    <- c(NA_real_, NA_real_)
       lam_ci     <- c(NA_real_, NA_real_)
     }
 
+    # Blomberg's K for log_resp_mean (on species in tree).
+    # K and lambda capture different aspects: lambda scales off-diagonal covariance
+    # relative to BM; K is the ratio of observed MPD to BM expectation.
+    # K > 1 = stronger-than-BM clustering; K < 1 = weaker (trait evolution faster than BM).
+    blom_k <- tryCatch({
+      resp_vec <- setNames(sp_sub$log_resp_mean, sp_sub$sp_tree)
+      phytools::phylosig(tr, resp_vec, method = "K", test = TRUE, nsim = 999)
+    }, error = function(e) NULL)
+    blomberg_K   <- if (!is.null(blom_k)) blom_k$K  else NA_real_
+    blomberg_p   <- if (!is.null(blom_k)) blom_k$P  else NA_real_
+
     tibble(
-      group       = group_label,
-      n_species   = nrow(sp_sub),
-      method      = c("OLS", "SMA", "PGLS"),
-      slope       = c(ols_slope,  sma_slope,  pgls_slope),
-      ci_lower    = c(ols_ci[1],  sma_ci_lo,  pgls_ci[1]),
-      ci_upper    = c(ols_ci[2],  sma_ci_hi,  pgls_ci[2]),
-      r_squared   = c(ols_r2,     sma_r2,     pgls_r2),
-      lambda      = c(NA_real_,   NA_real_,   pgls_lambda),
-      lambda_ci_lo = c(NA_real_,  NA_real_,   lam_ci[1]),
-      lambda_ci_hi = c(NA_real_,  NA_real_,   lam_ci[2]),
-      p_vs_wbe    = c(
+      group        = group_label,
+      n_species    = nrow(sp_sub),
+      method       = c("OLS", "SMA", "PGLS"),
+      slope        = c(ols_slope,  sma_slope,  pgls_slope),
+      ci_lower     = c(ols_ci[1],  sma_ci_lo,  pgls_ci[1]),
+      ci_upper     = c(ols_ci[2],  sma_ci_hi,  pgls_ci[2]),
+      r_squared    = c(ols_r2,     sma_r2,     pgls_r2),
+      lambda       = c(NA_real_,   NA_real_,   pgls_lambda),
+      lambda_ci_lo = c(NA_real_,   NA_real_,   lam_ci[1]),
+      lambda_ci_hi = c(NA_real_,   NA_real_,   lam_ci[2]),
+      blomberg_K   = c(NA_real_,   NA_real_,   blomberg_K),
+      blomberg_p   = c(NA_real_,   NA_real_,   blomberg_p),
+      p_vs_wbe     = c(
         2 * pt(abs((ols_slope - 0.75) / ols_se), nrow(sp_sub) - 2, lower.tail = FALSE),
         tryCatch(smatr::slope.test(sp_sub$log_resp_mean, sp_sub$log_mass_mean,
                                    test.value = 0.75, method = "SMA")$p,
                  error = function(e) NA_real_),
         pgls_p_wbe
+      ),
+      p_vs_iso     = c(
+        2 * pt(abs((ols_slope - 1.00) / ols_se), nrow(sp_sub) - 2, lower.tail = FALSE),
+        tryCatch(smatr::slope.test(sp_sub$log_resp_mean, sp_sub$log_mass_mean,
+                                   test.value = 1.00, method = "SMA")$p,
+                 error = function(e) NA_real_),
+        pgls_p_iso
       )
     )
   }
 
+  # BUG 2 FIX: include Whole-organ groups (84 Woody-Whole + 31 Herbaceous-Whole species in tree).
   # Run for each group
   pgls_results <- bind_rows(
     fit_group_pgls(sp_means |> filter(life_form == "Woody", plant_part == "Shoot"),
                    pgls_tree, "Woody — Shoot"),
     fit_group_pgls(sp_means |> filter(life_form == "Woody", plant_part == "Root"),
                    pgls_tree, "Woody — Root"),
+    fit_group_pgls(sp_means |> filter(life_form == "Woody", plant_part == "Whole"),
+                   pgls_tree, "Woody — Whole"),
     fit_group_pgls(sp_means |> filter(life_form == "Herbaceous", plant_part == "Shoot"),
                    pgls_tree, "Herbaceous — Shoot"),
     fit_group_pgls(sp_means |> filter(life_form == "Herbaceous", plant_part == "Root"),
-                   pgls_tree, "Herbaceous — Root")
+                   pgls_tree, "Herbaceous — Root"),
+    fit_group_pgls(sp_means |> filter(life_form == "Herbaceous", plant_part == "Whole"),
+                   pgls_tree, "Herbaceous — Whole")
   )
 } else {
   pgls_results <- tibble()
@@ -822,38 +1020,64 @@ if (nrow(pgls_results) > 0) {
     pgls_results |>
       filter(method == "PGLS") |>
       select(group, n_species, slope, ci_lower, ci_upper, r_squared,
-             lambda, lambda_ci_lo, lambda_ci_hi, p_vs_wbe) |>
+             lambda, lambda_ci_lo, lambda_ci_hi, blomberg_K, blomberg_p,
+             p_vs_wbe, p_vs_iso) |>
       mutate(across(where(is.numeric), ~ round(.x, 3)),
+             blomberg_p = ifelse(is.na(blomberg_p), "—",
+                                 ifelse(blomberg_p < 0.001, "<0.001",
+                                        as.character(round(blomberg_p, 3)))),
              p_vs_wbe = ifelse(is.na(p_vs_wbe), "—",
                                ifelse(p_vs_wbe < 0.001, "<0.001",
-                                      as.character(round(p_vs_wbe, 3))))) |>
+                                      as.character(round(p_vs_wbe, 3)))),
+             p_vs_iso = ifelse(is.na(p_vs_iso), "—",
+                               ifelse(p_vs_iso < 0.001, "<0.001",
+                                      as.character(round(p_vs_iso, 3))))) |>
       rename(Group = group, `N species` = n_species,
              `PGLS slope` = slope, `CI low` = ci_lower, `CI high` = ci_upper,
              `R²` = r_squared, `λ (ML)` = lambda,
              `λ CI low` = lambda_ci_lo, `λ CI high` = lambda_ci_hi,
-             `p (slope ≠ 0.75)` = p_vs_wbe),
-    caption = "PGLS results: phylogenetically corrected scaling exponents and Pagel's λ"
+             `Blomberg K` = blomberg_K, `K p-value` = blomberg_p,
+             `p (β≠3/4)` = p_vs_wbe, `p (β≠1)` = p_vs_iso),
+    caption = "PGLS results: phylogenetically corrected scaling exponents, Pagel's λ, and Blomberg's K for log respiration. p (β≠3/4) = two-tailed test vs WBE prediction; p (β≠1) = test vs isometric null."
   )
 }
 ```
 
 ## OLS / SMA / PGLS comparison forest plot
 
-```{r pgls-forest-plot, fig.height=6, fig.cap="OLS / SMA / PGLS slope comparison by group. Dashed line = WBE 3/4. PGLS slopes incorporate phylogenetic correction; systematic offset from SMA expected due to x-error attenuation in GLS."}
+> **Competing scaling predictions (reference lines in plot below):**
+>
+> | $\beta$ | Prediction | Biological meaning |
+> |--------|-----------|-------------------|
+> | 2/3 | Rubner (1883) surface-area rule | Mass-specific metabolism ∝ M^(-1/3); heat loss ∝ surface area |
+> | **3/4** | **WBE/MST** (West et al. 1997) | Fractal vascular network optimisation; universally applies to whole-organism metabolic rate |
+> | 1 | Isometric null | Mass-specific respiration constant; no metabolic scaling with size |
+>
+> An organ-level slope of 3/4 is *consistent with* WBE but requires the additional
+> assumption that the organ's fractional contribution to total plant respiration is
+> size-invariant (Mori et al. 2010). The isometric null ($\beta = 1$) is the
+> appropriate benchmark for "does size matter at all?" Rejection of both 3/4 *and* 1
+> would suggest an intermediate physiological scaling regime.
+
+```{r pgls-forest-plot, fig.height=6, fig.cap="OLS / SMA / PGLS slope comparison by group. Dashed = WBE 3/4 (red), dotted = isometric 1 (blue), dot-dash = Rubner 2/3 (grey). PGLS slopes incorporate phylogenetic correction; systematic offset from SMA expected due to x-error attenuation in GLS."}
 if (nrow(pgls_results) > 0) {
   ggplot(pgls_results |> filter(!is.na(slope)),
          aes(x = slope, y = group, colour = method, shape = method)) +
     geom_point(position = position_dodge(width = 0.5), size = 3) +
     geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper),
                    position = position_dodge(width = 0.5), height = 0.25) +
-    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40",
+    geom_vline(xintercept = 0.75, linetype = "dashed",  colour = "#d6604d",
                linewidth = 0.8) +
+    geom_vline(xintercept = 1.00, linetype = "dotted",  colour = "#2166ac",
+               linewidth = 0.8) +
+    geom_vline(xintercept = 2/3,  linetype = "dotdash", colour = "grey50",
+               linewidth = 0.6) +
     scale_colour_manual(values = c("OLS" = "steelblue", "SMA" = "darkorange",
                                    "PGLS" = "forestgreen")) +
     labs(x = "Scaling exponent  (log R ~ log Mass)",
          y = NULL, colour = "Method", shape = "Method",
          title = "Respiration scaling: OLS vs SMA vs PGLS (species means)",
-         subtitle = "Dashed = WBE 3/4 reference") +
+         subtitle = "Red dashed = WBE 3/4; blue dotted = isometric 1; grey dot-dash = Rubner 2/3") +
     theme_bw(base_size = 12) +
     theme(legend.position = "bottom")
 }
@@ -1098,7 +1322,17 @@ if (n_distinct(dat_fam$family) >= 3) {
 
 ## Family intercepts: metabolic normalization
 
-```{r family-intercepts, fig.cap="Family-level metabolic normalization (SMA intercept) — the expected log10 respiration rate at log10 fresh mass = 0 (i.e., 1 g plant). Differences in intercept reflect variation in mass-specific respiration rate, independent of the scaling slope."}
+> **⚠ Critical caveat — intercept comparisons are NOT temperature-standardized:**
+> Respiration rate is strongly temperature-dependent (Q₁₀ ≈ 1.5–3.0 for plant dark
+> respiration; Atkin & Tjoelker 2003, *Plant Cell Environ* 26: 543–559).
+> The Dryad CSV contains no measurement-temperature column, and measurements span
+> Japanese forests and Pyrenean sites across seasons and three sub-studies.
+> Family-level intercept differences below therefore **confound true metabolic
+> normalization differences with unknown temperature offsets**. Do not interpret
+> intercept rank-order as evidence of metabolic differences among families without
+> temperature standardization.
+
+```{r family-intercepts, fig.cap="⚠ NOT TEMPERATURE-STANDARDIZED. Family-level metabolic normalization (SMA intercept) — the expected log10 respiration rate at log10 fresh mass = 0 (i.e., 1 g plant). Intercept differences may partly reflect measurement temperature differences across sub-studies rather than true metabolic normalization differences."}
 ggplot(fam_fits, aes(x = reorder(family, intercept), y = intercept,
                      fill = life_form)) +
   geom_col(alpha = 0.8) +
@@ -1118,9 +1352,11 @@ ggplot(fam_fits, aes(x = reorder(family, intercept), y = intercept,
 
 ```{r family-pgls}
 if (HAS_TREE && nrow(pgls_results) > 0) {
-  # Identify families with enough species in the tree
+  # BUG 4 FIX: guard against all-NA family column; filter !is.na(family) before count().
+  # Without this, count(family) on an all-NA column returns one NA row, causing
+  # lapply(NA, ...) to return NULL results — no family-level PGLS runs.
   fam_pgls_eligible <- sp_means |>
-    filter(sp_tree %in% pgls_tree$tip.label) |>
+    filter(!is.na(family), sp_tree %in% pgls_tree$tip.label) |>
     count(family) |>
     filter(n >= 8) |>
     pull(family)
@@ -1142,7 +1378,9 @@ if (HAS_TREE && nrow(pgls_results) > 0) {
       if (nrow(sp_sub) < 6) return(NULL)
       tr <- ape::keep.tip(pgls_tree, sp_sub$sp_tree)
       tr$node.label <- NULL
-      df <- as.data.frame(sp_sub); rownames(df) <- df$sp_tree
+      # Restrict to formula columns only (same Bug 1 fix as in fit_group_pgls)
+      df <- as.data.frame(sp_sub)[, c("sp_tree", "log_resp_mean", "log_mass_mean")]
+      rownames(df) <- df$sp_tree
       cd <- tryCatch(caper::comparative.data(tr, df, "sp_tree",
                                               vcv = TRUE, warn.dropped = FALSE),
                      error = function(e) NULL)
@@ -1182,7 +1420,16 @@ if (HAS_TREE && nrow(pgls_results) > 0) {
 
 # Scaling exponent forest plot
 
-```{r forest-plot, fig.height=5, fig.cap="Forest plot of SMA slope estimates with 95% CI. Reference lines at 3/4 and 1."}
+Three reference exponents are shown as vertical lines, each with a distinct
+mechanistic interpretation:
+
+| Reference | $\beta$ | Label | Biological justification |
+|---|:---:|---|---|
+| Rubner surface-area null | $2/3$ | Rubner/surface | Body surface scales as $M^{2/3}$ for isometric bodies; if respiration is limited by diffusive O$_2$/CO$_2$ exchange or heat dissipation through the body surface, then $R \propto M^{2/3}$. Empirically observed in some inter-specific compilations of plant dark respiration (Rubner 1883; Hemmingsen 1960). |
+| WBE / MST prediction | $3/4$ | WBE/MST | Derived from fractal vascular network optimality (see Theory section): area-preserving branching + space-filling + size-invariant terminal units yield $B \propto M^{3/4}$ (West et al. 1997; Enquist et al. 1998; Mori et al. 2010). |
+| Isometric | $1$ | Isometric | Constant mass-specific respiration, $r = R/M = \text{const}$; implies metabolic rate is simply proportional to cytoplasmic volume. Observed within some ontogenetic series and for unicellular organisms; also a common OLS artefact under restricted mass ranges. |
+
+```{r forest-plot, fig.height=5, fig.cap="Forest plot of SMA slope estimates with 95% CI. Reference lines: dotted green = Rubner 2/3, dashed red = WBE 3/4, dotted blue = isometric 1."}
 forest_df <- group_fits |>
   select(group, slope, ci_lo, ci_hi, n) |>
   mutate(label = paste0(group, " (n=", n, ")"))
@@ -1190,18 +1437,22 @@ forest_df <- group_fits |>
 ggplot(forest_df, aes(y = reorder(label, slope), x = slope,
                       xmin = ci_lo, xmax = ci_hi)) +
   geom_pointrange(size = 0.7) +
+  geom_vline(xintercept = 2/3,  linetype = "dotted", colour = "#4dac26",
+             linewidth = 0.9) +
   geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
-             linewidth = 0.8) +
+             linewidth = 0.9) +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
-             linewidth = 0.8) +
-  annotate("text", x = 0.75, y = Inf, label = "  WBE 3/4", vjust = 2,
-           colour = "#d6604d", size = 3.5, hjust = 0) +
+             linewidth = 0.9) +
+  annotate("text", x = 2/3,  y = Inf, label = "  Rubner 2/3", vjust = 2,
+           colour = "#4dac26", size = 3.2, hjust = 0) +
+  annotate("text", x = 0.75, y = Inf, label = "  WBE 3/4",   vjust = 2,
+           colour = "#d6604d", size = 3.2, hjust = 0) +
   annotate("text", x = 1.00, y = Inf, label = "  Isometric 1", vjust = 2,
-           colour = "#2166ac", size = 3.5, hjust = 0) +
+           colour = "#2166ac", size = 3.2, hjust = 0) +
   labs(x = "SMA slope  (log R ~ log Fresh mass)",
        y = NULL,
        title = "Forest plot: respiration scaling exponents",
-       subtitle = "95% CI from SMA regression (smatr)") +
+       subtitle = "95% CI from SMA regression (smatr). Reference lines: Rubner 2/3 (green), WBE 3/4 (red), isometric 1 (blue).") +
   theme(axis.text.y = element_text(size = 11))
 ```
 
@@ -1257,6 +1508,120 @@ if (nrow(fagus_dat) >= 10) {
     nrow(fagus_dat)),
     "the dataset_source or species column uses a different naming convention.\n",
     "Check column content with: dat |> count(dataset_source) and dat |> count(species)\n")
+}
+```
+
+---
+
+# Root:shoot respiration ratio
+
+## Theoretical predictions
+
+Under WBE, if shoot and root respiration both obey $R_i \propto \alpha M_i^{3/4}$
+with the **same** allometric coefficient $\alpha$ (same metabolic intensity per
+unit network volume), the respiration ratio is determined entirely by the
+mass ratio:
+
+$$\frac{R_{\rm shoot}}{R_{\rm root}} = \left(\frac{M_{\rm shoot}}{M_{\rm root}}\right)^{3/4}$$
+
+If the root:shoot mass ratio $\rho = M_{\rm root}/M_{\rm shoot}$ is itself
+size-invariant — as WBE implicitly assumes when it posits a single whole-plant
+exponent — then $R_{\rm shoot}/R_{\rm root}$ is **constant across plant sizes**.
+
+Optimal partitioning theory (Thornley 1972) predicts instead that $\rho$ is
+dynamic: it increases under nutrient limitation (more root needed to acquire
+soil resources) and decreases under shade (more shoot area needed to capture
+light). Across a size gradient that is confounded with successional light
+environment or soil fertility, $\rho$ and therefore $R_{\rm shoot}/R_{\rm root}$
+will vary systematically with $M_{\rm total}$.
+
+**Discriminating tests:**
+
+1. **OLS of $\log(R_{\rm shoot}/R_{\rm root})$ vs $\log(M_{\rm plant})$:** WBE
+   + size-invariant allocation predicts slope $= 0$; slope $\neq 0$ reveals
+   differential organ scaling or size-dependent allocation shifts.
+2. **SMA of $\log R_{\rm shoot}$ vs $\log R_{\rm root}$ (species matched):**
+   WBE predicts slope $= 1$ and intercept $= 0$ if both organs have equal
+   metabolic intensity; an intercept $\neq 0$ at slope $= 1$ indicates that
+   shoots and roots differ in mass-specific metabolic rate (different $\alpha$)
+   but scale in parallel; a slope $\neq 1$ indicates divergent exponents.
+
+```{r root-shoot-ratio, fig.cap="Root vs. shoot respiration ratio. Left: ratio vs. species-level total log mass (species with both organs). Right: SMA of log R_shoot vs. log R_root matched by species. WBE predictions: slope = 0 (left), slope = 1 (right)."}
+# Match species that have BOTH shoot and root records
+rs_wide <- dat |>
+  filter(plant_part %in% c("Shoot", "Root")) |>
+  group_by(species, life_form, plant_part) |>
+  summarise(
+    log_resp_mean = mean(log_resp, na.rm = TRUE),
+    log_mass_mean = mean(log_mass, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  tidyr::pivot_wider(
+    names_from  = plant_part,
+    values_from = c(log_resp_mean, log_mass_mean)
+  ) |>
+  filter(!is.na(log_resp_mean_Shoot), !is.na(log_resp_mean_Root)) |>
+  mutate(
+    log_ratio      = log_resp_mean_Shoot - log_resp_mean_Root,
+    log_total_mass = log10(10^log_mass_mean_Shoot + 10^log_mass_mean_Root)
+  )
+
+if (nrow(rs_wide) >= 5) {
+  # OLS: log ratio ~ log total mass
+  lm_ratio <- lm(log_ratio ~ log_total_mass, data = rs_wide)
+  cat(sprintf("OLS log(R_shoot/R_root) ~ log(M_total): slope = %.3f, p = %.4f\n",
+              coef(lm_ratio)[2], summary(lm_ratio)$coefficients[2, 4]))
+
+  # SMA: log R_shoot ~ log R_root
+  sma_rs <- sma(log_resp_mean_Shoot ~ log_resp_mean_Root, data = rs_wide,
+                method = "SMA")
+  cf_rs  <- coef(sma_rs)
+  cat(sprintf("SMA log(R_shoot) ~ log(R_root): slope = %.3f (95%% CI: %.3f – %.3f)\n",
+              cf_rs[2], sma_rs$coef[[1]][2, 2], sma_rs$coef[[1]][2, 3]))
+  test_rs1 <- slope.test(rs_wide$log_resp_mean_Shoot, rs_wide$log_resp_mean_Root,
+                         test.value = 1.0, method = "SMA")
+  cat(sprintf("  H0: slope = 1.0 → p = %.4f\n", test_rs1$p))
+
+  p1 <- ggplot(rs_wide, aes(x = log_total_mass, y = log_ratio,
+                             colour = life_form)) +
+    geom_point(size = 2.5, alpha = 0.8) +
+    geom_smooth(method = "lm", se = TRUE, colour = "grey30",
+                linetype = "dashed", linewidth = 0.8) +
+    geom_hline(yintercept = 0, linetype = "solid", colour = "black",
+               linewidth = 0.6) +
+    scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
+    labs(x = expression(log[10]~"Total fresh mass (g)"),
+         y = expression(log[10]~"(R"[shoot]~"/"~"R"[root]~")"),
+         colour = "Life form",
+         title = "Shoot:root respiration ratio vs. plant size",
+         subtitle = sprintf("OLS slope = %.3f, p = %.3f  (WBE: slope = 0)",
+                            coef(lm_ratio)[2],
+                            summary(lm_ratio)$coefficients[2, 4])) +
+    theme(legend.position = "bottom")
+
+  p2 <- ggplot(rs_wide, aes(x = log_resp_mean_Root, y = log_resp_mean_Shoot,
+                             colour = life_form)) +
+    geom_point(size = 2.5, alpha = 0.8) +
+    geom_abline(intercept = cf_rs[1], slope = cf_rs[2],
+                colour = "black", linewidth = 1.1) +
+    geom_abline(intercept = mean(rs_wide$log_resp_mean_Shoot) -
+                              mean(rs_wide$log_resp_mean_Root),
+                slope = 1, linetype = "dashed", colour = "#d6604d",
+                linewidth = 0.9) +
+    scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
+    labs(x = expression(log[10]~"Root respiration"),
+         y = expression(log[10]~"Shoot respiration"),
+         colour = "Life form",
+         title = "SMA: shoot vs. root respiration (species means)",
+         subtitle = sprintf("SMA slope = %.3f  [WBE isometry: dashed, slope = 1]",
+                            cf_rs[2])) +
+    theme(legend.position = "bottom")
+
+  gridExtra::grid.arrange(p1, p2, ncol = 2)
+} else {
+  cat(sprintf("Only %d species have matched shoot AND root records — root:shoot\n",
+              nrow(rs_wide)),
+      "ratio analysis requires paired records. Check plant_part coding in data.\n")
 }
 ```
 
@@ -1341,6 +1706,28 @@ cat("General caveats:\n",
   and interspecific scaling of metabolic rate in animals. *Biol Rev* **80**: 611–662.
   DOI: 10.1017/S1464793105006834
 
+* Enquist BJ, Brown JH, West GB (1998). Allometric scaling of plant energetics
+  and population density. *Nature* **395**: 163–165.
+  DOI: 10.1038/26066
+
+* West GB, Brown JH, Enquist BJ (1999). A general model for the structure and
+  allometry of plant vascular systems. *Nature* **400**: 664–667.
+  DOI: 10.1038/23251
+
+* Rubner M (1883). Über den Einfluss der Körpergrösse auf Stoff- und Kraftwechsel.
+  *Z Biol* **19**: 535–562.
+
+* Hemmingsen AM (1960). Energy metabolism as related to body size and respiratory
+  surfaces, and its evolution. *Rep Steno Mem Hosp Nord Insulin Lab* **9**: 1–110.
+
+* Thornley JHM (1972). A balanced quantitative model for root:shoot ratios in
+  vegetative plants. *Ann Bot* **36**: 431–441.
+  DOI: 10.1093/oxfordjournals.aob.a084561
+
+* Pagel M (1999). Inferring the historical patterns of biological evolution.
+  *Nature* **401**: 877–884.
+  DOI: 10.1038/44766
+
 * Atkin OK & Tjoelker MG (2003). Thermal acclimation and the dynamic response
   of plant respiration to temperature. *Trends Plant Sci* **8**: 343–351.
   DOI: 10.1016/S1360-1385(03)00136-5
@@ -1351,6 +1738,19 @@ cat("General caveats:\n",
 
 * Orme D, Freckleton R, Thomas G, et al. (2013). caper: Comparative Analyses
   of Phylogenetics and Evolution in R. R package version 1.0.1.
+
+* Smith SA & Brown JW (2018). Constructing a broadly inclusive seed plant
+  phylogeny. *Am J Bot* **105**: 302–314.
+  DOI: 10.1002/ajb2.1019
+  *(GBOTB megaphylogeny backbone used for PGLS — verify DOI against Crossref before publication)*
+
+* Jin Y & Qian H (2022). V.PhyloMaker2: An updated and enlarged R package that
+  can generate very large phylogenies for vascular plants. *Plant Diversity*
+  **44**: 335–339. DOI: 10.1016/j.pld.2022.05.002
+
+* Blomberg SP, Garland T Jr, Ives AR (2003). Testing for phylogenetic signal
+  in comparative data: behavioral traits are more labile. *Evolution*
+  **57**: 717–745. DOI: 10.1111/j.0014-3820.2003.tb00285.x
 
 > **⚠ Citation verification:** All DOIs, volume numbers, page ranges, and journal
 > names in this document should be independently verified against Crossref or

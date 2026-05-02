@@ -63,3 +63,4 @@
 2026-05-02 | Scholarly rigor review complete; 5 Critical + 8 Warning fixes applied to grand_cross_study_allometry.Rmd. Re-rendered 7.0MB HTML.
 2026-05-02 | Fixed 4 PGLS bugs in kurosawa_respiration_scaling.Rmd; added Blomberg K diagnostic and 8-point phylogenetic caveats block.
 2026-05-02 | Theory review applied to kurosawa_respiration_scaling.Rmd: WBE derivation paragraph, Pagel-λ interpretation, β=2/3 forest-plot reference, root:shoot ratio OLS+SMA section.
+2026-05-02 | Fixed PGLS workflow in kurosawa_respiration_scaling.Rmd: family back-fill from phylo.maker match.table, df column restriction for caper, Whole-organ groups added, p_vs_iso, Blomberg K, Rubner 2/3 + isometric 1 reference lines, mass outlier QA, temperature caveat. Three agents consulted (phylogenetics-comparative-agent, biodiversity-science-guard, enhanced-theory). Re-rendered: 5.4MB, 73/73 chunks.
