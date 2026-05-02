@@ -1,0 +1,518 @@
+---
+title: "NEON ForestAGB — SMA/RMA Allometry of Tree Growth"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 5.5)
+suppressPackageStartupMessages({
+  library(readr)
+  library(dplyr)
+  library(ggplot2)
+  library(scales)
+  library(tidyr)
+  library(knitr)
+  library(smatr)
+})
+theme_set(theme_bw(base_size = 13))
+proj_dir <- dirname(knitr::current_input(dir = TRUE))
+```
+
+---
+
+# Overview
+
+This document re-examines the NEON ForestAGB growth rate allometries using
+**Standardised Major Axis (SMA)** regression via the `smatr` package.  Previous
+analyses (`neon_growth_allometry.Rmd`) used OLS, which underestimates allometric
+slopes when both variables carry measurement error.  SMA is the appropriate
+method for allometric scaling estimation.
+
+**Theoretical predictions tested:**
+
+| Relationship | MST prediction | Reference |
+|---|---|---|
+| $\Delta D \sim D^{\beta}$ | $\beta = 1/3 \approx 0.333$ | WBE pipe model (Enquist et al.) |
+| $\Delta M \sim M^{\gamma}$ | $\gamma = 3/4 = 0.75$ | Metabolic scaling (West et al. 1999) |
+
+> **AGB caveat:** NEON AGB is estimated from DBH via Chojnacky et al. (2014).
+> The $\Delta M \sim M$ relationship is algebraically dependent on $\Delta D \sim D$
+> and reflects the structure of the Chojnacky equations, **not independent
+> biomass measurements**.
+
+---
+
+# Data preparation
+
+```{r load-data}
+neon_sites <- c("BART","BLAN","CLBJ","DELA","DSNY","GRSM","GUAN","HARV",
+                "JERC","KONZ","LENO","MLBS","ORNL","OSBS","RMNP","SCBI",
+                "SERC","STEI","TALL","TREE","UKFS","UNDE","YELL")
+
+live_raw <- lapply(neon_sites, function(s) {
+  read_csv(
+    file.path(proj_dir, "data/raw/neon_forest_agb/biomass",
+              paste0(s, "_biomass.csv")),
+    show_col_types = FALSE
+  )
+}) |>
+  bind_rows() |>
+  filter(grepl("^Live", plantStatus, ignore.case = TRUE),
+         !is.na(stemDiameter), stemDiameter > 0) |>
+  group_by(individualID, siteID, domainID, scientificName, Family,
+           growthForm, year) |>
+  summarise(DBH_cm = mean(stemDiameter, na.rm = TRUE),
+            AGB_kg = mean(AGBChojnacky, na.rm = TRUE),
+            .groups = "drop")
+
+annual <- live_raw |>
+  arrange(individualID, year) |>
+  group_by(individualID, siteID, domainID, scientificName, Family, growthForm) |>
+  mutate(
+    delta_yr      = year    - lag(year),
+    DBH_start     = lag(DBH_cm),
+    AGB_start     = lag(AGB_kg),
+    DBH_inc_cm_yr = (DBH_cm - DBH_start) / delta_yr,
+    AGB_inc_kg_yr = (AGB_kg - AGB_start) / delta_yr,
+    RGR_DBH       = (log(DBH_cm)  - log(DBH_start))  / delta_yr
+  ) |>
+  filter(!is.na(delta_yr), delta_yr >= 1) |>
+  ungroup()
+
+# Positive-increment subsets for log-log SMA
+pos_dbh <- annual |>
+  filter(DBH_inc_cm_yr > 0, DBH_start > 0) |>
+  mutate(log_D0 = log(DBH_start), log_dD = log(DBH_inc_cm_yr))
+
+pos_agb <- annual |>
+  filter(AGB_inc_kg_yr > 0, AGB_start > 0, is.finite(AGB_start)) |>
+  mutate(log_M0 = log(AGB_start), log_dM = log(AGB_inc_kg_yr))
+
+cat("Annual intervals:                ", format(nrow(annual),   big.mark=","), "\n")
+cat("Positive \u0394D intervals (for SMA): ", format(nrow(pos_dbh), big.mark=","), "\n")
+cat("Positive \u0394AGB intervals (for SMA):", format(nrow(pos_agb), big.mark=","), "\n")
+cat("Negative \u0394D fraction:            ",
+    round(100*mean(annual$DBH_inc_cm_yr < 0, na.rm=TRUE), 1), "%\n")
+```
+
+---
+
+# $\Delta D \sim D^{\beta}$: SMA vs OLS
+
+## Global fit and theoretical test
+
+SMA is fit with `smatr::sma(log_dD ~ log_D0, slope.test = 1/3)`.
+The `slope.test` argument embeds the one-sample test H₀: β = 1/3 into
+the fit object, returning a p-value and 95% CI for the slope.
+
+```{r ddD-global-sma}
+fit_sma_dD <- sma(log_dD ~ log_D0, data = pos_dbh, method = "SMA",
+                  slope.test = 1/3)
+fit_ols_dD <- lm(log_dD ~ log_D0, data = pos_dbh)
+
+cf_dD <- fit_sma_dD$coef[[1]]
+
+kable(data.frame(
+  Method   = c("SMA", "OLS"),
+  N        = format(nrow(pos_dbh), big.mark=","),
+  slope    = c(round(cf_dD["slope","coef(SMA)"], 4),
+               round(coef(fit_ols_dD)[2], 4)),
+  CI_lo    = c(round(cf_dD["slope","lower limit"], 4), NA),
+  CI_hi    = c(round(cf_dD["slope","upper limit"], 4), NA),
+  R2       = round(summary(fit_ols_dD)$r.squared, 3),
+  p_vs_1_3 = c(round(fit_sma_dD$slopetest[[1]]$p, 6), NA),
+  stringsAsFactors = FALSE
+),
+col.names = c("Method","N","Slope","95% CI lo","95% CI hi","R\u00b2",
+              "p (vs 1/3)"),
+caption = paste0(
+  "Global SMA and OLS log-log \u0394D ~ D\u1da6 exponents. ",
+  "MST prediction: \u03b2 = 1/3 \u2248 0.333. ",
+  "p-value: H\u2080 slope = 1/3."
+))
+```
+
+## Scatter with SMA, OLS, and MST reference
+
+```{r ddD-scatter-sma, fig.height=5.5}
+set.seed(42)
+sub <- pos_dbh |> sample_n(min(25000, n()))
+
+rng_D  <- range(sub$log_D0)
+xs_D   <- seq(rng_D[1], rng_D[2], length.out = 200)
+cf_dD  <- fit_sma_dD$coef[[1]]
+ys_sma <- cf_dD["elevation","coef(SMA)"] + cf_dD["slope","coef(SMA)"] * xs_D
+ys_ols <- coef(fit_ols_dD)[1] + coef(fit_ols_dD)[2] * xs_D
+
+# MST reference anchored at median
+med_D     <- median(pos_dbh$DBH_start)
+med_dD    <- median(pos_dbh$DBH_inc_cm_yr)
+alpha_mst <- med_dD / med_D^(1/3)
+
+lines_df <- data.frame(
+  DBH_cm = exp(xs_D),
+  SMA    = exp(ys_sma),
+  OLS    = exp(ys_ols),
+  MST    = alpha_mst * exp(xs_D)^(1/3)
+) |> pivot_longer(-DBH_cm, names_to = "fit", values_to = "dD")
+
+ggplot(sub, aes(x = DBH_start, y = DBH_inc_cm_yr)) +
+  geom_point(alpha = 0.06, size = 0.5, color = "#1a9850") +
+  geom_line(data = lines_df,
+            aes(x = DBH_cm, y = dD, color = fit, linetype = fit),
+            linewidth = 1.2, inherit.aes = FALSE) +
+  scale_color_manual(values  = c(SMA = "#d73027", OLS = "#f46d43",
+                                  MST = "#4575b4"), name = "Fit") +
+  scale_linetype_manual(values = c(SMA = "solid", OLS = "dashed",
+                                    MST = "dotdash"), name = "Fit") +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 30, 100)) +
+  scale_y_log10(labels = comma,
+                breaks = c(0.01, 0.05, 0.1, 0.5, 1, 5, 10)) +
+  annotation_logticks() +
+  labs(
+    x = "Initial DBH (cm, log scale)",
+    y = "\u0394D / yr  (cm yr\u207b\u00b9, log scale)",
+    title = "\u0394D ~ D: SMA (red) vs OLS (orange) vs MST 1/3 (blue dot-dash)",
+    subtitle = paste0(
+      "SMA \u03b2 = ", round(cf_dD["slope","coef(SMA)"], 3),
+      "  |  OLS \u03b2 = ", round(coef(fit_ols_dD)[2], 3),
+      "  |  MST \u03b2 = 1/3 \u2248 0.333"
+    )
+  )
+```
+
+## Binned means: SMA vs OLS vs MST
+
+```{r ddD-binned-sma, fig.height=4.5}
+bin_dbh <- pos_dbh |>
+  mutate(DBH_bin = cut(log_D0,
+                       breaks = seq(log(1), log(200), length.out = 25),
+                       include.lowest = TRUE)) |>
+  filter(!is.na(DBH_bin)) |>
+  group_by(DBH_bin) |>
+  summarise(n = n(), DBH_mid = exp(mean(log_D0)),
+            mean_inc = mean(DBH_inc_cm_yr),
+            se_inc   = sd(DBH_inc_cm_yr) / sqrt(n()),
+            .groups = "drop") |>
+  filter(n >= 10) |>
+  mutate(log_D0 = log(DBH_mid), log_dD = log(mean_inc))
+
+fit_sma_bin <- sma(log_dD ~ log_D0, data = bin_dbh, method = "SMA",
+                   slope.test = 1/3)
+fit_ols_bin <- lm(log_dD ~ log_D0, data = bin_dbh)
+
+cf_bin <- fit_sma_bin$coef[[1]]
+rng_b  <- range(bin_dbh$log_D0)
+xs_b   <- seq(rng_b[1], rng_b[2], length.out = 150)
+lines_bin <- data.frame(
+  DBH_mid  = exp(xs_b),
+  SMA      = exp(cf_bin["elevation","coef(SMA)"] + cf_bin["slope","coef(SMA)"] * xs_b),
+  OLS      = exp(coef(fit_ols_bin)[1] + coef(fit_ols_bin)[2] * xs_b),
+  MST      = alpha_mst * exp(xs_b)^(1/3)
+) |> pivot_longer(-DBH_mid, names_to = "fit", values_to = "mean_inc")
+
+ggplot(bin_dbh, aes(x = DBH_mid, y = mean_inc)) +
+  geom_ribbon(aes(ymin = pmax(mean_inc - se_inc, 1e-4),
+                  ymax = mean_inc + se_inc),
+              fill = "#1a9850", alpha = 0.25) +
+  geom_point(aes(size = n), color = "#1a9850") +
+  geom_line(data = lines_bin,
+            aes(x = DBH_mid, y = mean_inc, color = fit, linetype = fit),
+            linewidth = 1.1, inherit.aes = FALSE) +
+  scale_color_manual(values  = c(SMA = "#d73027", OLS = "#f46d43",
+                                  MST = "#4575b4"), name = "Fit") +
+  scale_linetype_manual(values = c(SMA = "solid", OLS = "dashed",
+                                    MST = "dotdash"), name = "Fit") +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 30, 100)) +
+  scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  scale_size_continuous(range = c(2, 7), name = "N intervals") +
+  labs(
+    x = "Initial DBH bin midpoint (cm)",
+    y = "Mean \u0394D / yr  (cm yr\u207b\u00b9)",
+    title = "Binned mean \u0394D ~ D: SMA vs OLS vs MST (1/3)",
+    subtitle = paste0(
+      "SMA \u03b2 = ", round(cf_bin["slope","coef(SMA)"], 3),
+      "  |  OLS \u03b2 = ", round(coef(fit_ols_bin)[2], 3),
+      "  |  MST \u03b2 = 1/3  |  p (SMA vs 1/3) = ",
+      round(fit_sma_bin$slopetest[[1]]$p, 4)
+    )
+  )
+```
+
+---
+
+# $\Delta M \sim M^{\gamma}$: SMA vs OLS
+
+> AGB is model-derived from DBH — slopes here primarily reflect the Chojnacky
+> allometric equations embedded in NEON data processing.
+
+```{r dAGB-global-sma}
+fit_sma_dM <- sma(log_dM ~ log_M0, data = pos_agb, method = "SMA",
+                  slope.test = 3/4)
+fit_ols_dM <- lm(log_dM ~ log_M0, data = pos_agb)
+
+cf_dM <- fit_sma_dM$coef[[1]]
+
+kable(data.frame(
+  Method   = c("SMA", "OLS"),
+  N        = format(nrow(pos_agb), big.mark=","),
+  slope    = c(round(cf_dM["slope","coef(SMA)"], 4),
+               round(coef(fit_ols_dM)[2], 4)),
+  CI_lo    = c(round(cf_dM["slope","lower limit"], 4), NA),
+  CI_hi    = c(round(cf_dM["slope","upper limit"], 4), NA),
+  R2       = round(summary(fit_ols_dM)$r.squared, 3),
+  p_vs_3_4 = c(round(fit_sma_dM$slopetest[[1]]$p, 6), NA),
+  stringsAsFactors = FALSE
+),
+col.names = c("Method","N","Slope","95% CI lo","95% CI hi","R\u00b2",
+              "p (vs 3/4)"),
+caption = paste0(
+  "Global SMA and OLS log-log \u0394AGB ~ AGB\u1da7 exponents. ",
+  "MST prediction: \u03b3 = 3/4. ",
+  "\u26a0 AGB is derived from DBH (not independent)."
+))
+```
+
+## $\Delta M$ scatter: SMA vs OLS vs MST
+
+```{r dAGB-scatter-sma, fig.height=5.5}
+set.seed(42)
+sub_agb <- pos_agb |>
+  filter(AGB_start < 20000, AGB_inc_kg_yr < 1000) |>
+  sample_n(min(25000, n()))
+
+rng_M    <- range(sub_agb$log_M0)
+xs_M     <- seq(rng_M[1], rng_M[2], length.out = 200)
+ys_sma_M <- cf_dM["elevation","coef(SMA)"] + cf_dM["slope","coef(SMA)"] * xs_M
+ys_ols_M <- coef(fit_ols_dM)[1] + coef(fit_ols_dM)[2] * xs_M
+
+med_M         <- median(pos_agb$AGB_start)
+med_dM        <- median(pos_agb$AGB_inc_kg_yr)
+alpha_mst_agb <- med_dM / med_M^(3/4)
+
+lines_agb <- data.frame(
+  AGB_start = exp(xs_M),
+  SMA       = exp(ys_sma_M),
+  OLS       = exp(ys_ols_M),
+  MST       = alpha_mst_agb * exp(xs_M)^(3/4)
+) |> pivot_longer(-AGB_start, names_to = "fit", values_to = "AGB_inc")
+
+ggplot(sub_agb, aes(x = AGB_start, y = AGB_inc_kg_yr)) +
+  geom_point(alpha = 0.05, size = 0.5, color = "#8c510a") +
+  geom_line(data = lines_agb,
+            aes(x = AGB_start, y = AGB_inc, color = fit, linetype = fit),
+            linewidth = 1.2, inherit.aes = FALSE) +
+  scale_color_manual(values  = c(SMA = "#d73027", OLS = "#f46d43",
+                                  MST = "#4575b4"), name = "Fit") +
+  scale_linetype_manual(values = c(SMA = "solid", OLS = "dashed",
+                                    MST = "dotdash"), name = "Fit") +
+  scale_x_log10(labels = comma,
+                breaks = c(0.01, 0.1, 1, 10, 100, 1000, 10000)) +
+  scale_y_log10(labels = comma,
+                breaks = c(0.01, 0.1, 1, 10, 100, 1000)) +
+  annotation_logticks() +
+  labs(
+    x = "Initial AGB (kg, log scale)",
+    y = "\u0394AGB / yr  (kg yr\u207b\u00b9, log scale)",
+    title = "\u0394AGB ~ AGB: SMA (red) vs OLS (orange) vs MST 3/4 (blue dot-dash)",
+    subtitle = paste0(
+      "SMA \u03b3 = ", round(cf_dM["slope","coef(SMA)"], 3),
+      "  |  OLS \u03b3 = ", round(coef(fit_ols_dM)[2], 3),
+      "  |  MST \u03b3 = 3/4 = 0.75  (\u26a0 AGB not independent of DBH)"
+    )
+  )
+```
+
+---
+
+# Per-site SMA exponents: $\Delta D \sim D$
+
+```{r per-site-sma}
+site_sma <- pos_dbh |>
+  group_by(siteID) |>
+  filter(n() >= 50) |>
+  group_split() |>
+  lapply(function(d) {
+    site    <- unique(d$siteID)
+    fit_sma <- sma(log_dD ~ log_D0, data = d, method = "SMA",
+                   slope.test = 1/3)
+    fit_ols <- lm(log_dD ~ log_D0, data = d)
+    cf      <- fit_sma$coef[[1]]
+    data.frame(
+      siteID    = site,
+      n         = nrow(d),
+      SMA_beta  = round(cf["slope","coef(SMA)"], 3),
+      CI_lo     = round(cf["slope","lower limit"], 3),
+      CI_hi     = round(cf["slope","upper limit"], 3),
+      OLS_beta  = round(coef(fit_ols)[2], 3),
+      R2        = round(summary(fit_ols)$r.squared, 3),
+      p_vs_1_3  = round(fit_sma$slopetest[[1]]$p, 4),
+      med_inc   = round(median(d$DBH_inc_cm_yr), 3),
+      stringsAsFactors = FALSE
+    )
+  }) |> bind_rows() |> arrange(desc(SMA_beta))
+
+kable(site_sma,
+  col.names = c("Site","N","SMA \u03b2","CI lo","CI hi","OLS \u03b2",
+                "R\u00b2","p (vs 1/3)","Median \u0394D"),
+  caption = "Per-site SMA \u0394D ~ D exponents. MST prediction: \u03b2 = 1/3."
+)
+```
+
+## Per-site dot plot
+
+```{r per-site-dotplot, fig.height=6}
+site_sma |>
+  mutate(sig = ifelse(p_vs_1_3 < 0.05, "p < 0.05", "n.s.")) |>
+  ggplot(aes(x = SMA_beta, y = reorder(siteID, SMA_beta), color = sig)) +
+  geom_vline(xintercept = 1/3, linetype = "dashed", color = "#4575b4",
+             linewidth = 1) +
+  geom_errorbarh(aes(xmin = CI_lo, xmax = CI_hi),
+                 height = 0.3, linewidth = 0.9) +
+  geom_point(aes(size = n), alpha = 0.9) +
+  annotate("text", x = 1/3 + 0.01, y = 0.6,
+           label = "MST 1/3", color = "#4575b4", size = 3.5, hjust = 0) +
+  scale_color_manual(values = c("p < 0.05" = "#d73027", "n.s." = "#74c476"),
+                     name = "vs MST 1/3") +
+  scale_size_continuous(range = c(2, 8), name = "N intervals") +
+  labs(
+    x = "SMA \u03b2 (95% CI)", y = NULL,
+    title = "Per-site SMA exponent: \u0394D ~ D\u1da6",
+    subtitle = "Blue dashed = MST prediction (\u03b2 = 1/3);  red = significantly different"
+  )
+```
+
+## OLS vs SMA per site
+
+```{r per-site-ols-vs-sma, fig.height=4.5}
+site_sma |>
+  pivot_longer(cols = c(SMA_beta, OLS_beta),
+               names_to = "method", values_to = "beta") |>
+  mutate(method = recode(method, SMA_beta = "SMA", OLS_beta = "OLS"),
+         siteID = reorder(siteID, beta)) |>
+  ggplot(aes(x = beta, y = siteID, color = method, shape = method)) +
+  geom_vline(xintercept = 1/3, linetype = "dashed", color = "#4575b4",
+             linewidth = 0.8) +
+  geom_point(size = 2.5, alpha = 0.9) +
+  geom_line(aes(group = siteID), color = "grey60", linewidth = 0.5) +
+  scale_color_manual(values = c(SMA = "#d73027", OLS = "#f46d43"),
+                     name = "Method") +
+  scale_shape_manual(values = c(SMA = 16, OLS = 1), name = "Method") +
+  labs(
+    x = "\u03b2 (slope)", y = NULL,
+    title = "SMA vs OLS per site: SMA slopes are consistently higher",
+    subtitle = "Blue dashed = MST prediction (1/3)"
+  )
+```
+
+---
+
+# Summary comparison table
+
+```{r final-summary}
+kable(data.frame(
+  Relationship  = c(
+    "\u0394D ~ D\u1da6 (global raw)",
+    "\u0394D ~ D\u1da6 (binned means)",
+    "\u0394AGB ~ AGB\u1da7 (global raw)"
+  ),
+  SMA_slope = c(
+    round(fit_sma_dD$coef[[1]]["slope","coef(SMA)"], 3),
+    round(fit_sma_bin$coef[[1]]["slope","coef(SMA)"], 3),
+    round(fit_sma_dM$coef[[1]]["slope","coef(SMA)"], 3)
+  ),
+  CI_lo = c(
+    round(fit_sma_dD$coef[[1]]["slope","lower limit"], 3),
+    round(fit_sma_bin$coef[[1]]["slope","lower limit"], 3),
+    round(fit_sma_dM$coef[[1]]["slope","lower limit"], 3)
+  ),
+  CI_hi = c(
+    round(fit_sma_dD$coef[[1]]["slope","upper limit"], 3),
+    round(fit_sma_bin$coef[[1]]["slope","upper limit"], 3),
+    round(fit_sma_dM$coef[[1]]["slope","upper limit"], 3)
+  ),
+  OLS_slope = c(
+    round(coef(fit_ols_dD)[2], 3),
+    round(coef(fit_ols_bin)[2], 3),
+    round(coef(fit_ols_dM)[2], 3)
+  ),
+  MST_pred = c("1/3 \u2248 0.333","1/3 \u2248 0.333","3/4 = 0.75"),
+  p_vs_MST = c(
+    round(fit_sma_dD$slopetest[[1]]$p, 5),
+    round(fit_sma_bin$slopetest[[1]]$p, 5),
+    round(fit_sma_dM$slopetest[[1]]$p, 5)
+  ),
+  Note = c(
+    "High variance; OLS R\u00b2 \u2248 0.06",
+    "Cleaner central tendency",
+    "AGB not independent of DBH"
+  ),
+  stringsAsFactors = FALSE
+),
+col.names = c("Relationship","SMA \u03b2","CI lo","CI hi",
+              "OLS \u03b2","MST pred","p (vs MST)","Note"),
+caption = "Summary: SMA vs OLS vs MST for NEON growth allometry"
+)
+```
+
+> **Key takeaways:**
+>
+> - SMA slopes are higher than OLS slopes across all relationships, as expected
+>   when both variables carry measurement error.
+> - The empirical SMA $\beta$ for $\Delta D \sim D$ is **below** MST 1/3 for
+>   both raw and binned data.
+> - Per-site variation in $\beta$ is substantial — many sites deviate
+>   significantly from MST 1/3.
+> - The $\Delta M \sim M$ result should be interpreted cautiously because
+>   AGB is derived from DBH, creating a mathematical dependency.
+
+---
+
+# Caveats
+
+1. **SMA vs OLS:** SMA does not assume one variable is error-free.  With large N
+   and low R², the SMA–OLS difference in slope is large ($\approx \text{OLS}/R$).
+
+2. **Positive-increment filter:** Excluding negative increments (~20% of
+   intervals) selects for faster-growing or more accurately measured trees.
+
+3. **AGB dependence:** All $\Delta M \sim M$ slopes reflect the Chojnacky
+   equations, not direct biomass measurements.
+
+4. **Pooling across species and biomes:** The global SMA fit mixes 23 sites.
+   Within-species or within-biome fits are more appropriate for mechanistic
+   MST comparisons.
+
+5. **Large-N p-values:** With > 50,000 intervals, even small deviations from
+   theoretical exponents will be statistically significant.  Absolute departure
+   from the theoretical value is more ecologically informative.
+
+---
+
+# References
+
+- Warton, D.I., Wright, I.J., Falster, D.S. & Westoby, M. (2006). Bivariate
+  line-fitting methods for allometry. *Biological Reviews* 81, 259–291.
+- West, G.B., Brown, J.H. & Enquist, B.J. (1999). A general model for the
+  structure and allometry of plant vascular systems. *Nature* 400, 664–667.
+- Chojnacky, D.C., Heath, L.S. & Jenkins, J.C. (2014). Updated generalized
+  biomass equations for North American tree species. *Forestry* 87, 129–151.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```
