@@ -1,0 +1,1636 @@
+---
+title: "Grand Cross-Study Plant Allometry: Theory Testing, Inter- and Intraspecific Scaling"
+subtitle: "OLS, SMA/RMA, PGLS across Tallo, BAAD, NEON, ForestGEO Panama, Niklas-Enquist"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6)
+suppressPackageStartupMessages({
+  library(readr); library(dplyr); library(ggplot2); library(scales)
+  library(tidyr); library(knitr); library(smatr); library(purrr)
+  library(stringr); library(tibble); library(caper); library(ape)
+  library(phytools); library(lme4); library(leaflet); library(gridExtra)
+})
+
+HAS_BAAD      <- requireNamespace("baad.data",    quietly = TRUE)
+HAS_PHYLOMAKER <- requireNamespace("V.PhyloMaker2", quietly = TRUE)
+HAS_METAFOR   <- requireNamespace("metafor",       quietly = TRUE)
+
+# Explicit namespace bindings to prevent masking conflicts
+map       <- purrr::map
+map_dbl   <- purrr::map_dbl
+map_int   <- purrr::map_int
+map_chr   <- purrr::map_chr
+map_lgl   <- purrr::map_lgl
+map_df    <- purrr::map_df
+pmap      <- purrr::pmap
+pmap_dbl  <- purrr::pmap_dbl
+pmap_chr  <- purrr::pmap_chr
+select    <- dplyr::select
+filter    <- dplyr::filter
+mutate    <- dplyr::mutate
+rename    <- dplyr::rename
+arrange   <- dplyr::arrange
+group_by  <- dplyr::group_by
+summarise <- dplyr::summarise
+summarize <- dplyr::summarize
+slice     <- dplyr::slice
+
+set.seed(42)
+theme_set(theme_bw(base_size = 12))
+
+proj_dir <- tryCatch(dirname(knitr::current_input(dir = TRUE)),
+                     error = function(e) getwd())
+
+# Theory prediction constants
+WBE_H_DBH      <- 2/3   # H ~ DBH: West, Brown, Enquist (elastic similarity)
+ELASTIC_H_DBH  <- 2/3   # elastic similarity (same value, different justification)
+STRESS_H_DBH   <- 1/2   # stress similarity (McMahon 1973) [UNVERIFIED]
+WBE_AGB_DBH    <- 8/3   # AGB ~ DBH: WBE 1997
+WBE_GROWTH_M   <- 3/4   # dM/dt ~ M: metabolic scaling
+WBE_CROWN_DBH  <- 1.0   # Crown radius ~ DBH: pipe model prediction
+WBE_LEAF_TOTAL <- 3/4   # leaf ~ total biomass: WBE
+WBE_STEM_TOTAL <- 1.0   # stem ~ total: isometric
+```
+
+---
+
+# Data Loading and Harmonisation {#sec-data}
+
+```{r load-tallo}
+tallo_raw <- read_csv(file.path(proj_dir, "data/raw/tallo/Tallo.csv"),
+                      show_col_types = FALSE)
+tallo_clean <- tallo_raw |>
+  filter(height_outlier != "Y" | is.na(height_outlier),
+         crown_radius_outlier != "Y" | is.na(crown_radius_outlier),
+         !grepl("^sp\\.?$", species, ignore.case = TRUE),
+         !is.na(stem_diameter_cm), stem_diameter_cm > 0) |>
+  mutate(
+    source        = "Tallo",
+    DBH_cm        = stem_diameter_cm,
+    Height_m      = height_m,
+    AGB_kg        = NA_real_,
+    AGB_method    = NA_character_,
+    CrownRadius_m = crown_radius_m,
+    genus         = genus,
+    family        = family,
+    division      = division,
+    lat           = latitude,
+    lon           = longitude,
+    agb_eligible  = FALSE
+  ) |>
+  select(source, DBH_cm, Height_m, AGB_kg, AGB_method, CrownRadius_m,
+         species, genus, family, division, lat, lon, agb_eligible)
+```
+
+```{r load-baad}
+if (HAS_BAAD) {
+  baad_raw <- baad.data::baad_data()$data
+  baad_clean <- baad_raw |>
+    mutate(
+      source        = "BAAD",
+      DBH_cm        = d.bh * 100,   # CRITICAL: d.bh is in metres
+      Height_m      = h.t,
+      AGB_kg        = m.to,
+      AGB_method    = "direct",
+      CrownRadius_m = NA_real_,
+      species       = speciesMatched,
+      genus         = word(speciesMatched, 1),
+      family        = NA_character_,
+      division      = NA_character_,
+      lat           = NA_real_,
+      lon           = NA_real_,
+      agb_eligible  = !is.na(m.to)
+    ) |>
+    filter(!is.na(DBH_cm), DBH_cm > 0) |>
+    select(source, DBH_cm, Height_m, AGB_kg, AGB_method, CrownRadius_m,
+           species, genus, family, division, lat, lon, agb_eligible)
+} else {
+  baad_raw   <- NULL
+  baad_clean <- tibble(source = character(), DBH_cm = numeric(),
+    Height_m = numeric(), AGB_kg = numeric(), AGB_method = character(),
+    CrownRadius_m = numeric(), species = character(), genus = character(),
+    family = character(), division = character(), lat = numeric(),
+    lon = numeric(), agb_eligible = logical())
+  message("baad.data not available — BAAD sections will be skipped.")
+}
+```
+
+```{r load-neon}
+neon_sites <- c("BART","BLAN","CLBJ","DELA","DSNY","GRSM","GUAN","HARV",
+                "JERC","KONZ","LENO","MLBS","ORNL","OSBS","RMNP","SCBI",
+                "SERC","STEI","TALL","TREE","UKFS","UNDE","YELL")
+bm_dir <- file.path(proj_dir, "data/raw/neon_forest_agb/biomass")
+
+site_coords <- tryCatch(
+  read_csv(file.path(proj_dir, "data/raw/neon_forest_agb/sitecoordinates.csv"),
+           show_col_types = FALSE),
+  error = function(e) tibble(siteID = character(), X = numeric(), Y = numeric()))
+
+neon_list <- map(neon_sites, function(s) {
+  tryCatch({
+    d <- read_csv(file.path(bm_dir, paste0(s, "_biomass.csv")),
+                  show_col_types = FALSE)
+    d |>
+      filter(plantStatus == "Live" | is.na(plantStatus),
+             !is.na(stemDiameter), stemDiameter > 0) |>
+      mutate(
+        source        = "NEON",
+        siteID_tmp    = s,
+        DBH_cm        = stemDiameter,
+        Height_m      = height,
+        AGB_kg        = AGBChojnacky,
+        AGB_method    = "allometric_chojnacky",
+        CrownRadius_m = NA_real_,
+        species       = scientificName,
+        genus         = Genus,
+        family        = Family,
+        division      = NA_character_,
+        agb_eligible  = FALSE
+      ) |>
+      left_join(site_coords |> select(siteID, lon = X, lat = Y),
+                by = c("siteID_tmp" = "siteID")) |>
+      select(source, DBH_cm, Height_m, AGB_kg, AGB_method, CrownRadius_m,
+             species, genus, family, division, lat, lon, agb_eligible)
+  }, error = function(e) NULL)
+})
+neon_clean <- bind_rows(Filter(Negate(is.null), neon_list))
+```
+
+```{r load-forestgeo}
+fgeo_raw <- read_csv(
+  file.path(proj_dir,
+    "data/raw/forestgeo_panama/TreeHeightDataSmallPlotsCombined_2024_08_05.csv"),
+  show_col_types = FALSE)
+
+# BCI / Panama small-plot approximate centroid
+FGEO_LAT <- 9.15; FGEO_LON <- -79.84
+
+fgeo_clean <- fgeo_raw |>
+  filter(!is.na(DBH_mm), DBH_mm > 0, !is.na(TreeHt_m), TreeHt_m > 0) |>
+  mutate(
+    source        = "ForestGEO_Panama",
+    DBH_cm        = DBH_mm / 10,
+    Height_m      = TreeHt_m,
+    AGB_kg        = NA_real_,
+    AGB_method    = NA_character_,
+    CrownRadius_m = NA_real_,
+    species       = LatinBinomial,
+    genus         = word(LatinBinomial, 1),
+    family        = NA_character_,
+    division      = NA_character_,
+    lat           = FGEO_LAT,
+    lon           = FGEO_LON,
+    agb_eligible  = FALSE
+  ) |>
+  select(source, DBH_cm, Height_m, AGB_kg, AGB_method, CrownRadius_m,
+         species, genus, family, division, lat, lon, agb_eligible)
+```
+
+```{r load-niklas}
+nik_col_names <- c(
+  "taxa","citation","footnotes","record_num","age_yr","log_age",
+  "height_m","log_height","root_biomass_kg","log_root","stem_biomass_kg",
+  "log_stem","leaf_biomass_kg","log_leaf","shoot_biomass_kg","log_shoot",
+  "repro_biomass_kg","log_repro","total_biomass_kg","log_total",
+  "stem_growth_kgyr","log_stem_growth","leaf_growth_kgyr","log_leaf_growth",
+  "root_growth_kgyr","log_root_growth","total_growth_kgyr","log_total_growth")
+
+nik_enq <- read_csv(
+  file.path(proj_dir, "data/raw/niklas_enquist/niklas_enquist_biomass_20040122.csv"),
+  skip = 2, col_names = nik_col_names,
+  locale = locale(encoding = "latin1"), show_col_types = FALSE) |>
+  mutate(across(-c(taxa, citation, footnotes), as.numeric)) |>
+  mutate(across(where(is.numeric), ~ ifelse(. == -999, NA_real_, .))) |>
+  mutate(pgls_eligible = !grepl(
+    "with a few|community|stand|plot|mixed", taxa, ignore.case = TRUE))
+```
+
+```{r harmonise-allom}
+allom <- bind_rows(tallo_clean, baad_clean, neon_clean, fgeo_clean) |>
+  filter(!is.na(species), species != "",
+         !grepl("^sp\\.?$|^[A-Z][a-z]+ sp\\.$", species, ignore.case = FALSE))
+```
+
+```{r summary-table}
+src_summary <- allom |>
+  group_by(source) |>
+  summarise(
+    N_records = n(),
+    N_species = n_distinct(species, na.rm = TRUE),
+    N_families = n_distinct(family[!is.na(family)]),
+    lat_range = ifelse(all(is.na(lat)), "NA",
+      paste0(round(min(lat, na.rm = TRUE), 1), " to ",
+             round(max(lat, na.rm = TRUE), 1))),
+    lon_range = ifelse(all(is.na(lon)), "NA",
+      paste0(round(min(lon, na.rm = TRUE), 1), " to ",
+             round(max(lon, na.rm = TRUE), 1))),
+    .groups = "drop")
+
+kable(src_summary, caption = "Summary of harmonised allom tibble by source.",
+      format.args = list(big.mark = ","))
+```
+
+---
+
+# Geographic Overview {#sec-geo}
+
+```{r geo-leaflet}
+# Subsample Tallo for leaflet performance
+set.seed(42)
+tallo_ll <- tallo_clean |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  sample_n(min(20000, n())) |>
+  mutate(col = "#2196F3")
+
+neon_ll <- site_coords |>
+  filter(!is.na(X), !is.na(Y)) |>
+  mutate(source = "NEON", lat = Y, lon = X, col = "#FF5722")
+
+fgeo_ll <- data.frame(lat = FGEO_LAT, lon = FGEO_LON,
+                      source = "ForestGEO_Panama", col = "#4CAF50")
+
+pal_src <- colorFactor(
+  palette = c("#2196F3","#9C27B0","#FF5722","#4CAF50"),
+  levels  = c("Tallo","BAAD","NEON","ForestGEO_Panama"))
+
+m <- leaflet() |>
+  addTiles() |>
+  addCircleMarkers(data = tallo_ll, ~lon, ~lat, radius = 2,
+    color = "#2196F3", opacity = 0.4, fillOpacity = 0.4,
+    group = "Tallo") |>
+  addCircleMarkers(data = neon_ll, ~lon, ~lat, radius = 7,
+    color = "#FF5722", opacity = 0.9, fillOpacity = 0.9,
+    popup = ~siteID, group = "NEON sites") |>
+  addCircleMarkers(data = fgeo_ll, ~lon, ~lat, radius = 8,
+    color = "#4CAF50", opacity = 0.9, fillOpacity = 0.9,
+    popup = "ForestGEO Panama", group = "ForestGEO Panama") |>
+  addLayersControl(overlayGroups = c("Tallo","NEON sites","ForestGEO Panama"),
+                   options = layersControlOptions(collapsed = FALSE))
+m
+```
+
+```{r geo-barchart, fig.height=4}
+allom |>
+  count(source) |>
+  mutate(source = reorder(source, n)) |>
+  ggplot(aes(source, n, fill = source)) +
+  geom_col(show.legend = FALSE) +
+  scale_y_continuous(labels = comma) +
+  coord_flip() +
+  labs(title = "Records per dataset", x = NULL, y = "N records")
+```
+
+```{r tallo-family-map, fig.height=5}
+top10_fam <- tallo_clean |>
+  count(family, sort = TRUE) |>
+  slice(1:10) |>
+  pull(family)
+
+set.seed(42)
+tallo_clean |>
+  filter(!is.na(lat), !is.na(lon), family %in% top10_fam) |>
+  sample_n(min(50000, n())) |>
+  ggplot(aes(lon, lat, colour = family)) +
+  geom_point(size = 0.3, alpha = 0.4) +
+  coord_quickmap() +
+  labs(title = "Tallo records — top 10 families",
+       x = "Longitude", y = "Latitude", colour = "Family") +
+  guides(colour = guide_legend(override.aes = list(size = 3, alpha = 1)))
+```
+
+---
+
+# Taxonomic Coverage and Size Range Audit {#sec-taxonomy}
+
+```{r taxonomy-audit}
+fam_audit <- allom |>
+  filter(!is.na(DBH_cm), DBH_cm > 0, !is.na(family)) |>
+  group_by(family, division) |>
+  summarise(
+    n_records   = n(),
+    n_species   = n_distinct(species, na.rm = TRUE),
+    n_datasets  = n_distinct(source),
+    log10_range = log10(max(DBH_cm, na.rm = TRUE) /
+                          max(min(DBH_cm, na.rm = TRUE), 1e-6)),
+    .groups = "drop") |>
+  mutate(
+    pgls_eligible = n_species  >= 8  & log10_range >= 2.0,
+    sma_eligible  = (n_species >= 5  | n_records >= 20) & log10_range >= 1.5,
+    intra_eligible = n_records >= 10 & log10_range >= 1.5) |>
+  arrange(desc(n_records))
+
+kable(head(fam_audit, 30), digits = 2,
+      caption = "Family-level coverage and eligibility flags (top 30 by N records).")
+```
+
+```{r taxonomy-barchart, fig.height=5}
+fam_audit |>
+  slice(1:20) |>
+  mutate(
+    tier = case_when(pgls_eligible ~ "PGLS-eligible",
+                     sma_eligible  ~ "SMA-eligible",
+                     TRUE          ~ "Low coverage"),
+    family = reorder(family, n_records)) |>
+  ggplot(aes(family, n_records, fill = tier)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  scale_fill_manual(values = c("PGLS-eligible" = "#1976D2",
+                               "SMA-eligible"  = "#66BB6A",
+                               "Low coverage"  = "#BDBDBD")) +
+  labs(title = "Top 20 families — record counts and eligibility tier",
+       x = NULL, y = "N records", fill = "Eligibility")
+```
+
+```{r division-summary}
+div_sum <- allom |>
+  filter(!is.na(division), !is.na(DBH_cm), DBH_cm > 0) |>
+  group_by(division) |>
+  summarise(n_records = n(), n_species = n_distinct(species),
+            DBH_min_cm = min(DBH_cm), DBH_max_cm = max(DBH_cm),
+            .groups = "drop")
+kable(div_sum, digits = 1, caption = "Division-level summary (DBH records).")
+```
+
+---
+
+# H ~ DBH Scaling {#sec-h-dbh}
+
+## Pooled cross-study {#sec-h-dbh-pooled}
+
+```{r h-dbh-pooled}
+pool_hd <- allom |>
+  filter(!is.na(DBH_cm), !is.na(Height_m),
+         DBH_cm > 0, Height_m > 0) |>
+  mutate(log_dbh = log10(DBH_cm), log_h = log10(Height_m))
+
+ols_hd  <- lm(log_h ~ log_dbh, data = pool_hd)
+sma_hd  <- tryCatch(sma(log_h ~ log_dbh, data = pool_hd), error = function(e) NULL)
+lmm_hd  <- tryCatch(
+  lmer(log_h ~ log_dbh + (1 | source), data = pool_hd, REML = FALSE),
+  error = function(e) NULL)
+
+ols_coef <- coef(ols_hd)
+sma_coef <- if (!is.null(sma_hd)) as.numeric(coef(sma_hd)[[1]]) else NULL
+
+ols_ci  <- confint(ols_hd, "log_dbh")
+sma_ci  <- if (!is.null(sma_hd)) as.numeric(sma_hd$slopetest[[1]]$test[c("lower","upper")]) else c(NA_real_, NA_real_)
+
+sma_test_hd <- if (!is.null(sma_hd)) tryCatch(
+  slope.test(pool_hd$log_h, pool_hd$log_dbh, test.value = WBE_H_DBH, method = "SMA"),
+  error = function(e) list(p = NA_real_)) else list(p = NA_real_)
+
+lmm_slope <- if (!is.null(lmm_hd)) as.numeric(fixef(lmm_hd)["log_dbh"]) else NA_real_
+
+hd_table <- tibble(
+  Method = c("OLS","SMA","LMM (random source)"),
+  Slope  = c(as.numeric(ols_coef["log_dbh"]),
+             if (!is.null(sma_coef)) as.numeric(sma_coef["slope"]) else NA_real_,
+             lmm_slope),
+  CI_lo  = c(ols_ci[1], if (!is.null(sma_coef)) sma_ci[1] else NA_real_, NA_real_),
+  CI_hi  = c(ols_ci[2], if (!is.null(sma_coef)) sma_ci[2] else NA_real_, NA_real_),
+  R2     = c(summary(ols_hd)$r.squared, NA_real_, NA_real_),
+  p_vs_WBE = c(
+    2 * pt(abs((ols_coef["log_dbh"] - WBE_H_DBH) /
+                summary(ols_hd)$coefficients["log_dbh","Std. Error"]),
+             df = df.residual(ols_hd), lower.tail = FALSE),
+    sma_test_hd$p,
+    NA_real_))
+
+kable(hd_table, digits = 3,
+      caption = paste0("H ~ DBH pooled regression (N = ", nrow(pool_hd),
+                       "). WBE prediction β = 2/3."))
+```
+
+```{r h-dbh-scatter, fig.height=5}
+set.seed(42)
+plot_hd <- pool_hd |> sample_n(min(50000, n()))
+
+ggplot(plot_hd, aes(log_dbh, log_h, colour = source)) +
+  geom_point(size = 0.3, alpha = 0.3) +
+  geom_abline(slope = as.numeric(ols_coef["log_dbh"]),
+              intercept = as.numeric(ols_coef["(Intercept)"]),
+              colour = "black", linewidth = 1, linetype = "solid") +
+  {if (!is.null(sma_coef)) geom_abline(
+              slope = as.numeric(sma_coef["slope"]),
+              intercept = as.numeric(sma_coef["y-intercept"]),
+              colour = "#1565C0", linewidth = 1, linetype = "dashed")} +
+  geom_abline(slope = WBE_H_DBH,
+              intercept = mean(plot_hd$log_h) - WBE_H_DBH * mean(plot_hd$log_dbh),
+              colour = "red", linewidth = 1, linetype = "dotted") +
+  scale_colour_brewer(palette = "Set1") +
+  labs(title = paste0("H ~ DBH — ", nrow(plot_hd), " subsampled points"),
+       subtitle = "Black=OLS, Blue-dashed=SMA, Red-dotted=WBE (β=2/3)",
+       x = "log10(DBH cm)", y = "log10(Height m)", colour = "Source")
+```
+
+## Study-level slopes {#sec-h-dbh-study}
+
+```{r h-dbh-study-slopes}
+study_hd <- pool_hd |>
+  group_by(source) |>
+  group_map(function(d, k) {
+    if (nrow(d) < 5) return(NULL)
+    o  <- lm(log_h ~ log_dbh, data = d)
+    s  <- tryCatch(sma(log_h ~ log_dbh, data = d), error = function(e) NULL)
+    ci <- confint(o, "log_dbh")
+    se <- summary(o)$coefficients["log_dbh", "Std. Error"]
+    tibble(
+      source  = k$source,
+      n       = nrow(d),
+      ols_slope = coef(o)["log_dbh"],
+      ols_ci_lo = ci[1], ols_ci_hi = ci[2],
+      ols_se  = se,
+      r2      = summary(o)$r.squared,
+      sma_slope = if (!is.null(s)) as.numeric(coef(s)[[1]]["slope"]) else NA_real_)
+  }) |> bind_rows()
+
+if (HAS_METAFOR) {
+  re_hd <- tryCatch(
+    metafor::rma(yi = ols_slope, sei = ols_se, data = study_hd, method = "REML"),
+    error = function(e) NULL)
+} else {
+  # Manual Cochran Q
+  w     <- 1 / study_hd$ols_se^2
+  wm    <- weighted.mean(study_hd$ols_slope, w)
+  Q_hd  <- sum(w * (study_hd$ols_slope - wm)^2)
+  df_hd <- nrow(study_hd) - 1
+  I2_hd <- max(0, (Q_hd - df_hd) / Q_hd * 100)
+  re_hd <- NULL
+}
+
+I2_report <- if (!is.null(re_hd) && HAS_METAFOR) {
+  round(re_hd$I2, 1)
+} else if (exists("I2_hd")) round(I2_hd, 1) else NA_real_
+
+if (!is.na(I2_report)) cat(sprintf("H~DBH heterogeneity: I² = %.1f%%\n", I2_report)) else cat("H~DBH I² not estimable.\n")
+
+study_hd |>
+  mutate(source = reorder(source, ols_slope)) |>
+  ggplot(aes(source, ols_slope)) +
+  geom_pointrange(aes(ymin = ols_ci_lo, ymax = ols_ci_hi), size = 0.6) +
+  geom_hline(yintercept = WBE_H_DBH, colour = "red", linetype = "dashed",
+             linewidth = 0.8) +
+  geom_hline(yintercept = STRESS_H_DBH, colour = "orange", linetype = "dotted",
+             linewidth = 0.8) +
+  coord_flip() +
+  labs(title = "H ~ DBH OLS slopes per source",
+       subtitle = "Red=WBE 2/3, Orange=stress similarity 1/2",
+       x = NULL, y = "OLS slope ± 95% CI")
+```
+
+## Gymnosperm vs Angiosperm {#sec-h-dbh-division}
+
+```{r h-dbh-division}
+pool_hd_div <- pool_hd |> filter(!is.na(division))
+if (nrow(pool_hd_div) > 50) {
+  div_fits <- pool_hd_div |>
+    group_by(division) |>
+    group_map(function(d, k) {
+      o <- lm(log_h ~ log_dbh, data = d)
+      s <- tryCatch(sma(log_h ~ log_dbh, data = d), error = function(e) NULL)
+      tibble(division = k$division, n = nrow(d),
+             ols_slope = coef(o)["log_dbh"],
+             ci_lo = confint(o,"log_dbh")[1], ci_hi = confint(o,"log_dbh")[2],
+             sma_slope = if (!is.null(s)) as.numeric(coef(s)[[1]]["slope"]) else NA_real_)
+    }) |> bind_rows()
+
+  kable(div_fits, digits = 3,
+        caption = "H ~ DBH by division. WBE prediction = 2/3.")
+
+  set.seed(42)
+  pool_hd_div |>
+    filter(division %in% c("Angiosperm","Gymnosperm")) |>
+    sample_n(min(30000, n())) |>
+    ggplot(aes(log_dbh, log_h, colour = division)) +
+    geom_point(size = 0.3, alpha = 0.3) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+    geom_abline(slope = WBE_H_DBH,
+                intercept = mean(pool_hd$log_h) - WBE_H_DBH * mean(pool_hd$log_dbh),
+                colour = "red", linetype = "dashed") +
+    scale_colour_manual(values = c(Angiosperm = "#1976D2", Gymnosperm = "#E65100")) +
+    labs(title = "H ~ DBH by division", x = "log10(DBH cm)", y = "log10(Height m)")
+} else message("Insufficient division-labelled records.")
+```
+
+## Family-level SMA forest plot {#sec-h-dbh-family}
+
+```{r h-dbh-family-sma, fig.height=7}
+sma_elig_fams <- fam_audit |> filter(sma_eligible) |> pull(family)
+
+fam_hd_fits <- map_df(sma_elig_fams, function(fam) {
+  d <- pool_hd |> filter(family == fam)
+  if (nrow(d) < 10) return(NULL)
+  s <- tryCatch(sma(log_h ~ log_dbh, data = d), error = function(e) NULL)
+  if (is.null(s)) return(NULL)
+  tibble(family = fam, n = nrow(d),
+         slope  = as.numeric(coef(s)[[1]]["slope"]),
+         ci_lo  = as.numeric(s$slopetest[[1]]$test["lower"]),
+         ci_hi  = as.numeric(s$slopetest[[1]]$test["upper"]),
+         division = unique(d$division[!is.na(d$division)])[1])
+})
+
+if (nrow(fam_hd_fits) > 0) {
+  fam_hd_fits |>
+    mutate(family = reorder(family, slope)) |>
+    ggplot(aes(slope, family, colour = division)) +
+    geom_pointrange(aes(xmin = ci_lo, xmax = ci_hi), size = 0.5) +
+    geom_vline(xintercept = WBE_H_DBH, colour = "red",
+               linetype = "dashed", linewidth = 0.8) +
+    scale_colour_manual(values = c(Angiosperm = "#1976D2", Gymnosperm = "#E65100"),
+                        na.value = "grey50") +
+    labs(title = "Family-level SMA slopes — H ~ DBH",
+         subtitle = "Red dashed = WBE 2/3",
+         x = "SMA slope ± 95% CI", y = NULL, colour = "Division") +
+    theme(axis.text.y = element_text(size = 8))
+}
+```
+
+## PGLS for H ~ DBH {#sec-h-dbh-pgls}
+
+```{r h-dbh-pgls}
+# Aggregate to species means across all direct-measurement sources
+spp_hd <- allom |>
+  filter(!is.na(DBH_cm), !is.na(Height_m), DBH_cm > 0, Height_m > 0,
+         !is.na(species), !grepl("^sp\\.?$", species)) |>
+  mutate(log_dbh = log10(DBH_cm), log_h = log10(Height_m)) |>
+  group_by(species, family) |>
+  summarise(log_dbh_m = mean(log_dbh, na.rm = TRUE),
+            log_h_m   = mean(log_h, na.rm = TRUE),
+            n = n(), .groups = "drop") |>
+  filter(n >= 3, !is.na(species)) |>
+  mutate(sp_tree = gsub(" ", "_", species)) |>
+  distinct(sp_tree, .keep_all = TRUE)
+
+ols_pgls_hd <- lm(log_h_m ~ log_dbh_m, data = spp_hd)
+sma_pgls_hd <- tryCatch(sma(log_h_m ~ log_dbh_m, data = spp_hd),
+                         error = function(e) NULL)
+
+if (HAS_PHYLOMAKER && nrow(spp_hd) > 20) {
+  sp_list_hd <- spp_hd |>
+    filter(!is.na(family)) |>
+    mutate(genus_col = word(species, 1)) |>
+    distinct(species, genus_col, family) |>
+    rename(species_col = species)
+
+  phy_hd <- tryCatch({
+    res <- V.PhyloMaker2::phylo.maker(
+      sp.list = data.frame(species = gsub(" ","_", sp_list_hd$species_col),
+                           genus   = sp_list_hd$genus_col,
+                           family  = sp_list_hd$family),
+      tree      = V.PhyloMaker2::GBOTB.extended.WP,
+      nodes     = V.PhyloMaker2::nodes.info.1.WP,
+      scenarios = "S3")
+    res$scenario.3
+  }, error = function(e) {
+    message("V.PhyloMaker2 failed — using star tree fallback.")
+    spp_tmp <- gsub(" ","_", spp_hd$species)
+    stree   <- ape::stree(length(spp_tmp), type = "star")
+    stree$tip.label <- spp_tmp; stree
+  })
+
+  phy_hd <- multi2di(phy_hd, random = TRUE)
+  phy_hd <- phytools::force.ultrametric(phy_hd, method = "extend")
+  phy_hd$node.label <- NULL
+
+  pgls_df_hd <- spp_hd |>
+    filter(sp_tree %in% phy_hd$tip.label) |>
+    distinct(sp_tree, .keep_all = TRUE) |>
+    as.data.frame()
+  rownames(pgls_df_hd) <- pgls_df_hd$sp_tree
+
+  cd_hd <- tryCatch(
+    caper::comparative.data(phy = phy_hd, data = pgls_df_hd,
+                            names.col = "sp_tree", vcv = TRUE),
+    error = function(e) NULL)
+
+  if (!is.null(cd_hd)) {
+    pgls_fit_hd <- tryCatch(
+      caper::pgls(log_h_m ~ log_dbh_m, data = cd_hd,
+                  lambda = "ML", bounds = list(lambda = c(1e-6, 1))),
+      error = function(e) NULL)
+
+    if (!is.null(pgls_fit_hd)) {
+      pgls_slope  <- coef(pgls_fit_hd)["log_dbh_m"]
+      pgls_se     <- sqrt(diag(vcov(pgls_fit_hd)))["log_dbh_m"]
+      pgls_ci     <- pgls_slope + c(-1, 1) *
+                       qt(0.975, length(pgls_fit_hd$residuals) - 2) * pgls_se
+      pgls_lambda <- pgls_fit_hd$param["lambda"]
+
+      lp <- tryCatch(pgls.profile(pgls_fit_hd, which = "lambda"),
+                     error = function(e) NULL)
+      lambda_ci <- if (!is.null(lp)) tryCatch(pgls.confint(lp)$ci.val,
+                                               error = function(e) c(NA, NA)) else c(NA, NA)
+
+      pgls_r2 <- summary(pgls_fit_hd)$r.squared
+
+      hd_pgls_table <- tibble(
+        Method = c("OLS (spp means)","SMA (spp means)","PGLS"),
+        Slope  = c(coef(ols_pgls_hd)["log_dbh_m"],
+                   if (!is.null(sma_pgls_hd)) as.numeric(coef(sma_pgls_hd)[[1]]["slope"]) else NA_real_,
+                   pgls_slope),
+        CI_lo  = c(confint(ols_pgls_hd,"log_dbh_m")[1],
+                   if (!is.null(sma_pgls_hd)) as.numeric(sma_pgls_hd$slopetest[[1]]$test["lower"]) else NA_real_,
+                   pgls_ci[1]),
+        CI_hi  = c(confint(ols_pgls_hd,"log_dbh_m")[2],
+                   if (!is.null(sma_pgls_hd)) as.numeric(sma_pgls_hd$slopetest[[1]]$test["upper"]) else NA_real_,
+                   pgls_ci[2]),
+        Lambda = c(NA, NA, pgls_lambda),
+        R2     = c(summary(ols_pgls_hd)$r.squared, NA_real_, pgls_r2))
+
+      kable(hd_pgls_table, digits = 3,
+            caption = paste0("H ~ DBH: OLS / SMA / PGLS comparison (N spp = ",
+                             nrow(pgls_df_hd), "). WBE β = 2/3."))
+    }
+  }
+} else {
+  message("PGLS skipped (V.PhyloMaker2 unavailable or insufficient species).")
+}
+```
+
+## Intraspecific H ~ DBH slopes {#sec-h-dbh-intra}
+
+```{r h-dbh-intraspecific, fig.height=5}
+intra_hd <- pool_hd |>
+  group_by(species, family) |>
+  filter(n() >= 10,
+         log10(max(DBH_cm) / pmax(min(DBH_cm), 1e-6)) >= 1.5) |>
+  group_map(function(d, k) {
+    o  <- lm(log_h ~ log_dbh, data = d)
+    ci <- confint(o, "log_dbh")
+    tibble(species = k$species, family = k$family,
+           slope = coef(o)["log_dbh"],
+           ci_lo = ci[1], ci_hi = ci[2],
+           r2 = summary(o)$r.squared, n = nrow(d))
+  }) |> bind_rows()
+
+if (nrow(intra_hd) > 0) {
+  t_intra_hd <- t.test(intra_hd$slope, mu = WBE_H_DBH)
+  cat(sprintf("Intraspecific H~DBH: mean β = %.3f ± %.3f SD; t-test vs 2/3: p = %.4f\n",
+              mean(intra_hd$slope), sd(intra_hd$slope), t_intra_hd$p.value))
+
+  ggplot(intra_hd, aes(slope)) +
+    geom_histogram(bins = 40, fill = "#42A5F5", colour = "white") +
+    geom_vline(xintercept = WBE_H_DBH, colour = "red",
+               linetype = "dashed", linewidth = 1) +
+    geom_vline(xintercept = 1.0, colour = "grey40",
+               linetype = "dotted", linewidth = 0.8) +
+    labs(title = paste0("Intraspecific H ~ DBH slopes (N species = ",
+                        nrow(intra_hd), ")"),
+         subtitle = "Red=WBE 2/3, Grey=isometric 1.0",
+         x = "OLS slope", y = "Count")
+
+  kable(intra_hd |> arrange(desc(n)) |> head(20),
+        digits = 3, caption = "Top 20 species by N (intraspecific H~DBH).")
+}
+```
+
+---
+
+# AGB ~ DBH Scaling {#sec-agb-dbh}
+
+> ⚠️ **NEON AGB circularity caveat:** NEON AGB values were computed from DBH
+> using Chojnacky et al. (2014) allometric equations. For NEON records, AGB ~ DBH
+> is partly circular — the AGB is itself a function of DBH. NEON is included in
+> the sensitivity analysis (Section 5.1 sensitivity) but excluded from the primary
+> PGLS and family-level analyses.
+
+```{r agb-setup}
+# Primary: BAAD only (direct AGB)
+pool_agb_primary <- allom |>
+  filter(agb_eligible, !is.na(DBH_cm), !is.na(AGB_kg),
+         DBH_cm > 0, AGB_kg > 0) |>
+  mutate(log_dbh = log10(DBH_cm), log_agb = log10(AGB_kg))
+
+# Sensitivity: include NEON
+pool_agb_all <- allom |>
+  filter(!is.na(DBH_cm), !is.na(AGB_kg), DBH_cm > 0, AGB_kg > 0) |>
+  mutate(log_dbh = log10(DBH_cm), log_agb = log10(AGB_kg))
+```
+
+## Pooled AGB ~ DBH {#sec-agb-pooled}
+
+```{r agb-dbh-pooled}
+if (nrow(pool_agb_primary) > 20) {
+  ols_agb  <- lm(log_agb ~ log_dbh, data = pool_agb_primary)
+  sma_agb  <- tryCatch(sma(log_agb ~ log_dbh, data = pool_agb_primary),
+                        error = function(e) NULL)
+  sma_test_agb <- tryCatch(
+    slope.test(pool_agb_primary$log_agb, pool_agb_primary$log_dbh,
+               test.value = WBE_AGB_DBH, method = "SMA"),
+    error = function(e) list(p = NA_real_))
+
+  agb_ci <- confint(ols_agb, "log_dbh")
+  agb_table <- tibble(
+    Method   = c("OLS (BAAD primary)","SMA (BAAD primary)"),
+    Slope    = c(coef(ols_agb)["log_dbh"],
+                 if (!is.null(sma_agb)) as.numeric(coef(sma_agb)[[1]]["slope"]) else NA_real_),
+    CI_lo    = c(agb_ci[1],
+                 if (!is.null(sma_agb)) as.numeric(sma_agb$slopetest[[1]]$test["lower"]) else NA_real_),
+    CI_hi    = c(agb_ci[2],
+                 if (!is.null(sma_agb)) as.numeric(sma_agb$slopetest[[1]]$test["upper"]) else NA_real_),
+    R2       = c(summary(ols_agb)$r.squared, NA_real_),
+    p_vs_WBE = c(
+      2 * pt(abs((coef(ols_agb)["log_dbh"] - WBE_AGB_DBH) /
+                   summary(ols_agb)$coefficients["log_dbh","Std. Error"]),
+             df = df.residual(ols_agb), lower.tail = FALSE),
+      sma_test_agb$p))
+
+  kable(agb_table, digits = 3,
+        caption = paste0("AGB ~ DBH pooled (N = ", nrow(pool_agb_primary),
+                         " BAAD). WBE prediction β = 8/3 ≈ 2.667."))
+
+  agb_coef <- coef(ols_agb)
+  ggplot(pool_agb_primary |> sample_n(min(5000, n())),
+         aes(log_dbh, log_agb, colour = source)) +
+    geom_point(size = 0.5, alpha = 0.5) +
+    geom_abline(slope = agb_coef["log_dbh"], intercept = agb_coef["(Intercept)"],
+                colour = "black", linewidth = 1) +
+    geom_abline(slope = WBE_AGB_DBH,
+                intercept = mean(pool_agb_primary$log_agb) -
+                            WBE_AGB_DBH * mean(pool_agb_primary$log_dbh),
+                colour = "red", linetype = "dashed", linewidth = 1) +
+    labs(title = "AGB ~ DBH (BAAD primary)",
+         subtitle = "Black=OLS, Red-dashed=WBE (β=8/3)",
+         x = "log10(DBH cm)", y = "log10(AGB kg)", colour = "Source")
+} else {
+  message("BAAD not available — AGB primary analysis skipped.")
+}
+```
+
+## Study-level AGB slopes {#sec-agb-study}
+
+```{r agb-dbh-study-slopes}
+if (HAS_BAAD && nrow(pool_agb_primary) > 20) {
+  # Use baad_raw (cached in load-baad chunk) directly — avoids fragile paste-match
+  baad_full <- baad_raw |>
+    filter(!is.na(d.bh), !is.na(m.to), d.bh > 0, m.to > 0) |>
+    mutate(log_dbh = log10(d.bh * 100), log_agb = log10(m.to))
+
+  study_agb <- baad_full |>
+    group_by(studyName) |>
+    group_map(function(d, k) {
+      if (nrow(d) < 5) return(NULL)
+      o  <- lm(log_agb ~ log_dbh, data = d)
+      ci <- confint(o, "log_dbh")
+      tibble(studyName = k$studyName, n = nrow(d),
+             slope = coef(o)["log_dbh"],
+             ci_lo = ci[1], ci_hi = ci[2],
+             r2 = summary(o)$r.squared)
+    }) |> bind_rows()
+
+  if (nrow(study_agb) > 1) {
+    study_agb |>
+      mutate(studyName = reorder(studyName, slope)) |>
+      ggplot(aes(slope, studyName)) +
+      geom_pointrange(aes(xmin = ci_lo, xmax = ci_hi), size = 0.5) +
+      geom_vline(xintercept = WBE_AGB_DBH, colour = "red",
+                 linetype = "dashed", linewidth = 0.8) +
+      labs(title = "AGB ~ DBH OLS slopes by BAAD study",
+           subtitle = "Red = WBE 8/3",
+           x = "OLS slope ± 95% CI", y = NULL)
+  }
+}
+```
+
+## Division comparison, family SMA, PGLS, intraspecific {#sec-agb-rest}
+
+```{r agb-division}
+if (HAS_BAAD && nrow(pool_agb_primary) > 20) {
+  pool_agb_div <- baad_raw |>
+    filter(!is.na(d.bh), !is.na(m.to), d.bh > 0, m.to > 0) |>
+    mutate(log_dbh = log10(d.bh * 100), log_agb = log10(m.to),
+           family  = NA_character_)
+  # Division info not in BAAD — skip division comparison for AGB
+  message("BAAD lacks division annotation — AGB division comparison not available.")
+}
+```
+
+```{r agb-intraspecific}
+if (HAS_BAAD && nrow(pool_agb_primary) > 50) {
+  intra_agb <- pool_agb_primary |>
+    filter(!is.na(species)) |>
+    group_by(species) |>
+    filter(n() >= 10,
+           log10(max(DBH_cm) / pmax(min(DBH_cm), 1e-6)) >= 1.5) |>
+    group_map(function(d, k) {
+      o  <- lm(log_agb ~ log_dbh, data = d)
+      ci <- confint(o, "log_dbh")
+      tibble(species = k$species, slope = coef(o)["log_dbh"],
+             ci_lo = ci[1], ci_hi = ci[2],
+             r2 = summary(o)$r.squared, n = nrow(d))
+    }) |> bind_rows()
+
+  if (nrow(intra_agb) > 0) {
+    ggplot(intra_agb, aes(slope)) +
+      geom_histogram(bins = 30, fill = "#66BB6A", colour = "white") +
+      geom_vline(xintercept = WBE_AGB_DBH, colour = "red",
+                 linetype = "dashed", linewidth = 1) +
+      labs(title = paste0("Intraspecific AGB ~ DBH slopes (N = ",
+                          nrow(intra_agb), " species)"),
+           subtitle = "Red = WBE 8/3 ≈ 2.667",
+           x = "OLS slope", y = "Count")
+  }
+}
+```
+
+---
+
+# Crown Radius ~ DBH (Tallo) {#sec-crown}
+
+```{r crown-setup}
+crown_dat <- tallo_clean |>
+  filter(!is.na(CrownRadius_m), !is.na(DBH_cm),
+         CrownRadius_m > 0, DBH_cm > 0) |>
+  mutate(log_dbh = log10(DBH_cm), log_cr = log10(CrownRadius_m))
+```
+
+## Pooled crown analysis {#sec-crown-pooled}
+
+```{r crown-dbh-pooled}
+if (nrow(crown_dat) > 100) {
+  ols_cr  <- lm(log_cr ~ log_dbh, data = crown_dat)
+  sma_cr  <- tryCatch(sma(log_cr ~ log_dbh, data = crown_dat),
+                       error = function(e) NULL)
+  sma_test_cr <- tryCatch(
+    slope.test(crown_dat$log_cr, crown_dat$log_dbh,
+               test.value = WBE_CROWN_DBH, method = "SMA"),
+    error = function(e) list(p = NA_real_))
+
+  cr_ci <- confint(ols_cr, "log_dbh")
+  cr_table <- tibble(
+    Method   = c("OLS","SMA"),
+    Slope    = c(coef(ols_cr)["log_dbh"],
+                 if (!is.null(sma_cr)) as.numeric(coef(sma_cr)[[1]]["slope"]) else NA_real_),
+    CI_lo    = c(cr_ci[1],
+                 if (!is.null(sma_cr)) as.numeric(sma_cr$slopetest[[1]]$test["lower"]) else NA_real_),
+    CI_hi    = c(cr_ci[2],
+                 if (!is.null(sma_cr)) as.numeric(sma_cr$slopetest[[1]]$test["upper"]) else NA_real_),
+    R2       = c(summary(ols_cr)$r.squared, NA_real_),
+    p_vs_WBE = c(
+      2 * pt(abs((coef(ols_cr)["log_dbh"] - WBE_CROWN_DBH) /
+                   summary(ols_cr)$coefficients["log_dbh","Std. Error"]),
+             df = df.residual(ols_cr), lower.tail = FALSE),
+      sma_test_cr$p))
+
+  kable(cr_table, digits = 3,
+        caption = paste0("Crown radius ~ DBH (N = ", nrow(crown_dat),
+                         "). WBE pipe model β = 1.0."))
+}
+```
+
+## Family SMA and division for crown {#sec-crown-family}
+
+```{r crown-dbh-family, fig.height=6}
+if (nrow(crown_dat) > 100) {
+  fam_cr_fits <- map_df(sma_elig_fams, function(fam) {
+    d <- crown_dat |> filter(family == fam)
+    if (nrow(d) < 10) return(NULL)
+    s <- tryCatch(sma(log_cr ~ log_dbh, data = d), error = function(e) NULL)
+    if (is.null(s)) return(NULL)
+    tibble(family = fam, n = nrow(d),
+           slope  = as.numeric(coef(s)[[1]]["slope"]),
+           ci_lo  = as.numeric(s$slopetest[[1]]$test["lower"]),
+           ci_hi  = as.numeric(s$slopetest[[1]]$test["upper"]))
+  })
+
+  if (nrow(fam_cr_fits) > 0) {
+    fam_cr_fits |>
+      mutate(family = reorder(family, slope)) |>
+      ggplot(aes(slope, family)) +
+      geom_pointrange(aes(xmin = ci_lo, xmax = ci_hi), size = 0.5) +
+      geom_vline(xintercept = WBE_CROWN_DBH, colour = "red",
+                 linetype = "dashed", linewidth = 0.8) +
+      labs(title = "Family-level SMA — Crown radius ~ DBH",
+           subtitle = "Red = WBE pipe model (β = 1.0)",
+           x = "SMA slope ± 95% CI", y = NULL)
+  }
+}
+```
+
+```{r crown-geo, fig.height=4}
+tallo_crown_geo <- tallo_raw |>
+  filter(!is.na(crown_radius_m), !is.na(latitude),
+         crown_radius_outlier != "Y" | is.na(crown_radius_outlier)) |>
+  mutate(lat_band = floor(latitude / 5) * 5) |>
+  group_by(lat_band) |>
+  summarise(mean_crown_r = mean(crown_radius_m, na.rm = TRUE),
+            n = n(), .groups = "drop") |>
+  filter(n >= 20)
+
+ggplot(tallo_crown_geo, aes(lat_band, mean_crown_r)) +
+  geom_col(fill = "#26A69A") +
+  labs(title = "Mean crown radius by 5° latitude band (Tallo)",
+       x = "Latitude band (°)", y = "Mean crown radius (m)")
+```
+
+---
+
+# Growth Rate Scaling (Niklas-Enquist) {#sec-growth}
+
+```{r growth-filter}
+nik_pg <- nik_enq |>
+  filter(pgls_eligible,
+         !is.na(total_biomass_kg), total_biomass_kg > 0,
+         !is.na(stem_growth_kgyr), stem_growth_kgyr > 0)
+```
+
+## dM/dt ~ M (WBE: β = 3/4) {#sec-growth-dm}
+
+> ⚠️ **Growth rate caveat:** Growth rates in Niklas-Enquist are net annual
+> biomass increment averages from Cannell (1982), not instantaneous metabolic
+> rates. This does not constitute a direct test of WBE metabolic rate scaling
+> (dM/dt ∝ M^0.75); net increment = gross production − maintenance respiration.
+
+```{r growth-dm-dt}
+if (nrow(nik_pg) > 10) {
+  nik_pg2 <- nik_pg |>
+    mutate(log_M     = log10(total_biomass_kg),
+           log_dMdt  = log10(stem_growth_kgyr))
+
+  ols_dM  <- lm(log_dMdt ~ log_M, data = nik_pg2)
+  sma_dM  <- tryCatch(sma(log_dMdt ~ log_M, data = nik_pg2),
+                       error = function(e) NULL)
+  test_dM_75 <- tryCatch(
+    slope.test(nik_pg2$log_dMdt, nik_pg2$log_M,
+               test.value = WBE_GROWTH_M, method = "SMA"),
+    error = function(e) list(p = NA_real_))
+  test_dM_10 <- tryCatch(
+    slope.test(nik_pg2$log_dMdt, nik_pg2$log_M,
+               test.value = 1.0, method = "SMA"),
+    error = function(e) list(p = NA_real_))
+
+  dM_ci <- confint(ols_dM, "log_M")
+  dM_table <- tibble(
+    Method   = c("OLS","SMA"),
+    Slope    = c(coef(ols_dM)["log_M"],
+                 if (!is.null(sma_dM)) as.numeric(coef(sma_dM)[[1]]["slope"]) else NA_real_),
+    CI_lo    = c(dM_ci[1],
+                 if (!is.null(sma_dM)) as.numeric(sma_dM$slopetest[[1]]$test["lower"]) else NA_real_),
+    CI_hi    = c(dM_ci[2],
+                 if (!is.null(sma_dM)) as.numeric(sma_dM$slopetest[[1]]$test["upper"]) else NA_real_),
+    p_vs_0.75 = c(
+      2 * pt(abs((coef(ols_dM)["log_M"] - WBE_GROWTH_M) /
+                   summary(ols_dM)$coefficients["log_M","Std. Error"]),
+             df = df.residual(ols_dM), lower.tail = FALSE),
+      test_dM_75$p),
+    p_vs_1.0  = c(
+      2 * pt(abs((coef(ols_dM)["log_M"] - 1.0) /
+                   summary(ols_dM)$coefficients["log_M","Std. Error"]),
+             df = df.residual(ols_dM), lower.tail = FALSE),
+      test_dM_10$p))
+
+  kable(dM_table, digits = 3,
+        caption = paste0("dM/dt ~ M (N = ", nrow(nik_pg2),
+                         " pgls-eligible). WBE β = 3/4; test also vs β = 1."))
+
+  dM_coef <- coef(ols_dM)
+  ggplot(nik_pg2, aes(log_M, log_dMdt)) +
+    geom_point(alpha = 0.5, colour = "#5C6BC0") +
+    geom_abline(slope = dM_coef["log_M"], intercept = dM_coef["(Intercept)"],
+                colour = "black", linewidth = 1) +
+    geom_abline(slope = WBE_GROWTH_M,
+                intercept = mean(nik_pg2$log_dMdt) -
+                            WBE_GROWTH_M * mean(nik_pg2$log_M),
+                colour = "red", linetype = "dashed", linewidth = 1) +
+    labs(title = "dM/dt ~ M — Niklas-Enquist",
+         subtitle = "Red dashed = WBE β = 3/4",
+         x = "log10(Total biomass kg)", y = "log10(Stem growth kg/yr)")
+}
+```
+
+## dM/dt ~ Height {#sec-growth-height}
+
+```{r growth-height}
+nik_h <- nik_enq |>
+  filter(pgls_eligible, !is.na(height_m), height_m > 0,
+         !is.na(stem_growth_kgyr), stem_growth_kgyr > 0) |>
+  mutate(log_h = log10(height_m), log_dMdt = log10(stem_growth_kgyr))
+
+if (nrow(nik_h) > 10) {
+  ols_h_dM <- lm(log_dMdt ~ log_h, data = nik_h)
+  sma_h_dM <- tryCatch(sma(log_dMdt ~ log_h, data = nik_h),
+                        error = function(e) NULL)
+  cat(sprintf("dM/dt ~ H: OLS slope = %.3f (WBE-derived ~2.0 from H~M^0.25~M^0.375 chain)\n",
+              coef(ols_h_dM)["log_h"]))
+  ggplot(nik_h, aes(log_h, log_dMdt)) +
+    geom_point(alpha = 0.5, colour = "#AB47BC") +
+    geom_smooth(method = "lm", colour = "black", se = TRUE) +
+    labs(title = "dM/dt ~ Height — Niklas-Enquist",
+         x = "log10(Height m)", y = "log10(Stem growth kg/yr)")
+}
+```
+
+## Leaf biomass ~ Total biomass (coupling-corrected) {#sec-leaf-total}
+
+> ⚠️ **Mathematical coupling caveat:** When a component (leaf biomass) is
+> regressed against the total that includes it, the correlation is partly
+> artifactual (Pearson 1897). The corrected denominator uses
+> total − leaf to avoid this artifact.
+
+```{r leaf-total}
+nik_bt <- nik_enq |>
+  filter(pgls_eligible,
+         !is.na(leaf_biomass_kg), leaf_biomass_kg > 0,
+         !is.na(total_biomass_kg), total_biomass_kg > 0) |>
+  mutate(other_biomass = total_biomass_kg - leaf_biomass_kg) |>
+  filter(other_biomass > 0) |>
+  mutate(log_leaf  = log10(leaf_biomass_kg),
+         log_other = log10(other_biomass),
+         log_total = log10(total_biomass_kg))
+
+if (nrow(nik_bt) > 10) {
+  ols_leaf_corr  <- lm(log_leaf ~ log_other, data = nik_bt)
+  ols_leaf_naive <- lm(log_leaf ~ log_total, data = nik_bt)
+  sma_leaf_corr  <- tryCatch(sma(log_leaf ~ log_other, data = nik_bt),
+                              error = function(e) NULL)
+  test_leaf_corr <- tryCatch(
+    slope.test(nik_bt$log_leaf, nik_bt$log_other,
+               test.value = WBE_LEAF_TOTAL, method = "SMA"),
+    error = function(e) list(p = NA_real_))
+
+  leaf_ci <- confint(ols_leaf_corr, "log_other")
+  leaf_table <- tibble(
+    Model     = c("Corrected (leaf ~ other)", "Naive (leaf ~ total)"),
+    Slope     = c(coef(ols_leaf_corr)["log_other"],
+                  coef(ols_leaf_naive)["log_total"]),
+    CI_lo     = c(leaf_ci[1], confint(ols_leaf_naive,"log_total")[1]),
+    CI_hi     = c(leaf_ci[2], confint(ols_leaf_naive,"log_total")[2]),
+    R2        = c(summary(ols_leaf_corr)$r.squared,
+                  summary(ols_leaf_naive)$r.squared),
+    p_vs_WBE  = c(
+      2 * pt(abs((coef(ols_leaf_corr)["log_other"] - WBE_LEAF_TOTAL) /
+                   summary(ols_leaf_corr)$coefficients["log_other","Std. Error"]),
+             df = df.residual(ols_leaf_corr), lower.tail = FALSE),
+      NA_real_))
+
+  kable(leaf_table, digits = 3,
+        caption = paste0("Leaf ~ Total biomass (N = ", nrow(nik_bt),
+                         "). WBE prediction β = 3/4."))
+}
+```
+
+## Stem and Root biomass ~ Total {#sec-stem-root}
+
+```{r stem-total}
+nik_stem <- nik_enq |>
+  filter(pgls_eligible, !is.na(stem_biomass_kg), stem_biomass_kg > 0,
+         !is.na(total_biomass_kg), total_biomass_kg > 0) |>
+  mutate(other = total_biomass_kg - stem_biomass_kg) |>
+  filter(other > 0) |>
+  mutate(log_stem = log10(stem_biomass_kg), log_other = log10(other))
+
+if (nrow(nik_stem) > 10) {
+  ols_stem <- lm(log_stem ~ log_other, data = nik_stem)
+  test_stem <- tryCatch(
+    slope.test(nik_stem$log_stem, nik_stem$log_other,
+               test.value = WBE_STEM_TOTAL, method = "SMA"),
+    error = function(e) list(p = NA_real_))
+  cat(sprintf("Stem ~ (Total-stem): OLS slope = %.3f; p vs WBE 1.0 (SMA) = %.4f\n",
+              coef(ols_stem)["log_other"], test_stem$p))
+}
+```
+
+```{r root-total}
+nik_root <- nik_enq |>
+  filter(pgls_eligible, !is.na(root_biomass_kg), root_biomass_kg > 0,
+         !is.na(total_biomass_kg), total_biomass_kg > 0) |>
+  mutate(other = total_biomass_kg - root_biomass_kg) |>
+  filter(other > 0) |>
+  mutate(log_root = log10(root_biomass_kg), log_other = log10(other))
+
+if (nrow(nik_root) > 10) {
+  ols_root <- lm(log_root ~ log_other, data = nik_root)
+  cat(sprintf("Root ~ (Total-root): OLS slope = %.3f\n",
+              coef(ols_root)["log_other"]))
+}
+```
+
+## Niklas-Enquist summary table {#sec-growth-summary}
+
+```{r growth-summary}
+nik_summary <- tibble(
+  Relationship      = c("dM/dt ~ M","Leaf ~ Total","Stem ~ Total","Root ~ Total"),
+  WBE_prediction    = c("3/4","3/4","1","NA"),
+  OLS_slope         = c(
+    if (exists("ols_dM"))   round(coef(ols_dM)["log_M"],       3) else NA_real_,
+    if (exists("ols_leaf_corr")) round(coef(ols_leaf_corr)["log_other"], 3) else NA_real_,
+    if (exists("ols_stem")) round(coef(ols_stem)["log_other"], 3) else NA_real_,
+    if (exists("ols_root")) round(coef(ols_root)["log_other"], 3) else NA_real_),
+  SMA_slope         = c(
+    if (exists("sma_dM") && !is.null(sma_dM)) round(as.numeric(coef(sma_dM)[[1]]["slope"]), 3) else NA_real_,
+    if (exists("sma_leaf_corr") && !is.null(sma_leaf_corr)) round(as.numeric(coef(sma_leaf_corr)[[1]]["slope"]), 3) else NA_real_,
+    NA_real_, NA_real_),
+  p_vs_WBE_SMA      = c(
+    if (exists("test_dM_75"))   round(test_dM_75$p, 4)   else NA_real_,
+    if (exists("test_leaf_corr")) round(test_leaf_corr$p, 4) else NA_real_,
+    if (exists("test_stem"))    round(test_stem$p, 4)    else NA_real_,
+    NA_real_))
+
+kable(nik_summary, digits = 3,
+      caption = "Summary of Niklas-Enquist scaling relationships vs WBE predictions.")
+```
+
+---
+
+# Intraspecific Scaling Synthesis {#sec-intra-synth}
+
+> ⚠️ **Intra- vs interspecific scaling:** Intraspecific and interspecific scaling
+> exponents often differ (Glazier 2005, *Biol. Rev.*). Intraspecific slopes reflect
+> ontogenetic changes within individual growth trajectories; interspecific slopes
+> reflect evolutionary diversification of body plan. Neither is the 'correct' test
+> of WBE theory — each addresses a different biological question.
+
+```{r intra-synthesis, fig.height=5}
+intra_all <- bind_rows(
+  if (exists("intra_hd") && nrow(intra_hd) > 0)
+    intra_hd |> mutate(relationship = "H ~ DBH") else NULL,
+  if (exists("intra_agb") && nrow(intra_agb) > 0)
+    intra_agb |> mutate(relationship = "AGB ~ DBH") else NULL)
+
+if (!is.null(intra_all) && nrow(intra_all) > 0) {
+  inter_beta <- c(
+    "H ~ DBH"   = if (!is.null(sma_hd)) as.numeric(coef(sma_hd)[[1]]["slope"]) else WBE_H_DBH,
+    "AGB ~ DBH" = if (exists("sma_agb") && !is.null(sma_agb)) as.numeric(coef(sma_agb)[[1]]["slope"]) else WBE_AGB_DBH)
+
+  ref_lines <- tibble(
+    relationship = c("H ~ DBH","H ~ DBH","AGB ~ DBH","AGB ~ DBH"),
+    xintercept   = c(WBE_H_DBH, inter_beta["H ~ DBH"],
+                     WBE_AGB_DBH, inter_beta["AGB ~ DBH"]),
+    label        = c("WBE (inter)","SMA inter","WBE (inter)","SMA inter"))
+
+  ggplot(intra_all, aes(slope, fill = relationship)) +
+    geom_density(alpha = 0.5) +
+    geom_vline(data = ref_lines, aes(xintercept = xintercept, linetype = label),
+               colour = "red", linewidth = 0.8) +
+    facet_wrap(~relationship, scales = "free") +
+    labs(title = "Intraspecific β distribution vs interspecific reference",
+         x = "OLS slope (intraspecific)", y = "Density",
+         linetype = "Reference") +
+    theme(legend.position = "bottom")
+
+  glazier_table <- intra_all |>
+    group_by(relationship) |>
+    summarise(
+      Intraspecific_median = median(slope, na.rm = TRUE),
+      Intraspecific_SD     = sd(slope, na.rm = TRUE),
+      N_species            = n(),
+      pct_below_WBE        = mean(slope < inter_beta[relationship[1]], na.rm = TRUE) * 100,
+      .groups = "drop") |>
+    mutate(Interspecific_SMA = inter_beta[relationship])
+
+  kable(glazier_table, digits = 3,
+        caption = "Glazier-style comparison: interspecific vs intraspecific β.")
+}
+```
+
+---
+
+# Phylogenetic Analyses {#sec-phylo}
+
+## Phylogeny construction {#sec-phylo-build}
+
+```{r phylo-build}
+spp_pool <- allom |>
+  filter(!is.na(DBH_cm), !is.na(Height_m), DBH_cm > 0, Height_m > 0,
+         !is.na(species), !grepl("sp\\.?$|cf\\.", species)) |>
+  mutate(log_dbh = log10(DBH_cm), log_h = log10(Height_m),
+         log_agb = ifelse(!is.na(AGB_kg) & AGB_kg > 0, log10(AGB_kg), NA_real_)) |>
+  group_by(species, family) |>
+  summarise(log_dbh_m = mean(log_dbh, na.rm = TRUE),
+            log_h_m   = mean(log_h, na.rm = TRUE),
+            log_agb_m = mean(log_agb, na.rm = TRUE),
+            n = n(), .groups = "drop") |>
+  filter(n >= 3) |>
+  mutate(sp_tree = gsub(" ", "_", species),
+         genus   = word(species, 1)) |>
+  distinct(sp_tree, .keep_all = TRUE)
+
+if (HAS_PHYLOMAKER && nrow(spp_pool) > 20) {
+  sp_list_phy <- spp_pool |>
+    filter(!is.na(family)) |>
+    distinct(sp_tree, genus, family)
+
+  phy_grand <- tryCatch({
+    res <- V.PhyloMaker2::phylo.maker(
+      sp.list = data.frame(species = sp_list_phy$sp_tree,
+                           genus   = sp_list_phy$genus,
+                           family  = sp_list_phy$family),
+      tree      = V.PhyloMaker2::GBOTB.extended.WP,
+      nodes     = V.PhyloMaker2::nodes.info.1.WP,
+      scenarios = "S3")
+    res$scenario.3
+  }, error = function(e) {
+    message("V.PhyloMaker2 failed — using star tree.")
+    st <- ape::stree(nrow(spp_pool), type = "star")
+    st$tip.label <- spp_pool$sp_tree; st
+  })
+
+  phy_grand <- multi2di(phy_grand, random = TRUE)
+  set.seed(42)
+  phy_grand <- phytools::force.ultrametric(phy_grand, method = "extend")
+  phy_grand$node.label <- NULL
+
+  n_matched <- sum(spp_pool$sp_tree %in% phy_grand$tip.label)
+  cat(sprintf("Phylogeny: %d tips; %d/%d species matched.\n",
+              length(phy_grand$tip.label), n_matched, nrow(spp_pool)))
+} else {
+  message("V.PhyloMaker2 not available or insufficient species. Phylo sections skipped.")
+  phy_grand <- NULL
+}
+```
+
+## Phylogenetic signal {#sec-phylo-signal}
+
+```{r phylo-signal}
+if (!is.null(phy_grand)) {
+  sig_df <- spp_pool |>
+    filter(sp_tree %in% phy_grand$tip.label) |>
+    as.data.frame()
+
+  compute_signal <- function(trait_vec, sp_names, tree, trait_name) {
+    vals <- setNames(trait_vec, sp_names)
+    vals <- vals[!is.na(vals)]
+    pruned <- ape::drop.tip(tree, setdiff(tree$tip.label, names(vals)))
+    if (length(pruned$tip.label) < 5) return(NULL)
+    vals   <- vals[pruned$tip.label]
+    lam <- tryCatch(phytools::phylosig(pruned, vals, method = "lambda", test = TRUE),
+                    error = function(e) list(lambda = NA, P = NA))
+    K   <- tryCatch(phytools::phylosig(pruned, vals, method = "K", test = TRUE),
+                    error = function(e) list(K = NA, P = NA))
+    tibble(Trait = trait_name, N = length(vals),
+           lambda = lam$lambda, p_lambda = lam$P,
+           K = K$K, p_K = K$P)
+  }
+
+  sig_table <- bind_rows(
+    compute_signal(sig_df$log_h_m,   sig_df$sp_tree, phy_grand, "log10(Height)"),
+    compute_signal(sig_df$log_dbh_m, sig_df$sp_tree, phy_grand, "log10(DBH)"),
+    compute_signal(sig_df$log_agb_m, sig_df$sp_tree, phy_grand, "log10(AGB)"))
+
+  kable(sig_table, digits = 3,
+        caption = "Phylogenetic signal: Pagel's λ and Blomberg's K.")
+  cat("High λ for height indicates OLS will underestimate SEs for H~DBH. PGLS provides more conservative slope estimates under phylogenetic signal.\n")
+}
+```
+
+## PGLS H ~ DBH (cross-dataset means) {#sec-phylo-pgls-h}
+
+```{r phylo-pgls-h}
+if (!is.null(phy_grand)) {
+  pgls_df_grand <- spp_pool |>
+    filter(sp_tree %in% phy_grand$tip.label,
+           !is.na(log_dbh_m), !is.na(log_h_m)) |>
+    distinct(sp_tree, .keep_all = TRUE) |>
+    as.data.frame()
+  rownames(pgls_df_grand) <- pgls_df_grand$sp_tree
+
+  cd_grand <- tryCatch(
+    caper::comparative.data(phy = phy_grand, data = pgls_df_grand,
+                            names.col = "sp_tree", vcv = TRUE),
+    error = function(e) NULL)
+
+  if (!is.null(cd_grand)) {
+    pgls_hd_grand <- tryCatch(
+      caper::pgls(log_h_m ~ log_dbh_m, data = cd_grand,
+                  lambda = "ML", bounds = list(lambda = c(1e-6, 1))),
+      error = function(e) NULL)
+
+    if (!is.null(pgls_hd_grand)) {
+      pg_sl  <- coef(pgls_hd_grand)["log_dbh_m"]
+      pg_se  <- sqrt(diag(vcov(pgls_hd_grand)))["log_dbh_m"]
+      pg_ci  <- pg_sl + c(-1, 1) * qt(0.975, length(pgls_hd_grand$residuals) - 2) * pg_se
+      pg_lam <- pgls_hd_grand$param["lambda"]
+
+      lp_h <- tryCatch(pgls.profile(pgls_hd_grand, which = "lambda"),
+                       error = function(e) NULL)
+      lam_ci_h <- if (!is.null(lp_h))
+        tryCatch(pgls.confint(lp_h)$ci.val, error = function(e) c(NA, NA))
+      else c(NA, NA)
+
+      ols_g <- lm(log_h_m ~ log_dbh_m, data = pgls_df_grand)
+      sma_g <- tryCatch(sma(log_h_m ~ log_dbh_m, data = pgls_df_grand),
+                         error = function(e) NULL)
+
+      res_grand <- tibble(
+        Method = c("OLS","SMA","PGLS"),
+        Slope  = c(coef(ols_g)["log_dbh_m"],
+                   if (!is.null(sma_g)) as.numeric(coef(sma_g)[[1]]["slope"]) else NA_real_,
+                   pg_sl),
+        CI_lo  = c(confint(ols_g,"log_dbh_m")[1],
+                   if (!is.null(sma_g)) as.numeric(sma_g$slopetest[[1]]$test["lower"]) else NA_real_,
+                   pg_ci[1]),
+        CI_hi  = c(confint(ols_g,"log_dbh_m")[2],
+                   if (!is.null(sma_g)) as.numeric(sma_g$slopetest[[1]]$test["upper"]) else NA_real_,
+                   pg_ci[2]),
+        Lambda  = c(NA, NA, pg_lam),
+        Lam_CI  = c(NA, NA, paste0("[", round(lam_ci_h[1],3), ", ",
+                                   round(lam_ci_h[2],3), "]")),
+        R2      = c(summary(ols_g)$r.squared, NA_real_,
+                    summary(pgls_hd_grand)$r.squared))
+
+      kable(res_grand, digits = 3,
+            caption = paste0("H ~ DBH: OLS / SMA / PGLS (N spp = ",
+                             nrow(pgls_df_grand), "). WBE β = 2/3."))
+
+      res_grand |>
+        filter(!is.na(CI_lo)) |>
+        ggplot(aes(Slope, Method)) +
+        geom_pointrange(aes(xmin = CI_lo, xmax = CI_hi), size = 0.8) +
+        geom_vline(xintercept = WBE_H_DBH, colour = "red",
+                   linetype = "dashed", linewidth = 0.8) +
+        labs(title = "H ~ DBH: OLS / SMA / PGLS comparison",
+             subtitle = "Red = WBE 2/3", x = "Slope ± 95% CI", y = NULL)
+    }
+  }
+}
+```
+
+## PGLS AGB ~ DBH {#sec-phylo-pgls-agb}
+
+```{r phylo-pgls-agb}
+if (!is.null(phy_grand) && HAS_BAAD && nrow(pool_agb_primary) > 20) {
+  pgls_df_agb <- spp_pool |>
+    filter(sp_tree %in% phy_grand$tip.label, !is.na(log_agb_m)) |>
+    distinct(sp_tree, .keep_all = TRUE) |>
+    as.data.frame()
+  rownames(pgls_df_agb) <- pgls_df_agb$sp_tree
+
+  if (nrow(pgls_df_agb) > 10) {
+    cd_agb <- tryCatch(
+      caper::comparative.data(phy = phy_grand, data = pgls_df_agb,
+                              names.col = "sp_tree", vcv = TRUE),
+      error = function(e) NULL)
+
+    if (!is.null(cd_agb)) {
+      pgls_agb_g <- tryCatch(
+        caper::pgls(log_agb_m ~ log_dbh_m, data = cd_agb,
+                    lambda = "ML", bounds = list(lambda = c(1e-6, 1))),
+        error = function(e) NULL)
+
+      if (!is.null(pgls_agb_g)) {
+        ag_sl <- coef(pgls_agb_g)["log_dbh_m"]
+        ag_se <- sqrt(diag(vcov(pgls_agb_g)))["log_dbh_m"]
+        ag_ci <- ag_sl + c(-1, 1) * qt(0.975, length(pgls_agb_g$residuals) - 2) * ag_se
+        cat(sprintf("PGLS AGB~DBH: slope = %.3f [%.3f, %.3f], λ = %.3f\n",
+                    ag_sl, ag_ci[1], ag_ci[2], pgls_agb_g$param["lambda"]))
+      }
+    }
+  }
+}
+```
+
+## Family-level PGLS {#sec-phylo-family}
+
+```{r phylo-family}
+if (!is.null(phy_grand)) {
+  pgls_elig_fams <- fam_audit |> filter(pgls_eligible) |> pull(family)
+
+  fam_pgls_fits <- map_df(pgls_elig_fams, function(fam) {
+    d <- spp_pool |>
+      filter(family == fam, sp_tree %in% phy_grand$tip.label,
+             !is.na(log_h_m), !is.na(log_dbh_m))
+    if (nrow(d) < 8) return(NULL)
+    pruned <- tryCatch(
+      ape::drop.tip(phy_grand, setdiff(phy_grand$tip.label, d$sp_tree)),
+      error = function(e) NULL)
+    if (is.null(pruned)) return(NULL)
+    df_f <- d |> distinct(sp_tree, .keep_all = TRUE) |> as.data.frame()
+    rownames(df_f) <- df_f$sp_tree
+    cd_f <- tryCatch(
+      caper::comparative.data(phy = pruned, data = df_f,
+                              names.col = "sp_tree", vcv = TRUE),
+      error = function(e) NULL)
+    if (is.null(cd_f)) return(NULL)
+    pg_f <- tryCatch(
+      caper::pgls(log_h_m ~ log_dbh_m, data = cd_f,
+                  lambda = "ML", bounds = list(lambda = c(1e-6, 1))),
+      error = function(e) NULL)
+    if (is.null(pg_f)) return(NULL)
+    sl <- coef(pg_f)["log_dbh_m"]
+    se <- sqrt(diag(vcov(pg_f)))["log_dbh_m"]
+    ci <- sl + c(-1, 1) * qt(0.975, length(pg_f$residuals) - 2) * se
+    tibble(family = fam, n = nrow(d), pgls_slope = sl,
+           ci_lo = ci[1], ci_hi = ci[2],
+           lambda = pg_f$param["lambda"])
+  })
+
+  if (nrow(fam_pgls_fits) > 0) {
+    fam_pgls_fits |>
+      mutate(family = reorder(family, pgls_slope)) |>
+      ggplot(aes(pgls_slope, family)) +
+      geom_pointrange(aes(xmin = ci_lo, xmax = ci_hi), size = 0.6) +
+      geom_vline(xintercept = WBE_H_DBH, colour = "red",
+                 linetype = "dashed", linewidth = 0.8) +
+      labs(title = "Family PGLS slopes — H ~ DBH",
+           subtitle = "Red = WBE 2/3",
+           x = "PGLS slope ± 95% CI", y = NULL)
+  }
+}
+```
+
+## Lambda forest plot {#sec-lambda-forest}
+
+```{r lambda-forest}
+if (exists("sig_table") && !is.null(sig_table)) {
+  sig_table |>
+    ggplot(aes(lambda, Trait)) +
+    geom_col(fill = "#5C6BC0") +
+    geom_errorbar(aes(xmin = 0, xmax = 1), width = 0, colour = "grey70") +
+    scale_x_continuous(limits = c(0, 1)) +
+    labs(title = "Pagel's λ by trait",
+         subtitle = "λ = 1: Brownian motion; λ = 0: no phylogenetic signal",
+         x = "Pagel's λ", y = NULL)
+}
+```
+
+---
+
+# Theory Synthesis {#sec-theory}
+
+## Distribution of β across analyses {#sec-theory-beta}
+
+```{r theory-beta-dist, fig.height=5}
+# Collect slopes from key analyses
+beta_rows <- list()
+if (exists("ols_coef") && !is.null(ols_coef))
+  beta_rows[["OLS_pooled_H_DBH"]]  <- tibble(rel="H ~ DBH", method="OLS",  slope=ols_coef["log_dbh"])
+if (!is.null(sma_hd))
+  beta_rows[["SMA_pooled_H_DBH"]]  <- tibble(rel="H ~ DBH", method="SMA",  slope=as.numeric(coef(sma_hd)[[1]]["slope"]))
+if (exists("res_grand") && !is.null(res_grand))
+  beta_rows[["PGLS_H_DBH"]]        <- tibble(rel="H ~ DBH", method="PGLS",
+    slope=res_grand$Slope[res_grand$Method=="PGLS"])
+if (nrow(study_hd) > 0)
+  beta_rows <- c(beta_rows, map(seq_len(nrow(study_hd)), function(i)
+    tibble(rel="H ~ DBH", method="OLS_study", slope=study_hd$ols_slope[i])))
+if (exists("ols_agb") && !is.null(ols_agb))
+  beta_rows[["OLS_pooled_AGB_DBH"]] <- tibble(rel="AGB ~ DBH", method="OLS", slope=coef(ols_agb)["log_dbh"])
+if (exists("sma_agb") && !is.null(sma_agb))
+  beta_rows[["SMA_pooled_AGB_DBH"]] <- tibble(rel="AGB ~ DBH", method="SMA", slope=as.numeric(coef(sma_agb)[[1]]["slope"]))
+
+beta_all <- bind_rows(beta_rows)
+
+if (nrow(beta_all) > 0) {
+  wbe_refs <- tibble(rel = c("H ~ DBH","AGB ~ DBH"),
+                     xint = c(WBE_H_DBH, WBE_AGB_DBH))
+  ggplot(beta_all, aes(slope, fill = method)) +
+    geom_density(alpha = 0.45) +
+    geom_vline(data = wbe_refs, aes(xintercept = xint),
+               colour = "red", linetype = "dashed", linewidth = 0.9) +
+    facet_wrap(~rel, scales = "free") +
+    labs(title = "Distribution of β across all analyses",
+         subtitle = "Red dashed = WBE prediction",
+         x = "Slope β", y = "Density", fill = "Method") +
+    theme(legend.position = "bottom")
+}
+```
+
+## Normalization variation {#sec-theory-norm}
+
+```{r theory-normalization, fig.height=4}
+norm_rows <- map_df(unique(pool_hd$source), function(s) {
+  d <- pool_hd |> filter(source == s)
+  if (nrow(d) < 10) return(NULL)
+  fit <- tryCatch(sma(log_h ~ log_dbh, data = d), error = function(e) NULL)
+  if (is.null(fit)) return(NULL)
+  tibble(source = s, log10_norm = as.numeric(coef(fit)[[1]]["y-intercept"]))
+})
+
+if (nrow(norm_rows) > 0) {
+  ggplot(norm_rows, aes(source, log10_norm, fill = source)) +
+    geom_col(show.legend = FALSE) +
+    coord_flip() +
+    labs(title = "Normalization (SMA intercept) for H ~ DBH by source",
+         subtitle = "Captures biome/wood-density/architecture differences",
+         x = NULL, y = "log10(normalization constant)")
+}
+```
+
+> ⚠️ **Normalization caveat:** Normalizations (intercepts) integrate climate,
+> wood density, and architectural differences among biomes. Expected to vary
+> even when exponents are conserved (Enquist et al. 2007 [UNVERIFIED]).
+
+## WBE theory scorecard {#sec-theory-scorecard}
+
+```{r theory-scorecard}
+get_supported <- function(ci_lo, ci_hi, pred) {
+  if (is.na(ci_lo) || is.na(ci_hi)) return("Unknown")
+  if (ci_lo <= pred & pred <= ci_hi) "Supported" else "Not supported"
+}
+
+scorecard <- tibble(
+  Relationship    = c("H ~ DBH","H ~ DBH","AGB ~ DBH"),
+  Dataset         = c("Pooled (SMA)","Species means (PGLS)","BAAD (SMA)"),
+  WBE_prediction  = c(WBE_H_DBH, WBE_H_DBH, WBE_AGB_DBH),
+  Slope           = c(
+    if (!is.null(sma_hd)) as.numeric(coef(sma_hd)[[1]]["slope"]) else NA_real_,
+    if (exists("res_grand") && !is.null(res_grand))
+      res_grand$Slope[res_grand$Method == "PGLS"] else NA_real_,
+    if (exists("sma_agb") && !is.null(sma_agb)) as.numeric(coef(sma_agb)[[1]]["slope"]) else NA_real_),
+  CI_lo = c(
+    if (!is.null(sma_hd)) as.numeric(sma_hd$slopetest[[1]]$test["lower"]) else NA_real_,
+    if (exists("res_grand") && !is.null(res_grand))
+      res_grand$CI_lo[res_grand$Method == "PGLS"] else NA_real_,
+    if (exists("sma_agb") && !is.null(sma_agb)) as.numeric(sma_agb$slopetest[[1]]$test["lower"]) else NA_real_),
+  CI_hi = c(
+    if (!is.null(sma_hd)) as.numeric(sma_hd$slopetest[[1]]$test["upper"]) else NA_real_,
+    if (exists("res_grand") && !is.null(res_grand))
+      res_grand$CI_hi[res_grand$Method == "PGLS"] else NA_real_,
+    if (exists("sma_agb") && !is.null(sma_agb)) as.numeric(sma_agb$slopetest[[1]]$test["upper"]) else NA_real_)) |>
+  mutate(Supported = pmap_chr(list(CI_lo, CI_hi, WBE_prediction),
+    function(lo, hi, pred) get_supported(lo, hi, pred)))
+
+kable(scorecard, digits = 3,
+      caption = "WBE theory scorecard: CI includes prediction = 'Supported'.")
+
+scorecard |>
+  filter(!is.na(Slope)) |>
+  ggplot(aes(Slope, paste(Relationship, Dataset, sep = "\n"),
+             colour = Supported)) +
+  geom_pointrange(aes(xmin = CI_lo, xmax = CI_hi), size = 0.8) +
+  geom_vline(data = scorecard |> distinct(Relationship, WBE_prediction),
+             aes(xintercept = WBE_prediction),
+             colour = "red", linetype = "dashed") +
+  scale_colour_manual(values = c("Supported"     = "#2E7D32",
+                                 "Not supported" = "#C62828",
+                                 "Unknown"       = "grey50")) +
+  labs(title = "WBE scorecard: slopes with 95% CI",
+       x = "β ± 95% CI", y = NULL, colour = "WBE status")
+```
+
+## Heterogeneity summary {#sec-theory-hetero}
+
+```{r theory-heterogeneity}
+I2_val <- if (HAS_METAFOR && exists("re_hd") && !is.null(re_hd)) {
+  re_hd$I2
+} else if (exists("I2_hd")) I2_hd else NA_real_
+
+cat(sprintf("H ~ DBH study-level I² = %.1f%%\n", I2_val))
+if (!is.na(I2_val) && I2_val > 50)
+  cat("High I² (>50%): study-level factors (biome, method, size range, species pool) substantially modulate the apparent allometric exponent beyond sampling error.\n")
+```
+
+---
+
+# Methods {#sec-methods}
+
+**Data sources:**
+Tallo v1.0 (Jucker et al. 2022, *Glob. Change Biol.*, DOI: 10.1111/gcb.16302 [UNVERIFIED]);
+BAAD (Falster et al. 2015, *Ecology* 96:1445, DOI: 10.1890/14-1309.1 [UNVERIFIED]);
+NEONForestAGBv2 (Atkins et al. 2024, DOI: 10.6084/m9.figshare.25625352.v1 [UNVERIFIED]);
+ForestGEO Panama small-plots 2024;
+Niklas-Enquist biomass compilation (Niklas & Enquist 2001, *PNAS* 98:2922, DOI: 10.1073/pnas.041590298 [UNVERIFIED]).
+
+**Unit harmonisation:** BAAD `d.bh` converted from metres to centimetres (× 100); NEON `stemDiameter` already in cm; ForestGEO `DBH_mm` divided by 10. All AGB in kg; all height in m.
+
+**Regression methods:** OLS = `lm()`; SMA = `smatr::sma()`; PGLS = `caper::pgls()` with Pagel's λ estimated by ML.
+
+**Intraspecific criteria:** ≥ 10 records per species; log₁₀(DBH_max/DBH_min) ≥ 1.5.
+
+**Phylogenetic signal:** `phytools::phylosig()`, methods "lambda" and "K".
+
+**Theory predictions:** WBE (West, Brown & Enquist 1997, *Science* 276:122 [UNVERIFIED]; 1999, *Science* 284:1677 [UNVERIFIED]); elastic similarity (McMahon 1973 [UNVERIFIED]).
+
+**NEON AGB circularity:** AGB derived from DBH via Chojnacky et al. (2014, *Forestry* 87:129 [UNVERIFIED]); AGB ~ DBH is partly circular for NEON and excluded from primary analyses.
+
+**Mathematical coupling:** Organ ~ Total regressions use corrected denominator (Total − organ) per Pearson (1897) to avoid spurious correlation.
+
+---
+
+# Caveats {#sec-caveats}
+
+> ⚠️ **1. AGB provenance:** Primary AGB analyses use BAAD only (direct harvest/measurement). NEON AGB is allometric (Chojnacky equations) and excluded from primary AGB scaling tests.
+
+> ⚠️ **2. Mathematical coupling:** Regressing a component against its total containing whole inflates correlation (Pearson 1897). Corrected denominators (total − component) are used throughout Section 7.
+
+> ⚠️ **3. Growth rate measurement:** Net annual biomass increment ≠ instantaneous metabolic rate. The Niklas-Enquist dM/dt data are not a direct test of WBE metabolic scaling.
+
+> ⚠️ **4. Phylogenetic uncertainty:** The V.PhyloMaker2 tree is a hypothesis; placement of taxa without family assignment defaults to stochastic grafting. PGLS results should be interpreted with tree uncertainty in mind.
+
+> ⚠️ **5. Sampling bias:** NEON covers USA biomes only; Niklas-Enquist draws heavily from temperate northern hemisphere literature (Cannell 1982). Global inferences may not hold uniformly.
+
+> ⚠️ **6. Size range limitation:** Intraspecific slope reliability depends on span of DBH data within each species. Very narrow size ranges inflate uncertainty in regression slopes.
+
+> ⚠️ **7. Palm allometry:** Arecaceae (palms) have non-woody stems and are architecturally incommensurable with WBE assumptions based on branching networks. Results for Arecaceae should be interpreted separately.
+
+> ⚠️ **8. Taxonomic name uncertainty:** Species names across datasets have not been fully reconciled via TNRS or a consistent backbone. Synonymy may inflate apparent species richness and introduce duplicates in cross-dataset aggregations.
+
+---
+
+# Session Info {#sec-session}
+
+```{r session-info}
+sessionInfo()
+```

@@ -26,6 +26,9 @@ suppressPackageStartupMessages({
   library(purrr)
   library(stringr)
   library(leaflet)
+  library(lme4)
+  library(performance)
+  library(quantreg)
 })
 theme_set(theme_bw(base_size = 13))
 proj_dir <- dirname(knitr::current_input(dir = TRUE))
@@ -757,6 +760,1219 @@ size-asymmetric.
 
 ---
 
+# Scaling analysis: theoretical framework
+
+## WBE network model vs. pipe model
+
+Two independent mechanistic frameworks converge on the same scaling prediction
+for whole-tree water use, providing testable expectations for each regression
+exponent.
+
+**Pipe model** (Shinozaki et al. 1964; Mäkelä 1986):
+Each unit of leaf area is supplied by a fixed cross-sectional area of sapwood
+(one "pipe" per leaf unit). Total transpiration demand scales linearly with
+conducting sapwood area $S_A$:
+
+$$E = k_{SA} \cdot S_A$$
+
+where $k_{SA}$ (L day$^{-1}$ cm$^{-2}$) is **sap flux density** — the
+normalization constant of the relationship. Under the null (pipe-model)
+hypothesis, $k_{SA}$ is **size-independent**. Because area-preserving
+branching requires $S_A \propto D^{\gamma}$ with $\gamma \approx 2$:
+
+$$E \propto S_A \propto D^{\gamma} \approx D^{2}$$
+
+**WBE network model** (West, Brown & Enquist 1997):
+Fractal branching networks with area-preserving geometry also predict
+$S_A \propto D^2$. Whole-tree hydraulic conductance from Poiseuille flow
+scales as $K_{tree} \propto D^2$. For a size-independent driving gradient
+$\Delta\Psi$ (water-potential difference trunk-to-leaf):
+
+$$E = K_{tree} \cdot \Delta\Psi \propto D^2$$
+
+The WBE result is numerically identical to the pipe-model result because both
+encode the same area-preserving assumption. Deviation from slope $= 2.0$ in
+$E \sim D$ (or slope $= 1.0$ in $E \sim S_A$) implies one or more of:
+(i) $k_{SA}$ varies systematically with tree size; (ii) conduit taper changes
+with height; (iii) $\Delta\Psi$ is not size-independent (hydraulic
+limitation in tall trees).
+
+**Dimensional check:**
+
+$$[E] = \text{L day}^{-1} = [k_{SA}] \times [S_A] = \underbrace{\text{L day}^{-1}\,\text{cm}^{-2}}_{k_{SA}} \times \underbrace{\text{cm}^{2}}_{S_A}$$
+
+The antilog of the SMA intercept in $\log_{10} E = b_0 + b_1 \log_{10} S_A$
+gives the **effective hydraulic conductance per unit sapwood area**,
+$k_{SA} = 10^{b_0}$, a physiologically interpretable quantity comparable across
+biomes and functional types.
+
+**Summary of testable predictions:**
+
+| Relationship | Pipe model / WBE | Size-linear null |
+|---|:---:|:---:|
+| $E \sim D$    | **2.0** | 1.0 |
+| $E \sim BA$   | **1.0** | 0.5 |
+| $E \sim S_A$  | **1.0** | —   |
+| $S_A \sim D$  | **2.0** | 1.0 |
+
+```{r exponent-synthesis, fig.height=4.5, fig.cap="Exponent synthesis plot: empirical SMA slopes (blue ± 95% CI) versus theoretical predictions (red diamond). Theoretical values inside the CI = consistent with prediction."}
+synth_df <- tibble(
+  relationship  = factor(
+    c("E ~ D", "E ~ BA", "E ~ SA", "SA ~ D"),
+    levels = c("SA ~ D", "E ~ SA", "E ~ BA", "E ~ D")
+  ),
+  slope  = c(coef(fit_dbh)[2],   coef(fit_ba)[2],
+             coef(fit_sa)[2],    coef(fit_sadbh)[2]),
+  ci_lo  = c(fit_dbh$coef[[1]][2,2],   fit_ba$coef[[1]][2,2],
+             fit_sa$coef[[1]][2,2],    fit_sadbh$coef[[1]][2,2]),
+  ci_hi  = c(fit_dbh$coef[[1]][2,3],   fit_ba$coef[[1]][2,3],
+             fit_sa$coef[[1]][2,3],    fit_sadbh$coef[[1]][2,3]),
+  theory = c(2.0, 1.0, 1.0, 2.0)
+)
+
+ggplot(synth_df, aes(y = relationship, x = slope,
+                     xmin = ci_lo, xmax = ci_hi)) +
+  geom_pointrange(colour = "#2166ac", size = 0.9) +
+  geom_point(aes(x = theory), shape = 18, size = 6,
+             colour = "#d6604d", alpha = 0.9) +
+  geom_vline(xintercept = c(1.0, 2.0), linetype = "dashed",
+             colour = "grey65", linewidth = 0.6) +
+  labs(
+    x = "SMA slope (log–log)",
+    y = NULL,
+    title = "Exponent synthesis: empirical vs. theoretical scaling slopes",
+    subtitle = "Blue circle ± 95% CI = empirical  |  Red diamond = pipe-model / WBE prediction"
+  ) +
+  theme_bw(base_size = 13)
+```
+
+---
+
+# Multi-level structure: site effects
+
+Trees are nested within 194 sites spanning 32 countries.  Standard SMA treats
+every tree as an independent observation, which inflates degrees of freedom and
+may bias inference if sites differ in their hydraulic baseline.  This section
+decomposes variance into within-site (tree-to-tree) and among-site components
+and fits a linear mixed model (LMM) as a complement to the SMA.
+
+```{r advanced-data-prep}
+# ── Join site metadata (si_mat, si_map, si_biome, si_country) to dat ─────────
+# Required by all subsequent advanced sections.
+# Real data:  left_join on si_code from site_md.
+# Demo data:  create synthetic site structure (40 sites) to enable all analyses.
+
+if (!is.null(site_md) &&
+    "si_code" %in% names(dat) &&
+    !"si_mat" %in% names(dat)) {
+
+  dat <- dat |>
+    left_join(
+      site_md |>
+        select(si_code, si_biome, si_country, si_mat, si_map) |>
+        distinct(si_code, .keep_all = TRUE),
+      by = "si_code"
+    )
+  cat("Site metadata joined: si_mat, si_map, si_biome, si_country added.\n",
+      "Trees with si_mat:", sum(!is.na(dat$si_mat)), "\n")
+
+} else if (!USE_REAL_DATA && !"si_code" %in% names(dat)) {
+
+  # Synthetic site structure for demonstration data
+  set.seed(42)
+  n_sites <- 40
+  site_tbl <- tibble(
+    si_code  = paste0("SITE_", sprintf("%02d", seq_len(n_sites))),
+    si_biome = sample(
+      c("Temperate forest", "Boreal forest",
+        "Tropical forest savanna", "Woodland/Shrubland",
+        "Subtropical desert"),
+      n_sites, replace = TRUE,
+      prob = c(0.45, 0.20, 0.20, 0.10, 0.05)
+    ),
+    si_mat = rnorm(n_sites, mean = 10, sd = 7),
+    si_map = exp(rnorm(n_sites, mean = log(900), sd = 0.45))
+  )
+  dat <- dat |>
+    mutate(
+      si_code = sample(site_tbl$si_code, n(), replace = TRUE)
+    ) |>
+    left_join(site_tbl, by = "si_code")
+  cat("\u26a0 Demo data: synthetic site structure assigned (",
+      n_sites, "sites)\n")
+
+} else {
+  cat("Site columns already present in dat.\n")
+}
+
+cat("Columns now in dat: ",
+    paste(intersect(c("si_code","si_biome","si_mat","si_map"),
+                    names(dat)), collapse = ", "), "\n")
+```
+
+```{r site-variance, fig.height=4}
+# ── Variance decomposition and ICC ───────────────────────────────────────────
+# LMM: log(E) ~ log(DBH) + (1 | site)
+# Random intercept absorbs site-level hydraulic baseline differences.
+
+if ("si_code" %in% names(dat)) {
+
+  lmm_dbh <- lmer(log_e ~ log_dbh + (1 | si_code),
+                  data = dat, REML = TRUE)
+
+  # Variance components
+  vc <- as.data.frame(VarCorr(lmm_dbh)) |>
+    select(grp, var1, vcov) |>
+    rename(Source = grp, Component = var1, Variance = vcov) |>
+    mutate(
+      `Std. Dev.`  = round(sqrt(Variance), 4),
+      Variance     = round(Variance, 4),
+      `% of total` = round(100 * Variance / sum(Variance), 1)
+    )
+  kable(vc,
+        caption = "Variance components: log(E) ~ log(DBH) + (1 | site)")
+
+  # ICC: proportion of variance attributable to among-site differences
+  icc_res <- icc(lmm_dbh)
+  cat("\nICC (proportion of total variance from among-site differences):\n")
+  print(icc_res)
+
+  # Fixed-effect slope from LMM vs SMA
+  fe <- fixef(lmm_dbh)
+  ci_fe <- confint(lmm_dbh, parm = "log_dbh",
+                   method = "Wald", quiet = TRUE)
+  cat(sprintf(
+    "\nLMM fixed slope: %.3f  (95%% Wald CI: %.3f \u2013 %.3f)\n",
+    fe["log_dbh"], ci_fe[1], ci_fe[2]
+  ))
+  cat(sprintf(
+    "SMA slope (pooled): %.3f  (95%% CI: %.3f \u2013 %.3f)\n",
+    coef(fit_dbh)[2],
+    fit_dbh$coef[[1]][2,2],
+    fit_dbh$coef[[1]][2,3]
+  ))
+
+} else {
+  cat("si_code not in dat \u2014 skipping LMM\n")
+}
+```
+
+```{r site-residuals, fig.height=7, fig.cap="Site-level mean deviations from the overall SMA E~DBH fitted line (caterpillar plot). Large positive residuals = sites with higher water use than the global scaling predicts at a given DBH; points coloured by biome."}
+# Residuals are computable for all trees regardless of site structure
+dat$resid_sma_dbh <- dat$log_e -
+  (coef(fit_dbh)[1] + coef(fit_dbh)[2] * dat$log_dbh)
+
+if ("si_code" %in% names(dat)) {
+  site_resid_df <- dat |>
+    group_by(si_code) |>
+    summarise(
+      mean_resid = mean(resid_sma_dbh, na.rm = TRUE),
+      se_resid   = sd(resid_sma_dbh, na.rm = TRUE) / sqrt(n()),
+      n_trees    = n(),
+      si_biome   = first(si_biome),
+      .groups = "drop"
+    ) |>
+    filter(!is.na(mean_resid))
+
+  ggplot(site_resid_df,
+         aes(x = mean_resid,
+             y = reorder(si_code, mean_resid),
+             colour = si_biome)) +
+    geom_pointrange(
+      aes(xmin = mean_resid - 1.96 * se_resid,
+          xmax = mean_resid + 1.96 * se_resid),
+      size = 0.35, linewidth = 0.6
+    ) +
+    geom_vline(xintercept = 0, linetype = "dashed",
+               colour = "grey40", linewidth = 0.7) +
+    scale_colour_brewer(palette = "Set2", na.value = "grey60") +
+    labs(
+      x = expression("Mean site residual  (" * log[10] * " units)"),
+      y = "Site (ranked by residual)",
+      colour = "Biome",
+      title = "Site-level departures from global E~DBH scaling",
+      subtitle = sprintf("%d sites  |  points \u00b11.96 SE",
+                         nrow(site_resid_df))
+    ) +
+    theme(
+      axis.text.y  = element_text(size = 5.5),
+      legend.position = "bottom"
+    )
+} else {
+  cat("si_code not in dat \u2014 skipping site residuals plot\n")
+}
+```
+
+```{r resid-vs-climate, fig.height=4.5, fig.cap="Tree-level residuals from the SMA E~DBH fit vs. mean annual temperature (left) and log10 MAP (right). Systematic trends indicate climate-driven variation in the hydraulic baseline beyond what tree size explains."}
+if (all(c("si_mat", "si_map", "resid_sma_dbh") %in% names(dat))) {
+
+  dat_env <- dat |> filter(!is.na(si_mat), !is.na(si_map))
+
+  p_mat <- ggplot(dat_env,
+                  aes(x = si_mat, y = resid_sma_dbh,
+                      colour = growth_form)) +
+    geom_point(alpha = 0.12, size = 0.8) +
+    geom_smooth(method = "lm", se = TRUE, linewidth = 1.0) +
+    scale_colour_manual(
+      values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+    ) +
+    labs(
+      x = "Mean annual temperature (\u00b0C)",
+      y = expression("Residual  (" * log[10] * " E ~ DBH)"),
+      colour = "Growth form",
+      title = "Residuals vs. MAT"
+    ) +
+    theme(legend.position = "bottom")
+
+  p_map <- ggplot(dat_env,
+                  aes(x = log10(si_map), y = resid_sma_dbh,
+                      colour = growth_form)) +
+    geom_point(alpha = 0.12, size = 0.8) +
+    geom_smooth(method = "lm", se = TRUE, linewidth = 1.0) +
+    scale_colour_manual(
+      values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+    ) +
+    labs(
+      x = expression(log[10] ~ "MAP (mm)"),
+      y = expression("Residual  (" * log[10] * " E ~ DBH)"),
+      colour = "Growth form",
+      title = "Residuals vs. MAP"
+    ) +
+    theme(legend.position = "bottom")
+
+  gridExtra::grid.arrange(p_mat, p_map, ncol = 2)
+
+} else {
+  cat("Climate variables or residuals not available.\n")
+}
+```
+
+---
+
+# Biome-stratified scaling
+
+Slopes that vary across biomes reveal ecological contexts where the pipe model
+or WBE predictions break down.  Colder or drier biomes may show lower
+normalization constants ($k_{SA}$) due to lower leaf-area-to-sapwood ratios or
+colder xylem conductance.
+
+```{r biome-sma, fig.height=5, fig.cap="Biome-stratified SMA slopes for E~DBH and E~SA (biomes with ≥20 trees). Dashed lines mark the theoretical predictions. Biomes whose CI excludes the theoretical value deviate significantly from the pipe-model / WBE prediction."}
+biome_sma <- NULL   # initialise so hydro-norm can check existence
+
+if ("si_biome" %in% names(dat)) {
+
+  biome_sma <- dat |>
+    filter(!is.na(si_biome)) |>
+    tidyr::nest(data = -si_biome) |>
+    mutate(
+      n = map_int(data, nrow),
+      fit_dbh = map(data, ~ {
+        if (nrow(.x) < 20) return(NULL)
+        tryCatch(sma(log_e ~ log_dbh, data = .x, method = "SMA"),
+                 error = function(e) NULL)
+      }),
+      fit_sa = map(data, ~ {
+        if (nrow(.x) < 20) return(NULL)
+        tryCatch(sma(log_e ~ log_sa,  data = .x, method = "SMA"),
+                 error = function(e) NULL)
+      }),
+      slope_dbh    = map_dbl(fit_dbh,
+                             ~ if (is.null(.x)) NA_real_ else coef(.x)[2]),
+      ci_lo_dbh    = map_dbl(fit_dbh,
+                             ~ if (is.null(.x)) NA_real_ else .x$coef[[1]][2,2]),
+      ci_hi_dbh    = map_dbl(fit_dbh,
+                             ~ if (is.null(.x)) NA_real_ else .x$coef[[1]][2,3]),
+      slope_sa     = map_dbl(fit_sa,
+                             ~ if (is.null(.x)) NA_real_ else coef(.x)[2]),
+      ci_lo_sa     = map_dbl(fit_sa,
+                             ~ if (is.null(.x)) NA_real_ else .x$coef[[1]][2,2]),
+      ci_hi_sa     = map_dbl(fit_sa,
+                             ~ if (is.null(.x)) NA_real_ else .x$coef[[1]][2,3]),
+      intercept_sa = map_dbl(fit_sa,
+                             ~ if (is.null(.x)) NA_real_ else coef(.x)[1])
+    )
+
+  forest_biome <- bind_rows(
+    biome_sma |>
+      filter(!is.na(slope_dbh)) |>
+      transmute(si_biome, n,
+                slope = slope_dbh, ci_lo = ci_lo_dbh, ci_hi = ci_hi_dbh,
+                metric = "E ~ DBH", theory = 2.0),
+    biome_sma |>
+      filter(!is.na(slope_sa)) |>
+      transmute(si_biome, n,
+                slope = slope_sa,  ci_lo = ci_lo_sa,  ci_hi = ci_hi_sa,
+                metric = "E ~ SA",  theory = 1.0)
+  )
+
+  ggplot(forest_biome,
+         aes(y = reorder(si_biome, slope),
+             x = slope, xmin = ci_lo, xmax = ci_hi,
+             colour = metric)) +
+    geom_pointrange(position = position_dodge(width = 0.55), size = 0.7) +
+    geom_vline(data = distinct(forest_biome, metric, theory),
+               aes(xintercept = theory, colour = metric),
+               linetype = "dashed", linewidth = 0.7, alpha = 0.75) +
+    scale_colour_manual(
+      values = c("E ~ DBH" = "#2166ac", "E ~ SA" = "#d6604d")
+    ) +
+    facet_wrap(~ metric, scales = "free_x") +
+    labs(
+      x = "SMA slope (\u00b1 95% CI)",
+      y = NULL,
+      colour = "Relationship",
+      title = "Biome-stratified SMA scaling slopes",
+      subtitle = "Dashed lines = theoretical predictions"
+    ) +
+    theme(legend.position = "bottom")
+
+} else {
+  cat("si_biome not in dat \u2014 skipping biome-stratified SMA\n")
+}
+```
+
+```{r biome-size-dist, fig.height=6, fig.cap="Size distribution (log10 DBH) by biome and growth form. Biomes with truncated large-tree distributions may show artefactually lower slopes due to restricted size range."}
+if ("si_biome" %in% names(dat)) {
+  dat |>
+    filter(!is.na(si_biome)) |>
+    ggplot(aes(x = log_dbh, fill = growth_form)) +
+    geom_histogram(bins = 25, colour = "white", alpha = 0.85,
+                   position = "stack") +
+    facet_wrap(~ si_biome, scales = "free_y", ncol = 2) +
+    scale_fill_manual(
+      values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+    ) +
+    labs(
+      x = expression(log[10] ~ "Stem diameter (cm)"),
+      y = "Count",
+      fill = "Growth form",
+      title = "Size distribution by biome and growth form",
+      subtitle = "Restricted size range biases SMA slopes toward the OLS slope"
+    ) +
+    theme(strip.text = element_text(size = 8),
+          legend.position = "bottom")
+} else {
+  cat("si_biome not in dat \u2014 skipping size distribution\n")
+}
+```
+
+---
+
+# Climate modulation of scaling intercepts
+
+The SMA intercept for $E \sim S_A$ is the log-scale metabolic normalisation
+constant.  If the intercept varies across sites with mean annual temperature
+(MAT) or precipitation (MAP), it means $k_{SA}$ — the effective sap flux
+density — shifts with climate independently of tree size.  This is tested by
+averaging SMA residuals at the site level and regressing them against site
+climate variables.
+
+```{r climate-intercepts, fig.height=4.5, fig.cap="Site-level mean deviation from the E~SA SMA fit vs. MAT (left) and log10 MAP (right). Points sized by number of trees per site, coloured by biome. The weighted linear regression line quantifies directional climate effects on the hydraulic normalisation constant."}
+# Residuals from the global E~SA SMA fit
+dat$resid_sa <- dat$log_e -
+  (coef(fit_sa)[1] + coef(fit_sa)[2] * dat$log_sa)
+
+if (all(c("si_code", "si_mat", "si_map") %in% names(dat))) {
+
+  site_intercepts <- dat |>
+    filter(!is.na(si_code), !is.na(resid_sa)) |>
+    group_by(si_code) |>
+    summarise(
+      intercept_i = mean(resid_sa, na.rm = TRUE),
+      n_trees     = n(),
+      si_mat      = first(si_mat),
+      si_map      = first(si_map),
+      si_biome    = first(si_biome),
+      .groups = "drop"
+    ) |>
+    filter(!is.na(si_mat), !is.na(si_map), n_trees >= 3)
+
+  cat("Sites entering climate model:", nrow(site_intercepts), "\n")
+
+  # Weighted LM: site intercept deviation ~ MAT + log10(MAP)
+  # Weights = number of trees per site (more trees = more reliable mean residual)
+  lm_clim <- lm(intercept_i ~ si_mat + log10(si_map),
+                data    = site_intercepts,
+                weights = n_trees)
+  cat("\n=== LM: site intercept ~ MAT + log10(MAP) [weighted by n trees] ===\n")
+  print(summary(lm_clim))
+
+  p_mat2 <- ggplot(site_intercepts,
+                   aes(x = si_mat, y = intercept_i,
+                       colour = si_biome, size = n_trees)) +
+    geom_point(alpha = 0.8) +
+    geom_smooth(aes(x = si_mat, y = intercept_i),
+                method = "lm", se = TRUE, colour = "grey30",
+                linewidth = 1.0, inherit.aes = FALSE) +
+    scale_colour_brewer(palette = "Set2", na.value = "grey60") +
+    scale_size_continuous(range = c(2, 8)) +
+    labs(
+      x = "Mean annual temperature (\u00b0C)",
+      y = "Site mean residual (E~SA)",
+      colour = "Biome",
+      size = "N trees"
+    ) +
+    theme(legend.position = "none")
+
+  p_map2 <- ggplot(site_intercepts,
+                   aes(x = log10(si_map), y = intercept_i,
+                       colour = si_biome, size = n_trees)) +
+    geom_point(alpha = 0.8) +
+    geom_smooth(aes(x = log10(si_map), y = intercept_i),
+                method = "lm", se = TRUE, colour = "grey30",
+                linewidth = 1.0, inherit.aes = FALSE) +
+    scale_colour_brewer(palette = "Set2", na.value = "grey60") +
+    scale_size_continuous(range = c(2, 8)) +
+    labs(
+      x = expression(log[10] ~ "MAP (mm)"),
+      y = "Site mean residual (E~SA)",
+      colour = "Biome",
+      size = "N trees"
+    ) +
+    theme(legend.position = "right")
+
+  gridExtra::grid.arrange(p_mat2, p_map2, ncol = 2,
+    top = "Climate modulation of the E~SA hydraulic normalisation constant")
+
+} else {
+  cat("Climate variables not available \u2014 skipping climate intercept analysis\n")
+}
+```
+
+---
+
+# Size-range invariance test
+
+A true power law is **scale-invariant**: the slope should not change when the
+analysis is restricted to different portions of the size distribution.  A
+systematically changing slope across DBH windows is evidence against a single
+power-law mechanism operating across the full size range.
+
+The quantile regression of sap flux density vs. diameter provides an additional
+test: if $k_{SA}$ is truly size-independent (pipe model), the slope at every
+quantile should be near zero.
+
+```{r size-windows, fig.height=4, fig.cap="Scale-invariance test: SMA slope for E~DBH within three non-overlapping DBH windows. If the power law is scale-invariant, slopes should be statistically indistinguishable from each other and consistent with the theoretical value of 2.0 (red dashed line)."}
+dat_w <- dat |>
+  mutate(
+    size_class = factor(
+      case_when(
+        pl_dbh < 5    ~ "Small (<5 cm)",
+        pl_dbh <= 20  ~ "Medium (5\u201320 cm)",
+        TRUE          ~ "Large (>20 cm)"
+      ),
+      levels = c("Small (<5 cm)", "Medium (5\u201320 cm)", "Large (>20 cm)")
+    )
+  )
+
+window_sma <- dat_w |>
+  tidyr::nest(data = -size_class) |>
+  mutate(
+    n       = map_int(data, nrow),
+    dbh_min = map_dbl(data, ~ min(.x$pl_dbh, na.rm = TRUE)),
+    dbh_max = map_dbl(data, ~ max(.x$pl_dbh, na.rm = TRUE)),
+    fit     = map(data, ~ {
+      if (nrow(.x) < 10) return(NULL)
+      tryCatch(sma(log_e ~ log_dbh, data = .x, method = "SMA"),
+               error = function(e) NULL)
+    }),
+    slope  = map_dbl(fit, ~ if (is.null(.x)) NA_real_ else coef(.x)[2]),
+    ci_lo  = map_dbl(fit, ~ if (is.null(.x)) NA_real_ else .x$coef[[1]][2,2]),
+    ci_hi  = map_dbl(fit, ~ if (is.null(.x)) NA_real_ else .x$coef[[1]][2,3]),
+    r2     = map_dbl(fit, ~ if (is.null(.x)) NA_real_ else .x$r2[[1]])
+  )
+
+kable(
+  window_sma |>
+    select(size_class, n, dbh_min, dbh_max, slope, ci_lo, ci_hi, r2) |>
+    mutate(across(c(dbh_min, dbh_max, slope, ci_lo, ci_hi, r2),
+                  ~ round(.x, 3))) |>
+    rename(
+      `Size class`  = size_class,
+      N             = n,
+      `DBH min (cm)` = dbh_min,
+      `DBH max (cm)` = dbh_max,
+      `SMA slope`   = slope,
+      `CI low`      = ci_lo,
+      `CI high`     = ci_hi,
+      `R2`          = r2
+    ),
+  caption = "SMA slope for E~DBH within each DBH size window (scale-invariance test)"
+)
+
+ggplot(window_sma |> filter(!is.na(slope)),
+       aes(x = size_class, y = slope, ymin = ci_lo, ymax = ci_hi)) +
+  geom_hline(yintercept = 2.0, linetype = "dashed",
+             colour = "#d6604d", linewidth = 0.9) +
+  geom_pointrange(colour = "#2166ac", size = 1.0) +
+  geom_text(aes(label = paste0("n=", n)),
+            nudge_x = 0.12, size = 3.5, colour = "grey30") +
+  annotate("text", x = 0.55, y = 2.0, label = "Pipe model / WBE = 2.0",
+           vjust = -0.5, hjust = 0, colour = "#d6604d", size = 3.5) +
+  labs(
+    x = "DBH size class",
+    y = "SMA slope  (log E ~ log DBH)",
+    title = "Scale-invariance test: SMA slope by DBH window",
+    subtitle = "Consistent slopes across windows support a single power-law mechanism"
+  )
+```
+
+```{r sfd-quantile, fig.height=4.5, fig.cap="Quantile regression of log sap flux density (SFD = E/SA) vs. log stem diameter at the 10th, 50th, and 90th percentiles. Slopes near zero at all quantiles support size-independence of SFD (pipe model null). Non-zero slope at the 90th percentile but not the median would indicate that only the largest trees deviate."}
+# Pipe-model invariance: SFD should be size-independent
+dat_sfd_qr <- dat |>
+  mutate(log_sfd = log10(e_tree / pl_sapw_area)) |>
+  filter(is.finite(log_sfd), !is.na(log_dbh))
+
+taus <- c(0.10, 0.50, 0.90)
+qr_fits <- lapply(taus, function(tau) {
+  rq(log_sfd ~ log_dbh, data = dat_sfd_qr, tau = tau)
+})
+names(qr_fits) <- paste0("tau=", taus)
+
+# Coefficient table (sandwich SE, computationally inexpensive)
+qr_coef_rows <- lapply(names(qr_fits), function(nm) {
+  s    <- summary(qr_fits[[nm]], se = "nid")
+  cmat <- as.data.frame(s$coefficients)
+  tibble(
+    Quantile  = nm,
+    Term      = rownames(cmat),
+    Estimate  = cmat[[1]],
+    `Std. Error` = cmat[[2]],
+    `t value` = cmat[[3]],
+    `p value` = cmat[[4]]
+  )
+})
+qr_table <- bind_rows(qr_coef_rows) |>
+  filter(Term == "log_dbh") |>
+  select(-Term) |>
+  mutate(across(where(is.numeric), ~ round(.x, 4)))
+
+kable(qr_table,
+      caption = "Quantile regression: log(SFD) ~ log(DBH) — slope at 10th, 50th, 90th percentile")
+
+# Prediction lines
+dbh_seq  <- seq(min(dat_sfd_qr$log_dbh), max(dat_sfd_qr$log_dbh),
+                length.out = 200)
+qr_lines <- lapply(names(qr_fits), function(nm) {
+  cf <- coef(qr_fits[[nm]])
+  tibble(
+    log_dbh  = dbh_seq,
+    log_sfd  = cf[1] + cf[2] * dbh_seq,
+    quantile = nm
+  )
+}) |> bind_rows()
+
+ggplot(dat_sfd_qr, aes(x = log_dbh, y = log_sfd)) +
+  geom_point(aes(colour = growth_form), alpha = 0.14, size = 0.9) +
+  geom_line(data  = qr_lines,
+            aes(x = log_dbh, y = log_sfd,
+                linetype = quantile, group = quantile),
+            colour = "black", linewidth = 1.0) +
+  geom_hline(yintercept = mean(dat_sfd_qr$log_sfd, na.rm = TRUE),
+             linetype = "dotted", colour = "grey50", linewidth = 0.7) +
+  scale_colour_manual(
+    values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+  ) +
+  scale_linetype_manual(
+    values = c("tau=0.1"  = "dotdash",
+               "tau=0.5"  = "solid",
+               "tau=0.9"  = "longdash"),
+    labels = c("tau=0.1"  = "10th pctile",
+               "tau=0.5"  = "Median",
+               "tau=0.9"  = "90th pctile")
+  ) +
+  labs(
+    x        = expression(log[10] ~ "Stem diameter (cm)"),
+    y        = expression(log[10] ~ "Sap flux density  (L day" ^ {-1} ~ cm ^ {-2} * ")"),
+    colour   = "Growth form",
+    linetype = "Quantile",
+    title    = "Pipe-model invariance: sap flux density vs. stem diameter",
+    subtitle = "Slope near zero = size-independent SFD (pipe model holds)"
+  ) +
+  theme(legend.position = "bottom")
+```
+
+---
+
+# Hydraulic normalization constants
+
+The antilog of the SMA intercept from $\log E = b_0 + b_1 \log S_A$ gives
+
+$$k_{SA} = 10^{b_0} \quad [\text{L day}^{-1}\,\text{cm}^{-2}]$$
+
+This is the **effective sap flux density** — the average water throughput per
+unit sapwood cross-section.  It is a physiologically interpretable quantity
+that varies with stomatal conductance regime, hydraulic architecture, and
+atmospheric demand.  Differences across biomes and functional types represent
+climatic and anatomical modulation of the normalization constant that is
+otherwise invisible in slope-only comparisons.
+
+```{r hydro-norm, fig.height=4.5, fig.cap="Hydraulic normalization constant k_SA (= 10^intercept from E~SA SMA) by growth form (table) and biome (dot plot). Red dashed line = global mean k_SA. Biomes above the line maintain higher sap flux density per unit sapwood area."}
+# ── Global normalisation constant ─────────────────────────────────────────────
+hyd_norm_global <- 10^coef(fit_sa)[1]
+cat(sprintf(
+  "Global k_SA: 10^%.4f = %.4f L day\u207b\u00b9 cm\u207b\u00b2\n",
+  coef(fit_sa)[1], hyd_norm_global
+))
+
+# ── By growth form (from gf_fits; metric == 'SA') ─────────────────────────────
+hyd_norm_gf <- gf_fits |>
+  filter(metric == "SA", !is.na(slope)) |>
+  rowwise() |>
+  mutate(
+    intercept = if (!is.null(fit)) coef(fit)[1] else NA_real_,
+    hyd_norm  = 10^intercept
+  ) |>
+  ungroup() |>
+  select(growth_form, n, intercept, hyd_norm, slope, ci_lo, ci_hi)
+
+kable(
+  hyd_norm_gf |>
+    mutate(across(where(is.numeric), ~ round(.x, 4))) |>
+    rename(
+      `Growth form`     = growth_form,
+      N                 = n,
+      `log10(k_SA)`     = intercept,
+      `k_SA (L/d/cm2)` = hyd_norm,
+      `E~SA slope`      = slope,
+      `CI low`          = ci_lo,
+      `CI high`         = ci_hi
+    ),
+  caption = "Hydraulic normalisation constant k_SA by growth form"
+)
+
+# ── By biome (from biome_sma) ─────────────────────────────────────────────────
+if (!is.null(biome_sma) && "intercept_sa" %in% names(biome_sma)) {
+
+  hyd_norm_biome <- biome_sma |>
+    filter(!is.na(intercept_sa)) |>
+    mutate(hyd_norm = 10^intercept_sa) |>
+    select(si_biome, n, intercept_sa, hyd_norm,
+           slope_sa, ci_lo_sa, ci_hi_sa) |>
+    arrange(desc(hyd_norm))
+
+  kable(
+    hyd_norm_biome |>
+      mutate(across(where(is.numeric), ~ round(.x, 4))) |>
+      rename(
+        Biome                = si_biome,
+        N                    = n,
+        `log10(k_SA)`        = intercept_sa,
+        `k_SA (L/d/cm2)`    = hyd_norm,
+        `E~SA slope`         = slope_sa,
+        `CI low (slope)`     = ci_lo_sa,
+        `CI high (slope)`    = ci_hi_sa
+      ),
+    caption = "Hydraulic normalisation constant k_SA by biome"
+  )
+
+  ggplot(hyd_norm_biome,
+         aes(x = reorder(si_biome, hyd_norm),
+             y = hyd_norm, size = n)) +
+    geom_point(colour = "#2166ac", alpha = 0.85) +
+    geom_hline(yintercept = hyd_norm_global,
+               linetype = "dashed", colour = "#d6604d",
+               linewidth = 0.8) +
+    annotate("text",
+             x     = 0.6,
+             y     = hyd_norm_global,
+             label = sprintf("Global k_SA = %.4f", hyd_norm_global),
+             vjust = -0.55, hjust = 0, size = 3.5, colour = "#d6604d") +
+    coord_flip() +
+    scale_size_continuous(range = c(3, 10)) +
+    labs(
+      x        = NULL,
+      y        = expression(k[SA] ~ "(L day" ^ {-1} ~ cm ^ {-2} * ")"),
+      size     = "N trees",
+      title    = expression("Hydraulic normalisation constant " * k[SA] * " by biome"),
+      subtitle = "Antilog of E~SA SMA intercept  |  Red dashed = global mean"
+    ) +
+    theme(legend.position = "right")
+
+} else {
+  cat("biome_sma not available \u2014 run the biome-stratified SMA section first\n")
+}
+```
+
+---
+
+# Regression method comparison: OLS, RMA (SMA), and PGLS
+
+Ordinary least squares (OLS), standardised major axis regression (SMA, equivalent to RMA for the bivariate case), and phylogenetic generalised least squares (PGLS) make different assumptions about measurement error, data independence, and evolutionary history. OLS minimises residuals in the $y$-direction only, producing a slope attenuated toward zero when both variables carry error. SMA minimises residuals symmetrically and is preferred when both axes carry measurement uncertainty, as is standard for allometric data. PGLS operates on species means and accounts for shared evolutionary history via Pagel's $\lambda$, which quantifies the degree to which residual variance tracks the phylogenetic covariance matrix.
+
+```{r taxon-reconciliation}
+# Required for this section: V.PhyloMaker2, caper, ape
+# (loaded in setup chunk above)
+
+if (USE_REAL_DATA && "pl_species" %in% names(dat)) {
+
+  # Count trees per species
+  sp_counts <- dat |>
+    filter(!is.na(pl_species), nchar(trimws(pl_species)) > 0) |>
+    count(pl_species, name = "n_trees")
+
+  # Parse genus as first word of binomial
+  sp_list_raw <- sp_counts |>
+    mutate(
+      species = pl_species,
+      genus   = stringr::word(pl_species, 1)
+    )
+
+  # Family lookup from V.PhyloMaker2 species table (LCVP backbone)
+  # tips.info.LCVP columns: group, species (Genus_species), genus, family
+  tips_lcvp     <- V.PhyloMaker2::tips.info.LCVP
+  # Convert backbone species to space format for matching against pl_species
+  tips_sp_space <- gsub("_", " ", tips_lcvp$species)
+
+  genus_family <- tips_lcvp |>
+    select(genus, family) |>
+    distinct(genus, .keep_all = TRUE)
+
+  sp_list <- sp_list_raw |>
+    left_join(genus_family, by = "genus") |>
+    mutate(
+      family       = if_else(is.na(family), "Unknown", family),
+      match_status = case_when(
+        species %in% tips_sp_space     ~ "matched",
+        genus   %in% tips_lcvp$genus   ~ "genus_only",
+        TRUE                            ~ "unmatched"
+      )
+    )
+
+  n_total      <- nrow(sp_list)
+  n_matched    <- sum(sp_list$match_status == "matched")
+  n_genus_only <- sum(sp_list$match_status == "genus_only")
+  n_unmatched  <- sum(sp_list$match_status == "unmatched")
+
+  cat(sprintf(
+    "Taxonomy reconciliation \u2014 %d species total\n  matched: %d (%.1f%%)\n  genus-only: %d (%.1f%%)\n  unmatched: %d (%.1f%%)\n",
+    n_total,
+    n_matched,    100 * n_matched    / n_total,
+    n_genus_only, 100 * n_genus_only / n_total,
+    n_unmatched,  100 * n_unmatched  / n_total
+  ))
+
+  kable(
+    sp_list |>
+      select(species, genus, family, match_status, n_trees) |>
+      arrange(match_status, species) |>
+      rename(
+        Species        = species,
+        Genus          = genus,
+        Family         = family,
+        `Match status` = match_status,
+        `N trees`      = n_trees
+      ),
+    caption = "Taxonomy reconciliation: SAPFLUXNET species matched to V.PhyloMaker2 GBIF backbone. match_status: matched = exact species in backbone; genus_only = genus placed, species absent; unmatched = genus absent."
+  )
+
+} else {
+  sp_list <- NULL
+  message(
+    "Taxonomy reconciliation skipped: requires USE_REAL_DATA = TRUE ",
+    "and pl_species column in dat."
+  )
+}
+```
+
+```{r phylo-build}
+if (USE_REAL_DATA && !is.null(sp_list)) {
+
+  n_unknown        <- sum(sp_list$family == "Unknown")
+  sp_list_for_tree <- sp_list |>
+    filter(family != "Unknown") |>
+    select(species, genus, family) |>
+    distinct(species, .keep_all = TRUE)
+
+  cat(sprintf(
+    "Building genus-level phylogeny (scenario S3) for %d species\n  (%d species with Unknown family excluded from tree build)\n",
+    nrow(sp_list_for_tree), n_unknown
+  ))
+
+  phy <- tryCatch({
+    result <- phylo.maker(
+      sp.list        = as.data.frame(sp_list_for_tree),
+      tree           = V.PhyloMaker2::GBOTB.extended.LCVP,
+      nodes          = V.PhyloMaker2::nodes.info.1.LCVP,
+      output.sp.list = FALSE,
+      scenarios      = "S3",
+      r              = 1
+    )
+    result$scenario.3
+  }, error = function(e) {
+    message("phylo.maker() failed: ", conditionMessage(e))
+    NULL
+  })
+
+  if (!is.null(phy)) {
+    cat(sprintf(
+      "Phylogeny built: %d tips\nIs ultrametric: %s\n",
+      length(phy$tip.label),
+      is.ultrametric(phy)
+    ))
+  } else {
+    cat("Tree build failed \u2014 PGLS sections will be skipped.\n")
+  }
+
+} else {
+  phy <- NULL
+  if (!USE_REAL_DATA) {
+    message("Phylogeny build skipped: PGLS requires real SAPFLUXNET species data.")
+  }
+}
+```
+
+```{r pgls-setup}
+sp_means   <- NULL
+comp_data  <- NULL
+phy_pruned <- NULL
+
+if (USE_REAL_DATA && !is.null(phy) && "pl_species" %in% names(dat)) {
+
+  sp_means <- dat |>
+    group_by(pl_species, growth_form) |>
+    summarise(
+      log_e   = mean(log_e,   na.rm = TRUE),
+      log_dbh = mean(log_dbh, na.rm = TRUE),
+      log_sa  = mean(log_sa,  na.rm = TRUE),
+      n       = n(),
+      .groups = "drop"
+    ) |>
+    filter(n >= 3) |>
+    mutate(tip_label = gsub(" ", "_", pl_species))
+
+  cat(sprintf("Species means: %d species with >= 3 trees each\n", nrow(sp_means)))
+
+  # V.PhyloMaker2 tip labels use Genus_species (underscore) format
+  shared_tips <- intersect(sp_means$tip_label, phy$tip.label)
+  cat(sprintf(
+    "Species in common with phylogeny tips: %d of %d\n",
+    length(shared_tips), nrow(sp_means)
+  ))
+
+  if (length(shared_tips) >= 10) {
+
+    phy_pruned <- drop.tip(phy, setdiff(phy$tip.label, shared_tips))
+
+    sp_means_df <- sp_means |>
+      filter(tip_label %in% shared_tips) |>
+      as.data.frame()
+
+    comp_data <- tryCatch(
+      caper::comparative.data(
+        phy          = phy_pruned,
+        data         = sp_means_df,
+        names.col    = "tip_label",
+        vcv          = TRUE,
+        warn.dropped = FALSE
+      ),
+      error = function(e) {
+        message("comparative.data() failed: ", conditionMessage(e))
+        NULL
+      }
+    )
+
+    if (!is.null(comp_data)) {
+      cat(sprintf(
+        "Comparative data object ready: %d species in pruned tree\n",
+        length(phy_pruned$tip.label)
+      ))
+    }
+
+  } else {
+    cat(sprintf(
+      "Only %d species overlap between data and tree (minimum 10 required) \u2014 PGLS skipped.\n",
+      length(shared_tips)
+    ))
+    sp_means <- sp_means |> filter(tip_label %in% shared_tips)
+  }
+
+} else if (!USE_REAL_DATA) {
+  message("PGLS setup skipped: requires real SAPFLUXNET data (USE_REAL_DATA = TRUE).")
+}
+```
+
+```{r reg-comparison}
+fit_ols         <- NULL
+fit_pgls        <- NULL
+pgls_lambda_val <- NA_real_
+pgls_n          <- NA_integer_
+
+if (USE_REAL_DATA && !is.null(sp_means) && nrow(sp_means) >= 10 &&
+    !is.null(comp_data)) {
+
+  # OLS on all individual trees
+  fit_ols  <- lm(log_e ~ log_dbh, data = dat)
+  ols_summ <- summary(fit_ols)
+  ols_ci   <- confint(fit_ols)
+  ols_n    <- nrow(model.frame(fit_ols))
+
+  # RMA/SMA \u2014 reuse fit_dbh from the sma-dbh chunk
+  sma_slope <- coef(fit_dbh)[2]
+  sma_ci_lo <- fit_dbh$coef[[1]][2, 2]
+  sma_ci_hi <- fit_dbh$coef[[1]][2, 3]
+  sma_r2    <- fit_dbh$r2[[1]]
+  sma_p     <- tryCatch(fit_dbh$pval[[1]], error = function(e) NA_real_)
+  sma_n     <- nrow(dat)
+
+  # PGLS on species means with ML Pagel lambda
+  fit_pgls <- tryCatch(
+    caper::pgls(log_e ~ log_dbh, data = comp_data, lambda = "ML"),
+    error = function(e) {
+      message("PGLS failed: ", conditionMessage(e))
+      NULL
+    }
+  )
+
+  if (!is.null(fit_pgls)) {
+
+    pgls_summ      <- summary(fit_pgls)
+    pgls_coef_mat  <- pgls_summ$coefficients
+    pgls_slope     <- pgls_coef_mat["log_dbh", "Estimate"]
+    pgls_slope_se  <- pgls_coef_mat["log_dbh", "Std. Error"]
+    pgls_p         <- pgls_coef_mat["log_dbh", "Pr(>|t|)"]
+    pgls_r2        <- pgls_summ$r.sq
+    pgls_lambda_val <- as.numeric(fit_pgls$param["lambda"])
+    pgls_n          <- nrow(comp_data$data)
+
+    pgls_ci_lo <- pgls_slope - 1.96 * pgls_slope_se
+    pgls_ci_hi <- pgls_slope + 1.96 * pgls_slope_se
+
+    lambda_ci <- tryCatch({
+      ci <- fit_pgls$param.CI$lambda
+      c(lo = unname(ci["lower.CI"]), hi = unname(ci["upper.CI"]))
+    }, error = function(e) c(lo = NA_real_, hi = NA_real_))
+
+    comp_table <- tibble(
+      Method    = c("OLS", "RMA/SMA", "PGLS"),
+      n         = c(ols_n, sma_n, pgls_n),
+      Slope     = round(c(coef(fit_ols)["log_dbh"], sma_slope, pgls_slope), 3),
+      CI_low    = round(c(ols_ci["log_dbh", 1], sma_ci_lo, pgls_ci_lo), 3),
+      CI_high   = round(c(ols_ci["log_dbh", 2], sma_ci_hi, pgls_ci_hi), 3),
+      R2        = round(c(ols_summ$r.squared, sma_r2, pgls_r2), 3),
+      pvalue    = signif(c(
+                    ols_summ$coefficients["log_dbh", "Pr(>|t|)"],
+                    sma_p,
+                    pgls_p), 3),
+      lambda_ML = c(NA_real_, NA_real_, round(pgls_lambda_val, 3))
+    )
+
+    kable(
+      comp_table,
+      col.names = c("Method", "n", "Slope", "CI low", "CI high",
+                    "R\u00b2", "p-value", "\u03bb (Pagel)"),
+      caption = sprintf(
+        "Regression method comparison for E ~ DBH (log-log scale). OLS and SMA use all individual trees (n = %d); PGLS uses species means (n = %d species). Pagel's lambda estimated by ML. R\u00b2 for SMA is the squared Pearson correlation.",
+        ols_n, pgls_n
+      )
+    )
+
+    cat(sprintf(
+      "\nPagel's lambda: %.3f  (95%% CI: %.3f \u2013 %.3f, n = %d species)\n",
+      pgls_lambda_val,
+      lambda_ci["lo"],
+      lambda_ci["hi"],
+      pgls_n
+    ))
+
+  } else {
+    message("PGLS fit failed \u2014 method comparison table not available.")
+  }
+
+} else {
+  message(
+    "Regression comparison skipped: requires USE_REAL_DATA = TRUE ",
+    "and >= 10 species with both data and phylogeny coverage."
+  )
+}
+```
+
+```{r reg-comparison-plot, fig.height=5.5, fig.cap="Scatter plot of log10 whole-tree water use vs. log10 stem diameter (grey points, shape by growth form). Three regression lines overlaid: OLS on all trees (blue solid), SMA on all trees (black solid), PGLS on species means (red dashed). Open circles are species means used in PGLS. Note: OLS and SMA degrees of freedom are the number of individual trees; PGLS degrees of freedom are the number of species in the pruned phylogeny."}
+if (USE_REAL_DATA && !is.null(sp_means) && nrow(sp_means) >= 10 &&
+    !is.null(fit_pgls) && !is.null(phy_pruned)) {
+
+  x_rng <- range(dat$log_dbh, na.rm = TRUE)
+  x_seq <- seq(x_rng[1], x_rng[2], length.out = 200)
+
+  ols_cf  <- coef(fit_ols)
+  sma_cf  <- coef(fit_dbh)
+  pgls_cf <- coef(fit_pgls)
+
+  pred_lines <- bind_rows(
+    tibble(log_dbh = x_seq,
+           log_e   = ols_cf["(Intercept)"] + ols_cf["log_dbh"] * x_seq,
+           Method  = "OLS (all trees)"),
+    tibble(log_dbh = x_seq,
+           log_e   = sma_cf[1] + sma_cf[2] * x_seq,
+           Method  = "RMA/SMA (all trees)"),
+    tibble(log_dbh = x_seq,
+           log_e   = pgls_cf["(Intercept)"] + pgls_cf["log_dbh"] * x_seq,
+           Method  = "PGLS (species means)")
+  )
+
+  line_cols  <- c(
+    "OLS (all trees)"      = "#2166ac",
+    "RMA/SMA (all trees)"  = "#333333",
+    "PGLS (species means)" = "#d6604d"
+  )
+  line_lty <- c(
+    "OLS (all trees)"      = "solid",
+    "RMA/SMA (all trees)"  = "solid",
+    "PGLS (species means)" = "dashed"
+  )
+
+  sp_means_pgls <- sp_means |> filter(tip_label %in% phy_pruned$tip.label)
+
+  ggplot() +
+    geom_point(
+      data = dat,
+      aes(x = log_dbh, y = log_e, shape = growth_form),
+      colour = "grey55", alpha = 0.13, size = 0.9
+    ) +
+    geom_line(
+      data = pred_lines,
+      aes(x = log_dbh, y = log_e, colour = Method, linetype = Method),
+      linewidth = 1.15
+    ) +
+    geom_point(
+      data = sp_means_pgls,
+      aes(x = log_dbh, y = log_e),
+      shape = 21, fill = "white", colour = "#d6604d",
+      size = 2.8, alpha = 0.85
+    ) +
+    scale_colour_manual(values = line_cols,  name = "Regression") +
+    scale_linetype_manual(values = line_lty, name = "Regression") +
+    scale_shape_manual(
+      values = c(Angiosperm = 16, Conifer = 17),
+      name   = "Growth form"
+    ) +
+    guides(
+      colour   = guide_legend(order = 1,
+                              override.aes = list(linewidth = 1.5, alpha = 1)),
+      linetype = guide_legend(order = 1),
+      shape    = guide_legend(order = 2,
+                              override.aes = list(colour = "grey40",
+                                                  alpha  = 0.8, size = 2))
+    ) +
+    labs(
+      x        = expression(log[10]~"Stem diameter (cm)"),
+      y        = expression(log[10]~"Whole-tree water use (L day"^{-1}*")"),
+      title    = expression(E[tree]~"~ DBH: OLS vs. RMA/SMA vs. PGLS"),
+      subtitle = sprintf(
+        "n = %d trees (grey)  |  %d species means (open circles) used in PGLS",
+        nrow(dat), nrow(sp_means_pgls)
+      )
+    ) +
+    theme(legend.position = "bottom", legend.box = "horizontal")
+
+} else {
+  message(
+    "Regression comparison plot skipped: requires USE_REAL_DATA = TRUE ",
+    "and a successful PGLS fit."
+  )
+}
+```
+
+```{r lambda-interpretation, results='asis'}
+if (USE_REAL_DATA && !is.na(pgls_lambda_val) && !is.null(fit_pgls)) {
+
+  lambda_ci <- tryCatch({
+    ci <- fit_pgls$param.CI$lambda
+    c(lo = unname(ci["lower.CI"]), hi = unname(ci["upper.CI"]))
+  }, error = function(e) c(lo = NA_real_, hi = NA_real_))
+
+  ols_slope_val  <- coef(fit_ols)["log_dbh"]
+  pgls_slope_val <- coef(fit_pgls)["log_dbh"]
+  slope_diff     <- abs(ols_slope_val - pgls_slope_val)
+
+  lambda_near_1 <- pgls_lambda_val > 0.7
+  lambda_near_0 <- pgls_lambda_val < 0.3
+  ci_lo         <- lambda_ci["lo"]
+  ci_hi         <- lambda_ci["hi"]
+  ci_incl_0     <- !is.na(ci_lo) && ci_lo < 0.05
+  ci_incl_1     <- !is.na(ci_hi) && ci_hi > 0.95
+
+  msg_signal <- if (lambda_near_1) {
+    paste0(
+      "\u03bb \u2248 ", round(pgls_lambda_val, 2),
+      ": strong phylogenetic signal. Residual variance in species-mean E tracks ",
+      "the phylogenetic covariance matrix, consistent with Brownian-motion ",
+      "evolution of hydraulic traits."
+    )
+  } else if (lambda_near_0) {
+    paste0(
+      "\u03bb \u2248 ", round(pgls_lambda_val, 2),
+      ": negligible phylogenetic signal. Species means behave as approximately ",
+      "independent observations; OLS and PGLS slopes converge."
+    )
+  } else {
+    paste0(
+      "\u03bb = ", round(pgls_lambda_val, 2),
+      ": intermediate phylogenetic signal. Residual covariance exceeds a ",
+      "star-phylogeny expectation but falls below full Brownian-motion covariance."
+    )
+  }
+
+  msg_ci <- if (ci_incl_0 && ci_incl_1) {
+    "The 95% CI spans 0 to 1: the estimate is imprecise and the data are consistent with either no signal or full Brownian covariance. Interpret with caution."
+  } else if (ci_incl_0) {
+    "The 95% CI includes 0: OLS would be a defensible alternative to PGLS for these data."
+  } else if (ci_incl_1) {
+    "The 95% CI includes 1: full Brownian-motion covariance cannot be excluded."
+  } else {
+    "The 95% CI excludes both 0 and 1: intermediate phylogenetic signal is well-supported."
+  }
+
+  msg_slopes <- if (slope_diff > 0.1) {
+    sprintf(
+      "OLS slope (%.3f) and PGLS slope (%.3f) differ by %.3f log-log units, ",
+      ols_slope_val, pgls_slope_val, slope_diff
+    ) |> paste0(
+      "suggesting that phylogenetic non-independence meaningfully shifts the ",
+      "estimated scaling exponent."
+    )
+  } else {
+    sprintf(
+      "OLS slope (%.3f) and PGLS slope (%.3f) differ by only %.3f log-log units; ",
+      ols_slope_val, pgls_slope_val, slope_diff
+    ) |> paste0(
+      "phylogenetic correction has minimal effect on the scaling exponent in this dataset."
+    )
+  }
+
+  ci_lo_str <- if (is.na(ci_lo)) "NA" else sprintf("%.3f", ci_lo)
+  ci_hi_str <- if (is.na(ci_hi)) "NA" else sprintf("%.3f", ci_hi)
+
+  cat(paste0(
+    "**Pagel's \u03bb interpretation**\n\n",
+    sprintf(
+      "Pagel's \u03bb (ML estimate): **%.3f** (95%% CI: %s \u2013 %s; n\u202f=\u202f%d species in PGLS).\n\n",
+      pgls_lambda_val, ci_lo_str, ci_hi_str, pgls_n
+    ),
+    msg_signal, "\n\n",
+    msg_ci, "\n\n",
+    msg_slopes, "\n"
+  ))
+
+} else {
+  cat("> Pagel's \u03bb not available: requires USE_REAL_DATA = TRUE and a successful PGLS fit.\n")
+}
+```
+
+## Caveats for the PGLS analysis
+
+1. **Species-mean aggregation.** PGLS uses per-species means, collapsing all within-species variation. The estimated slope may therefore differ from the individual-tree slope, because between-species differences in body-size range and hydraulic architecture are confounded in the species mean. The OLS and SMA slopes on all $n$ individual trees remain the primary scaling estimates; PGLS adds a phylogenetic-signal perspective on the species-level relationship.
+
+2. **Placement uncertainty.** V.PhyloMaker2 places species absent from the GBIF backbone by binding them to their genus node (scenario S3). For poorly represented genera, this introduces error in branch lengths and therefore in the variance\u2013covariance matrix used by PGLS. Rare or taxonomically uncertain species should be treated with caution.
+
+3. **Reliability of $\lambda$ with few species.** Pagel's $\lambda$ is estimated from the residual variance\u2013covariance structure. When the number of species in the PGLS is small (< 30), the ML estimate is unstable and the confidence interval wide. Check the reported $n_{\text{PGLS}}$; if substantially smaller than the full species count, the $\lambda$ estimate may be unreliable.
+
+4. **Phylogenetic sampling bias.** SAPFLUXNET species are not a random phylogenetic sample. Temperate Pinaceae (conifers) and Fagaceae (deciduous angiosperms) are over-represented relative to tropical and subtropical lineages. This affects both the $\lambda$ estimate and the generalisability of the PGLS slope across the broader tree of life.
+
+5. **Temporal-averaging offset.** All values use active-flow-timestep means rather than growing-season daily means as in Forrester et al.\ (2022). This affects intercepts but not slopes in the log\u2013log regression, provided the averaging bias is size-independent (see data-loading caveats above).
+
+---
+
 # Data status and download instructions
 
 ```{r data-status}
@@ -801,6 +2017,25 @@ if (!USE_REAL_DATA) {
 * SAPFLUXNET v0.1.5 (2020). Zenodo. DOI: 10.5281/zenodo.3971689
 
 * Zimmermann MH (1983). *Xylem Structure and the Ascent of Sap*. Springer.
+
+* West GB, Brown JH, Enquist BJ (1997). A general model for the origin of
+  allometric scaling laws in biology. *Science* **276**: 122–126.
+  DOI: 10.1126/science.276.5309.122
+
+* Shinozaki K, Yoda K, Hozumi K, Kira T (1964). A quantitative analysis of
+  plant form — the pipe model theory. *Japanese Journal of Ecology* **14**: 97–105.
+
+* Bates D, Maechler M, Bolker B, Walker S (2015). Fitting linear mixed-effects
+  models using lme4. *Journal of Statistical Software* **67**: 1–48.
+  DOI: 10.18637/jss.v067.i01
+
+* Ludecke D, Ben-Shachar MS, Patil I, Waggoner P, Makowski D (2021).
+  performance: An R package for assessment, comparison and testing of
+  statistical models. *Journal of Open Source Software* **6**: 3139.
+  DOI: 10.21105/joss.03139
+
+* Koenker R, Bassett G (1978). Regression quantiles. *Econometrica* **46**: 33–50.
+  DOI: 10.2307/1913643
 
 * Warton DI, Hui FKC (2012). The arcsine is asinine: the analysis of proportions
   in ecology. *Ecology* **92**: 3–10.

@@ -53,3 +53,4 @@
 5. Theoretical anchoring: WBE (2/3, 8/3), MST (1/3, 3/4), Chave 0.65 prediction sources cited in comments
 
 2026-05-02 | Added PGLS (caper, V.PhyloMaker2), intraspecific vs interspecific scaling decomposition (Glazier 2005 framework), and per-family SMA/PGLS to kurosawa_respiration_scaling.Rmd. Demo data regenerated with 52 named species (10 APG IV families). All 65 chunks render clean. HTML: kurosawa_respiration_scaling.html (3.9 MB).
+2026-05-02 | sapfluxnet_water_use_scaling.Rmd: Added six advanced scaling analysis sections (theoretical framework, site effects LMM, biome-stratified SMA, climate intercept modulation, size-range invariance, hydraulic normalisation constants). Packages: lme4, performance, quantreg. Rendered successfully.
