@@ -203,6 +203,161 @@ dat2 |>
 
 ---
 
+# Geographic coverage
+
+> **⚠ Caveat:** The Niklas-Enquist CSV contains **no latitude/longitude columns**.
+> Geographic origin is inferred here by keyword-matching citation strings and,
+> secondarily, taxon names. Assignments are approximate and unverified.
+> Centroids represent the broad inferred region, not precise sampling locations.
+
+```{r geo-assign}
+# ── Keyword → region lookup ───────────────────────────────────────────────────
+# Rules are ordered: first match wins. More-specific rules precede catch-alls.
+classify_region <- function(citation, taxa) {
+  cit <- ifelse(is.na(citation), "", citation)
+  tax <- ifelse(is.na(taxa), "", taxa)
+
+  dplyr::case_when(
+    # Sudan
+    grepl("Gezira",           cit, ignore.case=TRUE) ~ "Sudan",
+
+    # Germany
+    grepl("Harz Mountains|Germany|Gentianella Germanica", cit, ignore.case=TRUE) ~ "Germany",
+
+    # Sweden / Scandinavia
+    grepl("Sweden|Swedish|J.derlund|Jaderlund|Zackrisson|Norberg", cit, ignore.case=TRUE) ~ "Sweden",
+
+    # Finland
+    grepl("Finland|Finnish|Oksanen", cit, ignore.case=TRUE) ~ "Finland",
+
+    # Pakistan
+    grepl("Pakistan Journal", cit, ignore.case=TRUE) ~ "Pakistan",
+
+    # India
+    grepl("India|Indian Forestry", cit, ignore.case=TRUE) |
+      grepl("Inamdar|Kharak Singh", cit, ignore.case=TRUE) ~ "India",
+
+    # French Guiana
+    grepl("French Guiana", cit, ignore.case=TRUE) ~ "French Guiana",
+
+    # Sri Lanka
+    grepl("Gunatilleke|Sri Lanka|Peradeniya", cit, ignore.case=TRUE) ~ "Sri Lanka",
+
+    # Alaska (explicitly named)
+    grepl("Alaskan|Alaska", cit, ignore.case=TRUE) ~ "Alaska (USA)",
+
+    # USA (explicit state/institution clues)
+    grepl("Georgia, U\\.S\\.A|Cornell University|Ithaca, New York|loblolly|slash pine",
+          cit, ignore.case=TRUE) ~ "USA",
+    grepl("Douglas-fir seedlings|Pacific Northwest|Michigan|Ohio|Minnesota|Populus tremuloides.*sucoff",
+          cit, ignore.case=TRUE) ~ "USA",
+
+    # Australia
+    grepl("Australia|Snowy Mountains|Eucalypt", cit, ignore.case=TRUE) ~ "Australia",
+
+    # UK / British Isles (Scotland explicitly)
+    grepl("Scotland|Blanket Peat.*Scotland", cit, ignore.case=TRUE) ~ "Scotland (UK)",
+    grepl("British Isles|Journal of Ecology|Annals of Bot|Biological Flora|Heather Moorland",
+          cit, ignore.case=TRUE) ~ "UK / Europe",
+
+    # Canada (Can. J. For. Res. studies that describe Canadian work)
+    grepl("Can\\. J\\. For\\. Res\\.|Canadian Journal",
+          cit, ignore.case=TRUE) ~ "Canada / North America",
+
+    # Cannell compilation — global multi-region
+    grepl("Cannell", cit, ignore.case=TRUE) ~ "Global (Cannell 1982)",
+
+    # Unpublished / personal communication
+    grepl("personal communication|unpublished data", cit, ignore.case=TRUE) ~ "USA (unpublished)",
+
+    TRUE ~ "Unclassified"
+  )
+}
+
+dat_geo <- dat |>
+  mutate(region = classify_region(citation, taxa))
+```
+
+```{r geo-bubble-map, fig.width=11, fig.height=5}
+library(maps)
+
+# Approximate centroids (longitude, latitude) for each region
+centroids <- data.frame(
+  region = c("UK / Europe","Scotland (UK)","Germany","Sweden","Finland",
+             "Canada / North America","USA","Alaska (USA)",
+             "Australia","French Guiana","India","Pakistan","Sri Lanka","Sudan",
+             "Global (Cannell 1982)","USA (unpublished)","Unclassified"),
+  lon = c(-2, -4, 10, 18, 25,
+          -96, -98, -153,
+          134, -53, 78, 67, 81, 32,
+          0, -80, 0),
+  lat = c(52, 57, 51, 62, 64,
+          56, 40, 64,
+          -25, 4, 22, 30, 8, 15,
+          20, 38, 0),
+  stringsAsFactors = FALSE
+)
+
+region_counts <- dat_geo |>
+  count(region, sort = TRUE)
+
+plot_df <- region_counts |>
+  left_join(centroids, by = "region") |>
+  filter(!is.na(lon))
+
+world_map <- map_data("world")
+
+ggplot() +
+  geom_polygon(data = world_map,
+               aes(x = long, y = lat, group = group),
+               fill = "grey88", color = "grey70", linewidth = 0.2) +
+  geom_point(data = plot_df,
+             aes(x = lon, y = lat, size = n, color = region),
+             alpha = 0.75) +
+  geom_text(data = plot_df,
+            aes(x = lon, y = lat, label = n),
+            size = 3, vjust = -1.3, fontface = "bold") +
+  scale_size_continuous(range = c(3, 18), guide = "none") +
+  coord_fixed(1.3, xlim = c(-170, 165), ylim = c(-55, 75)) +
+  scale_color_brewer(palette = "Paired") +
+  labs(
+    title = "Niklas-Enquist dataset — inferred geographic origin of observations",
+    subtitle = paste0("⚠ No lat/lon in source file. Regions keyword-inferred from citation text (n = ",
+                      format(nrow(dat_geo), big.mark=","), " records)"),
+    color = "Inferred region",
+    x = NULL, y = NULL
+  ) +
+  theme(legend.position = "right",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank())
+```
+
+```{r geo-bar, fig.height=5}
+region_counts |>
+  filter(region != "Unclassified") |>
+  ggplot(aes(x = reorder(region, n), y = n, fill = region)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = n), hjust = -0.2, size = 3.5) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_brewer(palette = "Paired") +
+  labs(x = NULL, y = "Records",
+       title = "Records per inferred geographic region",
+       subtitle = "⚠ Approximate keyword classification only")
+```
+
+```{r geo-table}
+kable(region_counts,
+      col.names = c("Inferred region", "N records"),
+      caption = paste0("Record counts by inferred geographic region. ",
+                       "Regions are keyword-classified, not verified coordinates. ",
+                       "Cannell (1982) is a global compilation of primary literature ",
+                       "spanning multiple continents."))
+```
+
+---
+
 # Age and size distributions
 
 ```{r age-dist}
