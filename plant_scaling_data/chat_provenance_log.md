@@ -20,3 +20,13 @@
 - allodb/BIOMASS contain equations, not raw observations — must be kept separate from measurement data in merged table
 - Niklas-Enquist has NO lat/lon; geographic map is keyword-inferred from citation text and is approximate
 2026-05-01 | ForestGEO Panama summary, cross-study allometry, inventory update — forestgeo_panama_summary.Rmd/html; cross_study_allometry.Rmd/html; data_source_inventory updated. Committed 10fe5f9.
+
+2026-05-02 | NEON ForestAGB summary Rmd/HTML and Nouragues H-D summary Rmd/HTML added. Commit 6f082f8.
+
+2026-05-02 | NEON ForestAGB growth rate analysis added (neon_growth_rates.Rmd/html). Commit 39bd72c.
+
+2026-05-02 | NEON growth rate allometry analysis added (neon_growth_allometry.Rmd/html). Commit c1e8ef3.
+
+2026-05-02 | SMA/RMA allometry analyses added: cross_study_allometry_sma.Rmd/html and neon_growth_allometry_sma.Rmd/html. Commit 0abfbe8.
+
+2026-05-02 | PGLS allometric scaling workflow added (scripts 04-06, pgls_allometry_report.Rmd). Smith 2018 tree via V.PhyloMaker2. OLS/SMA/PGLS for 6 relationships. Scholarly rigor review applied and critical issues fixed.

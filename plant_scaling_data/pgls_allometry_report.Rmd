@@ -1,0 +1,361 @@
+---
+title: "Allometric Scaling — OLS vs SMA vs PGLS Analysis"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6)
+suppressPackageStartupMessages({
+  library(caper)
+  library(ape)
+  library(dplyr)
+  library(ggplot2)
+  library(smatr)
+  library(phytools)
+  library(tibble)
+  library(readr)
+  library(tidyr)
+  library(knitr)
+  library(scales)
+})
+theme_set(theme_bw(base_size = 13))
+
+proj_dir <- dirname(knitr::current_input(dir = TRUE))
+```
+
+```{r load-results}
+results_table    <- readRDS(file.path(proj_dir, "data/processed/pgls_results_table.rds"))
+phylosig_table   <- readRDS(file.path(proj_dir, "data/processed/phylosig_table.rds"))
+ne_species_means <- readRDS(file.path(proj_dir, "data/processed/ne_species_means.rds"))
+baad_species_means <- readRDS(file.path(proj_dir, "data/processed/baad_species_means.rds"))
+pruned_tree      <- readRDS(file.path(proj_dir, "data/processed/pgls_tree_smith2018_s2.rds"))
+```
+
+---
+
+# Overview
+
+This report documents the phylogenetically informed allometric scaling analysis
+for two plant datasets.  Three regression methods are compared for each
+scaling relationship: OLS, SMA, and PGLS.
+
+**Datasets:**
+
+| Dataset | N records | Aggregation unit | Primary source |
+|---------|-----------|-----------------|----------------|
+| Niklas-Enquist | ~2,626 cross-species records | Species means (geometric mean of log10 values) | Cannell (1982) and primary literature compiled by Niklas & Enquist (2001) |
+| BAAD | ~21,084 individual-level records | Species means (geometric mean of log10 values) | Falster et al. (2015) |
+
+For PGLS, both datasets were aggregated to species means by taking the
+arithmetic mean of log10-transformed values, which is equivalent to the
+geometric mean in the original scale.
+
+**Regression methods:**
+
+- **OLS** (ordinary least squares): treats each species as independent; ignores
+  phylogenetic relatedness.
+- **SMA** (standardized major axis): accounts for measurement error in both
+  variables but still ignores phylogeny.  Preferred over OLS for allometric
+  estimation when both axes carry error.
+- **PGLS** (phylogenetic generalised least squares, `caper::pgls`): corrects
+  for phylogenetic non-independence by modelling the expected covariance among
+  species via the variance-covariance matrix of the pruned phylogeny.
+  Pagel's lambda (λ) is estimated by maximum likelihood to scale the off-diagonal
+  covariances.
+
+**Phylogeny:** Smith & Brown (2018) GBOTB seed plant megatree, pruned to study
+species via V.PhyloMaker2 (Scenario 2).
+
+**WBE theoretical predictions (West, Brown & Enquist 1997):**
+
+- $\text{AGB} \sim H^{8/3} \approx 2.67$
+- $\frac{dM}{dt} \sim M^{3/4}$
+- leaf biomass $\sim$ total biomass$^{3/4}$
+- $H \sim \text{DBH}^{2/3}$
+
+---
+
+# Phylogeny
+
+```{r phylogeny-summary}
+cat("Tree tips:      ", ape::Ntip(pruned_tree), "\n")
+cat("Ultrametric:    ", ape::is.ultrametric(pruned_tree, tol = 1e-5), "\n")
+```
+
+```{r match-table, results='asis'}
+match_path <- file.path(proj_dir, "data/processed/pgls_tree_match_table.csv")
+if (file.exists(match_path)) {
+  match_tbl <- read_csv(match_path, show_col_types = FALSE)
+  knitr::kable(match_tbl, caption = "Species-to-tree tip match summary.")
+} else {
+  ne_in_tree   <- nrow(ne_species_means[ne_species_means$taxa %in% pruned_tree$tip.label, ])
+  baad_in_tree <- nrow(baad_species_means[baad_species_means$speciesMatched %in% pruned_tree$tip.label, ])
+  knitr::kable(
+    tibble(
+      dataset        = c("Niklas-Enquist", "BAAD"),
+      species_in_data = c(nrow(ne_species_means), nrow(baad_species_means)),
+      species_in_tree = c(ne_in_tree, baad_in_tree)
+    ),
+    caption = "Species matched to pruned phylogeny per dataset."
+  )
+}
+```
+
+Tip labels follow the V.PhyloMaker2 GBOTB format.  Species from each dataset
+were matched to tree tips after taxonomy cleaning.
+
+---
+
+# Phylogenetic Signal Before Regression
+
+```{r phylosig-table, results='asis'}
+knitr::kable(
+  phylosig_table |>
+    mutate(
+      lambda     = round(lambda, 2),
+      lambda_pval = formatC(lambda_pval, format = "g", digits = 3),
+      K          = round(K, 2),
+      K_pval     = formatC(K_pval, format = "g", digits = 3)
+    ),
+  col.names = c("Trait", "λ", "λ p-value", "K", "K p-value", "N species"),
+  caption   = paste(
+    "Pagel's lambda (λ) and Blomberg's K for each trait.",
+    "λ = 0: no phylogenetic signal; λ = 1: signal matches Brownian motion prediction.",
+    "K > 1: more signal than Brownian motion."
+  )
+)
+```
+
+If λ is high for a trait, OLS will underestimate standard errors by treating
+closely related species as independent observations.  In that case, PGLS
+confidence intervals will be wider than OLS, and the apparent statistical
+support for a WBE exponent may be overstated by OLS.
+
+---
+
+# Scaling Results
+
+```{r results-setup}
+fmt3 <- function(x) round(x, 3)
+
+print_relationship_table <- function(dat, y_col, x_col, ds, wbe_slope) {
+  sub <- dat |>
+    filter(dataset == ds, y_var == y_col, x_var == x_col) |>
+    select(method, slope, ci_lower, ci_upper, r_squared, lambda, p_vs_wbe) |>
+    mutate(across(where(is.numeric), fmt3))
+  knitr::kable(
+    sub,
+    col.names = c("Method", "Slope", "CI lower", "CI upper", "R²", "λ (PGLS)", "p vs WBE"),
+    caption   = paste0(ds, ": ", y_col, " ~ ", x_col,
+                       if (!is.na(wbe_slope)) paste0(" (WBE predicted slope = ", wbe_slope, ")") else "")
+  )
+}
+```
+
+## Niklas-Enquist Dataset
+
+```{r ne-biomass-height, results='asis'}
+print_relationship_table(results_table,
+  "log_total_biomass_kg", "log_height_m", "Niklas-Enquist", round(8/3, 3))
+```
+
+WBE predicts a slope of 8/3 ≈ 2.667 for total biomass ~ height.  Compare each
+method's CI to this value; a CI that excludes 2.667 indicates a statistically
+significant departure.
+
+```{r ne-growth-biomass, results='asis'}
+print_relationship_table(results_table,
+  "log_total_growth_kgyr", "log_total_biomass_kg", "Niklas-Enquist", 0.75)
+```
+
+WBE predicts a slope of 3/4 = 0.75 for net growth rate ~ total biomass.
+
+> **⚠️ CRITICAL CAVEAT: Growth rate measurement** — Growth rates in the
+> Niklas-Enquist dataset are annual net biomass increment period averages
+> compiled from Cannell (1982), not instantaneous metabolic rates.  WBE's
+> $dM/dt \propto M^{3/4}$ prediction applies to gross metabolic flux, which
+> includes maintenance respiration (typically 40–60% of GPP in temperate trees).
+> Net increment = gross production − maintenance respiration.  Therefore this
+> analysis **does not constitute a direct test of the WBE 3/4 metabolic
+> scaling prediction**.  Results are descriptive: if net increment also scales
+> as ~$M^{3/4}$, it is consistent with but does not confirm WBE.
+
+```{r ne-leaf-total, results='asis'}
+print_relationship_table(results_table,
+  "log_leaf_biomass_kg", "log_total_biomass_kg", "Niklas-Enquist", 0.75)
+```
+
+WBE predicts leaf biomass ~ total biomass$^{3/4}$.
+
+> **⚠️ WARNING: Compositional / mathematical coupling artifact** —
+> leaf_biomass + stem_biomass + root_biomass ≈ total_biomass.  Regressing any
+> component against its sum (e.g., leaf ~ total) introduces spurious allometry
+> through mathematical coupling — known since Pearson (1897) and formalised
+> in the ecological literature by Prairie & Bird (1989) and Kronmal (1993).
+> **Citations need independent verification before manuscript use.**
+> Interpret these slopes as descriptive only; they cannot confirm or
+> falsify biomass partitioning theory without a mathematically independent
+> analysis (e.g., regressing components against DBH or height).
+
+```{r ne-stem-total, results='asis'}
+print_relationship_table(results_table,
+  "log_stem_biomass_kg", "log_total_biomass_kg", "Niklas-Enquist", 1.0)
+```
+
+WBE predicts isometric scaling (slope = 1.0) for stem biomass ~ total biomass.
+
+> **⚠️ WARNING: Compositional / mathematical coupling artifact** — Same
+> mathematical coupling concern applies here.  See note above for leaf ~ total.
+
+---
+
+## BAAD Dataset
+
+```{r baad-agb-dbh, results='asis'}
+print_relationship_table(results_table,
+  "log_AGB_kg", "log_DBH_cm", "BAAD", NA_real_)
+```
+
+No specific WBE theoretical prediction is applied to AGB ~ DBH in log-log
+space here; the slope is reported descriptively.
+
+```{r baad-ht-dbh, results='asis'}
+print_relationship_table(results_table,
+  "log_height_m", "log_DBH_cm", "BAAD", round(2/3, 3))
+```
+
+WBE predicts H ~ DBH$^{2/3}$ ≈ 0.667 for height ~ diameter scaling.
+
+---
+
+# Visualizations
+
+```{r forest-plot, fig.cap="Forest plot of allometric scaling exponents. Points = estimated slope; error bars = 95% CI; dashed line = WBE theoretical prediction. OLS (blue), SMA (orange), PGLS (green)."}
+forest_path <- file.path(proj_dir, "output/forest_plot_slopes.png")
+if (file.exists(forest_path)) {
+  knitr::include_graphics(forest_path)
+} else {
+  message("forest_plot_slopes.png not found — run scripts/06_pgls_allometry.R first.")
+}
+```
+
+```{r scatter-ne, fig.cap="Niklas-Enquist species means: log10(Total biomass [kg]) ~ log10(Height [m]). Blue line = OLS fit with 95% confidence band."}
+scatter_path <- file.path(proj_dir, "output/scatter_ne_biomass_height.png")
+if (file.exists(scatter_path)) {
+  knitr::include_graphics(scatter_path)
+} else {
+  message("scatter_ne_biomass_height.png not found — run scripts/06_pgls_allometry.R first.")
+}
+```
+
+---
+
+# Interpretation
+
+## OLS vs PGLS Slope Differences
+
+When the PGLS slope differs from the OLS slope, this indicates that clade-level
+body size stratification is influencing the estimate.  PGLS down-weights
+within-clade replication through the phylogenetic variance-covariance matrix:
+species that share a recent common ancestor are treated as partially redundant
+observations.  A PGLS slope that is shallower than OLS is consistent with the
+interpretation that the OLS slope partly reflects between-clade body size
+diversification (e.g., the contrast between large-bodied trees and small-bodied
+herbs) rather than a constraint operating within lineages.
+
+## Pagel's Lambda Interpretation
+
+The ML-estimated λ in PGLS residuals indicates how much of the unexplained
+biomass variation is phylogenetically conserved.  λ near 1 means residuals
+follow the Brownian motion expectation — traits have diverged proportionally to
+branch length.  This is expected for architectural traits such as wood density,
+crown geometry, and height–diameter ratios, which differ substantially among
+major plant clades (gymnosperms vs. angiosperms, monocots vs. eudicots).  When
+λ is high, OLS standard errors are anti-conservative and p-values should be
+interpreted with caution.
+
+## WBE Theory Evaluation
+
+The recovery of exponents close to WBE predictions (8/3 for biomass ~ height,
+3/4 for growth ~ biomass) in OLS regressions of cross-species data is
+consistent with the theory but does not uniquely confirm it.  The same exponents
+are predicted by several alternative models and may also arise from between-clade
+body size diversification rather than from the fractal vascular network
+constraint WBE postulated.  PGLS provides a more conservative test because it
+partially removes the among-clade signal.  If the PGLS exponent still matches
+the WBE prediction, that constitutes stronger within-lineage support.
+
+## Dataset Caveats
+
+> **⚠ WARNING: Clade bias** — The Niklas-Enquist dataset is derived
+> substantially from Cannell (1982) and overrepresents temperate deciduous trees
+> and conifers.  Conclusions may not generalize to tropical broadleaf species or
+> herbaceous taxa.
+
+> **⚠ WARNING: Growth rate measurement** — Growth rates in Niklas-Enquist are
+> annual net biomass increment period averages, not instantaneous metabolic
+> rates.  The test of $dM/dt \propto M^{3/4}$ is an approximation; net
+> production ≠ gross metabolic rate.
+
+---
+
+# Methods
+
+Allometric scaling was analysed for two datasets.  The **Niklas-Enquist**
+database (~2,626 records) compiles cross-species biomass measurements primarily
+from Cannell (1982) with additional primary literature records; see Niklas &
+Enquist (2001) *PNAS* 98:2922-2927 and Enquist & Niklas (2002) *Science*
+295:1517-1520.  The **BAAD** database (~21,084 individual-level records) is
+described in Falster et al. (2015) *Scientific Data* 2:150034
+(https://doi.org/10.1038/sdata.2015.34).
+
+Both datasets were aggregated to species means by taking arithmetic means of
+log10-transformed trait values (equivalent to geometric means).  Only species
+present in both the dataset and the phylogeny were retained for PGLS.
+
+The phylogeny is the Smith & Brown (2018) GBOTB seed plant megatree, pruned
+to study species using V.PhyloMaker2 (Scenario 2).  Citation: Smith SA & Brown
+JW (2018) Constructing a broadly inclusive seed plant phylogeny.
+*American Journal of Botany* 105(3):302-314.
+DOI: 10.1002/ajb2.1019.  **Note: this citation should be verified
+independently before any manuscript use.**
+
+OLS regressions used `stats::lm()`.  SMA regressions used the `smatr` package
+(Warton et al. 2012 *Methods in Ecology and Evolution* 3:257-259).  Tests of
+SMA slopes against WBE theoretical values used `smatr::slope.test()`.  PGLS
+regressions used `caper::pgls()` (Orme et al. 2018), with Pagel's λ estimated
+by maximum likelihood; if ML optimisation failed, λ was fixed at 1.
+Phylogenetic signal was assessed with Pagel's λ and Blomberg's K via
+`phytools::phylosig()` (Revell 2012 *Methods in Ecology and Evolution*
+3:217-223).
+
+---
+
+# Pipeline Run Order
+
+> **Required execution order before knitting this report:**
+>
+> 1. `Rscript scripts/04_prepare_pgls_species_means.R` — aggregate species means
+> 2. `Rscript scripts/05_build_phylogeny_smith2018.R` — build pruned tree (requires V.PhyloMaker2)
+> 3. `Rscript scripts/06_pgls_allometry.R` — run OLS / SMA / PGLS regressions
+> 4. Knit this Rmd
+>
+> All scripts should be run from the `plant_scaling_data/` directory.
+> Outputs are written to `data/processed/` and `output/`.
+
+```{r session-info}
+cat("Analysis date:", format(Sys.Date()), "\n")
+R.Version()$version.string
+tryCatch(cat("V.PhyloMaker2 version:", as.character(packageVersion("V.PhyloMaker2")), "\n"), error=function(e) NULL)
+tryCatch(cat("caper version:", as.character(packageVersion("caper")), "\n"), error=function(e) NULL)
+```
