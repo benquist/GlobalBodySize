@@ -1,0 +1,1332 @@
+---
+title: "Kurosawa et al. 2025 — Scaling of Shoot and Root Respiration Across Woody and Herbaceous Plants"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 5.5)
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(readr)
+  library(tidyr)
+  library(knitr)
+  library(scales)
+  library(smatr)
+  library(purrr)
+  library(stringr)
+  library(tibble)
+  library(caper)
+  library(ape)
+  library(phytools)
+})
+# Resolve namespace conflict: maps::map (loaded as a transitive dependency of
+# ape/phytools) masks purrr::map. Explicitly bind purrr versions so that all
+# map() / map_dbl() / map_int() calls in this document use purrr semantics.
+map     <- purrr::map
+map_dbl <- purrr::map_dbl
+map_int <- purrr::map_int
+map_chr <- purrr::map_chr
+pmap    <- purrr::pmap
+
+# Resolve dplyr masking: caper loads MASS which exports select(); ape loads
+# maps. Bind dplyr versions explicitly to prevent silent substitution.
+select  <- dplyr::select
+filter  <- dplyr::filter
+mutate  <- dplyr::mutate
+rename  <- dplyr::rename
+arrange <- dplyr::arrange
+group_by  <- dplyr::group_by
+summarise <- dplyr::summarise
+summarize <- dplyr::summarize
+
+# V.PhyloMaker2 is not on CRAN for R 4.3 arm64. Load conditionally.
+HAS_PHYLOMAKER <- requireNamespace("V.PhyloMaker2", quietly = TRUE)
+if (!HAS_PHYLOMAKER) {
+  message("V.PhyloMaker2 not available — PGLS phylogeny sections will use a simulated star tree as placeholder.")
+}
+HAS_CAPER <- requireNamespace("caper", quietly = TRUE)
+theme_set(theme_bw(base_size = 13))
+proj_dir <- dirname(knitr::current_input(dir = TRUE))
+```
+
+---
+
+# Overview and Data Source
+
+This document analyses the allometric scaling of plant respiration across a broad
+size range of **woody and herbaceous plants**, using the dataset compiled by
+Kurosawa et al. (2025):
+
+> **Kurosawa Y, Mori S, Ferrio JP, et al.** (2025). Scaling of shoot and root
+> respiration of woody and herbaceous plants. *Proceedings of the Royal Society B*,
+> **292**: 20241910.
+> DOI: [10.1098/rspb.2024.1910](https://doi.org/10.1098/rspb.2024.1910)
+
+The accompanying Dryad dataset is:
+
+> **Kurosawa Y, Mori S, Ferrio JP, et al.** (2024). Data from: Scaling of shoot
+> and root respiration of woody and herbaceous plants. *Dryad*.
+> DOI: [10.5061/dryad.sxksn03cj](https://doi.org/10.5061/dryad.sxksn03cj)
+
+> **⚠ Data provenance note:** The woody-plant component of this dataset explicitly
+> integrates records from three sub-sources:
+>
+> * **Mori et al. 2010** — *Proceedings of the Royal Society B* 277: 1447–1454.
+>   DOI: [10.1098/rspb.2009.1811](https://doi.org/10.1098/rspb.2009.1811)
+> * **Kurosawa et al. 2023** — Ontogenetic respiration data for *Fagus crenata*.
+>   *Annals of Botany* 131: 313–322.
+>   DOI: [10.1093/aob/mcac143](https://doi.org/10.1093/aob/mcac143)
+> * New measurements reported in Kurosawa et al. 2025.
+>
+> All DOIs, journal names, and volume/page details above should be independently
+> verified against Crossref before use in any manuscript.
+
+The database contains respiration rates, fresh mass, plant part (shoot/root),
+life form (woody/herbaceous), species, and dataset source for each record.
+
+**Key theoretical predictions tested:**
+
+| Scaling relationship | WBE / MST prediction | Reference |
+|---|---|---|
+| $R \propto M^{\alpha}$ (overall) | $\alpha = 3/4$ | West et al. 1997; Mori et al. 2010 |
+| $R \propto M^{\alpha}$ (herbaceous) | $\alpha \leq 3/4$? | Kurosawa et al. 2025 |
+| Root vs. shoot slope equality | Slopes equal? | Kurosawa et al. 2025 |
+
+---
+
+# Data loading
+
+```{r load-data}
+# ── Local file path (Dryad download) ──────────────────────────────────────────
+# Download from: https://doi.org/10.5061/dryad.sxksn03cj
+# File: data.respiration.csv
+data_path <- file.path(proj_dir,
+  "data/raw/kurosawa_respiration/data.respiration.csv")
+
+USE_REAL_DATA <- file.exists(data_path) && file.info(data_path)$size > 1000
+
+if (USE_REAL_DATA) {
+  raw <- read_csv(data_path, show_col_types = FALSE)
+
+  # ── Flexible column detection ─────────────────────────────────────────────
+  # Normalise column names to lowercase for matching
+  names(raw) <- tolower(trimws(names(raw)))
+  names(raw) <- gsub("[ .]", "_", names(raw))
+  cat("Columns detected:", paste(names(raw), collapse = ", "), "\n")
+  cat("Rows:", nrow(raw), "\n")
+
+  # Detect mass column (g fresh mass)
+  mass_col <- names(raw)[which(grepl("mass|fm|fresh", names(raw)) &
+                                !grepl("log", names(raw)))[1]]
+  # Detect respiration column (nmol or µmol CO2 g-1 s-1 or similar)
+  resp_col  <- names(raw)[which(grepl("resp|rate|r_", names(raw)) &
+                                 !grepl("log", names(raw)))[1]]
+  # Detect life-form and plant-part columns
+  lf_col    <- names(raw)[which(grepl("life|form|type|woody|herb|group",
+                                       names(raw)))[1]]
+  part_col  <- names(raw)[which(grepl("part|organ|shoot|root",
+                                       names(raw)))[1]]
+  sp_col    <- names(raw)[which(grepl("speci|taxa|name", names(raw)))[1]]
+  ds_col    <- names(raw)[which(grepl("dataset|source|study|ref",
+                                       names(raw)))[1]]
+  temp_col  <- names(raw)[which(grepl("temp", names(raw)) &
+                                  !grepl("log", names(raw)))[1]]
+
+  # Build harmonised frame
+  dat <- raw |>
+    rename_with(~ "fresh_mass_g",    all_of(mass_col)) |>
+    rename_with(~ "respiration",     all_of(resp_col)) |>
+    rename_with(~ "life_form",       any_of(lf_col))  |>
+    rename_with(~ "plant_part",      any_of(part_col)) |>
+    rename_with(~ "species",         any_of(sp_col))   |>
+    rename_with(~ "dataset_source",  any_of(ds_col))   |>
+    filter(!is.na(fresh_mass_g), !is.na(respiration),
+           fresh_mass_g > 0,  respiration > 0) |>
+    mutate(
+      log_mass = log10(fresh_mass_g),
+      log_resp = log10(respiration),
+      life_form  = if (exists("life_form",  where = cur_data()))
+                     as.character(life_form)  else "unknown",
+      plant_part = if (exists("plant_part", where = cur_data()))
+                     as.character(plant_part) else "unknown"
+    )
+  if (!is.null(temp_col) && !is.na(temp_col) && temp_col %in% names(raw)) {
+    dat <- left_join(dat, raw |>
+                       rename(meas_temp_c = all_of(temp_col)) |>
+                       select(meas_temp_c), by = character())
+  }
+
+} else {
+  # ── Reconstructed demonstration data ─────────────────────────────────────
+  # These data use REAL species names (APG IV families, woody/herbaceous mix)
+  # representative of the Mori 2010 / Kurosawa 2025 dataset scope.
+  # Slopes are seeded from published SMA exponents; individual records are
+  # simulated to enable per-species (intraspecific) slope estimation.
+  # Per-species intercepts include random among-species variation (SD = 0.08)
+  # to simulate realistic metabolic normalization differences.
+  # THIS IS NOT THE ORIGINAL DATA. Verify with doi:10.5061/dryad.sxksn03cj
+  message("\u26a0 Using reconstructed demo data. Download real data from https://doi.org/10.5061/dryad.sxksn03cj")
+  set.seed(42)
+
+  # DEMO TAXONOMY — NOT DERIVED FROM REAL DATA
+  # Family assignments follow APG IV classification.
+  # All species names should be verified against GBIF Backbone before any publication use.
+  species_lookup <- tribble(
+    ~species,                    ~family,         ~life_form,    ~plant_part, ~dataset_source,   ~n_ind, ~log_mass_min, ~log_mass_max,
+    "Fagus crenata",             "Fagaceae",      "Woody",       "Shoot",     "Kurosawa2023",     8,     -1.0,          4.2,
+    "Fagus crenata",             "Fagaceae",      "Woody",       "Root",      "Kurosawa2023",     8,     -1.0,          4.0,
+    "Fagus japonica",            "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         5,      0.5,          3.8,
+    "Fagus japonica",            "Fagaceae",      "Woody",       "Root",      "Mori2010",         5,      0.3,          3.5,
+    "Quercus serrata",           "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         5,      0.0,          4.0,
+    "Quercus serrata",           "Fagaceae",      "Woody",       "Root",      "Mori2010",         4,      0.0,          3.8,
+    "Quercus mongolica",         "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         4,      0.2,          3.9,
+    "Quercus robur",             "Fagaceae",      "Woody",       "Shoot",     "New",              4,      0.5,          4.1,
+    "Castanea crenata",          "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         4,      0.3,          3.5,
+    "Castanopsis cuspidata",     "Fagaceae",      "Woody",       "Shoot",     "New",              3,      0.5,          3.7,
+    "Pinus densiflora",          "Pinaceae",      "Woody",       "Shoot",     "Mori2010",         6,      1.0,          4.3,
+    "Pinus densiflora",          "Pinaceae",      "Woody",       "Root",      "Mori2010",         5,      0.8,          4.0,
+    "Pinus sylvestris",          "Pinaceae",      "Woody",       "Shoot",     "New",              5,      1.0,          4.2,
+    "Abies homolepis",           "Pinaceae",      "Woody",       "Shoot",     "Mori2010",         5,      0.5,          4.1,
+    "Abies sachalinensis",       "Pinaceae",      "Woody",       "Shoot",     "New",              4,      0.5,          4.0,
+    "Picea abies",               "Pinaceae",      "Woody",       "Shoot",     "New",              4,      0.8,          4.2,
+    "Larix kaempferi",           "Pinaceae",      "Woody",       "Shoot",     "Mori2010",         4,      0.8,          4.0,
+    "Betula platyphylla",        "Betulaceae",    "Woody",       "Shoot",     "Mori2010",         4,      0.2,          3.8,
+    "Betula pendula",            "Betulaceae",    "Woody",       "Shoot",     "New",              4,      0.2,          3.9,
+    "Betula ermanii",            "Betulaceae",    "Woody",       "Shoot",     "Mori2010",         3,      0.3,          3.7,
+    "Alnus hirsuta",             "Betulaceae",    "Woody",       "Shoot",     "Mori2010",         3,      0.5,          3.8,
+    "Alnus japonica",            "Betulaceae",    "Woody",       "Shoot",     "New",              3,      0.5,          3.8,
+    "Acer palmatum",             "Sapindaceae",   "Woody",       "Shoot",     "Mori2010",         4,      0.0,          3.5,
+    "Acer mono",                 "Sapindaceae",   "Woody",       "Shoot",     "Mori2010",         4,      0.2,          3.8,
+    "Acer platanoides",          "Sapindaceae",   "Woody",       "Shoot",     "New",              3,      0.2,          3.7,
+    "Magnolia obovata",          "Magnoliaceae",  "Woody",       "Shoot",     "Mori2010",         3,      0.3,          3.5,
+    "Magnolia kobus",            "Magnoliaceae",  "Woody",       "Shoot",     "New",              3,      0.3,          3.5,
+    "Fraxinus mandshurica",      "Oleaceae",      "Woody",       "Shoot",     "Mori2010",         3,      0.5,          3.9,
+    "Fraxinus excelsior",        "Oleaceae",      "Woody",       "Shoot",     "New",              3,      0.5,          3.8,
+    "Prunus sargentii",          "Rosaceae",      "Woody",       "Shoot",     "New",              3,      0.2,          3.5,
+    "Sorbus alnifolia",          "Rosaceae",      "Woody",       "Shoot",     "New",              3,      0.2,          3.4,
+    "Cornus controversa",        "Cornaceae",     "Woody",       "Shoot",     "Mori2010",         3,      0.3,          3.5,
+    "Rhododendron japonicum",    "Ericaceae",     "Woody",       "Shoot",     "Mori2010",         3,     -0.5,          2.8,
+    "Vaccinium corymbosum",      "Ericaceae",     "Woody",       "Shoot",     "New",              3,     -0.5,          2.5,
+    "Miscanthus sinensis",       "Poaceae",       "Herbaceous",  "Shoot",     "New",              5,     -1.0,          2.5,
+    "Phragmites australis",      "Poaceae",       "Herbaceous",  "Shoot",     "New",              5,     -0.5,          2.8,
+    "Festuca arundinacea",       "Poaceae",       "Herbaceous",  "Shoot",     "New",              4,     -1.5,          1.8,
+    "Poa annua",                 "Poaceae",       "Herbaceous",  "Shoot",     "New",              4,     -2.0,          1.0,
+    "Sasa kurilensis",           "Poaceae",       "Herbaceous",  "Shoot",     "New",              4,     -1.0,          2.5,
+    "Miscanthus sinensis",       "Poaceae",       "Herbaceous",  "Root",      "New",              4,     -1.2,          2.3,
+    "Phragmites australis",      "Poaceae",       "Herbaceous",  "Root",      "New",              4,     -0.8,          2.6,
+    "Solidago gigantea",         "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -1.0,          2.2,
+    "Artemisia princeps",        "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -1.0,          2.0,
+    "Helianthus annuus",         "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -0.5,          2.5,
+    "Taraxacum officinale",      "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -2.0,          1.0,
+    "Salvia officinalis",        "Lamiaceae",     "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.5,
+    "Mentha spicata",            "Lamiaceae",     "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.5,
+    "Lycopus europaeus",         "Lamiaceae",     "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.3,
+    "Ranunculus repens",         "Ranunculaceae", "Herbaceous",  "Shoot",     "New",              3,     -2.0,          0.8,
+    "Trifolium repens",          "Fabaceae",      "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.2,
+    "Medicago sativa",           "Fabaceae",      "Herbaceous",  "Shoot",     "New",              4,     -1.0,          1.8,
+    "Vicia cracca",              "Fabaceae",      "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.3
+  )
+
+  # Group-level slope and intercept parameters (from published SMA estimates)
+  group_params <- tribble(
+    ~life_form,    ~plant_part, ~slope, ~intercept, ~sd_resid,
+    "Woody",       "Shoot",     0.753,  -2.85,      0.12,
+    "Woody",       "Root",      0.780,  -2.60,      0.13,
+    "Herbaceous",  "Shoot",     0.741,  -2.72,      0.15,
+    "Herbaceous",  "Root",      0.762,  -2.55,      0.16
+  )
+
+  # Generate individual records per species
+  dat_list <- pmap(species_lookup, function(species, family, life_form, plant_part,
+                                             dataset_source, n_ind,
+                                             log_mass_min, log_mass_max) {
+    gp  <- group_params |>
+      filter(life_form == !!life_form, plant_part == !!plant_part)
+    # Per-species random intercept offset (among-species metabolic normalization variation)
+    sp_int_offset  <- rnorm(1, 0, 0.08)
+    # Per-species slope perturbation (intraspecific slope variation)
+    sp_slope_delta <- rnorm(1, 0, 0.04)
+    log_mass_vals  <- runif(n_ind, log_mass_min, log_mass_max)
+    log_resp_vals  <- (gp$intercept + sp_int_offset) +
+                      (gp$slope + sp_slope_delta) * log_mass_vals +
+                      rnorm(n_ind, 0, gp$sd_resid)
+    tibble(
+      fresh_mass_g   = 10^log_mass_vals,
+      respiration    = 10^log_resp_vals,
+      log_mass       = log_mass_vals,
+      log_resp       = log_resp_vals,
+      life_form      = life_form,
+      plant_part     = plant_part,
+      dataset_source = dataset_source,
+      species        = species,
+      family         = family
+    )
+  })
+  dat <- bind_rows(dat_list)
+  USE_REAL_DATA <- FALSE
+}
+# If real data loaded, add placeholder family column (will be filled in Section 6)
+if (!"family" %in% names(dat)) {
+  dat$family <- NA_character_
+}
+```
+
+```{r data-summary-table}
+kable(
+  dat |>
+    count(life_form, plant_part, dataset_source) |>
+    arrange(life_form, plant_part, dataset_source),
+  caption = if (USE_REAL_DATA)
+    "Record counts by life form, plant part, and dataset source"
+  else
+    "⚠ DEMONSTRATION DATA — Record counts (simulated to match published structure)"
+)
+```
+
+---
+
+# Descriptive overview
+
+```{r mass-distribution, fig.cap="Fresh-mass distribution by life form and plant part (log10 scale)."}
+ggplot(dat, aes(x = log_mass, fill = life_form)) +
+  geom_histogram(bins = 40, alpha = 0.75, colour = "white") +
+  facet_grid(plant_part ~ life_form, scales = "free_y") +
+  scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
+                               unknown = "grey60")) +
+  labs(x = expression(log[10]~"Fresh mass (g)"),
+       y = "Count",
+       fill = "Life form",
+       title = "Fresh-mass distribution") +
+  theme(legend.position = "none")
+```
+
+```{r resp-distribution, fig.cap="Respiration rate distribution by life form and plant part (log10 scale)."}
+ggplot(dat, aes(x = log_resp, fill = life_form)) +
+  geom_histogram(bins = 40, alpha = 0.75, colour = "white") +
+  facet_grid(plant_part ~ life_form, scales = "free_y") +
+  scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
+                               unknown = "grey60")) +
+  labs(x = expression(log[10]~"Respiration rate"),
+       y = "Count",
+       fill = "Life form",
+       title = "Respiration rate distribution") +
+  theme(legend.position = "none")
+```
+
+---
+
+# SMA scaling analyses
+
+## Overall scaling: R ~ Mass (pooled)
+
+```{r sma-pooled, fig.cap="Pooled SMA regression of log respiration vs. log fresh mass. Dashed line shows WBE 3/4 prediction."}
+fit_pooled <- sma(log_resp ~ log_mass, data = dat, method = "SMA")
+pooled_summ <- summary(fit_pooled)
+cf_pooled   <- coef(fit_pooled)
+
+cat(sprintf("Pooled SMA:  slope = %.3f (95%% CI: %.3f – %.3f)\n",
+            cf_pooled[2],
+            fit_pooled$coef[[1]][2,2],
+            fit_pooled$coef[[1]][2,3]))
+
+# Test slope vs 3/4  (slope.test requires vector interface in smatr >= 3.4)
+test_pooled <- slope.test(dat$log_resp, dat$log_mass, test.value = 0.75, method = "SMA")
+cat(sprintf("  H0: slope = 0.75 → p = %.4f\n", test_pooled$p))
+test_1 <- slope.test(dat$log_resp, dat$log_mass, test.value = 1.0, method = "SMA")
+cat(sprintf("  H0: slope = 1.00 → p = %.4f\n", test_1$p))
+
+ggplot(dat, aes(x = log_mass, y = log_resp, colour = life_form)) +
+  geom_point(alpha = 0.25, size = 1.2) +
+  geom_abline(intercept = cf_pooled[1], slope = cf_pooled[2],
+              linewidth = 1.1, colour = "black") +
+  geom_abline(intercept = mean(dat$log_resp) - 0.75 * mean(dat$log_mass),
+              slope = 0.75, linetype = "dashed", colour = "grey40", linewidth = 0.9) +
+  scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
+                                 unknown = "grey60")) +
+  labs(x = expression(log[10]~"Fresh mass (g)"),
+       y = expression(log[10]~"Respiration rate"),
+       colour = "Life form",
+       title = "Overall SMA scaling: R ~ Mass",
+       subtitle = sprintf("Pooled slope = %.3f  [WBE 3/4 reference = dashed]",
+                           cf_pooled[2])) +
+  theme(legend.position = "bottom")
+```
+
+## By life form and plant part
+
+```{r sma-by-group, fig.cap="SMA regression lines by life form and plant part. Dashed = WBE 3/4."}
+groups <- dat |>
+  filter(life_form != "unknown", plant_part != "unknown") |>
+  mutate(group = paste(life_form, plant_part, sep = " — "))
+
+group_fits <- groups |>
+  group_by(group, life_form, plant_part) |>
+  nest() |>
+  mutate(
+    fit      = map(data, ~ sma(log_resp ~ log_mass, data = .x, method = "SMA")),
+    slope    = map_dbl(fit, ~ coef(.x)[2]),
+    intercept= map_dbl(fit, ~ coef(.x)[1]),
+    ci_lo    = map_dbl(fit, ~ .x$coef[[1]][2,2]),
+    ci_hi    = map_dbl(fit, ~ .x$coef[[1]][2,3]),
+    n        = map_int(data, nrow),
+    r2       = map_dbl(fit, ~ .x$r2[[1]]),
+    p_vs_075 = map_dbl(data, ~ {
+      tryCatch(
+        slope.test(.x$log_resp, .x$log_mass, test.value = 0.75, method = "SMA")$p,
+        error = function(e) NA_real_
+      )
+    })
+  )
+
+kable(
+  group_fits |>
+    select(group, n, slope, ci_lo, ci_hi, r2, p_vs_075) |>
+    rename(Group = group, N = n, Slope = slope,
+           `CI low` = ci_lo, `CI high` = ci_hi,
+           `R²` = r2, `p (slope ≠ 0.75)` = p_vs_075) |>
+    mutate(across(where(is.numeric), ~ round(.x, 3))),
+  caption = "SMA scaling exponents by life form and plant part"
+)
+```
+
+```{r sma-by-group-plot, fig.cap="Observed scaling and fitted SMA lines per group."}
+ablines_df <- group_fits |>
+  select(group, intercept, slope, life_form, plant_part)
+
+ggplot(groups, aes(x = log_mass, y = log_resp, colour = life_form)) +
+  geom_point(alpha = 0.20, size = 1.1) +
+  geom_abline(data = ablines_df,
+              aes(intercept = intercept, slope = slope, colour = life_form),
+              linewidth = 1.2) +
+  geom_abline(data = ablines_df |>
+                group_by(plant_part) |>
+                summarise(int_ref = mean(log10(10^mean(groups$log_resp[groups$plant_part == plant_part[1]])) -
+                                          0.75 * mean(groups$log_mass[groups$plant_part == plant_part[1]])),
+                          .groups = "drop"),
+              aes(intercept = int_ref, slope = 0.75),
+              linetype = "dashed", colour = "grey40", linewidth = 0.7,
+              inherit.aes = FALSE) +
+  facet_grid(plant_part ~ life_form, scales = "free") +
+  scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
+                                 unknown = "grey60")) +
+  labs(x = expression(log[10]~"Fresh mass (g)"),
+       y = expression(log[10]~"Respiration rate"),
+       colour = "Life form",
+       title = "SMA scaling by life form and plant part",
+       subtitle = "Grey dashed = WBE 3/4 reference") +
+  theme(legend.position = "none")
+```
+
+## Slope comparison: woody vs. herbaceous
+
+```{r slope-comparison-lf}
+fit_lf <- sma(log_resp ~ log_mass * life_form,
+              data = filter(dat, life_form %in% c("Woody", "Herbaceous")),
+              method = "SMA")
+comp_lf <- summary(fit_lf)
+cat("Woody vs. Herbaceous slope comparison:\n")
+print(comp_lf$coef)
+```
+
+## Slope comparison: shoot vs. root
+
+```{r slope-comparison-part}
+fit_part <- sma(log_resp ~ log_mass * plant_part,
+                data = filter(dat, plant_part %in% c("Shoot", "Root")),
+                method = "SMA")
+comp_part <- summary(fit_part)
+cat("Shoot vs. Root slope comparison:\n")
+print(comp_part$coef)
+```
+
+---
+
+# Dataset-source comparison (Mori 2010 / Kurosawa 2023 / New)
+
+```{r sma-by-dataset, fig.cap="SMA lines stratified by dataset source within the woody component."}
+woody_dat <- dat |>
+  filter(life_form == "Woody", !is.na(dataset_source)) |>
+  mutate(dataset_source = factor(dataset_source,
+                                 levels = c("Mori2010", "Kurosawa2023", "New")))
+
+if (length(unique(woody_dat$dataset_source)) > 1) {
+  ds_fits <- woody_dat |>
+    group_by(dataset_source, plant_part) |>
+    filter(n() >= 10) |>
+    nest() |>
+    mutate(
+      fit        = map(data, ~ sma(log_resp ~ log_mass, data = .x, method = "SMA")),
+      slope      = map_dbl(fit, ~ coef(.x)[2]),
+      intercept  = map_dbl(fit, ~ coef(.x)[1]),
+      ci_lo      = map_dbl(fit, ~ .x$coef[[1]][2,2]),
+      ci_hi      = map_dbl(fit, ~ .x$coef[[1]][2,3]),
+      n          = map_int(data, nrow)
+    )
+
+  kable(
+    ds_fits |>
+      select(dataset_source, plant_part, n, slope, ci_lo, ci_hi) |>
+      rename(`Dataset source` = dataset_source, `Plant part` = plant_part,
+             N = n, Slope = slope, `CI low` = ci_lo, `CI high` = ci_hi) |>
+      mutate(across(where(is.numeric), ~ round(.x, 3))),
+    caption = "SMA slopes by dataset source (woody plants only)"
+  )
+
+  ggplot(woody_dat, aes(x = log_mass, y = log_resp, colour = dataset_source)) +
+    geom_point(alpha = 0.25, size = 1.2) +
+    geom_abline(data = ds_fits,
+                aes(intercept = intercept, slope = slope, colour = dataset_source),
+                linewidth = 1.1) +
+    facet_wrap(~ plant_part, scales = "free") +
+    scale_colour_brewer(palette = "Set1") +
+    labs(x = expression(log[10]~"Fresh mass (g)"),
+         y = expression(log[10]~"Respiration rate"),
+         colour = "Dataset source",
+         title = "Woody-plant respiration by dataset source") +
+    theme(legend.position = "bottom")
+}
+```
+
+---
+
+# Taxonomy and family assignment
+
+```{r taxonomy-audit}
+# ── Demo-mode family assignment ────────────────────────────────────────────
+# In demo mode, family is hardcoded from APG IV classification (see species_lookup above).
+# In real-data mode (USE_REAL_DATA = TRUE), the family column must be populated
+# via a taxonomic API (e.g. taxize::tax_name or rgbif::name_backbone) or
+# a curated lookup table from the Dryad README.
+#
+# ⚠ All family assignments below are for demo data only and have NOT been
+# verified through a live taxonomic service. Verify via GBIF Backbone or TNRS
+# (https://tnrs.biendata.org) before any publication use.
+
+# Build species-level audit table
+taxonomy_audit <- dat |>
+  group_by(species, family, life_form) |>
+  summarise(
+    n_records    = n(),
+    n_parts      = n_distinct(plant_part),
+    parts        = paste(sort(unique(plant_part)), collapse = " + "),
+    .groups = "drop"
+  ) |>
+  arrange(family, life_form, species)
+
+kable(
+  taxonomy_audit |>
+    rename(Species = species, Family = family, `Life form` = life_form,
+           `N records` = n_records, `N parts` = n_parts, Parts = parts),
+  caption = if (USE_REAL_DATA)
+    "Species inventory: family, life form, and record counts"
+  else
+    "\u26a0 DEMO DATA — Species inventory with hardcoded APG IV family assignments"
+)
+```
+
+```{r family-counts}
+fam_summary <- dat |>
+  group_by(family, life_form) |>
+  summarise(
+    n_species = n_distinct(species),
+    n_records = n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    pgls_eligible = n_species >= 8,
+    sma_eligible  = n_species >= 5 | n_records >= 10
+  ) |>
+  arrange(desc(n_species))
+
+kable(
+  fam_summary |>
+    rename(Family = family, `Life form` = life_form,
+           `N species` = n_species, `N records` = n_records,
+           `PGLS eligible (n≥8)` = pgls_eligible,
+           `SMA eligible (n≥5 sp or n≥10 rec)` = sma_eligible),
+  caption = "Family summary: species counts and eligibility for family-level analyses"
+)
+```
+
+---
+
+# Phylogenetically corrected scaling (PGLS)
+
+PGLS corrects for phylogenetic non-independence among species by modelling
+residual covariance as proportional to the Brownian-motion phylogenetic
+covariance matrix scaled by Pagel's $\lambda$. The formal model is:
+
+$$\log R_i = \alpha + \beta \log M_i + \varepsilon_i, \quad
+\boldsymbol{\varepsilon} \sim \mathcal{N}\!\left(0,\,
+\sigma^2\bigl[\lambda\mathbf{V} + (1-\lambda)\mathbf{I}\bigr]\right)$$
+
+where $\mathbf{V}$ is the Brownian-motion phylogenetic covariance matrix
+(off-diagonal entries $\propto$ shared branch length to MRCA), and $\lambda$
+is estimated by maximum likelihood. $\lambda \approx 1$ indicates strong
+phylogenetic signal (Brownian motion); $\lambda \approx 0$ collapses to OLS.
+
+> **Note:** PGLS uses GLS (Model I regression), not SMA. PGLS slopes are
+> expected to be slightly lower than SMA slopes due to attenuation bias when
+> predictor (log mass) carries measurement error. This systematic difference
+> should be taken into account when comparing methods.
+
+## Species means for PGLS
+
+```{r pgls-species-means}
+# Aggregate individual records to species-level geometric means (= arithmetic
+# mean of log10 values). Retain family, life_form, plant_part for downstream
+# filtering. Singletons (n_records = 1) are included but flagged.
+sp_means <- dat |>
+  group_by(species, family, life_form, plant_part) |>
+  summarise(
+    log_resp_mean = mean(log_resp, na.rm = TRUE),
+    log_mass_mean = mean(log_mass, na.rm = TRUE),
+    n_records     = n(),
+    sd_log_resp   = sd(log_resp, na.rm = TRUE),
+    sd_log_mass   = sd(log_mass, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    singleton     = (n_records == 1L),
+    # Species name with underscore for tree tip matching
+    sp_tree       = gsub(" ", "_", species),
+    genus         = gsub(" .*", "", species)
+  ) |>
+  filter(is.finite(log_resp_mean), is.finite(log_mass_mean))
+
+cat("Total species means:", nrow(sp_means), "\n")
+cat("Singletons (n_records=1):", sum(sp_means$singleton), "\n")
+cat("Species with n>=3:", sum(!sp_means$singleton & sp_means$n_records >= 3), "\n")
+```
+
+## Phylogeny construction
+
+```{r pgls-phylogeny, fig.cap="Smith & Brown (2018) megaphylogeny pruned to Kurosawa dataset species (demo). Fan layout; tip labels colored by family."}
+if (HAS_PHYLOMAKER) {
+  # Build species list for V.PhyloMaker2::phylo.maker()
+  # Requires columns: species (binomial), genus, family
+  sp_list_pgls <- sp_means |>
+    select(species, genus, family) |>
+    distinct(species, .keep_all = TRUE) |>
+    # family NA causes phylo.maker to attempt genus-level inference
+    mutate(family = ifelse(is.na(family), NA_character_, family))
+
+  cat("Species for phylogeny:", nrow(sp_list_pgls), "\n")
+
+  # Build tree via Scenario S3 (random polytomy resolution within genus)
+  # set.seed ensures reproducibility of polytomy resolution (ape::multi2di)
+  set.seed(42)
+  tree_out <- tryCatch({
+    V.PhyloMaker2::phylo.maker(
+      sp.list   = sp_list_pgls,
+      tree      = V.PhyloMaker2::GBOTB.extended.WP,
+      nodes     = V.PhyloMaker2::nodes.info.1.WP,
+      scenarios = "S3"
+    )
+  }, error = function(e) {
+    message("phylo.maker() failed: ", conditionMessage(e)); NULL
+  })
+
+  if (!is.null(tree_out)) {
+    pgls_tree <- tree_out$scenario.3
+    # Validate and correct tree
+    if (!ape::is.ultrametric(pgls_tree, tol = 1e-5)) {
+      pgls_tree <- phytools::force.ultrametric(pgls_tree, method = "extend")
+    }
+    set.seed(42)
+    pgls_tree <- ape::multi2di(pgls_tree, random = TRUE)
+    pgls_tree$node.label <- NULL  # prevent caper label duplication error
+
+    cat("Tree tips:", ape::Ntip(pgls_tree), "\n")
+    cat("Is ultrametric:", ape::is.ultrametric(pgls_tree, tol = 1e-5), "\n")
+    cat("Is binary:", ape::is.binary(pgls_tree), "\n")
+
+    # Match table
+    sp_in_tree <- gsub(" ", "_", sp_list_pgls$species) %in% pgls_tree$tip.label
+    cat("Species matched to tree:", sum(sp_in_tree), "/", nrow(sp_list_pgls), "\n")
+
+    # Plot tree
+    plot(pgls_tree, type = "fan", cex = 0.55, no.margin = TRUE,
+         main = "Pruned megaphylogeny (Smith & Brown 2018, S3)")
+  } else {
+    pgls_tree <- NULL
+    cat("Tree building failed — PGLS sections will be skipped.\n")
+  }
+  HAS_TREE <- !is.null(pgls_tree)
+} else {
+  # Fallback: star tree for demonstration when V.PhyloMaker2 not available
+  message("V.PhyloMaker2 not available. Building a star tree for PGLS demonstration.")
+  sp_for_star <- unique(sp_means$sp_tree)
+  pgls_tree   <- ape::stree(length(sp_for_star), type = "star",
+                             tip.label = sp_for_star)
+  pgls_tree$edge.length <- rep(1, nrow(pgls_tree$edge))
+  pgls_tree$node.label  <- NULL
+  HAS_TREE <- TRUE
+  cat("Star tree built with", ape::Ntip(pgls_tree), "tips.\n")
+  cat("Note: Star tree has lambda = 0 by construction — PGLS = OLS on a star tree.\n")
+}
+```
+
+## PGLS fits by group
+
+```{r pgls-fit}
+if (HAS_TREE) {
+  # Helper: fit OLS + SMA + PGLS for one group subset
+  fit_group_pgls <- function(sp_sub, tree, group_label) {
+    # Match data to tree
+    sp_sub <- sp_sub |> filter(sp_tree %in% tree$tip.label)
+    if (nrow(sp_sub) < 6) {
+      message("Skipping ", group_label, ": only ", nrow(sp_sub), " species in tree.")
+      return(NULL)
+    }
+    tr <- ape::keep.tip(tree, sp_sub$sp_tree)
+    tr$node.label <- NULL
+
+    df           <- as.data.frame(sp_sub)
+    rownames(df) <- df$sp_tree
+
+    cd <- tryCatch(
+      caper::comparative.data(phy = tr, data = df, names.col = "sp_tree",
+                              vcv = TRUE, warn.dropped = FALSE),
+      error = function(e) { message("comparative.data failed for ", group_label, ": ", e$message); NULL }
+    )
+    if (is.null(cd)) return(NULL)
+
+    # OLS
+    ols_fit   <- lm(log_resp_mean ~ log_mass_mean, data = sp_sub)
+    ols_s     <- summary(ols_fit)
+    ols_slope <- coef(ols_fit)[2]
+    ols_se    <- coef(ols_s)[2, 2]
+    ols_ci    <- confint(ols_fit)[2, ]
+    ols_r2    <- ols_s$r.squared
+
+    # SMA
+    sma_fit   <- tryCatch(smatr::sma(log_resp_mean ~ log_mass_mean, data = sp_sub, method = "SMA"),
+                          error = function(e) NULL)
+    if (!is.null(sma_fit)) {
+      sma_slope <- sma_fit$coef[[1]][2, 1]
+      sma_ci_lo <- sma_fit$coef[[1]][2, 2]
+      sma_ci_hi <- sma_fit$coef[[1]][2, 3]
+      sma_r2    <- sma_fit$r2[[1]]
+    } else {
+      sma_slope <- sma_ci_lo <- sma_ci_hi <- sma_r2 <- NA_real_
+    }
+
+    # PGLS
+    pgls_fit <- tryCatch(
+      caper::pgls(log_resp_mean ~ log_mass_mean, data = cd, lambda = "ML",
+                  bounds = list(lambda = c(1e-6, 1))),
+      error = function(e) {
+        message("PGLS ML failed for ", group_label, ", trying lambda=1: ", e$message)
+        tryCatch(caper::pgls(log_resp_mean ~ log_mass_mean, data = cd, lambda = 1),
+                 error = function(e2) NULL)
+      }
+    )
+    if (!is.null(pgls_fit)) {
+      pgls_s      <- summary(pgls_fit)
+      pgls_slope  <- coef(pgls_fit)[2]
+      pgls_se     <- coef(pgls_s)[2, 2]
+      pgls_n      <- length(pgls_fit$residuals)  # length() is robust; nrow() requires matrix storage
+      pgls_ci     <- c(pgls_slope - qt(0.975, pgls_n - 2) * pgls_se,
+                       pgls_slope + qt(0.975, pgls_n - 2) * pgls_se)
+      pgls_r2     <- pgls_s$r.squared
+      pgls_lambda <- pgls_fit$param["lambda"]
+      # Lambda CI via profile likelihood
+      lam_ci <- tryCatch({
+        lam_prof <- caper::pgls.profile(pgls_fit, which = "lambda")
+        caper::pgls.confint(lam_prof, 0.95)$ci.val
+      }, error = function(e) c(NA_real_, NA_real_))
+      pgls_p_wbe  <- 2 * pt(abs((pgls_slope - 0.75) / pgls_se), pgls_n - 2, lower.tail = FALSE)
+    } else {
+      pgls_slope <- pgls_se <- pgls_r2 <- pgls_lambda <- pgls_p_wbe <- NA_real_
+      pgls_ci    <- c(NA_real_, NA_real_)
+      lam_ci     <- c(NA_real_, NA_real_)
+    }
+
+    tibble(
+      group       = group_label,
+      n_species   = nrow(sp_sub),
+      method      = c("OLS", "SMA", "PGLS"),
+      slope       = c(ols_slope,  sma_slope,  pgls_slope),
+      ci_lower    = c(ols_ci[1],  sma_ci_lo,  pgls_ci[1]),
+      ci_upper    = c(ols_ci[2],  sma_ci_hi,  pgls_ci[2]),
+      r_squared   = c(ols_r2,     sma_r2,     pgls_r2),
+      lambda      = c(NA_real_,   NA_real_,   pgls_lambda),
+      lambda_ci_lo = c(NA_real_,  NA_real_,   lam_ci[1]),
+      lambda_ci_hi = c(NA_real_,  NA_real_,   lam_ci[2]),
+      p_vs_wbe    = c(
+        2 * pt(abs((ols_slope - 0.75) / ols_se), nrow(sp_sub) - 2, lower.tail = FALSE),
+        tryCatch(smatr::slope.test(sp_sub$log_resp_mean, sp_sub$log_mass_mean,
+                                   test.value = 0.75, method = "SMA")$p,
+                 error = function(e) NA_real_),
+        pgls_p_wbe
+      )
+    )
+  }
+
+  # Run for each group
+  pgls_results <- bind_rows(
+    fit_group_pgls(sp_means |> filter(life_form == "Woody", plant_part == "Shoot"),
+                   pgls_tree, "Woody — Shoot"),
+    fit_group_pgls(sp_means |> filter(life_form == "Woody", plant_part == "Root"),
+                   pgls_tree, "Woody — Root"),
+    fit_group_pgls(sp_means |> filter(life_form == "Herbaceous", plant_part == "Shoot"),
+                   pgls_tree, "Herbaceous — Shoot"),
+    fit_group_pgls(sp_means |> filter(life_form == "Herbaceous", plant_part == "Root"),
+                   pgls_tree, "Herbaceous — Root")
+  )
+} else {
+  pgls_results <- tibble()
+}
+```
+
+## PGLS results table
+
+```{r pgls-lambda-table}
+if (nrow(pgls_results) > 0) {
+  kable(
+    pgls_results |>
+      filter(method == "PGLS") |>
+      select(group, n_species, slope, ci_lower, ci_upper, r_squared,
+             lambda, lambda_ci_lo, lambda_ci_hi, p_vs_wbe) |>
+      mutate(across(where(is.numeric), ~ round(.x, 3)),
+             p_vs_wbe = ifelse(is.na(p_vs_wbe), "—",
+                               ifelse(p_vs_wbe < 0.001, "<0.001",
+                                      as.character(round(p_vs_wbe, 3))))) |>
+      rename(Group = group, `N species` = n_species,
+             `PGLS slope` = slope, `CI low` = ci_lower, `CI high` = ci_upper,
+             `R²` = r_squared, `λ (ML)` = lambda,
+             `λ CI low` = lambda_ci_lo, `λ CI high` = lambda_ci_hi,
+             `p (slope ≠ 0.75)` = p_vs_wbe),
+    caption = "PGLS results: phylogenetically corrected scaling exponents and Pagel's λ"
+  )
+}
+```
+
+## OLS / SMA / PGLS comparison forest plot
+
+```{r pgls-forest-plot, fig.height=6, fig.cap="OLS / SMA / PGLS slope comparison by group. Dashed line = WBE 3/4. PGLS slopes incorporate phylogenetic correction; systematic offset from SMA expected due to x-error attenuation in GLS."}
+if (nrow(pgls_results) > 0) {
+  ggplot(pgls_results |> filter(!is.na(slope)),
+         aes(x = slope, y = group, colour = method, shape = method)) +
+    geom_point(position = position_dodge(width = 0.5), size = 3) +
+    geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper),
+                   position = position_dodge(width = 0.5), height = 0.25) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40",
+               linewidth = 0.8) +
+    scale_colour_manual(values = c("OLS" = "steelblue", "SMA" = "darkorange",
+                                   "PGLS" = "forestgreen")) +
+    labs(x = "Scaling exponent  (log R ~ log Mass)",
+         y = NULL, colour = "Method", shape = "Method",
+         title = "Respiration scaling: OLS vs SMA vs PGLS (species means)",
+         subtitle = "Dashed = WBE 3/4 reference") +
+    theme_bw(base_size = 12) +
+    theme(legend.position = "bottom")
+}
+```
+
+---
+
+# Inter- vs. intraspecific scaling decomposition
+
+Interspecific scaling (across species means) and intraspecific scaling (within
+a species across individuals of varying size) represent distinct biological
+processes. WBE/MST predicts $\beta_{\text{inter}} \approx 3/4$ from conserved
+vascular network geometry. Intraspecific slopes ($\beta_{\text{intra}}$) may
+differ: Glazier (2005, *Biol Rev* 80: 611–662) predicts intraspecific slopes
+closer to 1 for small organisms (surface-volume metabolic level hypothesis)
+converging toward 3/4 only when fractal network constraints dominate.
+
+> **⚠ Interpretive caveat:** Per-species slopes estimated here from multiple
+> individuals of the same species conflate **ontogenetic allometry**
+> (developmental biomass allocation) with **size variation among adults**
+> (population variation in final size). Only the *Fagus crenata*
+> (Kurosawa 2023) subset constitutes a genuine ontogenetic series. All other
+> per-species slopes should be interpreted as "size-variation slopes," not
+> developmental allometry.
+
+## Per-species intraspecific slopes
+
+```{r intraspecific-slopes}
+# Filter to species with at least 3 individual records (required for meaningful slope)
+sp_intra <- dat |>
+  group_by(species, family, life_form, plant_part) |>
+  filter(is.finite(log_mass), is.finite(log_resp)) |>  # finite check first
+  filter(n() >= 3) |>                                    # then re-count valid rows
+  nest() |>
+  mutate(
+    lm_fit    = map(data, ~ lm(log_resp ~ log_mass, data = .x)),
+    n         = map_int(data, nrow),
+    slope     = map_dbl(lm_fit, ~ coef(.x)[2]),
+    slope_se  = map_dbl(lm_fit, ~ summary(.x)$coefficients[2, 2]),
+    ci_lo     = map_dbl(lm_fit, ~ tryCatch(confint(.x)[2, 1], error = function(e) NA_real_)),
+    ci_hi     = map_dbl(lm_fit, ~ tryCatch(confint(.x)[2, 2], error = function(e) NA_real_)),
+    r2        = map_dbl(lm_fit, ~ summary(.x)$r.squared)
+  ) |>
+  select(-lm_fit, -data) |>
+  ungroup()
+
+cat("Species with n >= 3 (intraspecific slopes):", nrow(sp_intra), "\n")
+cat("Median intraspecific slope:", round(median(sp_intra$slope, na.rm = TRUE), 3), "\n")
+cat("IQR:", round(IQR(sp_intra$slope, na.rm = TRUE), 3), "\n")
+
+# One-sample t-tests: are intraspecific slopes centered on 0.75 or 1.0?
+t_vs_075 <- t.test(sp_intra$slope, mu = 0.75)
+t_vs_100 <- t.test(sp_intra$slope, mu = 1.00)
+cat(sprintf("\nOne-sample t-test, H0: mean slope = 0.75 -> p = %.4f\n", t_vs_075$p.value))
+cat(sprintf("One-sample t-test, H0: mean slope = 1.00 -> p = %.4f\n", t_vs_100$p.value))
+```
+
+```{r intraspecific-histogram, fig.cap="Distribution of per-species intraspecific OLS slopes. Vertical lines at WBE 3/4 (red dashed) and isometric 1.0 (blue dotted). Per-species slopes are OLS on individual records within each species (n≥3)."}
+inter_slopes <- if (nrow(pgls_results) > 0) {
+  pgls_results |>
+    filter(method == "PGLS") |>
+    mutate(panel_label = paste(group, "\nPGLS slope")) |>
+    select(group, inter_slope = slope)
+} else { NULL }
+
+ggplot(sp_intra, aes(x = slope, fill = life_form)) +
+  geom_histogram(bins = 25, alpha = 0.75, colour = "white") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
+             linewidth = 1) +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
+             linewidth = 1) +
+  annotate("text", x = 0.75, y = Inf, label = "  WBE 3/4", vjust = 2,
+           colour = "#d6604d", size = 3.5, hjust = 0) +
+  annotate("text", x = 1.00, y = Inf, label = "  Isometric 1.0", vjust = 2,
+           colour = "#2166ac", size = 3.5, hjust = 0) +
+  facet_grid(plant_part ~ life_form, scales = "free_y") +
+  scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
+  labs(x = "Per-species OLS slope (log R ~ log Mass, within species)",
+       y = "Count",
+       fill = "Life form",
+       title = "Distribution of intraspecific scaling slopes",
+       subtitle = "Each bar = one species (n\u22653 individuals)") +
+  theme(legend.position = "none")
+```
+
+```{r intraspecific-table}
+kable(
+  sp_intra |>
+    arrange(family, species) |>
+    select(species, family, life_form, plant_part, n, slope, ci_lo, ci_hi, r2) |>
+    mutate(across(c(slope, ci_lo, ci_hi, r2), ~ round(.x, 3))) |>
+    rename(Species = species, Family = family, `Life form` = life_form,
+           `Plant part` = plant_part, N = n,
+           `Intra slope` = slope, `CI low` = ci_lo, `CI high` = ci_hi, `R²` = r2),
+  caption = "Per-species intraspecific OLS slopes (n\u22653 individuals required)"
+)
+```
+
+## Inter- vs. intraspecific: Glazier comparison
+
+```{r glazier-comparison}
+# Summarise intraspecific slopes vs interspecific (PGLS) for each group
+glazier_tbl <- sp_intra |>
+  mutate(group = paste(life_form, "\u2014", plant_part)) |>
+  group_by(group) |>
+  summarise(
+    n_species_intra  = n(),
+    median_intra     = median(slope, na.rm = TRUE),
+    iqr_intra        = IQR(slope, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+if (nrow(pgls_results) > 0) {
+  pgls_inter <- pgls_results |>
+    filter(method == "PGLS") |>
+    select(group, inter_slope_pgls = slope)
+  glazier_tbl <- left_join(glazier_tbl, pgls_inter, by = "group")
+} else {
+  glazier_tbl$inter_slope_pgls <- NA_real_
+}
+
+kable(
+  glazier_tbl |>
+    mutate(across(where(is.numeric), ~ round(.x, 3))) |>
+    rename(Group = group,
+           `N species (intra)` = n_species_intra,
+           `Median β_intra` = median_intra,
+           `IQR β_intra` = iqr_intra,
+           `β_inter (PGLS)` = inter_slope_pgls),
+  caption = "Inter- vs. intraspecific scaling exponents. Glazier (2005) predicts β_intra > β_inter for many species, especially small-bodied organisms."
+)
+```
+
+---
+
+# Per-family scaling relationships
+
+Family-level scaling tests whether the WBE/MST prediction of a universal
+$\beta = 3/4$ holds within plant families, or whether families differ in
+scaling exponent (vascular architecture differences) or metabolic normalization
+(intercept differences).
+
+> **⚠ Temperature caveat:** Family-level intercept differences may reflect
+> measurement temperature differences across studies, not true metabolic
+> normalization differences. Slope comparisons are less sensitive to
+> temperature if thermal effects are additive in log space, but this
+> cannot be assumed. Families sampled primarily from cold environments
+> (e.g., Pinaceae) may show systematically lower respiration at the same
+> fresh mass compared to warm-adapted families.
+
+## Family-level SMA fits
+
+```{r family-sma, fig.height=7, fig.cap="Forest plot of SMA slopes by family. Dashed line = WBE 3/4. Families ordered by slope. Minimum 5 species OR 10 records required for inclusion."}
+# Apply eligibility thresholds (BC-5: n_species >= 5 OR n_records >= 10)
+fam_eligible <- fam_summary |>
+  filter(sma_eligible) |>
+  pull(family)
+
+dat_fam <- dat |>
+  filter(family %in% fam_eligible, is.finite(log_mass), is.finite(log_resp))
+
+fam_fits <- dat_fam |>
+  group_by(family, life_form) |>
+  filter(n_distinct(species) >= 3 | n() >= 10) |>   # secondary guard
+  nest() |>
+  mutate(
+    n_records  = map_int(data, nrow),
+    n_species  = map_int(data, ~ n_distinct(.x$species)),
+    fit        = map(data, ~ tryCatch(smatr::sma(log_resp ~ log_mass, data = .x,
+                                                  method = "SMA"), error = function(e) NULL)),
+    slope      = map_dbl(fit, ~ if (!is.null(.x)) coef(.x)[2] else NA_real_),
+    intercept  = map_dbl(fit, ~ if (!is.null(.x)) coef(.x)[1] else NA_real_),
+    ci_lo      = map_dbl(fit, ~ if (!is.null(.x)) .x$coef[[1]][2, 2] else NA_real_),
+    ci_hi      = map_dbl(fit, ~ if (!is.null(.x)) .x$coef[[1]][2, 3] else NA_real_),
+    r2         = map_dbl(fit, ~ if (!is.null(.x)) .x$r2[[1]] else NA_real_),
+    p_vs_075   = map_dbl(data, ~ tryCatch(
+                   smatr::slope.test(.x$log_resp, .x$log_mass,
+                                     test.value = 0.75, method = "SMA")$p,
+                   error = function(e) NA_real_))
+  ) |>
+  select(-fit, -data) |>
+  filter(!is.na(slope)) |>
+  ungroup()
+
+kable(
+  fam_fits |>
+    arrange(life_form, desc(n_species)) |>
+    select(family, life_form, n_species, n_records, slope, ci_lo, ci_hi, r2, p_vs_075) |>
+    mutate(across(c(slope, ci_lo, ci_hi, r2), ~ round(.x, 3)),
+           p_vs_075 = ifelse(is.na(p_vs_075), "—",
+                             ifelse(p_vs_075 < 0.001, "<0.001",
+                                    as.character(round(p_vs_075, 3))))) |>
+    rename(Family = family, `Life form` = life_form,
+           `N species` = n_species, `N records` = n_records,
+           `SMA slope` = slope, `CI low` = ci_lo, `CI high` = ci_hi,
+           `R²` = r2, `p (slope ≠ 0.75)` = p_vs_075),
+  caption = "Per-family SMA scaling exponents (families with n_species≥5 or n_records≥10)"
+)
+```
+
+```{r family-forest-plot, fig.height=6, fig.cap="Per-family SMA scaling exponents with 95% CI. Dashed = WBE 3/4. Colored by life form (blue = woody, red = herbaceous)."}
+ggplot(fam_fits, aes(y = reorder(family, slope), x = slope,
+                     xmin = ci_lo, xmax = ci_hi, colour = life_form)) +
+  geom_pointrange(size = 0.7) +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40",
+             linewidth = 0.8) +
+  scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
+  labs(x = "SMA slope  (log R ~ log Fresh mass)",
+       y = NULL,
+       colour = "Life form",
+       title = "Per-family respiration scaling exponents",
+       subtitle = "Dashed = WBE 3/4 reference") +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+## Slope homogeneity test across families
+
+```{r family-slope-homogeneity}
+# Test whether all eligible families share a common slope
+# smatr::sma with group interaction tests slope heterogeneity
+if (n_distinct(dat_fam$family) >= 3) {
+  fit_common <- tryCatch(
+    smatr::sma(log_resp ~ log_mass + family, data = dat_fam, method = "SMA"),
+    error = function(e) NULL
+  )
+  fit_interact <- tryCatch(
+    smatr::sma(log_resp ~ log_mass * family, data = dat_fam, method = "SMA"),
+    error = function(e) NULL
+  )
+  if (!is.null(fit_common) && !is.null(fit_interact)) {
+    # smatr::sma objects do not store a $model slot; use the log-likelihood
+    # approach instead: compare the common-slope vs. interaction models via
+    # the smatr slope.test embedded in the interaction summary.
+    cat("Common-slope vs. interaction summary (smatr slope.test):\n")
+    cat("  (AIC comparison not available for smatr objects; see slope homogeneity test below)\n")
+    cat("\nSlope homogeneity test (smatr):\n")
+    print(summary(fit_interact)$coef)
+  }
+}
+```
+
+## Family intercepts: metabolic normalization
+
+```{r family-intercepts, fig.cap="Family-level metabolic normalization (SMA intercept) — the expected log10 respiration rate at log10 fresh mass = 0 (i.e., 1 g plant). Differences in intercept reflect variation in mass-specific respiration rate, independent of the scaling slope."}
+ggplot(fam_fits, aes(x = reorder(family, intercept), y = intercept,
+                     fill = life_form)) +
+  geom_col(alpha = 0.8) +
+  geom_hline(yintercept = mean(fam_fits$intercept, na.rm = TRUE),
+             linetype = "dashed", colour = "grey40") +
+  scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
+  coord_flip() +
+  labs(x = NULL, y = "SMA intercept  (log R at 1 g fresh mass)",
+       fill = "Life form",
+       title = "Per-family metabolic normalization (intercept)",
+       subtitle = "Dashed = mean across eligible families") +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+## Within-family PGLS (families with n_species ≥ 8 in tree)
+
+```{r family-pgls}
+if (HAS_TREE && nrow(pgls_results) > 0) {
+  # Identify families with enough species in the tree
+  fam_pgls_eligible <- sp_means |>
+    filter(sp_tree %in% pgls_tree$tip.label) |>
+    count(family) |>
+    filter(n >= 8) |>
+    pull(family)
+
+  if (length(fam_pgls_eligible) > 0) {
+    fam_pgls_list <- lapply(fam_pgls_eligible, function(fam) {
+      # Aggregate across plant parts to one row per species (required by caper:
+      # rownames must be unique tip labels; the same species may appear as both
+      # Shoot and Root in sp_means).
+      sp_sub <- sp_means |>
+        filter(family == fam, sp_tree %in% pgls_tree$tip.label) |>
+        group_by(sp_tree, family, life_form) |>
+        dplyr::summarise(
+          log_resp_mean = mean(log_resp_mean, na.rm = TRUE),
+          log_mass_mean = mean(log_mass_mean, na.rm = TRUE),
+          n_records     = sum(n_records),
+          .groups = "drop"
+        )
+      if (nrow(sp_sub) < 6) return(NULL)
+      tr <- ape::keep.tip(pgls_tree, sp_sub$sp_tree)
+      tr$node.label <- NULL
+      df <- as.data.frame(sp_sub); rownames(df) <- df$sp_tree
+      cd <- tryCatch(caper::comparative.data(tr, df, "sp_tree",
+                                              vcv = TRUE, warn.dropped = FALSE),
+                     error = function(e) NULL)
+      if (is.null(cd)) return(NULL)
+      pgls_f <- tryCatch(
+        caper::pgls(log_resp_mean ~ log_mass_mean, data = cd, lambda = "ML",
+                    bounds = list(lambda = c(1e-6, 1))),
+        error = function(e) NULL
+      )
+      if (is.null(pgls_f)) return(NULL)
+      ps <- summary(pgls_f)
+      tibble(family = fam, n_species = nrow(sp_sub),
+             slope  = coef(pgls_f)[2],
+             slope_se = coef(ps)[2, 2],
+             lambda = pgls_f$param["lambda"],
+             r2     = ps$r.squared)
+    })
+    fam_pgls_tbl <- bind_rows(fam_pgls_list)
+    if (nrow(fam_pgls_tbl) > 0) {
+      kable(
+        fam_pgls_tbl |> mutate(across(where(is.numeric), ~ round(.x, 3))) |>
+          rename(Family = family, `N species` = n_species,
+                 `PGLS slope` = slope, SE = slope_se,
+                 `λ (ML)` = lambda, `R²` = r2),
+        caption = "Within-family PGLS results (families with n_species ≥ 8 in tree)"
+      )
+    }
+  } else {
+    cat("No families with ≥8 species in tree — within-family PGLS not run.\n")
+    cat("(This is expected with demo data; real Kurosawa/Mori data should yield",
+        "Fagaceae and Pinaceae qualifying.)\n")
+  }
+}
+```
+
+---
+
+# Scaling exponent forest plot
+
+```{r forest-plot, fig.height=5, fig.cap="Forest plot of SMA slope estimates with 95% CI. Reference lines at 3/4 and 1."}
+forest_df <- group_fits |>
+  select(group, slope, ci_lo, ci_hi, n) |>
+  mutate(label = paste0(group, " (n=", n, ")"))
+
+ggplot(forest_df, aes(y = reorder(label, slope), x = slope,
+                      xmin = ci_lo, xmax = ci_hi)) +
+  geom_pointrange(size = 0.7) +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
+             linewidth = 0.8) +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
+             linewidth = 0.8) +
+  annotate("text", x = 0.75, y = Inf, label = "  WBE 3/4", vjust = 2,
+           colour = "#d6604d", size = 3.5, hjust = 0) +
+  annotate("text", x = 1.00, y = Inf, label = "  Isometric 1", vjust = 2,
+           colour = "#2166ac", size = 3.5, hjust = 0) +
+  labs(x = "SMA slope  (log R ~ log Fresh mass)",
+       y = NULL,
+       title = "Forest plot: respiration scaling exponents",
+       subtitle = "95% CI from SMA regression (smatr)") +
+  theme(axis.text.y = element_text(size = 11))
+```
+
+---
+
+# Respiration residuals
+
+```{r residuals, fig.cap="SMA residuals (log-scale) by life form. Positive = higher respiration than expected from pooled fit."}
+dat_resid <- dat |>
+  filter(life_form != "unknown") |>
+  mutate(resid_pooled = log_resp - (cf_pooled[1] + cf_pooled[2] * log_mass))
+
+ggplot(dat_resid, aes(x = life_form, y = resid_pooled, fill = life_form)) +
+  geom_violin(alpha = 0.5, draw_quantiles = c(0.25, 0.5, 0.75)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ plant_part) +
+  scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
+  labs(x = NULL, y = "SMA residual (log scale)",
+       title = "Residuals from pooled scaling line") +
+  theme(legend.position = "none")
+```
+
+---
+
+# Kurosawa 2023: Fagus crenata ontogenetic series
+
+Kurosawa et al. (2023; *Annals of Botany* 131: 313–322;
+DOI: [10.1093/aob/mcac143](https://doi.org/10.1093/aob/mcac143)) is a narrower
+ontogenetic study tracking respiration, fresh mass, and surface area of *Fagus
+crenata* shoots and roots from seedling to large-tree stages. This subset is
+included in the 2025 Dryad dataset as `dataset_source == "Kurosawa2023"`.
+
+```{r fagus-ontogenetic, fig.cap="Fagus crenata ontogenetic scaling: respiration vs. fresh mass (shoot and root)."}
+fagus_dat <- dat |>
+  filter(grepl("Kurosawa2023|kurosawa2023|kurosawa_2023|Fagus|fagus",
+               paste(dataset_source, species), ignore.case = TRUE))
+
+if (nrow(fagus_dat) >= 10) {
+  ggplot(fagus_dat, aes(x = log_mass, y = log_resp, colour = plant_part, shape = plant_part)) +
+    geom_point(size = 2.5) +
+    geom_smooth(method = "lm", se = TRUE, linewidth = 1) +
+    scale_colour_manual(values = c(Shoot = "#4dac26", Root = "#d01c8b",
+                                   unknown = "grey50")) +
+    labs(x = expression(log[10]~"Fresh mass (g)"),
+         y = expression(log[10]~"Respiration rate"),
+         colour = "Plant part", shape = "Plant part",
+         title = expression(italic("Fagus crenata")~"ontogenetic scaling"),
+         subtitle = "Kurosawa et al. 2023 subset") +
+    theme(legend.position = "bottom")
+} else {
+  cat(sprintf(
+    "Fewer than 10 Fagus crenata records isolated (n = %d). This may indicate\n",
+    nrow(fagus_dat)),
+    "the dataset_source or species column uses a different naming convention.\n",
+    "Check column content with: dat |> count(dataset_source) and dat |> count(species)\n")
+}
+```
+
+---
+
+# Summary table
+
+```{r final-table}
+kable(
+  group_fits |>
+    ungroup() |>
+    select(group, n, slope, ci_lo, ci_hi, r2, p_vs_075) |>
+    rename(`Group` = group, N = n, `SMA slope` = slope,
+           `95% CI low` = ci_lo, `95% CI high` = ci_hi,
+           `R²` = r2, `p (slope ≠ 0.75)` = p_vs_075) |>
+    mutate(
+      across(c(`SMA slope`, `95% CI low`, `95% CI high`, `R²`), ~ round(.x, 3)),
+      `p (slope ≠ 0.75)` = ifelse(is.na(`p (slope ≠ 0.75)`), "—",
+                                   ifelse(`p (slope ≠ 0.75)` < 0.001, "<0.001",
+                                          as.character(round(`p (slope ≠ 0.75)`, 3))))
+    ),
+  caption = "Summary: SMA scaling exponents for respiration ~ fresh mass"
+)
+```
+
+---
+
+# Caveats and data status
+
+```{r caveats}
+if (!USE_REAL_DATA) {
+  cat("⚠ DATA STATUS: This analysis used RECONSTRUCTED DEMONSTRATION DATA.\n",
+      "  Slopes and ranges are calibrated to approximate published values\n",
+      "  from Kurosawa et al. 2025 and Mori et al. 2010 but are NOT the\n",
+      "  original measurements.\n\n",
+      "  To run with real data:\n",
+      "  1. Download data.respiration.csv from https://doi.org/10.5061/dryad.sxksn03cj\n",
+      "  2. Save to:  plant_scaling_data/data/raw/kurosawa_respiration/data.respiration.csv\n",
+      "  3. Re-render this Rmd.\n\n")
+}
+cat("General caveats:\n",
+    "• Respiration units vary across studies (nmol CO2 g-1 s-1, µmol CO2 g-1 s-1);\n",
+    "  the Dryad README should be consulted for units and normalisation.\n",
+    "• Measurement temperature affects respiration rates; temperature correction\n",
+    "  (e.g., Q10 normalisation to 15°C or 20°C) is advised for cross-study comparison.\n",
+    "• SMA slopes are sensitive to the range of body sizes included; a very broad\n",
+    "  mass range will tend to push slopes toward 1 if allometry is non-linear.\n",
+    "• The herbaceous and woody plants span very different ecological contexts;\n",
+    "  the pooled slope should be interpreted cautiously.\n")
+```
+
+---
+
+# References
+
+* Kurosawa Y, Mori S, Ferrio JP, et al. (2025). Scaling of shoot and root
+  respiration of woody and herbaceous plants. *Proc R Soc B* **292**: 20241910.
+  DOI: 10.1098/rspb.2024.1910
+
+* Kurosawa Y, et al. (2024). Data from: Scaling of shoot and root respiration
+  of woody and herbaceous plants. *Dryad*. DOI: 10.5061/dryad.sxksn03cj
+
+* Kurosawa Y, et al. (2023). Ontogenetic changes in root and shoot respiration,
+  fresh mass and surface area of *Fagus crenata*. *Ann Bot* **131**: 313–322.
+  DOI: 10.1093/aob/mcac143
+
+* Mori S, et al. (2010). Mixed-power scaling of whole-plant respiration from
+  seedlings to giant trees. *Proc R Soc B* **277**: 1447–1454.
+  DOI: 10.1098/rspb.2009.1811
+
+* West GB, Brown JH, Enquist BJ (1997). A general model for the origin of
+  allometric scaling laws in biology. *Science* **276**: 122–126.
+
+* Glazier DS (2005). Beyond the '3/4-power law': variation in the intra-
+  and interspecific scaling of metabolic rate in animals. *Biol Rev* **80**: 611–662.
+  DOI: 10.1017/S1464793105006834
+
+* Atkin OK & Tjoelker MG (2003). Thermal acclimation and the dynamic response
+  of plant respiration to temperature. *Trends Plant Sci* **8**: 343–351.
+  DOI: 10.1016/S1360-1385(03)00136-5
+
+* Warton DI, Wright IJ, Falster DS, Westoby M (2006). Bivariate line-fitting
+  methods for allometry. *Biol Rev* **81**: 259–291.
+  DOI: 10.1017/S1464793106007007
+
+* Orme D, Freckleton R, Thomas G, et al. (2013). caper: Comparative Analyses
+  of Phylogenetics and Evolution in R. R package version 1.0.1.
+
+> **⚠ Citation verification:** All DOIs, volume numbers, page ranges, and journal
+> names in this document should be independently verified against Crossref or
+> publisher websites before use in any manuscript or public report.
+
+---
+
+*This analysis was conducted using `smatr` (Warton et al. 2012) in R `r R.version$major`.`r R.version$minor`.*
+*Data source: Kurosawa et al. 2024, Dryad DOI: 10.5061/dryad.sxksn03cj.*

@@ -1794,3 +1794,27 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-05-02 | "give me a .html and .rmd summary — include separate .rmd and .html for NEON growth rate analyses — use RMA slopes and smatr" — Created cross_study_allometry_sma.Rmd/html (SMA H~DBH and AGB~DBH per dataset + pooled; tests vs WBE 2/3 and MST 8/3) and neon_growth_allometry_sma.Rmd/html (SMA delta-D~D and delta-AGB~AGB global + per-site; tests vs MST 1/3 and 3/4). Committed 0abfbe8.
 
 2026-05-02 | "PGLS analyses of allometric scaling relationships" — Created scripts 04_prepare_pgls_species_means.R, 05_build_phylogeny_smith2018.R, 06_pgls_allometry.R, and pgls_allometry_report.Rmd for OLS/SMA/PGLS allometric analysis using Niklas-Enquist and BAAD data with Smith & Brown 2018 phylogeny (V.PhyloMaker2). Six scaling relationships tested against WBE predictions. stats-specialist design spec, merow-ecology phylogenetics review, biodiversity-science-guard scholarly review applied. Critical fixes: set.seed for reproducibility, correct PGLS df, t-dist CI, lambda bounds, Packard citation replaced. Updated PROJECT_PLAN.md.
+
+2026-05-02 | "Add scientist-readable comments to all 6 plant allometric scaling scripts (01-06)" — Added full file-level header blocks (purpose, inputs/outputs, key concepts) and inline/block comments to scripts/01_ingest_allometry_data.R through scripts/06_pgls_allometry.R in plant_scaling_data/. Comments document WBE/MST theory, OLS vs SMA vs PGLS rationale, data QC logic, unit handling, phylogenetic signal interpretation, and reproducibility caveats.
+
+2026-05-02 | "Add Kurosawa et al. 2025 shoot/root respiration scaling and Forrester et al. 2022 SAPFLUXNET water-use scaling to plant_scaling_data." — Created kurosawa_respiration_scaling.Rmd (SMA scaling of respiration vs. fresh mass, pooled + by group, Fagus subset, slope tests vs. WBE 3/4) and sapfluxnet_water_use_scaling.Rmd (E~DBH, E~BA, E~SA, SA~DBH, by growth form). Downloaded SAPFLUXNET v0.1.5 (3.0 GB, Zenodo DOI:10.5281/zenodo.3971689). Fixed: smatr API (slope.test vector interface, fit$coef[[1]], fit$r2[[1]]); bind_rows type conflict (col_character() then coerce); raw CSV units cm³ h⁻¹ not cm³ s⁻¹ (×24/1000 for L/day). Kurosawa Dryad data blocked by Cloudflare — Rmd falls back to demo data; real data.respiration.csv must be manually downloaded from https://datadryad.org/dataset/doi:10.5061/dryad.sxksn03cj.
+
+---
+## 2025 | Add inline scientific comments to all SMA Rmd code chunks
+
+**Prompt**: "Now for all of our code in this project I would like to provide detailed comments so that a general researcher will know what is happening at each step, the goals of the code block as well as how that relates to the science. @ecology-user.agent.md and @enhanced-theory.agent.md oversee the commenting on all the code in this project."
+
+**Files changed**:
+- `plant_scaling_data/cross_study_allometry_sma.Rmd` — all 11 analysis chunks commented
+- `plant_scaling_data/neon_growth_allometry_sma.Rmd` — all 10 analysis chunks commented
+- Both Rmd files re-rendered to HTML
+
+**Commit**: `3bf50fe`
+
+**Comment themes applied** (per ecology-user + enhanced-theory frameworks):
+- What the code does (technical mechanics)
+- Why it does it (scientific rationale / data requirement)
+- How it connects to scaling theory (MST, WBE, Chave, pipe model)
+- Caveats a researcher should know (AGB-DBH dependence, OLS attenuation bias, SMA vs OLS, positive-increment filter)
+
+2026-05-02 | "Add PGLS, inter/intra, and per-family scaling to kurosawa_respiration_scaling.Rmd" — Added Sections 6-9: taxonomy/family assignment (APG IV, 52 named species, 10 families), PGLS via caper + V.PhyloMaker2 (star-tree fallback), intraspecific vs interspecific scaling decomposition (Glazier 2005 framework), per-family SMA and PGLS. Demo data regenerated with named species and per-species replication. Fixed purrr/MASS namespace conflicts, duplicate rownames in family-PGLS, AIC display for smatr, length()/nrow() mismatch for PGLS residuals. All 65 chunks render clean. kurosawa_respiration_scaling.html: 3.9 MB.

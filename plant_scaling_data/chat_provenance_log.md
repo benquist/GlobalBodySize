@@ -30,3 +30,26 @@
 2026-05-02 | SMA/RMA allometry analyses added: cross_study_allometry_sma.Rmd/html and neon_growth_allometry_sma.Rmd/html. Commit 0abfbe8.
 
 2026-05-02 | PGLS allometric scaling workflow added (scripts 04-06, pgls_allometry_report.Rmd). Smith 2018 tree via V.PhyloMaker2. OLS/SMA/PGLS for 6 relationships. Scholarly rigor review applied and critical issues fixed.
+
+2026-05-02 | Added Kurosawa et al. 2025 respiration scaling analysis (kurosawa_respiration_scaling.Rmd/html) and Forrester et al. 2022 SAPFLUXNET water-use scaling analysis (sapfluxnet_water_use_scaling.Rmd/html). Data sources: Kurosawa Y. et al. 2025 Proc R Soc B 292:20241910 (DOI:10.1098/rspb.2024.1910); Forrester DI, Limousin J-M, Pfautsch S. 2022 Tree Physiology 42:1916–1927 (DOI:10.1093/treephys/tpac018); SAPFLUXNET v0.1.5 (Zenodo DOI:10.5281/zenodo.3971689). Note: Kurosawa Dryad data (10.5061/dryad.sxksn03cj) blocked by Cloudflare — Rmd uses demo data calibrated to published slopes until data.respiration.csv is manually downloaded. SAPFLUXNET 0.1.5.zip (3.0 GB) downloaded and extracted to data/raw/sapfluxnet/0.1.5/csv/plant/ (194 sites, 2458 trees). Both Rmds use SMA regression (smatr ≥3.4), corrected unit conversion (cm³ h⁻¹ × 24/1000 for L/day), and full smatr v3 API (fit$coef[[1]], fit$r2[[1]]).
+
+---
+## Session: Inline scientific comments added to SMA Rmd files
+
+**Date**: 2025
+**Commit**: `3bf50fe`
+
+**What was done**: Added detailed inline scientific comments to all code chunks in both SMA analysis files, supervised by ecology-user and enhanced-theory agent frameworks. Comments explain the purpose of each code block, the scientific rationale, how each step connects to MST/WBE scaling theory, and key caveats for non-expert readers.
+
+**Files commented**:
+- `cross_study_allometry_sma.Rmd`: load-data (part 2), hdbh-sma-table, hdbh-sma-dotplot, hdbh-ols-vs-sma, hdbh-scatter-sma, hdbh-pooled-sma, agb-sma-table, agb-sma-scatter, agb-ht-sma-table, all-exponents-summary, forest-plot
+- `neon_growth_allometry_sma.Rmd`: load-data, ddD-global-sma, ddD-scatter-sma, ddD-binned-sma, dAGB-global-sma, dAGB-scatter-sma, per-site-sma, per-site-dotplot, per-site-ols-vs-sma, final-summary
+
+**Recurring comment themes**:
+1. smatr API: why two sma() fits per test (one per theoretical value), where slope and CI live in the coef matrix, p-value location in slopetest[[1]]$p
+2. OLS vs SMA: attenuation bias explanation at every OLS comparison
+3. AGB-DBH dependence: NEON AGBChojnacky caveat repeated in all AGB chunks
+4. Positive-increment filter: why negative increments are excluded and what bias this introduces
+5. Theoretical anchoring: WBE (2/3, 8/3), MST (1/3, 3/4), Chave 0.65 prediction sources cited in comments
+
+2026-05-02 | Added PGLS (caper, V.PhyloMaker2), intraspecific vs interspecific scaling decomposition (Glazier 2005 framework), and per-family SMA/PGLS to kurosawa_respiration_scaling.Rmd. Demo data regenerated with 52 named species (10 APG IV families). All 65 chunks render clean. HTML: kurosawa_respiration_scaling.html (3.9 MB).
