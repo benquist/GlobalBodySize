@@ -1,0 +1,769 @@
+---
+title: "NEON ForestAGB — Tree Growth Rate Analysis"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 5)
+suppressPackageStartupMessages({
+  library(readr)
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(knitr)
+  library(scales)
+  library(maps)
+})
+theme_set(theme_bw(base_size = 13))
+
+proj_dir <- dirname(knitr::current_input(dir = TRUE))
+
+# ── Load all NEON site files ─────────────────────────────────────────────────
+neon_sites <- c("BART","BLAN","CLBJ","DELA","DSNY","GRSM","GUAN","HARV",
+                "JERC","KONZ","LENO","MLBS","ORNL","OSBS","RMNP","SCBI",
+                "SERC","STEI","TALL","TREE","UKFS","UNDE","YELL")
+
+raw <- lapply(neon_sites, function(s) {
+  read_csv(
+    file.path(proj_dir, "data/raw/neon_forest_agb/biomass",
+              paste0(s, "_biomass.csv")),
+    show_col_types = FALSE
+  )
+}) |> bind_rows()
+
+# ── Harmonise: all "Live*" statuses, one row per individual × year ───────────
+# Some individuals appear more than once in a year (different stems / flags).
+# We take the mean DBH and AGB per individual per year for those cases.
+live_raw <- raw |>
+  filter(grepl("^Live", plantStatus, ignore.case = TRUE),
+         !is.na(stemDiameter), stemDiameter > 0) |>
+  group_by(individualID, siteID, domainID, scientificName, Family,
+           growthForm, year) |>
+  summarise(
+    DBH_cm       = mean(stemDiameter,    na.rm = TRUE),
+    Height_m     = mean(height,          na.rm = TRUE),
+    AGB_Choj_kg  = mean(AGBChojnacky,    na.rm = TRUE),
+    AGB_Jenk_kg  = mean(AGBJenkins,      na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ── Annual growth increments (consecutive year pairs per individual) ──────────
+annual_growth <- live_raw |>
+  arrange(individualID, year) |>
+  group_by(individualID, siteID, domainID, scientificName, Family, growthForm) |>
+  mutate(
+    delta_yr     = year      - lag(year),
+    delta_DBH    = DBH_cm    - lag(DBH_cm),
+    delta_AGB    = AGB_Choj_kg - lag(AGB_Choj_kg),
+    delta_Ht     = Height_m  - lag(Height_m),
+    DBH_start    = lag(DBH_cm),
+    AGB_start    = lag(AGB_Choj_kg),
+    # annualised rates (divide by actual year gap — not always 1)
+    DBH_inc_cm_yr  = delta_DBH / delta_yr,
+    AGB_inc_kg_yr  = delta_AGB / delta_yr,
+    Ht_inc_m_yr    = delta_Ht  / delta_yr,
+    # relative growth rate (RGR) — normalised by size at start
+    RGR_DBH        = (log(DBH_cm) - log(DBH_start)) / delta_yr,
+    RGR_AGB        = (log(AGB_Choj_kg) - log(AGB_start)) / delta_yr
+  ) |>
+  filter(!is.na(delta_yr), delta_yr >= 1) |>
+  ungroup()
+
+# ── Per-individual lifetime summaries ────────────────────────────────────────
+lifetime <- live_raw |>
+  group_by(individualID, siteID, domainID, scientificName, Family, growthForm) |>
+  filter(n() >= 2) |>
+  summarise(
+    n_census           = n(),
+    year_first         = min(year),
+    year_last          = max(year),
+    duration_yr        = max(year) - min(year),
+    DBH_first_cm       = DBH_cm[which.min(year)],
+    DBH_last_cm        = DBH_cm[which.max(year)],
+    AGB_first_kg       = AGB_Choj_kg[which.min(year)],
+    AGB_last_kg        = AGB_Choj_kg[which.max(year)],
+    total_DBH_inc_cm   = DBH_last_cm  - DBH_first_cm,
+    total_AGB_inc_kg   = AGB_last_kg  - AGB_first_kg,
+    mean_annual_DBH_inc = total_DBH_inc_cm / duration_yr,
+    mean_annual_AGB_inc = total_AGB_inc_kg  / duration_yr,
+    RGR_DBH_lifetime   = (log(DBH_last_cm)  - log(DBH_first_cm))  / duration_yr,
+    RGR_AGB_lifetime   = (log(AGB_last_kg)  - log(AGB_first_kg))  / duration_yr,
+    .groups = "drop"
+  )
+```
+
+---
+
+# Overview
+
+This document derives individual-tree growth rates from the **NEON ForestAGB**
+longitudinal dataset.  The same tagged trees (`individualID`) are measured across
+multiple years, enabling computation of:
+
+- **Annual DBH increment** (cm yr⁻¹): diameter growth between consecutive censuses
+- **Annual AGB increment** (kg yr⁻¹): biomass growth between consecutive censuses
+- **Relative growth rate (RGR)**: proportional diameter or biomass change per year
+- **Lifetime totals**: cumulative change from first to last live census per tree
+
+> **AGB caveat:** Biomass is estimated from DBH via Chojnacky et al. (2014)
+> allometric equations.  AGB increments are therefore *model-derived* and
+> correlated with DBH increments — they do not represent independent
+> measurements.
+
+> **⚠ Growth rates can be negative** (measurement error, bark loss, or DBH
+> measured at different heights across visits). Negative values are retained
+> as data but flagged in relevant plots.
+
+---
+
+# Dataset summary
+
+```{r summary-table}
+kable(data.frame(
+  Metric = c(
+    "Total raw live-status rows",
+    "Live individuals with >= 1 census",
+    "Live individuals with >= 2 censuses (growth derivable)",
+    "Annual growth intervals computed",
+    "Year range",
+    "Sites"
+  ),
+  Value = c(
+    format(nrow(live_raw), big.mark = ","),
+    format(length(unique(live_raw$individualID)), big.mark = ","),
+    format(nrow(lifetime), big.mark = ","),
+    format(nrow(annual_growth), big.mark = ","),
+    paste0(min(live_raw$year, na.rm=TRUE), "\u2013", max(live_raw$year, na.rm=TRUE)),
+    length(neon_sites)
+  ),
+  stringsAsFactors = FALSE
+), caption = "NEON growth analysis — dataset scope")
+```
+
+---
+
+# Census visit distribution
+
+```{r visit-dist, fig.height=3.5}
+lifetime |>
+  count(n_census) |>
+  ggplot(aes(x = factor(n_census), y = n)) +
+  geom_col(fill = "#1a9850") +
+  geom_text(aes(label = format(n, big.mark=",")), vjust = -0.4, size = 3.5) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "Number of censuses per individual (live visits)",
+       y = "N individuals",
+       title = "Distribution of census visits per tree (live status only)")
+```
+
+```{r duration-dist, fig.height=4}
+lifetime |>
+  ggplot(aes(x = duration_yr)) +
+  geom_histogram(bins = 30, fill = "#4575b4", color = "white", linewidth = 0.2) +
+  scale_y_continuous(labels = comma) +
+  labs(x = "Duration from first to last live census (years)",
+       y = "N individuals",
+       title = paste0("Observation duration per individual  (n = ",
+                      format(nrow(lifetime), big.mark=","), ")"))
+```
+
+---
+
+# Annual DBH increment
+
+## Distribution
+
+```{r dbh-inc-dist, fig.height=4.5}
+annual_growth |>
+  ggplot(aes(x = DBH_inc_cm_yr)) +
+  geom_histogram(bins = 80, fill = "#1a9850", color = "white", linewidth = 0.15) +
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed", linewidth = 0.8) +
+  scale_y_continuous(labels = comma) +
+  coord_cartesian(xlim = c(-3, 6)) +
+  labs(
+    x = "Annual DBH increment (cm yr\u207b\u00b9)",
+    y = "N intervals",
+    title = paste0("Annual DBH increment distribution  (n = ",
+                   format(nrow(annual_growth), big.mark=","), " intervals)"),
+    subtitle = paste0(
+      "Median = ",
+      round(median(annual_growth$DBH_inc_cm_yr, na.rm=TRUE), 3),
+      " cm yr\u207b\u00b9   |   Mean = ",
+      round(mean(annual_growth$DBH_inc_cm_yr, na.rm=TRUE), 3),
+      " cm yr\u207b\u00b9   |   ",
+      format(sum(annual_growth$DBH_inc_cm_yr < 0, na.rm=TRUE), big.mark=","),
+      " intervals with negative increment (",
+      round(100*mean(annual_growth$DBH_inc_cm_yr < 0, na.rm=TRUE), 1), "%)"
+    )
+  )
+```
+
+## Annual DBH increment vs initial DBH
+
+```{r dbh-inc-vs-dbh, fig.height=5}
+sub <- annual_growth |>
+  filter(!is.na(DBH_start), DBH_start > 0,
+         !is.na(DBH_inc_cm_yr),
+         DBH_inc_cm_yr > -2, DBH_inc_cm_yr < 8) |>
+  sample_n(min(20000, n()))
+
+lm_dbhinc <- lm(DBH_inc_cm_yr ~ log(DBH_start), data = sub)
+r2_dbhinc  <- round(summary(lm_dbhinc)$r.squared, 3)
+
+ggplot(sub, aes(x = DBH_start, y = DBH_inc_cm_yr)) +
+  geom_point(alpha = 0.05, size = 0.5, color = "#1a9850") +
+  geom_smooth(method = "lm", formula = y ~ log(x),
+              color = "#d73027", linewidth = 1.2, se = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_x_log10(labels = comma) +
+  labs(
+    x = "Initial DBH at census start (cm, log scale)",
+    y = "Annual DBH increment (cm yr\u207b\u00b9)",
+    title = "Does growth rate depend on tree size?",
+    subtitle = paste0("OLS fit (log DBH predictor)   R\u00b2 = ", r2_dbhinc,
+                      "   n = 20,000 subsample")
+  )
+```
+
+## Annual DBH increment by site
+
+```{r dbh-inc-by-site, fig.height=6}
+annual_growth |>
+  filter(!is.na(DBH_inc_cm_yr)) |>
+  group_by(siteID) |>
+  mutate(med = median(DBH_inc_cm_yr, na.rm=TRUE)) |>
+  ungroup() |>
+  ggplot(aes(x = reorder(siteID, med), y = DBH_inc_cm_yr, fill = siteID)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, show.legend = FALSE,
+               coef = 1.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  coord_flip(ylim = c(-1.5, 4)) +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    x = NULL,
+    y = "Annual DBH increment (cm yr\u207b\u00b9)",
+    title = "Annual DBH increment distribution by NEON site",
+    subtitle = "Boxes ordered by median increment; clipped to [\u22121.5, 4] cm yr\u207b\u00b9"
+  )
+```
+
+## Annual DBH increment per-site statistics
+
+```{r dbh-site-stats}
+site_stats <- annual_growth |>
+  filter(!is.na(DBH_inc_cm_yr)) |>
+  group_by(siteID) |>
+  summarise(
+    N_intervals  = n(),
+    Mean_cm_yr   = round(mean(DBH_inc_cm_yr, na.rm=TRUE), 3),
+    Median_cm_yr = round(median(DBH_inc_cm_yr, na.rm=TRUE), 3),
+    SD_cm_yr     = round(sd(DBH_inc_cm_yr, na.rm=TRUE), 3),
+    P10_cm_yr    = round(quantile(DBH_inc_cm_yr, 0.10, na.rm=TRUE), 3),
+    P90_cm_yr    = round(quantile(DBH_inc_cm_yr, 0.90, na.rm=TRUE), 3),
+    Pct_negative = round(100*mean(DBH_inc_cm_yr < 0, na.rm=TRUE), 1),
+    .groups = "drop"
+  ) |>
+  arrange(desc(Median_cm_yr))
+
+kable(site_stats,
+      col.names = c("Site","N intervals","Mean (cm/yr)","Median (cm/yr)",
+                    "SD","P10","P90","% negative"),
+      caption = "Annual DBH increment summary per NEON site")
+```
+
+---
+
+# Annual AGB increment
+
+> **Reminder:** AGB is model-derived from DBH — AGB increments are not
+> independent of DBH increments.
+
+## Distribution
+
+```{r agb-inc-dist, fig.height=4.5}
+annual_growth |>
+  filter(!is.na(AGB_inc_kg_yr)) |>
+  ggplot(aes(x = AGB_inc_kg_yr)) +
+  geom_histogram(bins = 80, fill = "#8c510a", color = "white", linewidth = 0.15) +
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed", linewidth = 0.8) +
+  scale_y_continuous(labels = comma) +
+  coord_cartesian(xlim = c(-50, 150)) +
+  labs(
+    x = "Annual AGB increment (kg yr\u207b\u00b9, Chojnacky)",
+    y = "N intervals",
+    title = "Annual AGB increment distribution",
+    subtitle = paste0(
+      "Median = ",
+      round(median(annual_growth$AGB_inc_kg_yr, na.rm=TRUE), 2),
+      " kg yr\u207b\u00b9   |   Mean = ",
+      round(mean(annual_growth$AGB_inc_kg_yr, na.rm=TRUE), 2),
+      " kg yr\u207b\u00b9"
+    )
+  )
+```
+
+## Annual AGB increment vs initial AGB
+
+```{r agb-inc-vs-agb, fig.height=5}
+sub_agb <- annual_growth |>
+  filter(!is.na(AGB_start), AGB_start > 0,
+         !is.na(AGB_inc_kg_yr), AGB_inc_kg_yr > -50, AGB_inc_kg_yr < 500) |>
+  sample_n(min(20000, n()))
+
+lm_agbinc <- lm(AGB_inc_kg_yr ~ log(AGB_start), data = sub_agb)
+r2_agbinc  <- round(summary(lm_agbinc)$r.squared, 3)
+
+ggplot(sub_agb, aes(x = AGB_start, y = AGB_inc_kg_yr)) +
+  geom_point(alpha = 0.05, size = 0.5, color = "#8c510a") +
+  geom_smooth(method = "lm", formula = y ~ log(x),
+              color = "#4575b4", linewidth = 1.2, se = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_x_log10(labels = comma) +
+  labs(
+    x = "Initial AGB (kg, log scale)",
+    y = "Annual AGB increment (kg yr\u207b\u00b9)",
+    title = "Annual AGB increment vs initial biomass",
+    subtitle = paste0("OLS fit (log AGB predictor)   R\u00b2 = ", r2_agbinc)
+  )
+```
+
+## Annual AGB increment by site
+
+```{r agb-inc-by-site, fig.height=6}
+annual_growth |>
+  filter(!is.na(AGB_inc_kg_yr)) |>
+  group_by(siteID) |>
+  mutate(med = median(AGB_inc_kg_yr, na.rm=TRUE)) |>
+  ungroup() |>
+  ggplot(aes(x = reorder(siteID, med), y = AGB_inc_kg_yr, fill = siteID)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, show.legend = FALSE,
+               coef = 1.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  coord_flip(ylim = c(-20, 80)) +
+  scale_fill_viridis_d(option = "C") +
+  labs(
+    x = NULL,
+    y = "Annual AGB increment (kg yr\u207b\u00b9)",
+    title = "Annual AGB increment distribution by NEON site",
+    subtitle = "Boxes ordered by median; clipped to [\u221220, 80] kg yr\u207b\u00b9"
+  )
+```
+
+---
+
+# Relative growth rate (RGR)
+
+RGR normalises growth by initial size:
+$$\text{RGR}_{\text{DBH}} = \frac{\ln(D_2) - \ln(D_1)}{t_2 - t_1} \quad (\text{yr}^{-1})$$
+
+This removes the strong size-growth correlation and reveals proportional growth
+rates.
+
+## RGR-DBH distribution
+
+```{r rgr-dist, fig.height=4.5}
+annual_growth |>
+  filter(!is.na(RGR_DBH), is.finite(RGR_DBH)) |>
+  ggplot(aes(x = RGR_DBH)) +
+  geom_histogram(bins = 80, fill = "#4575b4", color = "white", linewidth = 0.15) +
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+  scale_y_continuous(labels = comma) +
+  coord_cartesian(xlim = c(-0.15, 0.25)) +
+  labs(
+    x = "RGR-DBH (yr\u207b\u00b9)",
+    y = "N intervals",
+    title = "Relative growth rate — DBH (annual census intervals)",
+    subtitle = paste0(
+      "Median = ",
+      round(median(annual_growth$RGR_DBH, na.rm=TRUE), 4), " yr\u207b\u00b9   |   ",
+      "Mean = ",
+      round(mean(annual_growth$RGR_DBH, na.rm=TRUE), 4), " yr\u207b\u00b9"
+    )
+  )
+```
+
+## RGR vs initial DBH
+
+Metabolic scaling theory (Enquist et al.) predicts RGR ∝ DBH^(−1/3) for
+size-symmetric light competition.
+
+```{r rgr-vs-dbh, fig.height=5}
+sub_rgr <- annual_growth |>
+  filter(!is.na(RGR_DBH), is.finite(RGR_DBH),
+         !is.na(DBH_start), DBH_start > 0,
+         RGR_DBH > -0.15, RGR_DBH < 0.25) |>
+  sample_n(min(20000, n()))
+
+lm_rgr <- lm(RGR_DBH ~ log(DBH_start), data = sub_rgr)
+beta_rgr <- round(coef(lm_rgr)[2], 4)
+r2_rgr   <- round(summary(lm_rgr)$r.squared, 3)
+
+ggplot(sub_rgr, aes(x = DBH_start, y = RGR_DBH)) +
+  geom_point(alpha = 0.04, size = 0.5, color = "#4575b4") +
+  geom_smooth(method = "lm", formula = y ~ log(x),
+              color = "#d73027", linewidth = 1.2, se = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_x_log10(labels = comma) +
+  labs(
+    x = "Initial DBH (cm, log scale)",
+    y = "RGR-DBH (yr\u207b\u00b9)",
+    title = "Relative growth rate vs tree size",
+    subtitle = paste0(
+      "OLS slope on log(DBH) = ", beta_rgr,
+      "   R\u00b2 = ", r2_rgr,
+      "   (MST prediction: slope \u2248 \u22121/3 \u2248 \u22120.33)"
+    )
+  )
+```
+
+## RGR by site
+
+```{r rgr-by-site, fig.height=6}
+annual_growth |>
+  filter(!is.na(RGR_DBH), is.finite(RGR_DBH)) |>
+  group_by(siteID) |>
+  mutate(med = median(RGR_DBH, na.rm=TRUE)) |>
+  ungroup() |>
+  ggplot(aes(x = reorder(siteID, med), y = RGR_DBH, fill = siteID)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, show.legend = FALSE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  coord_flip(ylim = c(-0.1, 0.2)) +
+  scale_fill_viridis_d(option = "E") +
+  labs(
+    x = NULL,
+    y = "RGR-DBH (yr\u207b\u00b9)",
+    title = "Relative DBH growth rate by NEON site"
+  )
+```
+
+---
+
+# Temporal trends in growth
+
+## Mean annual DBH increment by year
+
+```{r temporal-dbh, fig.height=4.5}
+annual_growth |>
+  group_by(siteID, year) |>
+  summarise(
+    mean_inc = mean(DBH_inc_cm_yr, na.rm=TRUE),
+    se_inc   = sd(DBH_inc_cm_yr, na.rm=TRUE) / sqrt(n()),
+    .groups  = "drop"
+  ) |>
+  ggplot(aes(x = year, y = mean_inc, color = siteID, group = siteID)) +
+  geom_line(linewidth = 0.7, alpha = 0.8) +
+  geom_point(size = 1.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_viridis_d(option = "D") +
+  labs(
+    x = "Census year (end of interval)",
+    y = "Mean annual DBH increment (cm yr\u207b\u00b9)",
+    title = "Temporal trend in mean annual DBH increment per site",
+    subtitle = "Each point = mean across all live trees measured in that interval at that site",
+    color = "Site"
+  ) +
+  theme(legend.position = "right",
+        legend.text = element_text(size = 8),
+        legend.key.size = unit(0.4, "cm"))
+```
+
+## All-site mean with trend
+
+```{r temporal-all-sites, fig.height=4}
+annual_growth |>
+  group_by(year) |>
+  summarise(
+    mean_inc = mean(DBH_inc_cm_yr, na.rm=TRUE),
+    se_inc   = sd(DBH_inc_cm_yr, na.rm=TRUE) / sqrt(n()),
+    n        = n(),
+    .groups  = "drop"
+  ) |>
+  ggplot(aes(x = year, y = mean_inc)) +
+  geom_ribbon(aes(ymin = mean_inc - se_inc, ymax = mean_inc + se_inc),
+              fill = "#1a9850", alpha = 0.25) +
+  geom_line(color = "#1a9850", linewidth = 1.2) +
+  geom_point(aes(size = n), color = "#1a9850") +
+  geom_smooth(method = "lm", formula = y ~ x,
+              color = "#d73027", linewidth = 1, linetype = "dashed", se = FALSE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_size_continuous(range = c(2, 6), labels = comma,
+                        name = "N intervals") +
+  labs(
+    x = "Census year",
+    y = "Mean annual DBH increment (cm yr\u207b\u00b9)",
+    title = "All-site mean annual DBH increment over time",
+    subtitle = "Ribbon = \u00b1 1 SE; dashed red line = OLS temporal trend; point size = N intervals"
+  )
+```
+
+---
+
+# Lifetime growth summaries
+
+## Lifetime total DBH increment distribution
+
+```{r lifetime-dbh-total, fig.height=4.5}
+lifetime |>
+  ggplot(aes(x = total_DBH_inc_cm)) +
+  geom_histogram(bins = 70, fill = "#1a9850", color = "white", linewidth = 0.15) +
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed") +
+  scale_y_continuous(labels = comma) +
+  coord_cartesian(xlim = c(-10, 40)) +
+  labs(
+    x = "Total DBH increment over full observation period (cm)",
+    y = "N individuals",
+    title = paste0("Lifetime total DBH growth  (n = ",
+                   format(nrow(lifetime), big.mark=","), " individuals)"),
+    subtitle = paste0(
+      "Median = ", round(median(lifetime$total_DBH_inc_cm, na.rm=TRUE), 2), " cm   |   ",
+      "Mean = ", round(mean(lifetime$total_DBH_inc_cm, na.rm=TRUE), 2), " cm   |   ",
+      format(sum(lifetime$total_DBH_inc_cm < 0, na.rm=TRUE), big.mark=","),
+      " trees with net decline"
+    )
+  )
+```
+
+## Mean annual increment vs duration
+
+```{r mean-annual-vs-duration, fig.height=5}
+lifetime |>
+  filter(duration_yr >= 1, !is.na(mean_annual_DBH_inc)) |>
+  ggplot(aes(x = duration_yr, y = mean_annual_DBH_inc, color = siteID)) +
+  geom_point(alpha = 0.15, size = 0.6) +
+  geom_smooth(aes(group = 1), method = "lm", formula = y ~ x,
+              color = "black", linewidth = 1.2, se = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_color_viridis_d(option = "D", guide = "none") +
+  labs(
+    x = "Observation duration (years)",
+    y = "Mean annual DBH increment (cm yr\u207b\u00b9)",
+    title = "Does estimated growth rate depend on observation window length?",
+    subtitle = "Systematic trends indicate regression-to-mean or temporal autocorrelation effects"
+  )
+```
+
+## Lifetime mean annual DBH increment by site
+
+```{r lifetime-by-site, fig.height=6}
+lifetime |>
+  filter(!is.na(mean_annual_DBH_inc)) |>
+  group_by(siteID) |>
+  mutate(med = median(mean_annual_DBH_inc, na.rm=TRUE)) |>
+  ungroup() |>
+  ggplot(aes(x = reorder(siteID, med), y = mean_annual_DBH_inc, fill = siteID)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, show.legend = FALSE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  coord_flip(ylim = c(-1, 3)) +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    x = NULL,
+    y = "Mean annual DBH increment (cm yr\u207b\u00b9)",
+    title = "Lifetime mean annual DBH increment by NEON site"
+  )
+```
+
+## Lifetime total AGB increment by site
+
+```{r lifetime-agb-by-site, fig.height=6}
+lifetime |>
+  filter(!is.na(total_AGB_inc_kg)) |>
+  group_by(siteID) |>
+  summarise(
+    N            = n(),
+    median_total = round(median(total_AGB_inc_kg, na.rm=TRUE), 1),
+    mean_total   = round(mean(total_AGB_inc_kg, na.rm=TRUE), 1),
+    .groups      = "drop"
+  ) |>
+  ggplot(aes(x = reorder(siteID, median_total), y = median_total, fill = siteID)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(median_total, " kg")),
+            hjust = -0.05, size = 3) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.25))) +
+  scale_fill_viridis_d(option = "C") +
+  labs(
+    x = NULL,
+    y = "Median lifetime total AGB increment (kg)",
+    title = "Median lifetime AGB gained per individual by NEON site",
+    subtitle = "AGB Chojnacky (model-derived from DBH)"
+  )
+```
+
+---
+
+# Growth rates by species
+
+## Top 15 fastest-growing species (median annual DBH increment)
+
+```{r top-species-growth, fig.height=5.5}
+sp_growth <- annual_growth |>
+  filter(!is.na(DBH_inc_cm_yr), !is.na(scientificName)) |>
+  group_by(scientificName) |>
+  filter(n() >= 50) |>
+  summarise(
+    N_intervals  = n(),
+    median_inc   = round(median(DBH_inc_cm_yr, na.rm=TRUE), 3),
+    mean_inc     = round(mean(DBH_inc_cm_yr, na.rm=TRUE), 3),
+    median_RGR   = round(median(RGR_DBH, na.rm=TRUE), 4),
+    .groups = "drop"
+  ) |>
+  arrange(desc(median_inc))
+
+sp_growth |>
+  head(15) |>
+  ggplot(aes(x = reorder(scientificName, median_inc), y = median_inc)) +
+  geom_col(fill = "#74c476") +
+  geom_text(aes(label = paste0(median_inc, " cm/yr")), hjust = -0.05, size = 3) +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +
+  labs(
+    x = NULL,
+    y = "Median annual DBH increment (cm yr\u207b\u00b9)",
+    title = "Top 15 fastest-growing species (median annual DBH increment)",
+    subtitle = "Species with \u2265 50 growth intervals across all NEON sites"
+  )
+```
+
+## Top 15 fastest-growing species (median RGR-DBH)
+
+```{r top-species-rgr, fig.height=5.5}
+sp_growth |>
+  arrange(desc(median_RGR)) |>
+  head(15) |>
+  ggplot(aes(x = reorder(scientificName, median_RGR), y = median_RGR)) +
+  geom_col(fill = "#9ecae1") +
+  geom_text(aes(label = sprintf("%.4f", median_RGR)), hjust = -0.05, size = 3) +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +
+  labs(
+    x = NULL,
+    y = "Median RGR-DBH (yr\u207b\u00b9)",
+    title = "Top 15 fastest-growing species by relative growth rate",
+    subtitle = "Species with \u2265 50 growth intervals"
+  )
+```
+
+## Full species growth table
+
+```{r species-growth-table}
+kable(sp_growth |> head(40),
+      col.names = c("Species","N intervals","Median DBH inc (cm/yr)",
+                    "Mean DBH inc (cm/yr)","Median RGR (yr\u207b\u00b9)"),
+      caption   = "Top 40 species by median annual DBH increment (>= 50 intervals)")
+```
+
+---
+
+# Growth rate vs canopy position
+
+```{r canopy-growth, fig.height=4.5}
+raw_canopy <- raw |>
+  filter(grepl("^Live", plantStatus, ignore.case=TRUE),
+         !is.na(canopyPosition), !is.na(stemDiameter), stemDiameter > 0) |>
+  group_by(individualID, year, canopyPosition) |>
+  summarise(DBH_cm = mean(stemDiameter, na.rm=TRUE), .groups="drop")
+
+# Join canopy position to annual growth
+annual_growth_cp <- annual_growth |>
+  left_join(
+    raw_canopy |> rename(year_end = year),
+    by = c("individualID", "year" = "year_end")
+  )
+
+annual_growth_cp |>
+  filter(!is.na(canopyPosition), !is.na(DBH_inc_cm_yr)) |>
+  group_by(canopyPosition) |>
+  mutate(med = median(DBH_inc_cm_yr, na.rm=TRUE)) |>
+  ungroup() |>
+  ggplot(aes(x = reorder(canopyPosition, med), y = DBH_inc_cm_yr,
+             fill = canopyPosition)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, show.legend = FALSE) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_flip(ylim = c(-1, 4)) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    x = NULL,
+    y = "Annual DBH increment (cm yr\u207b\u00b9)",
+    title = "Annual DBH increment by canopy position",
+    subtitle = "Clipped to [\u22121, 4] cm yr\u207b\u00b9"
+  )
+```
+
+---
+
+# Lifetime summary table by site
+
+```{r lifetime-site-table}
+lt_site <- lifetime |>
+  group_by(siteID) |>
+  summarise(
+    N_trees             = n(),
+    Median_dur_yr       = round(median(duration_yr), 1),
+    Median_total_DBH_cm = round(median(total_DBH_inc_cm, na.rm=TRUE), 2),
+    Mean_ann_DBH_cm_yr  = round(mean(mean_annual_DBH_inc, na.rm=TRUE), 3),
+    Median_ann_DBH_cm_yr = round(median(mean_annual_DBH_inc, na.rm=TRUE), 3),
+    Median_total_AGB_kg = round(median(total_AGB_inc_kg, na.rm=TRUE), 1),
+    Pct_net_decline     = round(100*mean(total_DBH_inc_cm < 0, na.rm=TRUE), 1),
+    .groups = "drop"
+  ) |>
+  arrange(desc(Median_ann_DBH_cm_yr))
+
+kable(lt_site,
+      col.names = c("Site","N trees","Median obs. duration (yr)",
+                    "Median total DBH inc (cm)","Mean annual DBH inc (cm/yr)",
+                    "Median annual DBH inc (cm/yr)",
+                    "Median total AGB inc (kg)","% trees with net decline"),
+      caption   = "Per-site lifetime growth summary (live trees with >= 2 censuses)")
+```
+
+---
+
+# Caveats and interpretation notes
+
+1. **AGB increments are model-derived.** All AGB values are estimated from DBH
+   via Chojnacky et al. (2014). AGB growth rates are therefore algebraically
+   related to DBH growth rates and do not represent independent measurements.
+
+2. **Negative increments** reflect measurement error, bark sloughing, changes
+   in measurement height across visits, or recorder differences — not genuine
+   shrinkage. Trees with large negative increments should be examined for flag
+   columns before including in formal analyses.
+
+3. **Year gap normalisation.** NEON plots are not revisited every year uniformly.
+   Growth is normalised by the actual year gap between consecutive censuses.
+   Intervals of >2 years (common) average over interannual variation.
+
+4. **Multiple live-status categories.** This analysis includes all `plantStatus`
+   values beginning with "Live" (Live, Live broken bole, Live insect damaged,
+   etc.) to maximise sample size. Restricting to "Live" only changes results
+   quantitatively but not qualitatively.
+
+5. **No dead-to-live transitions.** Each growth interval requires both years to
+   carry a "Live\*" status. Trees that died between censuses are excluded from
+   all growth calculations.
+
+6. **RGR interpretation.** RGR-DBH measures proportional diameter growth.
+   It is not equivalent to basal area increment (BAI) or volumetric growth,
+   which are better proxies for carbon accumulation.
+
+7. **OLS vs SMA.** All regressions here are OLS for rapid visualisation. SMA
+   (standardised major axis) is appropriate for formal allometric inference
+   when both variables carry error.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```
