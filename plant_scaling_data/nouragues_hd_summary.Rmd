@@ -1,0 +1,523 @@
+---
+title: "Nouragues H-D — Tropical Tree Height-Diameter Data, French Guiana"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 5)
+suppressPackageStartupMessages({
+  library(BIOMASS)
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(knitr)
+  library(scales)
+  library(maps)
+})
+theme_set(theme_bw(base_size = 13))
+
+dat <- NouraguesHD
+```
+
+---
+
+# Overview
+
+**NouraguesHD** is a paired height-diameter dataset for tropical trees in the
+Nouragues Natural Reserve, French Guiana.  It is distributed as part of the
+**BIOMASS** R package (Réjou-Méchain et al. 2017) and is used as a reference
+dataset for fitting local height-diameter models in tropical forest AGB
+estimation workflows.
+
+The Nouragues Reserve is a pristine, undisturbed lowland tropical moist forest
+in central French Guiana (~4°N, 52–53°W), with no recent logging or major
+anthropogenic disturbance.
+
+> **BIOMASS R package (data source):**
+> Réjou-Méchain M, Tanguy A, Piponiot C, Chave J, Hérault B (2017).
+> BIOMASS: an R Package for estimating aboveground biomass and its uncertainty
+> in tropical forests. *Methods in Ecology and Evolution* 8:1163–1167.
+> doi: [10.1111/2041-210X.12753](https://doi.org/10.1111/2041-210X.12753)
+
+> **Original Nouragues data (primary source):**
+> Coomes DA, Dalponte M, Jucker T, et al. (2017) Area-based vs tree-centric
+> approaches to mapping forest carbon in Southeast Asian forests from
+> airborne laser scanning data. *Remote Sensing of Environment* 194:77–88.
+> *(NouraguesHD is compiled from multiple field campaigns at this site.)*
+
+> **⚠ Citation note:** The primary literature citation for the NouraguesHD
+> dataset within the BIOMASS package should be verified — the package
+> documentation credits Réjou-Méchain et al. (2017) as the package reference
+> but does not provide a separate DOI for the dataset itself. The field
+> measurements originate from the Nouragues long-term research station.
+
+---
+
+# Top-level summary
+
+```{r top-summary}
+n_sp <- length(unique(paste(dat$genus, dat$species)[
+  dat$genus != "indet" & dat$species != "indet"]))
+
+kable(data.frame(
+  Metric = c(
+    "Total trees",
+    "Trees with height (H)",
+    "Unique plots",
+    "Unique genera",
+    "Unique identified species (excl. indet)",
+    "DBH range (cm)",
+    "Height range (m)",
+    "Latitude range (\u00b0N)",
+    "Longitude range (\u00b0E)",
+    "Forest type",
+    "Country",
+    "Source in R",
+    "License / access"
+  ),
+  Value = c(
+    format(nrow(dat), big.mark = ","),
+    format(sum(!is.na(dat$H)), big.mark = ","),
+    length(unique(dat$plotId)),
+    length(unique(dat$genus)),
+    n_sp,
+    paste0(min(dat$D, na.rm=TRUE), "\u2013",
+           round(max(dat$D, na.rm=TRUE), 1)),
+    paste0(min(dat$H, na.rm=TRUE), "\u2013",
+           max(dat$H, na.rm=TRUE)),
+    paste0(round(min(dat$lat),3), "\u2013", round(max(dat$lat),3)),
+    paste0(round(min(dat$long),3), "\u2013", round(max(dat$long),3)),
+    "Tropical moist forest (undisturbed, lowland)",
+    "France (French Guiana, ~4\u00b0N 52\u201353\u00b0W)",
+    "BIOMASS::NouraguesHD",
+    "Available via BIOMASS package (CRAN) — no separate download required"
+  ),
+  stringsAsFactors = FALSE
+), caption = "Nouragues H-D top-level summary")
+```
+
+---
+
+# Geographic context
+
+```{r geo-map, fig.width=10, fig.height=5}
+world <- map_data("world")
+
+# Exact plot coordinates from data
+plot_coords <- dat |>
+  distinct(plotId, lat, long)
+
+ggplot() +
+  geom_polygon(data = world,
+               aes(x = long, y = lat, group = group),
+               fill = "grey88", color = "grey70", linewidth = 0.2) +
+  geom_point(data = plot_coords,
+             aes(x = long, y = lat, color = plotId),
+             size = 6, alpha = 0.9) +
+  geom_text(data = plot_coords,
+            aes(x = long, y = lat, label = plotId),
+            vjust = -1.2, size = 4, fontface = "bold") +
+  coord_fixed(1.3, xlim = c(-65, -45), ylim = c(-5, 15)) +
+  scale_color_manual(values = c(Plot1 = "#d73027", Plot2 = "#4575b4")) +
+  labs(
+    title = "Nouragues H-D \u2014 exact plot locations in French Guiana",
+    subtitle = paste0("Plot 1: ", round(plot_coords$lat[1],3), "\u00b0N, ",
+                      round(plot_coords$long[1],3), "\u00b0E   |   ",
+                      "Plot 2: ", round(plot_coords$lat[2],3), "\u00b0N, ",
+                      round(plot_coords$long[2],3), "\u00b0E"),
+    x = NULL, y = NULL, color = "Plot"
+  ) +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid = element_blank())
+```
+
+Both plots are within the Nouragues Natural Reserve, separated by approximately
+**1.6 km** based on their coordinate distances.
+
+---
+
+# Data structure
+
+```{r data-structure}
+kable(data.frame(
+  Column      = names(dat),
+  Type        = sapply(dat, class),
+  N_nonNA     = sapply(dat, function(x) sum(!is.na(x))),
+  Pct_complete= paste0(sapply(dat, function(x)
+    round(100*mean(!is.na(x)), 1)), "%"),
+  Description = c(
+    "Plot identifier (Plot1 or Plot2)",
+    "Genus name (indet if undetermined)",
+    "Species epithet (indet if undetermined)",
+    "Diameter at breast height (cm); all >= 10 cm",
+    "Total tree height (m); 163 NAs (height not measured for all trees)",
+    "Plot centroid latitude (\u00b0N, WGS84)",
+    "Plot centroid longitude (\u00b0E, WGS84)"
+  ),
+  stringsAsFactors = FALSE
+), caption = "NouraguesHD column descriptions")
+```
+
+---
+
+# Diameter distribution
+
+```{r dbh-dist, fig.height=4.5}
+dat |>
+  ggplot(aes(x = D)) +
+  geom_histogram(bins = 50, fill = "#4575b4", color = "white", linewidth = 0.2) +
+  scale_x_log10(labels = comma, breaks = c(10, 20, 50, 100, 160)) +
+  annotation_logticks(sides = "b") +
+  scale_y_continuous(labels = comma) +
+  facet_wrap(~ plotId, scales = "free_y") +
+  labs(
+    x = "DBH (cm, log scale)", y = "N trees",
+    title = paste0("DBH distribution by plot (n = ", nrow(dat), " total)")
+  )
+```
+
+```{r dbh-combined, fig.height=4}
+dat |>
+  ggplot(aes(x = D, fill = plotId, color = plotId)) +
+  geom_density(alpha = 0.35, linewidth = 0.9, adjust = 0.8) +
+  scale_x_log10(labels = comma, breaks = c(10, 20, 50, 100, 160)) +
+  annotation_logticks(sides = "b") +
+  scale_fill_manual(values  = c(Plot1 = "#d73027", Plot2 = "#4575b4")) +
+  scale_color_manual(values = c(Plot1 = "#d73027", Plot2 = "#4575b4")) +
+  labs(
+    x = "DBH (cm, log scale)", y = "Density",
+    title = "DBH density comparison: Plot 1 vs. Plot 2",
+    fill = "Plot", color = "Plot"
+  )
+```
+
+```{r dbh-stats}
+dbh_stats <- dat |>
+  group_by(plotId) |>
+  summarise(
+    N        = n(),
+    Min_cm   = round(min(D, na.rm=TRUE), 1),
+    P25_cm   = round(quantile(D, 0.25, na.rm=TRUE), 1),
+    Median_cm= round(median(D, na.rm=TRUE), 1),
+    Mean_cm  = round(mean(D, na.rm=TRUE), 1),
+    P75_cm   = round(quantile(D, 0.75, na.rm=TRUE), 1),
+    Max_cm   = round(max(D, na.rm=TRUE), 1),
+    .groups  = "drop"
+  )
+kable(dbh_stats, caption = "DBH summary statistics by plot")
+```
+
+---
+
+# Height distribution
+
+```{r height-dist, fig.height=4.5}
+dat |>
+  filter(!is.na(H)) |>
+  ggplot(aes(x = H, fill = plotId, color = plotId)) +
+  geom_density(alpha = 0.35, linewidth = 0.9, adjust = 0.8) +
+  scale_fill_manual(values  = c(Plot1 = "#d73027", Plot2 = "#4575b4")) +
+  scale_color_manual(values = c(Plot1 = "#d73027", Plot2 = "#4575b4")) +
+  labs(
+    x = "Height (m)", y = "Density",
+    title = paste0("Height distribution (n = ", sum(!is.na(dat$H)),
+                   " trees with height; ", sum(is.na(dat$H)), " NAs)"),
+    fill = "Plot", color = "Plot"
+  )
+```
+
+```{r height-stats}
+ht_stats <- dat |>
+  filter(!is.na(H)) |>
+  group_by(plotId) |>
+  summarise(
+    N_with_H = n(),
+    Min_m    = round(min(H), 1),
+    P25_m    = round(quantile(H, 0.25), 1),
+    Median_m = round(median(H), 1),
+    Mean_m   = round(mean(H), 1),
+    P75_m    = round(quantile(H, 0.75), 1),
+    Max_m    = round(max(H), 1),
+    .groups  = "drop"
+  )
+kable(ht_stats, caption = "Height summary statistics by plot (excl. NAs)")
+```
+
+> **163 trees (15.5%) have no height measurement.** Height was not measured for
+> every tree in the field campaign.  Missing heights must be imputed using the
+> H~D model when computing AGB via the Chave et al. (2014) pantropical equation.
+
+---
+
+# Height ~ DBH scaling
+
+```{r hdbh-plot, fig.height=5.5}
+dat_hd <- dat |> filter(!is.na(H), D > 0, H > 0)
+
+# Per-plot OLS log-log
+models <- dat_hd |>
+  group_by(plotId) |>
+  summarise(
+    n    = n(),
+    beta = round(coef(lm(log(H) ~ log(D)))[2], 3),
+    R2   = round(summary(lm(log(H) ~ log(D)))$r.squared, 3),
+    .groups = "drop"
+  )
+
+ggplot(dat_hd, aes(x = D, y = H, color = plotId)) +
+  geom_point(alpha = 0.5, size = 1.8) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = TRUE, linewidth = 1.2) +
+  scale_x_log10(labels = comma, breaks = c(10, 20, 50, 100, 160)) +
+  scale_y_log10(labels = comma, breaks = c(5, 10, 20, 40)) +
+  annotation_logticks() +
+  scale_color_manual(values = c(Plot1 = "#d73027", Plot2 = "#4575b4")) +
+  labs(
+    x = "DBH (cm)", y = "Height (m)",
+    title = "Height ~ DBH — Nouragues Reserve, French Guiana",
+    subtitle = paste0(
+      "Plot 1: \u03b2 = ", models$beta[1], ", R\u00b2 = ", models$R2[1],
+      "   |   Plot 2: \u03b2 = ", models$beta[2], ", R\u00b2 = ", models$R2[2]
+    ),
+    color = "Plot"
+  )
+```
+
+```{r hdbh-exponents}
+kable(models,
+      col.names = c("Plot", "N (with height)", "\u03b2 (slope)", "R\u00b2"),
+      caption   = paste0(
+        "OLS log-log Height ~ DBH exponents per plot. ",
+        "\u26a0 OLS underestimates the slope when both variables carry error; ",
+        "use SMA or the Michaelis-Menten / Weibull model for formal inference ",
+        "(as recommended by the BIOMASS package)."))
+```
+
+## Weibull and Michaelis-Menten models (as used in BIOMASS)
+
+```{r hdbh-nonlinear, fig.height=5}
+# Fit the models used in BIOMASS::modelHD
+dat_fit <- dat |> filter(!is.na(H), D > 0, H > 0)
+
+# Weibull 3-parameter: H = a(1 - exp(-b*D^c))
+weib_fit <- nls(H ~ a * (1 - exp(-b * D^c)),
+                data = dat_fit,
+                start = list(a = 50, b = 0.05, c = 0.7),
+                control = nls.control(maxiter = 200))
+
+# Michaelis-Menten: H = (a*D)/(b+D)
+mm_fit   <- nls(H ~ (a * D) / (b + D),
+                data = dat_fit,
+                start = list(a = 60, b = 20),
+                control = nls.control(maxiter = 200))
+
+dbh_seq <- seq(min(dat_fit$D), max(dat_fit$D), length.out = 200)
+
+pred_df <- data.frame(
+  D     = dbh_seq,
+  Weibull        = predict(weib_fit, newdata = data.frame(D = dbh_seq)),
+  Michaelis_Menten = predict(mm_fit, newdata = data.frame(D = dbh_seq))
+) |>
+  pivot_longer(-D, names_to = "Model", values_to = "H_pred")
+
+ggplot(dat_fit, aes(x = D, y = H, color = plotId)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_line(data = pred_df,
+            aes(x = D, y = H_pred, linetype = Model),
+            color = "black", linewidth = 1.2,
+            inherit.aes = FALSE) +
+  scale_color_manual(values = c(Plot1 = "#d73027", Plot2 = "#4575b4")) +
+  scale_linetype_manual(values = c(Weibull = "solid", Michaelis_Menten = "dashed")) +
+  labs(
+    x = "DBH (cm)", y = "Height (m)",
+    title = "H~D with Weibull and Michaelis-Menten fits",
+    subtitle = "These are the two model forms used in BIOMASS::modelHD()",
+    color = "Plot", linetype = "Model"
+  )
+```
+
+```{r model-summary}
+kable(data.frame(
+  Model = c("Weibull 3-parameter", "Michaelis-Menten"),
+  Formula = c("H = a(1 \u2212 e^{\u2212b \u00b7 D^c})", "H = (a \u22c5 D) / (b + D)"),
+  AIC = c(round(AIC(weib_fit), 1), round(AIC(mm_fit), 1)),
+  RSE = c(round(summary(weib_fit)$sigma, 3), round(summary(mm_fit)$sigma, 3)),
+  Note = c("Asymptotic with flexible curvature",
+           "Asymptotic; simpler parameterisation"),
+  stringsAsFactors = FALSE
+), caption = "Non-linear H~D model fit statistics (all plots combined)")
+```
+
+---
+
+# Taxonomic composition
+
+## Genera breakdown
+
+```{r genera, fig.height=6.5}
+dat |>
+  count(genus, sort = TRUE) |>
+  head(25) |>
+  ggplot(aes(x = reorder(genus, n), y = n, fill = genus == "indet")) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = n), hjust = -0.1, size = 3.2) +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_manual(values = c("TRUE" = "#bdbdbd", "FALSE" = "#74c476")) +
+  labs(
+    x = NULL, y = "N trees",
+    title = "Top 25 genera (grey = indeterminate)"
+  )
+```
+
+```{r id-rate}
+n_indet <- sum(dat$genus == "indet" | dat$species == "indet")
+n_sp_id <- nrow(dat) - n_indet
+
+kable(data.frame(
+  Category = c("Fully identified (genus + species)",
+               "Indeterminate (indet genus or species)",
+               "Identification rate"),
+  N = c(format(n_sp_id, big.mark=","),
+        format(n_indet, big.mark=","),
+        paste0(round(100*n_sp_id/nrow(dat), 1), "%")),
+  stringsAsFactors = FALSE
+), caption = "Taxonomic identification completeness")
+```
+
+## Top 20 identified species
+
+```{r top-species, fig.height=5.5}
+dat |>
+  filter(genus != "indet", species != "indet") |>
+  mutate(species_name = paste(genus, species)) |>
+  count(species_name, sort = TRUE) |>
+  head(20) |>
+  ggplot(aes(x = reorder(species_name, n), y = n)) +
+  geom_col(fill = "#74c476") +
+  geom_text(aes(label = n), hjust = -0.1, size = 3.2) +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2))) +
+  labs(
+    x = NULL, y = "N trees",
+    title = "Top 20 identified species \u2014 Nouragues H-D"
+  )
+```
+
+---
+
+# DBH ~ Height by top genera
+
+```{r hdbh-genera, fig.height=6}
+top_genera <- dat |>
+  filter(genus != "indet", !is.na(H)) |>
+  count(genus, sort = TRUE) |>
+  head(8) |>
+  pull(genus)
+
+dat |>
+  filter(genus %in% top_genera, !is.na(H), D > 0, H > 0) |>
+  ggplot(aes(x = D, y = H, color = genus)) +
+  geom_point(alpha = 0.55, size = 1.8) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = FALSE, linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  facet_wrap(~ genus, scales = "free", ncol = 4) +
+  labs(
+    x = "DBH (cm)", y = "Height (m)",
+    title = "Height ~ DBH for top 8 genera (OLS log-log per genus)"
+  ) +
+  theme(legend.position = "none")
+```
+
+---
+
+# Use in BIOMASS AGB estimation
+
+The NouraguesHD dataset is the default training data for `BIOMASS::modelHD()`,
+which fits local height-diameter models as an intermediate step in Chave et al.
+(2014) pantropical AGB estimation.
+
+```{r biomass-workflow, eval=FALSE}
+# Example workflow (not run — requires wood density lookup)
+library(BIOMASS)
+
+# 1. Fit a local H~D model using Nouragues data
+hd_model <- modelHD(
+  D      = NouraguesHD$D,
+  H      = NouraguesHD$H,
+  method = "weibull"   # or "michaelis", "log1", "log2", "log3"
+)
+
+# 2. Predict heights for your trees
+H_pred <- predictHD(D = my_trees$DBH_cm, model = hd_model, plot = FALSE)
+
+# 3. Get wood densities
+wd <- getWoodDensity(genus = my_trees$genus, species = my_trees$species)
+
+# 4. Compute AGB with Chave et al. 2014 eq. 4
+AGB <- computeAGB(D = my_trees$DBH_cm, WD = wd$meanWD, H = H_pred$H,
+                  coord = cbind(my_trees$long, my_trees$lat))
+```
+
+> **Caveat:** Using Nouragues H-D to predict heights for forests *outside*
+> French Guiana introduces systematic bias proportional to the difference in
+> local H-D relationships.  Local calibration data are preferred wherever
+> available.
+
+---
+
+# Data completeness
+
+```{r completeness}
+compl <- data.frame(
+  Column = names(dat),
+  N_nonNA = sapply(dat, function(x) sum(!is.na(x))),
+  Pct = paste0(sapply(dat, function(x) round(100*mean(!is.na(x)),1)), "%"),
+  stringsAsFactors = FALSE
+)
+kable(compl, caption = "Column completeness (n = 1,051 trees)")
+```
+
+---
+
+# Notes for allometric merging
+
+1. **DBH range is >= 10 cm** — this is a canopy-tree dataset.  It lacks
+   saplings and small trees (< 10 cm DBH), which limits its use as a
+   universal H~D calibration dataset.
+
+2. **Only 2 plots, same reserve** — all data come from one site (Nouragues).
+   H-D relationships trained here may not transfer well to other tropical
+   regions.
+
+3. **163 NAs in height** — trees without height measurements must be
+   imputed before using the Chave et al. (2014) AGB equation, which
+   requires height as input.
+
+4. **DBH units are cm** — compatible with BAAD, Tallo, and NEON
+   (no conversion needed).
+
+5. **Taxonomy uses genus + species columns** (not a single `scientificName`);
+   concatenate them before merging with other sources.
+
+6. **Coordinates are plot centroids**, not individual tree positions.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```

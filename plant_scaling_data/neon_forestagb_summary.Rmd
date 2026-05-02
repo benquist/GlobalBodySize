@@ -1,0 +1,663 @@
+---
+title: "NEON ForestAGB — National Tree Aboveground Biomass Dataset"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 5)
+suppressPackageStartupMessages({
+  library(readr)
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(knitr)
+  library(scales)
+  library(maps)
+})
+theme_set(theme_bw(base_size = 13))
+
+proj_dir <- dirname(knitr::current_input(dir = TRUE))
+bm_dir   <- file.path(proj_dir, "data/raw/neon_forest_agb/biomass")
+
+neon_sites <- c("BART","BLAN","CLBJ","DELA","DSNY","GRSM","GUAN","HARV","JERC","KONZ",
+                "LENO","MLBS","ORNL","OSBS","RMNP","SCBI","SERC","STEI","TALL","TREE",
+                "UKFS","UNDE","YELL")
+
+dat <- lapply(neon_sites, function(s) {
+  read_csv(file.path(bm_dir, paste0(s, "_biomass.csv")), show_col_types = FALSE)
+}) |> bind_rows()
+
+site_coords <- read_csv(
+  file.path(proj_dir, "data/raw/neon_forest_agb/sitecoordinates.csv"),
+  show_col_types = FALSE
+)  # X = lon, Y = lat
+
+taxon_list <- read_csv(
+  file.path(proj_dir, "data/raw/neon_forest_agb/MasterTaxonList.csv"),
+  show_col_types = FALSE
+)
+```
+
+---
+
+# Overview
+
+**NEONForestAGB** (v2) is a derived data product that estimates individual
+tree aboveground biomass (AGB) for sites in the National Ecological
+Observatory Network (NEON).  Tree diameters measured in the field are
+combined with published allometric equations to produce per-tree biomass
+estimates.  The network spans the continental USA, Alaska, Puerto Rico,
+and Hawaii, covering a continental gradient of forest biomes.
+
+> Atkins JW, Meier C, Alveshere B, Breland S, Langley M (2024).
+> NEONForestAGBv2. figshare. Dataset.
+> doi: [10.6084/m9.figshare.25625352.v1](https://doi.org/10.6084/m9.figshare.25625352.v1)
+>
+> GitHub: [atkinsjeff/NEONForestAGB](https://github.com/atkinsjeff/NEONForestAGB)
+> Zenodo: doi: [10.5281/zenodo.11193519](https://doi.org/10.5281/zenodo.11193519)
+> License: CC0 1.0
+
+**Underlying NEON data product:**
+> National Ecological Observatory Network. Woody plant vegetation structure
+> (DP1.10098.001). neonscience.org.
+
+**Allometric methods:**
+> Chojnacky DC, Heath LS, Jenkins JC (2014). Updated generalized biomass
+> equations for North American tree species. *Forestry* 87:129–151.
+>
+> Jenkins JC, Chojnacky DC, Heath LS, Birdsey RA (2003). National-scale
+> biomass estimators for United States tree species.
+> *Forest Science* 49:12–35.
+
+> **⚠ Citation note:** All DOIs and journal references above should be verified
+> against Crossref before use in any manuscript. AGB values are model-derived
+> (not from destructive harvest) and carry allometric uncertainty.
+
+---
+
+# Top-level summary
+
+```{r top-summary}
+n_live <- sum(dat$plantStatus == "Live", na.rm = TRUE)
+
+kable(data.frame(
+  Metric = c(
+    "Total measurement rows (all years)",
+    "Unique individual trees",
+    "Unique species (scientificName)",
+    "Unique families",
+    "NEON sites with biomass files (ingested)",
+    "NEON sites in coordinate table (full network)",
+    "Measurement years",
+    "DBH range (cm)",
+    "Height range (m)",
+    "AGB range — Chojnacky (kg)",
+    "AGB range — Jenkins (kg)",
+    "Rows with live status",
+    "Rows with stemDiameter",
+    "Rows with height",
+    "Rows with AGB (Chojnacky)",
+    "Allometric methods",
+    "License"
+  ),
+  Value = c(
+    format(nrow(dat), big.mark = ","),
+    format(length(unique(dat$individualID)), big.mark = ","),
+    format(length(unique(dat$scientificName[!is.na(dat$scientificName)])),
+           big.mark = ","),
+    format(length(unique(dat$Family[!is.na(dat$Family)])), big.mark = ","),
+    length(neon_sites),
+    nrow(site_coords),
+    paste0(min(dat$year, na.rm = TRUE), "\u20132023"),
+    paste0(round(min(dat$stemDiameter, na.rm = TRUE), 1), "\u2013",
+           round(max(dat$stemDiameter, na.rm = TRUE), 1)),
+    paste0(round(min(dat$height, na.rm = TRUE), 1), "\u2013",
+           round(max(dat$height, na.rm = TRUE), 1)),
+    paste0(round(min(dat$AGBChojnacky, na.rm = TRUE), 2), "\u2013",
+           format(round(max(dat$AGBChojnacky, na.rm = TRUE), 0), big.mark = ",")),
+    paste0(round(min(dat$AGBJenkins, na.rm = TRUE), 2), "\u2013",
+           format(round(max(dat$AGBJenkins, na.rm = TRUE), 0), big.mark = ",")),
+    format(n_live, big.mark = ","),
+    format(sum(!is.na(dat$stemDiameter)), big.mark = ","),
+    format(sum(!is.na(dat$height)), big.mark = ","),
+    format(sum(!is.na(dat$AGBChojnacky)), big.mark = ","),
+    "Chojnacky et al. 2014; Jenkins et al. 2003",
+    "CC0 1.0"
+  ),
+  stringsAsFactors = FALSE
+), caption = "NEON ForestAGB top-level summary (23 ingested sites)")
+```
+
+---
+
+# Site map
+
+```{r site-map, fig.width=11, fig.height=5.5}
+sc <- site_coords |>
+  filter(!is.na(X), !is.na(Y)) |>
+  mutate(ingested = siteID %in% neon_sites)
+
+site_n <- dat |>
+  group_by(siteID) |>
+  summarise(n_rows = n(), n_indiv = length(unique(individualID)), .groups = "drop")
+
+sc <- sc |> left_join(site_n, by = "siteID")
+
+world <- map_data("world")
+usa   <- map_data("usa")
+
+ggplot() +
+  geom_polygon(data = world |> filter(region %in% c("Canada","Mexico")),
+               aes(x = long, y = lat, group = group),
+               fill = "grey92", color = "grey75", linewidth = 0.15) +
+  geom_polygon(data = usa,
+               aes(x = long, y = lat, group = group),
+               fill = "grey88", color = "grey70", linewidth = 0.2) +
+  geom_point(data = sc |> filter(!ingested),
+             aes(x = X, y = Y), color = "#bdbdbd", size = 2.5, alpha = 0.8) +
+  geom_point(data = sc |> filter(ingested),
+             aes(x = X, y = Y, size = n_indiv),
+             color = "#1a9850", alpha = 0.85) +
+  geom_text(data = sc |> filter(ingested),
+            aes(x = X, y = Y, label = siteID),
+            size = 2.5, vjust = -1.1, fontface = "bold", color = "#1a9850") +
+  scale_size_continuous(range = c(2, 9), labels = comma,
+                        name = "Unique individuals") +
+  coord_fixed(1.3, xlim = c(-175, -60), ylim = c(17, 72)) +
+  labs(
+    title = "NEON ForestAGB \u2014 site map (green = biomass ingested, grey = site only)",
+    subtitle = paste0(length(neon_sites), " sites with biomass files ingested; ",
+                      nrow(sc) - length(neon_sites),
+                      " additional NEON sites not yet downloaded"),
+    x = NULL, y = NULL
+  ) +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid = element_blank(), legend.position = "right")
+```
+
+---
+
+# Per-site record counts
+
+```{r per-site-table, fig.height=6}
+per_site <- dat |>
+  group_by(siteID) |>
+  summarise(
+    Domain      = first(domainID),
+    N_rows      = n(),
+    N_indiv     = length(unique(individualID)),
+    N_species   = length(unique(scientificName[!is.na(scientificName)])),
+    Yr_range    = paste0(min(year, na.rm=TRUE), "\u2013", max(year, na.rm=TRUE)),
+    DBH_max_cm  = round(max(stemDiameter, na.rm=TRUE), 1),
+    Ht_max_m    = round(max(height, na.rm=TRUE), 1),
+    AGB_max_kg  = round(max(AGBChojnacky, na.rm=TRUE), 0),
+    .groups = "drop"
+  ) |>
+  arrange(desc(N_rows))
+
+kable(per_site,
+      col.names = c("Site","Domain","N rows","N individuals","N species",
+                    "Year range","Max DBH (cm)","Max Ht (m)","Max AGB Chojnacky (kg)"),
+      caption   = "NEON ForestAGB per-site breakdown")
+
+ggplot(per_site, aes(x = reorder(siteID, N_rows), y = N_rows, fill = Domain)) +
+  geom_col() +
+  geom_text(aes(label = format(N_rows, big.mark=",")),
+            hjust = -0.05, size = 3) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_brewer(palette = "Paired") +
+  labs(x = NULL, y = "N measurement rows",
+       title = "NEON ForestAGB: measurement rows per site",
+       fill = "Domain")
+```
+
+---
+
+# Stem diameter distribution
+
+```{r dbh-dist, fig.height=4.5}
+dat |>
+  filter(!is.na(stemDiameter), stemDiameter > 0) |>
+  ggplot(aes(x = stemDiameter)) +
+  geom_histogram(bins = 60, fill = "#1a9850", color = "white", linewidth = 0.15) +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 50, 100, 200)) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(
+    x = "Stem diameter / DBH (cm, log scale)", y = "N records",
+    title = paste0("Stem diameter distribution \u2014 all sites  (n = ",
+                   format(sum(!is.na(dat$stemDiameter)), big.mark=","), ")")
+  )
+```
+
+```{r dbh-site, fig.height=6.5}
+dat |>
+  filter(!is.na(stemDiameter), stemDiameter > 0) |>
+  ggplot(aes(x = stemDiameter, fill = siteID)) +
+  geom_histogram(bins = 40, show.legend = FALSE) +
+  scale_x_log10(labels = comma) +
+  scale_y_continuous(labels = comma) +
+  facet_wrap(~ siteID, scales = "free_y", ncol = 5) +
+  labs(x = "DBH (cm)", y = "N",
+       title = "DBH distributions per site (y-axis free)")
+```
+
+---
+
+# Height distribution
+
+```{r height-dist, fig.height=4.5}
+dat |>
+  filter(!is.na(height), height > 0) |>
+  ggplot(aes(x = height)) +
+  geom_histogram(bins = 60, fill = "#4393c3", color = "white", linewidth = 0.15) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    x = "Height (m)", y = "N records",
+    title = paste0("Height distribution \u2014 all sites  (n = ",
+                   format(sum(!is.na(dat$height)), big.mark=","), ")")
+  )
+```
+
+---
+
+# Height ~ DBH scaling
+
+```{r hdbh, fig.height=5.5}
+sub <- dat |>
+  filter(!is.na(stemDiameter), !is.na(height),
+         stemDiameter > 0, height > 0) |>
+  sample_n(min(30000, n()))
+
+lm_fit <- lm(log(height) ~ log(stemDiameter), data = sub)
+beta_hdbh <- round(coef(lm_fit)[2], 3)
+r2_hdbh   <- round(summary(lm_fit)$r.squared, 3)
+
+sub |>
+  ggplot(aes(x = stemDiameter, y = height, color = siteID)) +
+  geom_point(alpha = 0.08, size = 0.5, show.legend = FALSE) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              color = "black", linewidth = 1.2, se = TRUE,
+              aes(group = 1)) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(
+    x = "DBH (cm)", y = "Height (m)",
+    title = "Height ~ DBH (OLS log-log, 30,000 subsample)",
+    subtitle = paste0("\u03b2 = ", beta_hdbh, "   R\u00b2 = ", r2_hdbh,
+                      "   n = 30,000")
+  )
+```
+
+```{r hdbh-by-site, fig.height=8}
+dat |>
+  filter(!is.na(stemDiameter), !is.na(height),
+         stemDiameter > 0, height > 0) |>
+  ggplot(aes(x = stemDiameter, y = height)) +
+  geom_point(alpha = 0.06, size = 0.4, color = "#1a9850") +
+  geom_smooth(method = "lm", formula = y ~ x,
+              color = "#d73027", linewidth = 0.9, se = FALSE) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  facet_wrap(~ siteID, scales = "free", ncol = 5) +
+  labs(x = "DBH (cm)", y = "Height (m)",
+       title = "Height ~ DBH per site (OLS log-log; free axes)")
+```
+
+---
+
+# Per-site scaling exponents
+
+```{r per-site-exponents}
+site_exp <- dat |>
+  filter(!is.na(stemDiameter), !is.na(height), stemDiameter > 0, height > 0) |>
+  group_by(siteID) |>
+  filter(n() >= 20) |>
+  summarise(
+    n      = n(),
+    beta   = round(coef(lm(log(height) ~ log(stemDiameter)))[2], 3),
+    R2     = round(summary(lm(log(height) ~ log(stemDiameter)))$r.squared, 3),
+    DBH_median = round(median(stemDiameter), 1),
+    Ht_median  = round(median(height), 1),
+    .groups = "drop"
+  ) |>
+  arrange(desc(n))
+
+kable(site_exp,
+      col.names = c("Site", "N", "\u03b2 (slope)", "R\u00b2",
+                    "Median DBH (cm)", "Median Ht (m)"),
+      caption = paste0(
+        "OLS log-log Height ~ DBH scaling exponents per NEON site. ",
+        "\u26a0 OLS underestimates slope; SMA regression preferred for formal inference."))
+```
+
+---
+
+# Aboveground biomass (AGB) distributions
+
+## Chojnacky et al. 2014
+
+```{r agb-choj, fig.height=4.5}
+dat |>
+  filter(!is.na(AGBChojnacky), AGBChojnacky > 0) |>
+  ggplot(aes(x = AGBChojnacky)) +
+  geom_histogram(bins = 70, fill = "#8c510a", color = "white", linewidth = 0.15) +
+  scale_x_log10(labels = comma,
+                breaks = c(0.01, 0.1, 1, 10, 100, 1000, 10000, 40000)) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(
+    x = "AGB Chojnacky (kg, log scale)", y = "N records",
+    title = paste0("AGB distribution \u2014 Chojnacky et al. 2014  (n = ",
+                   format(sum(!is.na(dat$AGBChojnacky) & dat$AGBChojnacky > 0,
+                              na.rm = TRUE), big.mark=","), ")")
+  )
+```
+
+## Jenkins et al. 2003
+
+```{r agb-jenkins, fig.height=4.5}
+dat |>
+  filter(!is.na(AGBJenkins), AGBJenkins > 0) |>
+  ggplot(aes(x = AGBJenkins)) +
+  geom_histogram(bins = 70, fill = "#4575b4", color = "white", linewidth = 0.15) +
+  scale_x_log10(labels = comma,
+                breaks = c(0.01, 0.1, 1, 10, 100, 1000, 10000)) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(
+    x = "AGB Jenkins (kg, log scale)", y = "N records",
+    title = paste0("AGB distribution \u2014 Jenkins et al. 2003  (n = ",
+                   format(sum(!is.na(dat$AGBJenkins) & dat$AGBJenkins > 0,
+                              na.rm = TRUE), big.mark=","), ")")
+  )
+```
+
+## AGB ~ DBH
+
+```{r agb-dbh, fig.height=5}
+sub_agb <- dat |>
+  filter(!is.na(stemDiameter), !is.na(AGBChojnacky),
+         stemDiameter > 0, AGBChojnacky > 0) |>
+  sample_n(min(30000, n()))
+
+lm_agb <- lm(log(AGBChojnacky) ~ log(stemDiameter), data = sub_agb)
+beta_agb <- round(coef(lm_agb)[2], 3)
+r2_agb   <- round(summary(lm_agb)$r.squared, 3)
+
+sub_agb |>
+  ggplot(aes(x = stemDiameter, y = AGBChojnacky)) +
+  geom_point(alpha = 0.08, size = 0.5, color = "#8c510a") +
+  geom_smooth(method = "lm", formula = y ~ x,
+              color = "black", linewidth = 1.2, se = TRUE) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma,
+                breaks = c(0.01, 0.1, 1, 10, 100, 1000, 10000, 40000)) +
+  annotation_logticks() +
+  labs(
+    x = "DBH (cm)", y = "AGB Chojnacky (kg)",
+    title = "AGB ~ DBH  (Chojnacky, OLS log-log, 30,000 subsample)",
+    subtitle = paste0("\u03b2 = ", beta_agb, "   R\u00b2 = ", r2_agb,
+                      "   — Note: AGB is *derived* from DBH, so R\u00b2 reflects",
+                      " the allometric model, not independent data")
+  )
+```
+
+## Chojnacky vs. Jenkins AGB comparison
+
+```{r agb-compare, fig.height=5}
+sub_comp <- dat |>
+  filter(!is.na(AGBChojnacky), !is.na(AGBJenkins),
+         AGBChojnacky > 0, AGBJenkins > 0) |>
+  sample_n(min(20000, n()))
+
+lm_cv <- lm(log(AGBChojnacky) ~ log(AGBJenkins), data = sub_comp)
+r2_cv <- round(summary(lm_cv)$r.squared, 3)
+
+sub_comp |>
+  ggplot(aes(x = AGBJenkins, y = AGBChojnacky)) +
+  geom_point(alpha = 0.06, size = 0.5, color = "#666666") +
+  geom_abline(slope = 1, intercept = 0, color = "red",
+              linetype = "dashed", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(
+    x = "AGB Jenkins (kg)", y = "AGB Chojnacky (kg)",
+    title = paste0("Chojnacky vs. Jenkins AGB  (n = 20,000 subsample; R\u00b2 = ",
+                   r2_cv, ")"),
+    subtitle = "Red dashed = 1:1 line"
+  )
+```
+
+---
+
+# Plant status breakdown
+
+```{r plant-status, fig.height=4}
+dat |>
+  count(plantStatus, sort = TRUE) |>
+  mutate(pct = paste0(round(100 * n / sum(n), 1), "%")) |>
+  ggplot(aes(x = reorder(plantStatus, n), y = n, fill = plantStatus)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(format(n, big.mark=","), " (", pct, ")")),
+            hjust = -0.05, size = 3) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.35))) +
+  scale_fill_viridis_d(option = "D") +
+  labs(x = NULL, y = "N records",
+       title = "Plant status breakdown (all sites, all years)")
+```
+
+---
+
+# Growth form breakdown
+
+```{r growth-form, fig.height=3.5}
+dat |>
+  count(growthForm, sort = TRUE) |>
+  ggplot(aes(x = reorder(growthForm, n), y = n, fill = growthForm)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = format(n, big.mark=",")), hjust = -0.05, size = 3.5) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(x = NULL, y = "N records",
+       title = "Growth form breakdown")
+```
+
+---
+
+# Taxonomic composition
+
+## Top 20 families
+
+```{r top-families, fig.height=5}
+dat |>
+  filter(!is.na(Family)) |>
+  count(Family, sort = TRUE) |>
+  head(20) |>
+  ggplot(aes(x = reorder(Family, n), y = n, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = format(n, big.mark=",")), hjust = -0.05, size = 3) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_viridis_c(option = "D", direction = -1) +
+  labs(x = NULL, y = "N records", title = "Top 20 families by record count")
+```
+
+## Top 25 species
+
+```{r top-species, fig.height=6}
+dat |>
+  filter(!is.na(scientificName)) |>
+  count(scientificName, sort = TRUE) |>
+  head(25) |>
+  ggplot(aes(x = reorder(scientificName, n), y = n)) +
+  geom_col(fill = "#74c476") +
+  geom_text(aes(label = format(n, big.mark=",")), hjust = -0.05, size = 3) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
+  labs(x = NULL, y = "N records",
+       title = "Top 25 species by record count")
+```
+
+---
+
+# Temporal coverage
+
+```{r temporal, fig.height=4}
+dat |>
+  count(year) |>
+  ggplot(aes(x = year, y = n)) +
+  geom_col(fill = "#9ecae1") +
+  geom_text(aes(label = format(n, big.mark=",")), vjust = -0.4, size = 3.2) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.15))) +
+  scale_x_continuous(breaks = 2014:2023) +
+  labs(x = "Year", y = "N measurement records",
+       title = "Measurement records by year (2014\u20132023)")
+```
+
+```{r temporal-site, fig.height=5.5}
+dat |>
+  count(siteID, year) |>
+  ggplot(aes(x = year, y = n, color = siteID, group = siteID)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.5) +
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(breaks = 2014:2023) +
+  facet_wrap(~ siteID, scales = "free_y", ncol = 5) +
+  labs(x = "Year", y = "N records",
+       title = "Temporal sampling coverage per site") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 7))
+```
+
+---
+
+# Data completeness
+
+```{r completeness}
+key_cols <- c("stemDiameter","height","AGBChojnacky","AGBJenkins",
+              "AGBAnnighofer","scientificName","Family","plantStatus",
+              "growthForm","year","siteID")
+
+compl <- data.frame(
+  Column = key_cols,
+  N_nonNA = sapply(key_cols, function(c) sum(!is.na(dat[[c]]))),
+  Pct     = paste0(
+    sapply(key_cols, function(c)
+      round(100 * mean(!is.na(dat[[c]])), 1)), "%")
+)
+kable(compl, caption = paste0(
+  "Completeness for key columns (total rows = ",
+  format(nrow(dat), big.mark = ","), ")"))
+
+compl |>
+  mutate(pct_num = as.numeric(sub("%","",Pct))) |>
+  ggplot(aes(x = reorder(Column, pct_num), y = pct_num)) +
+  geom_col(fill = "#1a9850") +
+  geom_text(aes(label = Pct), hjust = -0.1, size = 3.5) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 108)) +
+  labs(x = NULL, y = "% complete",
+       title = "Data completeness for key NEON ForestAGB columns")
+```
+
+---
+
+# Allometric method summary
+
+```{r allometry-methods}
+kable(data.frame(
+  Method = c("Chojnacky et al. 2014","Jenkins et al. 2003","Annighofer et al."),
+  Column = c("AGBChojnacky","AGBJenkins","AGBAnnighofer"),
+  N_nonNA = c(
+    format(sum(!is.na(dat$AGBChojnacky)), big.mark=","),
+    format(sum(!is.na(dat$AGBJenkins)),   big.mark=","),
+    format(sum(!is.na(dat$AGBAnnighofer)),big.mark=",")
+  ),
+  Max_AGB_kg = c(
+    format(round(max(dat$AGBChojnacky, na.rm=TRUE), 0), big.mark=","),
+    format(round(max(dat$AGBJenkins,   na.rm=TRUE), 0), big.mark=","),
+    format(round(max(dat$AGBAnnighofer,na.rm=TRUE), 0), big.mark=",")
+  ),
+  Scope = c(
+    "North American species, FIA-based species groups",
+    "National-scale, species-group equations",
+    "Sapling-specific equations"
+  ),
+  stringsAsFactors = FALSE
+), caption = "AGB allometric methods implemented in NEONForestAGB")
+```
+
+> **AGB is model-derived, not measured.** All biomass values are estimated
+> from stem diameter using published allometric equations.  They are NOT
+> independent of DBH and should not be treated as direct measurements in
+> allometric inference.
+
+---
+
+# Master taxon list profile
+
+```{r taxon-list}
+kable(data.frame(
+  Metric = c("Total taxa in MasterTaxonList","Unique FIA codes",
+             "Unique Jenkins model groups","Unique species groups (Chojnacky)"),
+  Value  = c(
+    format(nrow(taxon_list), big.mark=","),
+    length(unique(taxon_list[["FIA.Code"]][!is.na(taxon_list[["FIA.Code"]])])),
+    length(unique(taxon_list[["jenkins_model"]][!is.na(taxon_list[["jenkins_model"]])])),
+    length(unique(taxon_list[["Species.Group"]][!is.na(taxon_list[["Species.Group"]])]))
+  ),
+  stringsAsFactors = FALSE
+), caption = "MasterTaxonList.csv — allometric group assignments")
+```
+
+---
+
+# Notes for allometric merging
+
+1. **AGB is model-derived:** `AGBChojnacky` and `AGBJenkins` are estimated
+   from DBH using published equations — they are not independent of DBH and
+   cannot be used as both predictor and response in the same regression.
+
+2. **Repeated measurements:** The same `individualID` appears in multiple years.
+   Longitudinal analyses must account for repeat visits (NEON typically revisits
+   plots every 1–5 years).
+
+3. **DBH units:** `stemDiameter` is in **cm** — compatible with BAAD, Tallo,
+   and Nouragues.  BAAD `d.bh` is in metres (×100) and ForestGEO Panama is in
+   mm (÷10).
+
+4. **Growth form mix:** `growthForm` includes single-bole trees, saplings,
+   small trees, and multi-bole trees.  Saplings and single-bole trees should
+   be separated before fitting allometric models.
+
+5. **Plant status:** Filter to `plantStatus == "Live"` for standard AGB
+   estimation (134,114 of 194,704 records; 68.9%).
+
+6. **Taxonomy:** `scientificName` uses USDA PLANTS conventions.  Match to TNRS
+   or GBIF before cross-source taxonomic merging.
+
+7. **Geographic coordinates:** Not in the biomass CSV files.  Site centroids
+   are in `sitecoordinates.csv` (35 sites); plot-level coordinates are in the
+   original NEON DP1.10098.001 data product.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```
