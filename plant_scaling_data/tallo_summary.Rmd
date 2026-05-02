@@ -1,0 +1,428 @@
+---
+title: "Tallo — Global Tree Allometry and Crown Architecture Database"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 5)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+library(scales)
+library(stringr)
+
+theme_set(theme_bw(base_size = 12))
+
+raw_dir <- file.path(dirname(knitr::current_input(dir = TRUE)), "data/raw/tallo")
+
+tallo <- read_csv(file.path(raw_dir, "Tallo.csv"), show_col_types = FALSE)
+refs  <- read_csv(file.path(raw_dir, "Tallo_references.csv"),
+                  locale = locale(encoding = "latin1"), show_col_types = FALSE) |>
+  mutate(source = iconv(source, from = "latin1", to = "UTF-8", sub = "?"))
+meta  <- read_csv(file.path(raw_dir, "Tallo_metadata.csv"), show_col_types = FALSE)
+```
+
+---
+
+# Overview
+
+**Tallo** (v1.0.0) is a global database of individual tree measurements compiled
+by Jucker et al. (2022). It contains georeferenced records of stem diameter,
+height, and crown radius for nearly 500,000 trees drawn from 61,856 sites
+spanning all major biomes. All records are taxonomically standardized and
+every record carries exact latitude/longitude coordinates.
+
+> Jucker T, Fischer FO, Chave J, Coomes DA, Caspersen J, et al. (2022)
+> Tallo: A global tree allometry and crown architecture database.
+> *Global Change Biology*, 28: 5254–5268.
+> DOI: [10.1111/gcb.16302](https://doi.org/10.1111/gcb.16302)
+>
+> Data: Zenodo [doi:10.5281/zenodo.6637599](https://doi.org/10.5281/zenodo.6637599)
+
+> **⚠ Citation note:** The DOI and journal reference above should be verified
+> against Crossref before use in any manuscript.
+
+---
+
+# Top-level summary
+
+```{r top-counts}
+kable(data.frame(
+  Metric = c("Total records","Records with stem diameter","Records with height",
+             "Records with crown radius","Records with all three",
+             "Unique species","Unique genera","Unique families",
+             "Unique sites (approx.)", "Lat/lon coverage",
+             "Lat range (°)","Lon range (°)","Source studies"),
+  Value = c(
+    format(nrow(tallo), big.mark=","),
+    format(sum(!is.na(tallo$stem_diameter_cm)), big.mark=","),
+    format(sum(!is.na(tallo$height_m)),         big.mark=","),
+    format(sum(!is.na(tallo$crown_radius_m)),   big.mark=","),
+    format(sum(!is.na(tallo$stem_diameter_cm) & !is.na(tallo$height_m) &
+               !is.na(tallo$crown_radius_m)),  big.mark=","),
+    format(length(unique(tallo$species[!is.na(tallo$species)])), big.mark=","),
+    format(length(unique(tallo$genus[!is.na(tallo$genus)])),     big.mark=","),
+    format(length(unique(tallo$family[!is.na(tallo$family)])),   big.mark=","),
+    "61,856 (per Jucker et al. 2022)",
+    paste0(sum(!is.na(tallo$latitude) & !is.na(tallo$longitude)),
+           " (100%)"),
+    paste0(round(min(tallo$latitude),1), " to ", round(max(tallo$latitude),1)),
+    paste0(round(min(tallo$longitude),1), " to ", round(max(tallo$longitude),1)),
+    format(length(unique(tallo$reference_id)), big.mark=",")
+  )
+), caption = "Tallo database top-level summary")
+```
+
+---
+
+# Column dictionary
+
+```{r dict}
+kable(meta, caption = "Tallo column descriptions (from Tallo_metadata.csv)")
+```
+
+---
+
+# Data availability
+
+```{r availability, fig.height=4}
+avail <- data.frame(
+  variable = c("stem_diameter_cm","height_m","crown_radius_m",
+               "species","genus","family","division"),
+  n_present = c(
+    sum(!is.na(tallo$stem_diameter_cm)),
+    sum(!is.na(tallo$height_m)),
+    sum(!is.na(tallo$crown_radius_m)),
+    sum(!is.na(tallo$species)),
+    sum(!is.na(tallo$genus)),
+    sum(!is.na(tallo$family)),
+    sum(!is.na(tallo$division))
+  ),
+  total = nrow(tallo)
+) |> mutate(pct = n_present / total * 100)
+
+ggplot(avail, aes(x = reorder(variable, pct), y = pct)) +
+  geom_col(fill = "#2166ac") +
+  geom_text(aes(label = paste0(round(pct), "%")), hjust = -0.1, size = 3.5) +
+  coord_flip() +
+  scale_y_continuous(limits = c(0, 110), labels = function(x) paste0(x, "%")) +
+  labs(x = NULL, y = "% non-missing",
+       title = paste0("Data completeness (n = ", format(nrow(tallo), big.mark=","), " records)"))
+```
+
+---
+
+# Global geographic coverage
+
+```{r geo-map, fig.width=11, fig.height=5.5}
+# Thin to ~50k points for fast plotting
+set.seed(42)
+tallo_thin <- tallo |>
+  filter(!is.na(latitude), !is.na(longitude)) |>
+  sample_n(min(50000, n()))
+
+world_map <- map_data("world")
+
+ggplot() +
+  geom_polygon(data = world_map,
+               aes(x = long, y = lat, group = group),
+               fill = "grey88", color = "grey70", linewidth = 0.15) +
+  geom_point(data = tallo_thin,
+             aes(x = longitude, y = latitude),
+             alpha = 0.15, size = 0.4, color = "#1b7837") +
+  coord_fixed(1.3) +
+  labs(title = paste0("Tallo — sampling locations (n = ",
+                      format(nrow(tallo), big.mark=","),
+                      " trees; 50,000 plotted for clarity)"),
+       x = NULL, y = NULL) +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank())
+```
+
+```{r geo-division, fig.width=11, fig.height=5.5}
+tallo_div <- tallo |>
+  filter(!is.na(latitude), !is.na(longitude), !is.na(division)) |>
+  sample_n(min(50000, n()))
+
+ggplot() +
+  geom_polygon(data = world_map,
+               aes(x = long, y = lat, group = group),
+               fill = "grey88", color = "grey70", linewidth = 0.15) +
+  geom_point(data = tallo_div,
+             aes(x = longitude, y = latitude, color = division),
+             alpha = 0.2, size = 0.5) +
+  scale_color_manual(values = c(Angiosperm = "#d6604d", Gymnosperm = "#4393c3"),
+                     na.value = "grey50") +
+  coord_fixed(1.3) +
+  guides(color = guide_legend(override.aes = list(alpha=1, size=3))) +
+  labs(title = "Tallo — Angiosperm vs. Gymnosperm distribution",
+       color = "Division", x = NULL, y = NULL) +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = "bottom")
+```
+
+---
+
+# Taxonomic coverage
+
+## Division breakdown
+
+```{r div-bar, fig.height=3}
+tallo |>
+  mutate(division = ifelse(is.na(division), "Unknown", division)) |>
+  count(division) |>
+  ggplot(aes(x = reorder(division, n), y = n, fill = division)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = format(n, big.mark=",")), hjust = -0.1, size = 4) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_manual(values = c(Angiosperm="#d6604d", Gymnosperm="#4393c3", Unknown="grey60")) +
+  labs(x = NULL, y = "N trees", title = "Records by division")
+```
+
+## Top 30 families
+
+```{r top-families, fig.height=7}
+tallo |>
+  filter(!is.na(family)) |>
+  count(family, sort = TRUE) |>
+  head(30) |>
+  ggplot(aes(x = reorder(family, n), y = n, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = format(n, big.mark=",")), hjust = -0.1, size = 3) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_viridis_c(direction = -1) +
+  labs(x = NULL, y = "N trees", title = "Top 30 families by record count")
+```
+
+## Top 30 species
+
+```{r top-species, fig.height=7}
+tallo |>
+  filter(!is.na(species)) |>
+  count(species, sort = TRUE) |>
+  head(30) |>
+  ggplot(aes(x = reorder(species, n), y = n, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = format(n, big.mark=",")), hjust = -0.1, size = 3) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_viridis_c(direction = -1) +
+  labs(x = NULL, y = "N trees",
+       title = "Top 30 species by record count",
+       caption = "Species names as standardized in Tallo v1.0.0")
+```
+
+---
+
+# Size distributions
+
+```{r dbh-dist}
+tallo |> filter(!is.na(stem_diameter_cm), stem_diameter_cm > 0) |>
+  ggplot(aes(x = stem_diameter_cm)) +
+  geom_histogram(bins = 80, fill = "#2166ac", color = "white") +
+  scale_x_log10(labels = comma) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(x = "Stem diameter (cm, log scale)", y = "Count",
+       title = paste0("Stem diameter distribution  (n = ",
+                      format(sum(!is.na(tallo$stem_diameter_cm)), big.mark=","), ")"),
+       subtitle = paste0("Range: ", round(min(tallo$stem_diameter_cm, na.rm=TRUE),1),
+                         " – ", round(max(tallo$stem_diameter_cm, na.rm=TRUE),1), " cm"))
+```
+
+```{r height-dist}
+tallo |> filter(!is.na(height_m), height_m > 0) |>
+  ggplot(aes(x = height_m)) +
+  geom_histogram(bins = 80, fill = "#1b7837", color = "white") +
+  scale_x_log10(labels = comma) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(x = "Height (m, log scale)", y = "Count",
+       title = paste0("Height distribution  (n = ",
+                      format(sum(!is.na(tallo$height_m)), big.mark=","), ")"),
+       subtitle = paste0("Range: ", round(min(tallo$height_m, na.rm=TRUE),1),
+                         " – ", round(max(tallo$height_m, na.rm=TRUE),1), " m"))
+```
+
+```{r crown-dist}
+tallo |> filter(!is.na(crown_radius_m), crown_radius_m > 0) |>
+  ggplot(aes(x = crown_radius_m)) +
+  geom_histogram(bins = 80, fill = "#762a83", color = "white") +
+  scale_x_log10(labels = comma) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(x = "Crown radius (m, log scale)", y = "Count",
+       title = paste0("Crown radius distribution  (n = ",
+                      format(sum(!is.na(tallo$crown_radius_m)), big.mark=","), ")"),
+       subtitle = paste0("Range: ", round(min(tallo$crown_radius_m, na.rm=TRUE),2),
+                         " – ", round(max(tallo$crown_radius_m, na.rm=TRUE),2), " m"))
+```
+
+---
+
+# Scaling relationships
+
+All regressions below are **exploratory OLS on log10-transformed data** using a 
+10% random sample for speed. Use SMA (`smatr`) for formal allometric inference.
+
+```{r sample-subset}
+set.seed(123)
+sub <- tallo |>
+  filter(!is.na(stem_diameter_cm), stem_diameter_cm > 0,
+         !is.na(height_m), height_m > 0) |>
+  sample_frac(0.10)
+```
+
+## Height vs. stem diameter
+
+```{r ht-dbh}
+lm1 <- lm(log10(height_m) ~ log10(stem_diameter_cm), data = sub)
+b1 <- round(coef(lm1)[2], 3)
+r2 <- round(summary(lm1)$r.squared, 3)
+n1 <- nrow(sub)
+
+ggplot(sub, aes(x = stem_diameter_cm, y = height_m)) +
+  geom_point(alpha = 0.08, size = 0.5, color = "#1b7837") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "Stem diameter (cm)", y = "Height (m)",
+       title = paste0("Height ~ DBH  |  β = ", b1, "  |  R² = ", r2,
+                      "  |  n = ", format(n1, big.mark=",")),
+       subtitle = "10% random subsample; OLS on log10-transformed data")
+```
+
+```{r ht-dbh-div}
+sub_div <- tallo |>
+  filter(!is.na(stem_diameter_cm), stem_diameter_cm > 0,
+         !is.na(height_m), height_m > 0, !is.na(division)) |>
+  sample_frac(0.10)
+
+ggplot(sub_div, aes(x = stem_diameter_cm, y = height_m, color = division)) +
+  geom_point(alpha = 0.06, size = 0.5) +
+  geom_smooth(method = "lm", linewidth = 1.2, se = FALSE) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  scale_color_manual(values = c(Angiosperm = "#d6604d", Gymnosperm = "#4393c3")) +
+  guides(color = guide_legend(override.aes = list(alpha=1, size=3))) +
+  labs(x = "Stem diameter (cm)", y = "Height (m)",
+       title = "Height ~ DBH by division  (10% subsample)",
+       color = "Division")
+```
+
+## Crown radius vs. stem diameter
+
+```{r crown-dbh}
+sub2 <- tallo |>
+  filter(!is.na(stem_diameter_cm), stem_diameter_cm > 0,
+         !is.na(crown_radius_m), crown_radius_m > 0) |>
+  sample_frac(0.10)
+
+lm2 <- lm(log10(crown_radius_m) ~ log10(stem_diameter_cm), data = sub2)
+b2 <- round(coef(lm2)[2], 3)
+r2b <- round(summary(lm2)$r.squared, 3)
+n2 <- nrow(sub2)
+
+ggplot(sub2, aes(x = stem_diameter_cm, y = crown_radius_m)) +
+  geom_point(alpha = 0.08, size = 0.5, color = "#762a83") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "Stem diameter (cm)", y = "Crown radius (m)",
+       title = paste0("Crown radius ~ DBH  |  β = ", b2, "  |  R² = ", r2b,
+                      "  |  n = ", format(n2, big.mark=",")),
+       subtitle = "10% random subsample; OLS on log10-transformed data")
+```
+
+## Summary of scaling exponents (exploratory OLS)
+
+```{r exponent-table}
+kable(data.frame(
+  Relationship = c("Height ~ stem_diameter", "Crown_radius ~ stem_diameter"),
+  OLS_beta     = c(b1, b2),
+  R_squared    = c(r2, r2b),
+  n            = c(n1, n2)
+), caption = "Exploratory OLS exponents (log10-log10). Use SMA for formal allometric inference.")
+```
+
+---
+
+# Outlier flags
+
+Tallo includes two outlier flag columns: `height_outlier` and `crown_radius_outlier`.
+
+```{r outlier-summary}
+kable(data.frame(
+  Variable = c("height_outlier","crown_radius_outlier"),
+  n_flagged = c(
+    sum(tallo$height_outlier == "yes", na.rm=TRUE),
+    sum(tallo$crown_radius_outlier == "yes", na.rm=TRUE)
+  ),
+  pct_flagged = round(c(
+    100 * mean(tallo$height_outlier == "yes", na.rm=TRUE),
+    100 * mean(tallo$crown_radius_outlier == "yes", na.rm=TRUE)
+  ), 2)
+), caption = "Outlier flags in Tallo (flag = 'yes' per Jucker et al. 2022 criteria)")
+```
+
+> Jucker et al. (2022) recommend excluding flagged records for allometric
+> model fitting. For exploratory analysis both are retained here.
+
+---
+
+# Source references
+
+```{r refs-table}
+kable(refs, escape = TRUE,
+      caption = paste0("All ", nrow(refs), " source references in Tallo_references.csv"))
+```
+
+---
+
+# Key caveats
+
+1. **Crown radius only available for 63% of records.** Stem diameter is
+   complete for all 498,838 trees; height is available for 99.7%; crown radius
+   drops to 62.7%. Analyses involving crown architecture should account for
+   this non-random missingness.
+
+2. **Outlier flags.** Tallo provides `height_outlier` and `crown_radius_outlier`
+   columns. Records flagged `"yes"` should be excluded when fitting allometric
+   equations (see Jucker et al. 2022, Table S1 for criteria).
+
+3. **No biomass column.** Tallo records structural dimensions only (DBH, height,
+   crown radius). Biomass must be *estimated* from allometric equations (e.g.,
+   Chave 2014, allodb), not measured directly. Tallo is a complement to, not
+   a substitute for, the Niklas-Enquist or BAAD biomass datasets.
+
+4. **Taxonomic standardization:** Species names were harmonized against The Plant
+   List (v1.1) by Jucker et al. — additional reconciliation against a current
+   backbone (World Flora Online, TNRS) is recommended before merging.
+
+5. **Georeferenced:** All 498,838 records have exact decimal-degree coordinates —
+   making Tallo the only fully georeferenced dataset in this collection.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```
