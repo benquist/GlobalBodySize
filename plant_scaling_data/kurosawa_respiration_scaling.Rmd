@@ -112,7 +112,7 @@ life form (woody/herbaceous), species, and dataset source for each record.
 # Download from: https://doi.org/10.5061/dryad.sxksn03cj
 # File: data.respiration.csv
 data_path <- file.path(proj_dir,
-  "data/raw/kurosawa_respiration/data.respiration.csv")
+  "data/raw/kurosawa_respiration/doi_10_5061_dryad_sxksn03cj__v20241204/data.respiration.csv")
 
 USE_REAL_DATA <- file.exists(data_path) && file.info(data_path)$size > 1000
 
@@ -145,21 +145,28 @@ if (USE_REAL_DATA) {
 
   # Build harmonised frame
   dat <- raw |>
-    rename_with(~ "fresh_mass_g",    all_of(mass_col)) |>
+    rename_with(~ "fresh_mass_kg",   all_of(mass_col)) |>
     rename_with(~ "respiration",     all_of(resp_col)) |>
     rename_with(~ "life_form",       any_of(lf_col))  |>
     rename_with(~ "plant_part",      any_of(part_col)) |>
     rename_with(~ "species",         any_of(sp_col))   |>
     rename_with(~ "dataset_source",  any_of(ds_col))   |>
-    filter(!is.na(fresh_mass_g), !is.na(respiration),
-           fresh_mass_g > 0,  respiration > 0) |>
+    filter(!is.na(fresh_mass_kg), !is.na(respiration),
+           fresh_mass_kg > 0,  respiration > 0) |>
     mutate(
+      # Units from Dryad README:
+      #   Fresh mass: kg   — convert to g for consistency with body-mass scaling literature
+      #   Respiration: μmol CO2 s⁻¹  (absolute whole-organ rate, not mass-specific)
+      fresh_mass_g = fresh_mass_kg * 1000,
       log_mass = log10(fresh_mass_g),
       log_resp = log10(respiration),
-      life_form  = if (exists("life_form",  where = cur_data()))
-                     as.character(life_form)  else "unknown",
-      plant_part = if (exists("plant_part", where = cur_data()))
-                     as.character(plant_part) else "unknown"
+      # Standardise life_form to title case used throughout this document
+      life_form  = dplyr::recode(as.character(life_form),
+                                 "woody" = "Woody",
+                                 "herb"  = "Herbaceous",
+                                 .default = as.character(life_form)),
+      # Standardise plant_part to title case
+      plant_part = stringr::str_to_title(as.character(plant_part))
     )
   if (!is.null(temp_col) && !is.na(temp_col) && temp_col %in% names(raw)) {
     dat <- left_join(dat, raw |>
@@ -168,115 +175,23 @@ if (USE_REAL_DATA) {
   }
 
 } else {
-  # ── Reconstructed demonstration data ─────────────────────────────────────
-  # These data use REAL species names (APG IV families, woody/herbaceous mix)
-  # representative of the Mori 2010 / Kurosawa 2025 dataset scope.
-  # Slopes are seeded from published SMA exponents; individual records are
-  # simulated to enable per-species (intraspecific) slope estimation.
-  # Per-species intercepts include random among-species variation (SD = 0.08)
-  # to simulate realistic metabolic normalization differences.
-  # THIS IS NOT THE ORIGINAL DATA. Verify with doi:10.5061/dryad.sxksn03cj
-  message("\u26a0 Using reconstructed demo data. Download real data from https://doi.org/10.5061/dryad.sxksn03cj")
-  set.seed(42)
-
-  # DEMO TAXONOMY — NOT DERIVED FROM REAL DATA
-  # Family assignments follow APG IV classification.
-  # All species names should be verified against GBIF Backbone before any publication use.
-  species_lookup <- tribble(
-    ~species,                    ~family,         ~life_form,    ~plant_part, ~dataset_source,   ~n_ind, ~log_mass_min, ~log_mass_max,
-    "Fagus crenata",             "Fagaceae",      "Woody",       "Shoot",     "Kurosawa2023",     8,     -1.0,          4.2,
-    "Fagus crenata",             "Fagaceae",      "Woody",       "Root",      "Kurosawa2023",     8,     -1.0,          4.0,
-    "Fagus japonica",            "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         5,      0.5,          3.8,
-    "Fagus japonica",            "Fagaceae",      "Woody",       "Root",      "Mori2010",         5,      0.3,          3.5,
-    "Quercus serrata",           "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         5,      0.0,          4.0,
-    "Quercus serrata",           "Fagaceae",      "Woody",       "Root",      "Mori2010",         4,      0.0,          3.8,
-    "Quercus mongolica",         "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         4,      0.2,          3.9,
-    "Quercus robur",             "Fagaceae",      "Woody",       "Shoot",     "New",              4,      0.5,          4.1,
-    "Castanea crenata",          "Fagaceae",      "Woody",       "Shoot",     "Mori2010",         4,      0.3,          3.5,
-    "Castanopsis cuspidata",     "Fagaceae",      "Woody",       "Shoot",     "New",              3,      0.5,          3.7,
-    "Pinus densiflora",          "Pinaceae",      "Woody",       "Shoot",     "Mori2010",         6,      1.0,          4.3,
-    "Pinus densiflora",          "Pinaceae",      "Woody",       "Root",      "Mori2010",         5,      0.8,          4.0,
-    "Pinus sylvestris",          "Pinaceae",      "Woody",       "Shoot",     "New",              5,      1.0,          4.2,
-    "Abies homolepis",           "Pinaceae",      "Woody",       "Shoot",     "Mori2010",         5,      0.5,          4.1,
-    "Abies sachalinensis",       "Pinaceae",      "Woody",       "Shoot",     "New",              4,      0.5,          4.0,
-    "Picea abies",               "Pinaceae",      "Woody",       "Shoot",     "New",              4,      0.8,          4.2,
-    "Larix kaempferi",           "Pinaceae",      "Woody",       "Shoot",     "Mori2010",         4,      0.8,          4.0,
-    "Betula platyphylla",        "Betulaceae",    "Woody",       "Shoot",     "Mori2010",         4,      0.2,          3.8,
-    "Betula pendula",            "Betulaceae",    "Woody",       "Shoot",     "New",              4,      0.2,          3.9,
-    "Betula ermanii",            "Betulaceae",    "Woody",       "Shoot",     "Mori2010",         3,      0.3,          3.7,
-    "Alnus hirsuta",             "Betulaceae",    "Woody",       "Shoot",     "Mori2010",         3,      0.5,          3.8,
-    "Alnus japonica",            "Betulaceae",    "Woody",       "Shoot",     "New",              3,      0.5,          3.8,
-    "Acer palmatum",             "Sapindaceae",   "Woody",       "Shoot",     "Mori2010",         4,      0.0,          3.5,
-    "Acer mono",                 "Sapindaceae",   "Woody",       "Shoot",     "Mori2010",         4,      0.2,          3.8,
-    "Acer platanoides",          "Sapindaceae",   "Woody",       "Shoot",     "New",              3,      0.2,          3.7,
-    "Magnolia obovata",          "Magnoliaceae",  "Woody",       "Shoot",     "Mori2010",         3,      0.3,          3.5,
-    "Magnolia kobus",            "Magnoliaceae",  "Woody",       "Shoot",     "New",              3,      0.3,          3.5,
-    "Fraxinus mandshurica",      "Oleaceae",      "Woody",       "Shoot",     "Mori2010",         3,      0.5,          3.9,
-    "Fraxinus excelsior",        "Oleaceae",      "Woody",       "Shoot",     "New",              3,      0.5,          3.8,
-    "Prunus sargentii",          "Rosaceae",      "Woody",       "Shoot",     "New",              3,      0.2,          3.5,
-    "Sorbus alnifolia",          "Rosaceae",      "Woody",       "Shoot",     "New",              3,      0.2,          3.4,
-    "Cornus controversa",        "Cornaceae",     "Woody",       "Shoot",     "Mori2010",         3,      0.3,          3.5,
-    "Rhododendron japonicum",    "Ericaceae",     "Woody",       "Shoot",     "Mori2010",         3,     -0.5,          2.8,
-    "Vaccinium corymbosum",      "Ericaceae",     "Woody",       "Shoot",     "New",              3,     -0.5,          2.5,
-    "Miscanthus sinensis",       "Poaceae",       "Herbaceous",  "Shoot",     "New",              5,     -1.0,          2.5,
-    "Phragmites australis",      "Poaceae",       "Herbaceous",  "Shoot",     "New",              5,     -0.5,          2.8,
-    "Festuca arundinacea",       "Poaceae",       "Herbaceous",  "Shoot",     "New",              4,     -1.5,          1.8,
-    "Poa annua",                 "Poaceae",       "Herbaceous",  "Shoot",     "New",              4,     -2.0,          1.0,
-    "Sasa kurilensis",           "Poaceae",       "Herbaceous",  "Shoot",     "New",              4,     -1.0,          2.5,
-    "Miscanthus sinensis",       "Poaceae",       "Herbaceous",  "Root",      "New",              4,     -1.2,          2.3,
-    "Phragmites australis",      "Poaceae",       "Herbaceous",  "Root",      "New",              4,     -0.8,          2.6,
-    "Solidago gigantea",         "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -1.0,          2.2,
-    "Artemisia princeps",        "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -1.0,          2.0,
-    "Helianthus annuus",         "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -0.5,          2.5,
-    "Taraxacum officinale",      "Asteraceae",    "Herbaceous",  "Shoot",     "New",              4,     -2.0,          1.0,
-    "Salvia officinalis",        "Lamiaceae",     "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.5,
-    "Mentha spicata",            "Lamiaceae",     "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.5,
-    "Lycopus europaeus",         "Lamiaceae",     "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.3,
-    "Ranunculus repens",         "Ranunculaceae", "Herbaceous",  "Shoot",     "New",              3,     -2.0,          0.8,
-    "Trifolium repens",          "Fabaceae",      "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.2,
-    "Medicago sativa",           "Fabaceae",      "Herbaceous",  "Shoot",     "New",              4,     -1.0,          1.8,
-    "Vicia cracca",              "Fabaceae",      "Herbaceous",  "Shoot",     "New",              3,     -1.5,          1.3
+  stop(
+    "\n\n=== REAL DATA REQUIRED — ANALYSIS HALTED ===\n",
+    "data.respiration.csv is missing or empty.\n",
+    "Path checked: ", data_path, "\n\n",
+    "Download from: https://doi.org/10.5061/dryad.sxksn03cj\n",
+    "  1. Go to the Dryad page above\n",
+    "  2. Download 'data.respiration.csv'\n",
+    "  3. Save to: plant_scaling_data/data/raw/kurosawa_respiration/data.respiration.csv\n",
+    "  4. Re-render this Rmd\n\n",
+    "Fabricated data will NEVER be used as a substitute for real measurements.\n"
   )
-
-  # Group-level slope and intercept parameters (from published SMA estimates)
-  group_params <- tribble(
-    ~life_form,    ~plant_part, ~slope, ~intercept, ~sd_resid,
-    "Woody",       "Shoot",     0.753,  -2.85,      0.12,
-    "Woody",       "Root",      0.780,  -2.60,      0.13,
-    "Herbaceous",  "Shoot",     0.741,  -2.72,      0.15,
-    "Herbaceous",  "Root",      0.762,  -2.55,      0.16
-  )
-
-  # Generate individual records per species
-  dat_list <- pmap(species_lookup, function(species, family, life_form, plant_part,
-                                             dataset_source, n_ind,
-                                             log_mass_min, log_mass_max) {
-    gp  <- group_params |>
-      filter(life_form == !!life_form, plant_part == !!plant_part)
-    # Per-species random intercept offset (among-species metabolic normalization variation)
-    sp_int_offset  <- rnorm(1, 0, 0.08)
-    # Per-species slope perturbation (intraspecific slope variation)
-    sp_slope_delta <- rnorm(1, 0, 0.04)
-    log_mass_vals  <- runif(n_ind, log_mass_min, log_mass_max)
-    log_resp_vals  <- (gp$intercept + sp_int_offset) +
-                      (gp$slope + sp_slope_delta) * log_mass_vals +
-                      rnorm(n_ind, 0, gp$sd_resid)
-    tibble(
-      fresh_mass_g   = 10^log_mass_vals,
-      respiration    = 10^log_resp_vals,
-      log_mass       = log_mass_vals,
-      log_resp       = log_resp_vals,
-      life_form      = life_form,
-      plant_part     = plant_part,
-      dataset_source = dataset_source,
-      species        = species,
-      family         = family
-    )
-  })
-  dat <- bind_rows(dat_list)
-  USE_REAL_DATA <- FALSE
+  # ── Synthetic data fallback permanently removed (2026-05-02, hardened 2026-05-02) ──
+  # stop() above halts all rendering. No fallback code is retained.
+  # Audit: scholarly-rigor-reviewer confirmed that retaining functional synthetic code
+  # after stop() is a latent integrity risk (bypass via error=TRUE). All dead code removed.
 }
-# If real data loaded, add placeholder family column (will be filled in Section 6)
+# Add placeholder family column if real data loaded without it (will be filled in Section 6)
 if (!"family" %in% names(dat)) {
   dat$family <- NA_character_
 }
@@ -287,10 +202,118 @@ kable(
   dat |>
     count(life_form, plant_part, dataset_source) |>
     arrange(life_form, plant_part, dataset_source),
-  caption = if (USE_REAL_DATA)
-    "Record counts by life form, plant part, and dataset source"
-  else
-    "⚠ DEMONSTRATION DATA — Record counts (simulated to match published structure)"
+  caption = "Record counts by life form, plant part, and dataset source"
+)
+```
+
+---
+
+# Geographic distribution of observations
+
+```{r geo-check}
+# ── Check for coordinate columns in loaded data ───────────────────────────────
+# The Kurosawa et al. 2025 Dryad dataset (doi:10.5061/dryad.sxksn03cj) contains
+# allometric measurements compiled across Japanese forest sites (Mori 2010;
+# Kurosawa 2023) and European sites (Ferrio JP, Spain). The Dryad CSV does NOT
+# include per-observation lat/lon; coordinates are at the site / study level
+# and must be sourced from the original study metadata or supplementary tables.
+#
+# ⚠ DATA STATUS (current session):
+#   - data.respiration.csv is EMPTY — real data not yet downloaded from Dryad.
+#   - All analyses above use RECONSTRUCTED DEMONSTRATION DATA (no coordinates).
+#   - The map below shows APPROXIMATE LITERATURE-DERIVED study regions only.
+#     Individual measurement coordinates are NOT available in either the demo
+#     data or the Dryad dataset as currently structured.
+
+HAS_COORDS <- USE_REAL_DATA &&
+  any(grepl("lat|latitude",  names(dat), ignore.case = TRUE)) &&
+  any(grepl("lon|longitude", names(dat), ignore.case = TRUE))
+
+if (USE_REAL_DATA) {
+  coord_cols <- names(dat)[grepl("lat|lon|latitude|longitude", names(dat),
+                                 ignore.case = TRUE)]
+  if (length(coord_cols) > 0) {
+    cat("Real data loaded. Coordinate columns found:", paste(coord_cols, collapse = ", "), "\n")
+    cat("Records with non-NA coordinates:",
+        sum(!is.na(dat[[coord_cols[grepl("lat", coord_cols, ignore.case=TRUE)[1]]]])), "/", nrow(dat), "\n")
+  } else {
+    cat("Real data loaded but NO coordinate columns detected.\n")
+    cat("The Dryad CSV does not appear to contain per-observation lat/lon.\n")
+    cat("Site-level coordinates must be appended from original study metadata.\n")
+  }
+} else {
+  cat("DEMO DATA active — no observation coordinates available.\n")
+  cat("Map below shows approximate study regions from published literature.\n")
+}
+```
+
+```{r geo-map, fig.cap="Approximate geographic distribution of study regions contributing to the Kurosawa et al. 2025 dataset. Points represent known measurement site locations sourced from published study descriptions, NOT per-observation coordinates from the Dryad CSV. All coordinates are literature-derived approximations and should be verified against original publications before any spatial analysis.", fig.width=10, fig.height=5.5}
+library(maps)
+library(ggrepel)
+
+# ── Literature-derived approximate site locations ─────────────────────────────
+# Sources: Mori et al. 2010 (RSPB 277:1447-1454); Kurosawa et al. 2023 (Ann Bot
+# 131:313-322); Kurosawa et al. 2025 (RSPB 292:20241910).
+# Coordinates are approximate centre-points of the named forest sites described
+# in those papers. They are NOT from the Dryad dataset.
+# ⚠ Verify all coordinates against original supplementary material before use.
+approx_sites <- tribble(
+  ~site_name,                     ~lat,    ~lon,   ~dataset_source,  ~region,
+  "Miyagi Exp. Forest (Tohoku)",  38.15,  140.72,  "Mori2010",       "Japan",
+  "Aomori Research Forest",       40.60,  141.10,  "Mori2010",       "Japan",
+  "Hokkaido Univ. Forest (N)",    44.02,  142.40,  "Mori2010",       "Japan",
+  "Chichibu (Saitama)",           35.90,  138.90,  "Mori2010",       "Japan",
+  "Wakayama Forest (Osaka CU)",   33.92,  135.54,  "Mori2010",       "Japan",
+  "Takayama (Gifu)",              36.13,  137.42,  "New",            "Japan",
+  "Fuji Oshima Research Forest",  35.40,  138.72,  "Kurosawa2023",   "Japan",
+  "Lleida / Pyrenees (Spain)",    41.62,    0.62,  "New",            "Europe"
+)
+
+world_map <- map_data("world")
+
+ggplot() +
+  geom_polygon(data = world_map |>
+                 filter(long > -20, long < 160, lat > 20, lat < 60),
+               aes(x = long, y = lat, group = group),
+               fill = "grey92", colour = "grey70", linewidth = 0.2) +
+  geom_point(data = approx_sites,
+             aes(x = lon, y = lat, colour = dataset_source, shape = region),
+             size = 3.5, alpha = 0.85) +
+  geom_label_repel(data = approx_sites,
+                   aes(x = lon, y = lat, label = site_name,
+                       colour = dataset_source),
+                   size = 2.8, max.overlaps = 20,
+                   box.padding = 0.35, point.padding = 0.2,
+                   segment.colour = "grey50", show.legend = FALSE) +
+  scale_colour_brewer(palette = "Set1", name = "Dataset source") +
+  scale_shape_manual(values = c(Japan = 16, Europe = 17), name = "Region") +
+  coord_fixed(ratio = 1.3, xlim = c(-10, 155), ylim = c(25, 55)) +
+  labs(
+    title = "Approximate study regions — Kurosawa et al. 2025 dataset",
+    subtitle = paste0(
+      if (USE_REAL_DATA) "Real data loaded. " else "⚠ DEMO DATA — real data.respiration.csv not downloaded. ",
+      "Points are literature-derived site approximations, NOT per-observation coordinates."
+    ),
+    x = "Longitude", y = "Latitude"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "right",
+        plot.subtitle = element_text(size = 9, colour = "firebrick"))
+```
+
+```{r geo-site-table}
+kable(
+  approx_sites |>
+    arrange(region, dataset_source) |>
+    rename(`Site name` = site_name, Latitude = lat, Longitude = lon,
+           `Dataset source` = dataset_source, Region = region),
+  digits = 2,
+  caption = paste0(
+    "Literature-derived approximate study site coordinates. ",
+    "Sources: Mori et al. 2010 (RSPB); Kurosawa et al. 2023 (Ann Bot); ",
+    "Kurosawa et al. 2025 (RSPB). ",
+    "⚠ Coordinates are approximate and must be verified against original supplementary material."
+  )
 )
 ```
 
@@ -317,7 +340,7 @@ ggplot(dat, aes(x = log_resp, fill = life_form)) +
   facet_grid(plant_part ~ life_form, scales = "free_y") +
   scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                unknown = "grey60")) +
-  labs(x = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
+  labs(x = expression(log[10]~"Respiration (u03bcmol CO"[2]~"s"^{-1}~")"),
        y = "Count",
        fill = "Life form",
        title = "Respiration rate distribution") +
@@ -355,7 +378,7 @@ ggplot(dat, aes(x = log_mass, y = log_resp, colour = life_form)) +
   scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                  unknown = "grey60")) +
   labs(x = expression(log[10]~"Fresh mass (g)"),
-       y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
+       y = expression(log[10]~"Respiration (u03bcmol CO"[2]~"s"^{-1}~")"),
        colour = "Life form",
        title = "Overall SMA scaling: R ~ Mass",
        subtitle = sprintf("Pooled slope = %.3f  [WBE 3/4 reference = dashed]",
@@ -421,7 +444,7 @@ ggplot(groups, aes(x = log_mass, y = log_resp, colour = life_form)) +
   scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                  unknown = "grey60")) +
   labs(x = expression(log[10]~"Fresh mass (g)"),
-       y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
+       y = expression(log[10]~"Respiration (u03bcmol CO"[2]~"s"^{-1}~")"),
        colour = "Life form",
        title = "SMA scaling by life form and plant part",
        subtitle = "Grey dashed = WBE 3/4 reference") +
@@ -491,7 +514,7 @@ if (length(unique(woody_dat$dataset_source)) > 1) {
     facet_wrap(~ plant_part, scales = "free") +
     scale_colour_brewer(palette = "Set1") +
     labs(x = expression(log[10]~"Fresh mass (g)"),
-         y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
+         y = expression(log[10]~"Respiration (u03bcmol CO"[2]~"s"^{-1}~")"),
          colour = "Dataset source",
          title = "Woody-plant respiration by dataset source") +
     theme(legend.position = "bottom")
@@ -1223,7 +1246,7 @@ if (nrow(fagus_dat) >= 10) {
     scale_colour_manual(values = c(Shoot = "#4dac26", Root = "#d01c8b",
                                    unknown = "grey50")) +
     labs(x = expression(log[10]~"Fresh mass (g)"),
-         y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
+         y = expression(log[10]~"Respiration (u03bcmol CO"[2]~"s"^{-1}~")"),
          colour = "Plant part", shape = "Plant part",
          title = expression(italic("Fagus crenata")~"ontogenetic scaling"),
          subtitle = "Kurosawa et al. 2023 subset") +

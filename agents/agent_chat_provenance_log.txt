@@ -1186,3 +1186,7 @@ Actions: Replaced single SDM worked example with four parallel worked examples (
 2026-05-02 | Created phylogenetics-comparative-agent.agent.md in both agents/ and .github/agents/. Agent covers phylogenetic comparative methods: PGLS, phylogenetic signal, ancestral state reconstruction, diversification analysis, trait evolution models, and key R packages.
 
 2026-05-02 | Updated phylogenetics-comparative-agent.agent.md in both agents/ and .github/agents/ with expanded scope covering phylogeny construction, megatree workflows, taxonomic reconciliation, tree dating, community phylogenetics, and structured review output format.
+2026-05-02 | sapfluxnet_water_use_scaling.Rmd — Added OLS/RMA/PGLS regression method comparison section with 6 new Rmd chunks. V.PhyloMaker2 API corrections applied.
+2026-05-02 | Tallo QA assessment for BIEN export — reviewed coordinate precision, species completeness, trait units, and BIEN/Darwin Core readiness in plant_scaling_data project.
+2026-05-02 | tallo_summary.Rmd updated with BIEN QA section; tallo_bien_preexport.R created in plant_scaling_data/scripts/.
+2026-05-02 | scholarly-rigor-reviewer + biodiversity-science-guard audit of plant_scaling_data: removed dead synthetic fallback code from kurosawa and sapfluxnet Rmds; fixed star tree PGLS mislabeling in grand_cross_study_allometry.Rmd; fixed Darwin Core eventDate and added establishmentMeans in tallo_bien_preexport.R.

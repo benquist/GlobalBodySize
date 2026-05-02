@@ -600,28 +600,28 @@ if (HAS_PHYLOMAKER && nrow(spp_hd) > 20) {
       scenarios = "S3")
     res$scenario.3
   }, error = function(e) {
-    message("V.PhyloMaker2 failed — using star tree fallback.")
-    spp_tmp <- gsub(" ","_", spp_hd_phy$species)
-    stree   <- ape::stree(length(spp_tmp), type = "star")
-    stree$tip.label <- spp_tmp; stree
+    message("V.PhyloMaker2 failed — PGLS skipped (no valid phylogeny available).")
+    NULL
   })
 
-  phy_hd <- multi2di(phy_hd, random = TRUE)
-  phy_hd <- phytools::force.ultrametric(phy_hd, method = "extend")
-  phy_hd$node.label <- NULL
+  if (!is.null(phy_hd)) {
+    set.seed(42)
+    phy_hd <- multi2di(phy_hd, random = TRUE)
+    phy_hd <- phytools::force.ultrametric(phy_hd, method = "extend")
+    phy_hd$node.label <- NULL
 
-  pgls_df_hd <- spp_hd_phy |>
-    filter(sp_tree %in% phy_hd$tip.label) |>
-    distinct(sp_tree, .keep_all = TRUE) |>
-    as.data.frame()
-  rownames(pgls_df_hd) <- pgls_df_hd$sp_tree
+    pgls_df_hd <- spp_hd_phy |>
+      filter(sp_tree %in% phy_hd$tip.label) |>
+      distinct(sp_tree, .keep_all = TRUE) |>
+      as.data.frame()
+    rownames(pgls_df_hd) <- pgls_df_hd$sp_tree
 
-  cd_hd <- tryCatch(
-    caper::comparative.data(phy = phy_hd, data = pgls_df_hd,
-                            names.col = "sp_tree", vcv = TRUE),
-    error = function(e) NULL)
+    cd_hd <- tryCatch(
+      caper::comparative.data(phy = phy_hd, data = pgls_df_hd,
+                              names.col = "sp_tree", vcv = TRUE),
+      error = function(e) NULL)
 
-  if (!is.null(cd_hd)) {
+    if (!is.null(cd_hd)) {
     pgls_fit_hd <- tryCatch(
       caper::pgls(log_h_m ~ log_dbh_m, data = cd_hd,
                   lambda = "ML", bounds = list(lambda = c(1e-6, 1))),
@@ -660,6 +660,7 @@ if (HAS_PHYLOMAKER && nrow(spp_hd) > 20) {
                              nrow(pgls_df_hd), "). WBE β = 2/3."))
     }
   }
+  } # end if (!is.null(phy_hd))
 } else {
   message("PGLS skipped (V.PhyloMaker2 unavailable or insufficient species).")
 }
@@ -1243,19 +1244,22 @@ if (HAS_PHYLOMAKER && nrow(spp_pool) > 20) {
       scenarios = "S3")
     res$scenario.3
   }, error = function(e) {
-    message("V.PhyloMaker2 failed — using star tree.")
-    st <- ape::stree(nrow(spp_pool_phy), type = "star")
-    st$tip.label <- spp_pool_phy$sp_tree; st
+    message("V.PhyloMaker2 failed — PGLS skipped (no valid phylogeny available).")
+    NULL
   })
 
-  phy_grand <- multi2di(phy_grand, random = TRUE)
-  set.seed(42)
-  phy_grand <- phytools::force.ultrametric(phy_grand, method = "extend")
-  phy_grand$node.label <- NULL
+  if (!is.null(phy_grand)) {
+    set.seed(42)
+    phy_grand <- multi2di(phy_grand, random = TRUE)
+    phy_grand <- phytools::force.ultrametric(phy_grand, method = "extend")
+    phy_grand$node.label <- NULL
 
-  n_matched <- sum(spp_pool_phy$sp_tree %in% phy_grand$tip.label)
-  cat(sprintf("Phylogeny: %d tips; %d/%d species matched.\n",
-              length(phy_grand$tip.label), n_matched, nrow(spp_pool_phy)))
+    n_matched <- sum(spp_pool_phy$sp_tree %in% phy_grand$tip.label)
+    cat(sprintf("Phylogeny: %d tips; %d/%d species matched.\n",
+                length(phy_grand$tip.label), n_matched, nrow(spp_pool_phy)))
+  } else {
+    phy_grand <- NULL
+  }
 } else {
   message("V.PhyloMaker2 not available or insufficient species. Phylo sections skipped.")
   phy_grand <- NULL
