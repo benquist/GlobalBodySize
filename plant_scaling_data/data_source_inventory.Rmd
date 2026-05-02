@@ -21,6 +21,7 @@ library(knitr)
 library(scales)
 library(tidyr)
 library(readr)
+library(maps)
 
 theme_set(theme_bw(base_size = 12))
 ```
@@ -40,18 +41,22 @@ geographic scope, key variables, access method, and ingestion status.
 
 ```{r summary-table}
 inv <- data.frame(
-  Source = c("BAAD", "Niklas-Enquist", "Tallo", "allodb", "BIOMASS::wdData",
+  Source = c("BAAD", "Niklas-Enquist", "Tallo",
+             "ForestGEO Panama", "NEON ForestAGB",
+             "allodb", "BIOMASS::wdData",
              "BIOMASS::NouraguesHD", "rFIA (US)",
              "Zanne et al. 2009 (Dryad)", "Chave et al. 2014",
              "Poorter et al. 2012", "TRY", "FRED", "GlobAllomeTree"),
   Type = c("Individual measurements","Individual measurements",
            "Individual measurements",
+           "Individual measurements","Individual measurements + AGB (modeled)",
            "Allometric equations","Wood density lookup",
            "H-D paired measurements","Individual measurements (FIA plots)",
            "Wood density lookup","Allometric equations",
            "Biomass allocation fractions","Trait database","Root traits","Equation library"),
   N_records = c("21,084 individuals","2,626 individuals",
                 "498,838 individuals",
+                "5,109 individuals","194,704 rows (~93,971 unique trees)",
                 "570 equations","16,467 species×region",
                 "1,051 H-D pairs","millions (US national)",
                 "~16,000 spp","pantropical equations",
@@ -59,6 +64,8 @@ inv <- data.frame(
   Key_variables = c("height, DBH, crown, organ masses (kg)",
                     "height, root/stem/leaf/total biomass (kg), growth rates",
                     "DBH (cm), height (m), crown radius (m), lat/lon — all georeferenced",
+                    "DBH (mm), height (m), HOM (m), crown/light/lianas flags, 2011–2020",
+                    "DBH (cm), height (m), AGB Chojnacky & Jenkins (kg), 35 sites 2014–2023",
                     "DBH→AGB equations, r², bias correction",
                     "wood density (g/cm³) by species × region",
                     "DBH (cm), height (m), lat/lon",
@@ -71,6 +78,8 @@ inv <- data.frame(
                     "DBH→AGB equations, geographic metadata"),
   Access = c("R: baad.data::baad_data()","CSV on disk (ingested)",
              "Zenodo doi:10.5281/zenodo.6637599 — VERIFIED; CSV on disk (ingested)",
+             "Smithsonian Figshare doi:10.25573/data.24954204.v1 — ingested ✓",
+             "GitHub atkinsjeff/NEONForestAGB; Zenodo doi:10.5281/zenodo.11193519 — ingested ✓",
              "R: allodb (ropensci/allodb)","R: BIOMASS::wdData",
              "R: BIOMASS::NouraguesHD",
              "R: rFIA::getFIA(states='RI') — per state download",
@@ -82,6 +91,7 @@ inv <- data.frame(
              "globallometree.org — free, no account"),
   Status = c("Ingested ✓","Ingested ✓",
              "Ingested ✓",
+             "Ingested ✓","Ingested ✓",
              "Installed ✓ — not yet merged",
              "Installed ✓ — not yet merged",
              "Installed ✓ — not yet merged",
@@ -445,6 +455,150 @@ before merging with BAAD or Niklas-Enquist.
 
 ---
 
+## ForestGEO Panama — Small Plots Allometry
+
+```{r forestgeo-profile}
+library(readxl)
+fgeo_path <- file.path(dirname(knitr::current_input(dir = TRUE)),
+                       "data/raw/forestgeo_panama/TreeHeightDataSmallPlotsCombined_2024_08_05.csv")
+fgeo <- read_csv(fgeo_path, show_col_types = FALSE) |>
+  mutate(DBH_cm = DBH_mm / 10)
+
+kable(data.frame(
+  Metric = c("Total trees","Unique plots","Unique species",
+             "Years covered","DBH range (cm)","Height range (m)",
+             "HOM range (m)","Global lat/lon","AGB in source",
+             "License","Citation"),
+  Value = c(
+    format(nrow(fgeo), big.mark=","),
+    length(unique(fgeo$Plotname)),
+    length(unique(fgeo$LatinBinomial)),
+    paste0(min(fgeo$YYYY), "\u20132020"),
+    paste0(round(min(fgeo$DBH_cm),1), "\u2013", round(max(fgeo$DBH_cm),1)),
+    paste0(round(min(fgeo$TreeHt_m, na.rm=TRUE),1), "\u2013",
+           round(max(fgeo$TreeHt_m, na.rm=TRUE),1)),
+    paste0(round(min(fgeo$HOM_m),1), "\u2013", round(max(fgeo$HOM_m),1),
+           " m (non-standard; elevated above buttresses)"),
+    "None \u2014 plot-local Cartesian coords only",
+    "None \u2014 raw measurements only",
+    "CC BY 4.0",
+    "Ramos P, Villareal P, Muller-Landau HC (2024). Figshare doi:10.25573/data.24954204.v1"
+  ),
+  stringsAsFactors = FALSE
+), caption = "ForestGEO Panama small-plots profile")
+```
+
+```{r forestgeo-hdbh, fig.height=4}
+fgeo |>
+  filter(!is.na(TreeHt_m), DBH_cm > 0, TreeHt_m > 0) |>
+  ggplot(aes(x = DBH_cm, y = TreeHt_m)) +
+  geom_point(alpha = 0.2, size = 0.6, color = "#f46d43") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "DBH (cm)", y = "Height (m)",
+       title = "ForestGEO Panama: Height ~ DBH  (n = 5,109 trees, 24 plots)")
+```
+
+**Unit note:** DBH is stored in mm in the source file; converted to cm here.
+`HOM` ranges 0.3–4.8 m; buttressed trees measured above buttress.
+
+---
+
+## NEON ForestAGB — National Ecological Observatory Network
+
+```{r neon-profile}
+neon_sites_all <- c("BART","BLAN","CLBJ","DELA","DSNY","GRSM","GUAN","HARV",
+                    "JERC","KONZ","LENO","MLBS","ORNL","OSBS","RMNP","SCBI",
+                    "SERC","STEI","TALL","TREE","UKFS","UNDE","YELL")
+neon_all <- lapply(neon_sites_all, function(s) {
+  read_csv(file.path(dirname(knitr::current_input(dir = TRUE)),
+           "data/raw/neon_forest_agb/biomass", paste0(s, "_biomass.csv")),
+           show_col_types = FALSE)
+}) |> bind_rows()
+
+neon_sc <- read_csv(
+  file.path(dirname(knitr::current_input(dir = TRUE)),
+            "data/raw/neon_forest_agb/sitecoordinates.csv"),
+  show_col_types = FALSE
+)
+
+kable(data.frame(
+  Metric = c("Total measurement rows","Unique individuals","Unique species",
+             "NEON sites with biomass files","Sites in coord table (full network)",
+             "Years","DBH range (cm)","Height range (m)",
+             "AGB range — Chojnacky (kg)","AGB range — Jenkins (kg)",
+             "Allometric methods","License","Citation"),
+  Value = c(
+    format(nrow(neon_all), big.mark=","),
+    format(length(unique(neon_all$individualID)), big.mark=","),
+    format(length(unique(neon_all$scientificName[!is.na(neon_all$scientificName)])), big.mark=","),
+    length(neon_sites_all),
+    nrow(neon_sc),
+    paste0(min(neon_all$year, na.rm=TRUE), "\u20132023"),
+    paste0(round(min(neon_all$stemDiameter, na.rm=TRUE),1), "\u2013",
+           round(max(neon_all$stemDiameter, na.rm=TRUE),1)),
+    paste0(round(min(neon_all$height, na.rm=TRUE),1), "\u2013",
+           round(max(neon_all$height, na.rm=TRUE),1)),
+    paste0(round(min(neon_all$AGBChojnacky, na.rm=TRUE),2), "\u2013",
+           format(round(max(neon_all$AGBChojnacky, na.rm=TRUE),0), big.mark=",")),
+    if ("AGBJenkins" %in% names(neon_all))
+      paste0(round(min(neon_all$AGBJenkins, na.rm=TRUE),2), "\u2013",
+             format(round(max(neon_all$AGBJenkins, na.rm=TRUE),0), big.mark=","))
+    else "Not in files",
+    "Chojnacky et al. 2014; Jenkins et al. 2003",
+    "CC0 1.0",
+    "Atkins JW et al. (2024). NEONForestAGBv2. Figshare doi:10.6084/m9.figshare.25625352.v1"
+  ),
+  stringsAsFactors = FALSE
+), caption = "NEON ForestAGB profile (23 sites with ingested biomass files)")
+```
+
+```{r neon-map, fig.width=10, fig.height=4.5}
+neon_sc_clean <- neon_sc |>
+  filter(!is.na(X), !is.na(Y)) |>
+  mutate(has_biomass = siteID %in% neon_sites_all)
+
+ggplot() +
+  geom_polygon(data = map_data("usa"),
+               aes(x = long, y = lat, group = group),
+               fill = "grey88", color = "grey70", linewidth = 0.2) +
+  geom_polygon(data = map_data("world") |>
+                 filter(region %in% c("Canada","Mexico","Puerto Rico")),
+               aes(x = long, y = lat, group = group),
+               fill = "grey92", color = "grey75", linewidth = 0.15) +
+  geom_point(data = neon_sc_clean,
+             aes(x = X, y = Y,
+                 color = has_biomass, size = has_biomass),
+             alpha = 0.85) +
+  scale_color_manual(values = c("TRUE" = "#1a9850", "FALSE" = "#bdbdbd"),
+                     labels = c("TRUE" = "Biomass ingested", "FALSE" = "Site only")) +
+  scale_size_manual(values  = c("TRUE" = 3.2, "FALSE" = 2),
+                    guide   = "none") +
+  coord_fixed(1.3, xlim = c(-175, -60), ylim = c(17, 72)) +
+  labs(title = "NEON terrestrial sites (35 total; 23 with biomass files ingested)",
+       x = NULL, y = NULL, color = NULL) +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid = element_blank(), legend.position = "bottom")
+```
+
+```{r neon-hdbh, fig.height=4}
+neon_all |>
+  filter(!is.na(stemDiameter), !is.na(height), stemDiameter > 0, height > 0) |>
+  sample_n(min(20000, n())) |>
+  ggplot(aes(x = stemDiameter, y = height, color = siteID)) +
+  geom_point(alpha = 0.15, size = 0.5, show.legend = FALSE) +
+  geom_smooth(method = "lm", color = "black", linewidth = 1.1,
+              se = TRUE, aes(group = 1)) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "DBH (cm)", y = "Height (m)",
+       title = paste0("NEON ForestAGB: Height ~ DBH (20,000 subsample; ",
+                      length(neon_sites_all), " sites)"))
+```
+
+---
+
 ## Datasets not yet acquired (require download/registration)
 
 ```{r not-yet}
@@ -486,11 +640,29 @@ kable(pending, caption = "Datasets not yet ingested — acquisition plan")
 # Data volume summary
 
 ```{r volume-bar}
+# read ForestGEO Panama if not already in memory
+if (!exists("fgeo")) {
+  fgeo <- read_csv(
+    file.path(dirname(knitr::current_input(dir = TRUE)),
+              "data/raw/forestgeo_panama/TreeHeightDataSmallPlotsCombined_2024_08_05.csv"),
+    show_col_types = FALSE)
+}
+# read NEON row count
+neon_nrow <- 194704L   # pre-profiled; avoid re-reading all 84MB here
+
 vol <- data.frame(
-  Source = c("BAAD","Niklas-Enquist","Tallo","rFIA (1 state demo)","BIOMASS wdData","allodb","BIOMASS NouraguesHD"),
-  N = c(21084, 2626, nrow(tallo), nrow(fiaRI$TREE), nrow(wdData), nrow(equations), nrow(NouraguesHD)),
-  Type = c("Individual","Individual","Individual","Individual","Species lookup","Equations","Individual"),
-  Status = c("Ingested","Ingested","Ingested","Demo only","In package","In package","In package")
+  Source = c("BAAD","Niklas-Enquist","Tallo","ForestGEO Panama",
+             "NEON ForestAGB",
+             "rFIA (1 state demo)","BIOMASS wdData","allodb","BIOMASS NouraguesHD"),
+  N = c(21084, 2626, nrow(tallo), nrow(fgeo),
+        neon_nrow,
+        nrow(fiaRI$TREE), nrow(wdData), nrow(equations), nrow(NouraguesHD)),
+  Type = c("Individual","Individual","Individual","Individual",
+           "Individual",
+           "Individual","Species lookup","Equations","Individual"),
+  Status = c("Ingested","Ingested","Ingested","Ingested",
+             "Ingested",
+             "Demo only","In package","In package","In package")
 )
 
 ggplot(vol, aes(x=reorder(Source,N), y=N, fill=Type)) +

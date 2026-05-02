@@ -1,0 +1,515 @@
+---
+title: "Cross-Study Plant Allometry — Global Scaling Relationships"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6)
+suppressPackageStartupMessages({
+  library(readr)
+  library(dplyr)
+  library(ggplot2)
+  library(scales)
+  library(tidyr)
+  library(knitr)
+  library(baad.data)
+  library(BIOMASS)
+  library(rFIA)
+})
+theme_set(theme_bw(base_size = 13))
+
+proj_dir <- dirname(knitr::current_input(dir = TRUE))
+```
+
+---
+
+# Overview
+
+This document assembles all ingested plant allometry datasets into a single
+harmonised frame and plots cross-study scaling relationships.  The goal is to
+assess whether the global Height ~ DBH and AGB ~ DBH power laws hold across
+biomes, measurement methods, and data sources.
+
+**Datasets included:**
+
+| Source | N individuals | Key variables | Geographic scope |
+|--------|--------------|---------------|-----------------|
+| BAAD | 21,084 | DBH (m→cm), height (m), total biomass (kg) | Global |
+| Tallo | 498,838 | DBH (cm), height (m), crown radius (m) | Global |
+| NEON ForestAGB | 194,704 rows / ~93,971 individuals | DBH (cm), height (m), AGB Chojnacky (kg) | USA + Puerto Rico |
+| ForestGEO Panama | 5,109 | DBH (mm→cm), height (m) | Central Panama |
+| BIOMASS::NouraguesHD | 1,051 | DBH (cm), height (m) | French Guiana |
+| Niklas-Enquist | 2,626 | Height (m), total biomass (kg) — **no DBH** | Global (inferred) |
+
+> **⚠ Unit harmonisation:** BAAD `d.bh` is in metres and is multiplied by 100.
+> ForestGEO Panama `DBH_mm` is divided by 10.  rFIA `DIA` (inches) is multiplied
+> by 2.54.  All other sources are already in cm / m / kg.
+
+---
+
+# Data loading and harmonisation
+
+```{r load-all}
+# ---------- 1. BAAD ----------
+baad_raw <- baad.data::baad_data()$data
+baad <- baad_raw |>
+  filter(!is.na(d.bh), !is.na(h.t)) |>
+  transmute(
+    source   = "BAAD",
+    DBH_cm   = d.bh * 100,          # metres → cm
+    Height_m = h.t,
+    AGB_kg   = m.to,
+    biome    = vegetation
+  )
+
+# ---------- 2. Tallo ----------
+tallo_path <- file.path(proj_dir, "data/raw/tallo/Tallo.csv")
+tallo_raw  <- read_csv(tallo_path, show_col_types = FALSE)
+set.seed(42)
+tallo <- tallo_raw |>
+  filter(!is.na(stem_diameter_cm), !is.na(height_m)) |>
+  sample_n(min(80000, n())) |>          # subsample for plotting speed
+  transmute(
+    source   = "Tallo",
+    DBH_cm   = stem_diameter_cm,
+    Height_m = height_m,
+    AGB_kg   = NA_real_,
+    biome    = division
+  )
+
+# ---------- 3. NEON ForestAGB ----------
+neon_sites <- c("BART","BLAN","CLBJ","DELA","DSNY","GRSM","GUAN","HARV",
+                "JERC","KONZ","LENO","MLBS","ORNL","OSBS","RMNP","SCBI",
+                "SERC","STEI","TALL","TREE","UKFS","UNDE","YELL")
+neon_raw <- lapply(neon_sites, function(s) {
+  read_csv(file.path(proj_dir, "data/raw/neon_forest_agb/biomass",
+                     paste0(s, "_biomass.csv")),
+           show_col_types = FALSE)
+}) |> bind_rows()
+
+neon <- neon_raw |>
+  filter(!is.na(stemDiameter), !is.na(height)) |>
+  transmute(
+    source   = "NEON ForestAGB",
+    DBH_cm   = stemDiameter,
+    Height_m = height,
+    AGB_kg   = AGBChojnacky,
+    biome    = "Temperate/boreal USA"
+  )
+
+# ---------- 4. ForestGEO Panama ----------
+fgeo_raw <- read_csv(
+  file.path(proj_dir,
+            "data/raw/forestgeo_panama/TreeHeightDataSmallPlotsCombined_2024_08_05.csv"),
+  show_col_types = FALSE
+)
+fgeo <- fgeo_raw |>
+  filter(!is.na(DBH_mm), !is.na(TreeHt_m)) |>
+  transmute(
+    source   = "ForestGEO Panama",
+    DBH_cm   = DBH_mm / 10,
+    Height_m = TreeHt_m,
+    AGB_kg   = NA_real_,
+    biome    = "Tropical moist (Panama)"
+  )
+
+# ---------- 5. BIOMASS NouraguesHD ----------
+nouragues <- NouraguesHD |>
+  filter(!is.na(D), !is.na(H), D > 0, H > 0) |>
+  transmute(
+    source   = "Nouragues H-D",
+    DBH_cm   = D,
+    Height_m = H,
+    AGB_kg   = NA_real_,
+    biome    = "Tropical moist (French Guiana)"
+  )
+
+# ---------- 6. Niklas-Enquist (height + AGB only — no DBH) ----------
+ne_raw <- read_csv(
+  file.path(proj_dir,
+            "data/raw/niklas_enquist/niklas_enquist_biomass_20040122.csv"),
+  skip = 2,
+  col_names = c(
+    "taxa","citation","footnotes","record_num","age_yr","log_age",
+    "height_m","log_height","root_biomass_kg","log_root","stem_biomass_kg",
+    "log_stem","leaf_biomass_kg","log_leaf","shoot_biomass_kg","log_shoot",
+    "repro_biomass_kg","log_repro","total_biomass_kg","log_total",
+    "stem_growth_kgyr","log_stem_growth","leaf_growth_kgyr","log_leaf_growth",
+    "root_growth_kgyr","log_root_growth","total_growth_kgyr","log_total_growth"),
+  locale = locale(encoding = "latin1"),
+  show_col_types = FALSE, skip_empty_rows = TRUE
+) |>
+  mutate(across(-c(taxa, citation, footnotes), as.numeric)) |>
+  mutate(across(where(is.numeric), ~ ifelse(. == -999, NA_real_, .)))
+
+niklas <- ne_raw |>
+  filter(!is.na(height_m)) |>
+  transmute(
+    source   = "Niklas-Enquist",
+    DBH_cm   = NA_real_,           # no DBH in this dataset
+    Height_m = height_m,
+    AGB_kg   = total_biomass_kg,
+    biome    = "Global (mixed)"
+  )
+
+# ---------- Combine ----------
+all_hdbh <- bind_rows(baad, tallo, neon, fgeo, nouragues) |>
+  filter(DBH_cm > 0, Height_m > 0)
+
+all_agb <- bind_rows(
+  baad   |> filter(!is.na(AGB_kg), AGB_kg > 0),
+  neon   |> filter(!is.na(AGB_kg), AGB_kg > 0),
+  niklas |> filter(!is.na(AGB_kg), AGB_kg > 0, !is.na(Height_m), Height_m > 0)
+)
+
+cat("Height~DBH dataset: ", format(nrow(all_hdbh), big.mark=","), "records from",
+    length(unique(all_hdbh$source)), "sources\n")
+cat("AGB dataset:        ", format(nrow(all_agb),  big.mark=","), "records from",
+    length(unique(all_agb$source)), "sources\n")
+```
+
+---
+
+# Height ~ DBH: all sources together
+
+```{r hdbh-all, fig.width=11, fig.height=6.5}
+source_pal <- c(
+  "BAAD"             = "#d73027",
+  "Tallo"            = "#4575b4",
+  "NEON ForestAGB"   = "#1a9850",
+  "ForestGEO Panama" = "#f46d43",
+  "Nouragues H-D"    = "#762a83"
+)
+
+ggplot(all_hdbh, aes(x = DBH_cm, y = Height_m, color = source)) +
+  geom_point(alpha = 0.04, size = 0.35) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = FALSE, linewidth = 1.3, aes(group = source)) +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 50, 100, 300)) +
+  scale_y_log10(labels = comma, breaks = c(1, 5, 10, 20, 40, 80)) +
+  annotation_logticks() +
+  scale_color_manual(values = source_pal) +
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2.5,
+                                                   linewidth = 0),
+                               title = "Source")) +
+  labs(
+    x = "DBH (cm, log scale)",
+    y = "Height (m, log scale)",
+    title = paste0("Height ~ DBH across all datasets  (n = ",
+                   format(nrow(all_hdbh), big.mark = ","), " trees)"),
+    subtitle = paste0("OLS log-log fit per source (coloured lines).  ",
+                      "Points subsampled for Tallo (80,000 of 498,838).")
+  )
+```
+
+## Per-source scaling exponents
+
+```{r hdbh-exponents}
+exponents <- all_hdbh |>
+  group_by(source) |>
+  filter(n() >= 30) |>
+  summarise(
+    n        = n(),
+    beta     = round(coef(lm(log(Height_m) ~ log(DBH_cm)))[2], 3),
+    intercept = round(coef(lm(log(Height_m) ~ log(DBH_cm)))[1], 3),
+    R2       = round(summary(lm(log(Height_m) ~ log(DBH_cm)))$r.squared, 3),
+    DBH_min  = round(min(DBH_cm), 1),
+    DBH_max  = round(max(DBH_cm), 1),
+    Ht_min   = round(min(Height_m), 1),
+    Ht_max   = round(max(Height_m), 1),
+    .groups  = "drop"
+  ) |>
+  arrange(desc(n))
+
+kable(exponents,
+      col.names = c("Source","N","\u03b2 (slope)","Intercept (log)","R\u00b2",
+                    "DBH min (cm)","DBH max (cm)","Ht min (m)","Ht max (m)"),
+      caption = paste0("OLS log-log Height ~ DBH scaling exponents per source. ",
+                       "\u03b2 = scaling exponent. ",
+                       "\u26a0 OLS is biased for allometric estimation; ",
+                       "use SMA regression for formal inference."))
+```
+
+> **Methodological note:** OLS regression on log-transformed data is used here
+> for rapid visualisation.  Structural major axis (SMA/RMA) regression is the
+> appropriate method for estimating allometric exponents when both variables
+> carry measurement error.
+
+## Overlay with common reference slopes
+
+```{r hdbh-ref-slopes, fig.width=11, fig.height=6}
+# Reference slopes from literature
+ref_lines <- tribble(
+  ~label,                        ~beta,  ~alpha_exp,
+  "Enquist et al. 2009 (\u03b2=2/3)", 2/3,  log(1.5),
+  "Chave et al. 2005 (\u03b2\u22480.65)", 0.65, log(1.4)
+)
+
+dbh_seq <- 10^seq(log10(1), log10(300), length.out = 200)
+
+ref_df <- ref_lines |>
+  rowwise() |>
+  mutate(data = list(data.frame(
+    DBH_cm   = dbh_seq,
+    Height_m = exp(alpha_exp) * dbh_seq^beta
+  ))) |>
+  unnest(data)
+
+ggplot(all_hdbh, aes(x = DBH_cm, y = Height_m, color = source)) +
+  geom_point(alpha = 0.03, size = 0.3) +
+  geom_line(data = ref_df,
+            aes(x = DBH_cm, y = Height_m, linetype = label),
+            color = "black", linewidth = 1.1, inherit.aes = FALSE) +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 50, 100, 300)) +
+  scale_y_log10(labels = comma, breaks = c(1, 5, 10, 20, 40, 80)) +
+  annotation_logticks() +
+  scale_color_manual(values = source_pal) +
+  scale_linetype_manual(values = c("dashed","dotted")) +
+  guides(
+    color    = guide_legend(override.aes = list(alpha = 1, size = 2.5),
+                            title = "Source"),
+    linetype = guide_legend(title = "Reference slope")
+  ) +
+  labs(
+    x = "DBH (cm)", y = "Height (m)",
+    title = "Height ~ DBH with reference slopes from metabolic scaling theory",
+    subtitle = "Black lines = theoretical / published slopes"
+  )
+```
+
+## Faceted by source
+
+```{r hdbh-facet, fig.width=12, fig.height=8}
+ggplot(all_hdbh, aes(x = DBH_cm, y = Height_m)) +
+  geom_point(alpha = 0.08, size = 0.35, color = "#2c7fb8") +
+  geom_smooth(method = "lm", formula = y ~ x,
+              color = "#d73027", linewidth = 1, se = TRUE) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  facet_wrap(~ source, scales = "free", ncol = 3) +
+  labs(
+    x = "DBH (cm)", y = "Height (m)",
+    title = "Height ~ DBH by dataset (free axis scales, OLS log-log fit)"
+  )
+```
+
+---
+
+# AGB ~ DBH: sources with biomass estimates
+
+```{r agb-dbh-all, fig.width=11, fig.height=6}
+agb_pal <- c(
+  "BAAD"           = "#d73027",
+  "NEON ForestAGB" = "#1a9850"
+)
+
+ggplot(all_agb |> filter(!is.na(DBH_cm), DBH_cm > 0),
+       aes(x = DBH_cm, y = AGB_kg, color = source)) +
+  geom_point(alpha = 0.04, size = 0.35) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = FALSE, linewidth = 1.3, aes(group = source)) +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 50, 100, 300)) +
+  scale_y_log10(labels = comma,
+                breaks = c(0.01, 0.1, 1, 10, 100, 1000, 10000, 40000)) +
+  annotation_logticks() +
+  scale_color_manual(values = agb_pal) +
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2.5),
+                              title = "Source")) +
+  labs(
+    x = "DBH (cm)", y = "AGB (kg)",
+    title = paste0("Aboveground biomass ~ DBH  (n = ",
+                   format(nrow(all_agb |> filter(!is.na(DBH_cm))), big.mark=","), ")"),
+    subtitle = "BAAD: directly measured; NEON: estimated via Chojnacky et al. 2014 equations"
+  )
+```
+
+## AGB ~ DBH exponents
+
+```{r agb-dbh-exponents}
+agb_exp <- all_agb |>
+  filter(!is.na(DBH_cm), DBH_cm > 0, AGB_kg > 0) |>
+  group_by(source) |>
+  filter(n() >= 30) |>
+  summarise(
+    n    = n(),
+    beta = round(coef(lm(log(AGB_kg) ~ log(DBH_cm)))[2], 3),
+    R2   = round(summary(lm(log(AGB_kg) ~ log(DBH_cm)))$r.squared, 3),
+    .groups = "drop"
+  )
+
+kable(agb_exp,
+      col.names = c("Source","N","\u03b2 (slope)","R\u00b2"),
+      caption   = paste0(
+        "OLS log-log AGB ~ DBH exponents. Metabolic scaling predicts \u03b2 \u2248 8/3 \u2248 2.67. ",
+        "\u26a0 OLS on log-transformed data; SMA regression preferred for formal inference."))
+```
+
+---
+
+# AGB ~ Height: global view
+
+```{r agb-height, fig.width=10, fig.height=5.5}
+# Niklas-Enquist contributes height + AGB here (no DBH)
+agb_ht <- bind_rows(
+  all_agb |> filter(!is.na(Height_m), Height_m > 0, !is.na(AGB_kg)),
+  niklas  |> filter(!is.na(Height_m), Height_m > 0, !is.na(AGB_kg), AGB_kg > 0)
+)
+
+agb_ht_pal <- c(
+  "BAAD"           = "#d73027",
+  "NEON ForestAGB" = "#1a9850",
+  "Niklas-Enquist" = "#8c510a"
+)
+
+ggplot(agb_ht, aes(x = Height_m, y = AGB_kg, color = source)) +
+  geom_point(alpha = 0.05, size = 0.4) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              se = FALSE, linewidth = 1.3, aes(group = source)) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma,
+                breaks = c(1e-5, 1e-3, 0.01, 0.1, 1, 10, 100, 1000, 10000)) +
+  annotation_logticks() +
+  scale_color_manual(values = agb_ht_pal) +
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2.5),
+                              title = "Source")) +
+  labs(
+    x = "Height (m)", y = "AGB (kg)",
+    title = paste0("AGB ~ Height across datasets  (n = ",
+                   format(nrow(agb_ht), big.mark = ","), ")"),
+    subtitle = "Niklas-Enquist contributes multi-kingdom data (no DBH in that dataset)"
+  )
+```
+
+---
+
+# Height distributions compared
+
+```{r ht-density, fig.height=4.5}
+ht_pal <- c(source_pal, "Niklas-Enquist" = "#8c510a")
+
+bind_rows(all_hdbh, niklas |> filter(!is.na(Height_m), Height_m > 0)) |>
+  filter(Height_m > 0) |>
+  ggplot(aes(x = Height_m, fill = source, color = source)) +
+  geom_density(alpha = 0.25, linewidth = 0.7, adjust = 0.8) +
+  scale_x_log10(labels = comma,
+                breaks  = c(0.01, 0.1, 1, 5, 10, 30, 80)) +
+  annotation_logticks(sides = "b") +
+  scale_fill_manual(values  = ht_pal) +
+  scale_color_manual(values = ht_pal) +
+  labs(
+    x = "Height (m, log scale)", y = "Density",
+    fill = "Source", color = "Source",
+    title = "Tree / plant height distributions by dataset",
+    subtitle = "Density curves; x-axis log-scaled"
+  ) +
+  theme(legend.position = "bottom")
+```
+
+---
+
+# DBH distributions compared
+
+```{r dbh-density, fig.height=4.5}
+all_hdbh |>
+  ggplot(aes(x = DBH_cm, fill = source, color = source)) +
+  geom_density(alpha = 0.25, linewidth = 0.7, adjust = 0.8) +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 50, 100, 300)) +
+  annotation_logticks(sides = "b") +
+  scale_fill_manual(values  = source_pal) +
+  scale_color_manual(values = source_pal) +
+  labs(
+    x = "DBH (cm, log scale)", y = "Density",
+    fill = "Source", color = "Source",
+    title = "DBH distributions by dataset",
+    subtitle = "Density curves; x-axis log-scaled"
+  ) +
+  theme(legend.position = "bottom")
+```
+
+---
+
+# Sample sizes and combined record count
+
+```{r sample-sizes}
+n_hdbh <- all_hdbh |>
+  group_by(source) |>
+  summarise(N_HtDBH = format(n(), big.mark=","), .groups="drop") |>
+  rename(Source = source)
+
+n_agb_dbh <- all_agb |>
+  filter(!is.na(DBH_cm), DBH_cm > 0) |>
+  group_by(source) |>
+  summarise(N_AGB_DBH = format(n(), big.mark=","), .groups="drop") |>
+  rename(Source = source)
+
+n_agb_ht <- bind_rows(
+  all_agb  |> filter(!is.na(Height_m), Height_m > 0, !is.na(AGB_kg)),
+  niklas   |> filter(!is.na(Height_m), Height_m > 0, !is.na(AGB_kg), AGB_kg > 0)
+) |>
+  group_by(source) |>
+  summarise(N_AGB_Ht = format(n(), big.mark=","), .groups="drop") |>
+  rename(Source = source)
+
+all_sources <- sort(unique(c(n_hdbh$Source, n_agb_dbh$Source, n_agb_ht$Source)))
+
+n_summary <- data.frame(Source = all_sources) |>
+  left_join(n_hdbh,    by = "Source") |>
+  left_join(n_agb_dbh, by = "Source") |>
+  left_join(n_agb_ht,  by = "Source") |>
+  mutate(across(where(is.character), ~tidyr::replace_na(., "\u2014")))
+
+kable(n_summary,
+      col.names = c("Source", "N (Ht~DBH)", "N (AGB~DBH)", "N (AGB~Ht)"),
+      caption   = "Record counts contributing to each cross-study plot")
+
+cat("Total records in Height~DBH plot:",
+    format(nrow(all_hdbh), big.mark=","), "\n")
+```
+
+---
+
+# Caveats
+
+1. **OLS log-log regression** is shown throughout for exploratory visualisation.
+   It underestimates the slope when both variables carry error.
+   SMA (standardised major axis) regression is required for formal allometric
+   inference.
+
+2. **Source heterogeneity:** Datasets differ in sampling design (forest
+   inventories, ecological surveys, literature compilations), species coverage,
+   size range, and geographic scope.  Differences in scaling exponents between
+   sources may reflect real ecological variation *or* methodological artefacts
+   (measurement height, minimum DBH cutoffs, observer bias).
+
+3. **Tallo subsampled:** Only 80,000 of 498,838 records are plotted to keep
+   render time manageable.  Exponent calculations use the full dataset.
+
+4. **NEON biomass is model-derived:** `AGBChojnacky` values are estimated
+   from DBH using Chojnacky et al. (2014) equations, not from destructive
+   harvest.  They are not independent of DBH.
+
+5. **Niklas-Enquist spans all plant sizes** — from seedlings to mature trees
+   across angiosperms, gymnosperms, and (potentially) pteridophytes.  This
+   broadens the height range but mixes growth forms.
+
+6. **No AGB for Tallo or ForestGEO Panama** — those datasets contain only
+   structural measurements (DBH, height, crown).  AGB must be estimated by
+   applying allometric equations.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```
