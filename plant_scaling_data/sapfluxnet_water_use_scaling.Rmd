@@ -238,10 +238,12 @@ if (USE_REAL_DATA) {
                   "Cryptomeria","Sequoia","Sequoiadendron",
                   "Taxodium","Calocedrus","Platycladus",
                   "Taxus","Podocarpus",
-                  "Chamaecyparis","Araucaria"),
+                  "Chamaecyparis","Araucaria",
+                  "Cunninghamia","Metasequoia","Glyptostrobus",
+                  "Wollemia","Ginkgo","Ephedra"),
                 collapse = "|"),
           ")\\b"),
-          pl_species, ignore.case = FALSE) ~ "Conifer",
+          pl_species, ignore.case = FALSE) ~ "Gymnosperm",
         TRUE ~ "Angiosperm"
       )
     ) |>
@@ -337,7 +339,7 @@ if (USE_REAL_DATA && "pl_species" %in% names(dat)) {
     setNames(rep("Cupressaceae", 5), paste0("Picea ",  letters[1:5]))
   )
   ang_idx <- which(dat$growth_form == "Angiosperm")
-  con_idx <- which(dat$growth_form == "Conifer")
+  con_idx <- which(dat$growth_form == "Gymnosperm")
   sp_vec  <- character(nrow(dat))
   sp_vec[ang_idx] <- sample(ang_spp, length(ang_idx), replace = TRUE)
   sp_vec[con_idx] <- sample(con_spp, length(con_idx), replace = TRUE)
@@ -509,7 +511,7 @@ ggplot(dat, aes(x = log_dbh, y = log_e, colour = growth_form)) +
   geom_abline(intercept = mean(dat$log_e) - 1.0 * mean(dat$log_dbh),
               slope = 1.0, linetype = "dotted", colour = "#92c5de",
               linewidth = 0.9) +
-  scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
+  scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")) +
   labs(x = expression(log[10]~"Stem diameter (cm)"),
        y = expression(log[10]~"Whole-tree water use (L day"^{-1}*")"),
        colour = "Growth form",
@@ -553,7 +555,7 @@ ggplot(dat, aes(x = log_ba, y = log_e, colour = growth_form)) +
   geom_abline(intercept = mean(dat$log_e) - 1.0 * mean(dat$log_ba),
               slope = 1.0, linetype = "dotted", colour = "#d6604d",
               linewidth = 0.9) +
-  scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
+  scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")) +
   labs(x = expression(log[10]~"Basal area (cm²)"),
        y = expression(log[10]~"Whole-tree water use (L day"^{-1}*")"),
        colour = "Growth form",
@@ -597,7 +599,7 @@ ggplot(dat, aes(x = log_sa, y = log_e, colour = growth_form)) +
   geom_abline(intercept = mean(dat$log_e) - 1.0 * mean(dat$log_sa),
               slope = 1.0, linetype = "dotted", colour = "#d6604d",
               linewidth = 0.9) +
-  scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
+  scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")) +
   labs(x = expression(log[10]~"Sapwood area (cm²)"),
        y = expression(log[10]~"Whole-tree water use (L day"^{-1}*")"),
        colour = "Growth form",
@@ -614,7 +616,7 @@ ggplot(dat, aes(x = log_sa, y = log_e, colour = growth_form)) +
 
 ```{r sma-by-gf-all, fig.cap="OLS and SMA slopes by growth form for three size metrics."}
 gf_combos <- expand_grid(
-  growth_form = c("Angiosperm", "Conifer"),
+  growth_form = c("Angiosperm", "Gymnosperm"),
   metric      = c("DBH", "BA", "SA")
 ) |>
   mutate(
@@ -753,7 +755,7 @@ ag_plots <- lapply(ag_metrics, function(m) {
               hjust = 1.0, vjust = -0.4, size = 2.8, colour = "grey20",
               inherit.aes = FALSE) +
     facet_wrap(~ growth_form, ncol = 2) +
-    scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294"),
+    scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294"),
                         guide = "none") +
     labs(x = m$xlab,
          y = expression(log[10]~"E (L day"^{-1}*")"),
@@ -779,16 +781,16 @@ family_fits <- NULL
 MIN_N_FAM   <- 30
 
 if ("family" %in% names(dat)) {
-  fam_dat <- dat[!is.na(dat$family) & dat$family != "Unknown" &
-                  !is.na(dat$log_dbh) & !is.na(dat$log_sa) & !is.na(dat$log_e), ]
-  fam_groups <- split(fam_dat,
-                      interaction(fam_dat$family, fam_dat$growth_form, drop = TRUE))
+  fam_dat <- dat |>
+    filter(!is.na(family), family != "Unknown",
+           !is.na(log_dbh), !is.na(log_sa), !is.na(log_e)) |>
+    mutate(fam_gf = paste0(family, "___", growth_form))
+
+  fam_groups <- split(fam_dat, fam_dat$fam_gf)
   fam_groups <- fam_groups[sapply(fam_groups, nrow) >= MIN_N_FAM]
 
   if (length(fam_groups) > 0) {
-    family_fits <- do.call(rbind, lapply(names(fam_groups), function(nm) {
-      d   <- fam_groups[[nm]]
-      n   <- nrow(d)
+    family_fits <- bind_rows(lapply(fam_groups, function(d) {
       n_sp <- if ("pl_species" %in% names(d))
                 n_distinct(d$pl_species, na.rm = TRUE) else NA_integer_
       ols_d <- lm(log_e ~ log_dbh, data = d)
@@ -797,25 +799,54 @@ if ("family" %in% names(dat)) {
       ols_s <- lm(log_e ~ log_sa, data = d)
       sma_s <- tryCatch(sma(log_e ~ log_sa,  data = d, method = "SMA"),
                         error = function(e) NULL)
-      data.frame(
-        family      = d$family[1],
-        growth_form = d$growth_form[1],
-        n = n, n_sp = n_sp,
-        ols_sl_dbh  = as.numeric(coef(ols_d)["log_dbh"]),
-        ols_lo_dbh  = tryCatch(as.numeric(confint(ols_d)["log_dbh",1]), error=function(e) NA_real_),
-        ols_hi_dbh  = tryCatch(as.numeric(confint(ols_d)["log_dbh",2]), error=function(e) NA_real_),
+      tibble(
+        family      = d$family[[1]],
+        growth_form = d$growth_form[[1]],
+        n = nrow(d), n_sp = n_sp,
+        ols_sl_dbh  = as.numeric(coef(ols_d)[2]),
+        ols_lo_dbh  = tryCatch(as.numeric(confint(ols_d)[2,1]), error=function(e) NA_real_),
+        ols_hi_dbh  = tryCatch(as.numeric(confint(ols_d)[2,2]), error=function(e) NA_real_),
         sma_sl_dbh  = if (is.null(sma_d)) NA_real_ else as.numeric(coef(sma_d)[2]),
         sma_lo_dbh  = if (is.null(sma_d)) NA_real_ else as.numeric(sma_d$coef[[1]][2,2]),
         sma_hi_dbh  = if (is.null(sma_d)) NA_real_ else as.numeric(sma_d$coef[[1]][2,3]),
-        ols_sl_sa   = as.numeric(coef(ols_s)["log_sa"]),
-        ols_lo_sa   = tryCatch(as.numeric(confint(ols_s)["log_sa",1]), error=function(e) NA_real_),
-        ols_hi_sa   = tryCatch(as.numeric(confint(ols_s)["log_sa",2]), error=function(e) NA_real_),
+        ols_sl_sa   = as.numeric(coef(ols_s)[2]),
+        ols_lo_sa   = tryCatch(as.numeric(confint(ols_s)[2,1]), error=function(e) NA_real_),
+        ols_hi_sa   = tryCatch(as.numeric(confint(ols_s)[2,2]), error=function(e) NA_real_),
         sma_sl_sa   = if (is.null(sma_s)) NA_real_ else as.numeric(coef(sma_s)[2]),
         sma_lo_sa   = if (is.null(sma_s)) NA_real_ else as.numeric(sma_s$coef[[1]][2,2]),
-        sma_hi_sa   = if (is.null(sma_s)) NA_real_ else as.numeric(sma_s$coef[[1]][2,3]),
-        stringsAsFactors = FALSE
+        sma_hi_sa   = if (is.null(sma_s)) NA_real_ else as.numeric(sma_s$coef[[1]][2,3])
       )
     }))
+    cat("Families with >=", MIN_N_FAM, "trees:", nrow(family_fits), "\n")
+
+    kable(
+      family_fits |>
+        select(family, growth_form, n, n_sp,
+               ols_sl_dbh, ols_lo_dbh, ols_hi_dbh,
+               sma_sl_dbh, sma_lo_dbh, sma_hi_dbh,
+               ols_sl_sa,  ols_lo_sa,  ols_hi_sa,
+               sma_sl_sa,  sma_lo_sa,  sma_hi_sa) |>
+        mutate(across(where(is.numeric), ~ round(.x, 3))) |>
+        rename(Family = family, `Growth form` = growth_form,
+               N = n, `N spp` = n_sp,
+               `OLS(E~D)` = ols_sl_dbh, `lo` = ols_lo_dbh, `hi` = ols_hi_dbh,
+               `SMA(E~D)` = sma_sl_dbh, `lo ` = sma_lo_dbh, `hi ` = sma_hi_dbh,
+               `OLS(E~SA)` = ols_sl_sa,  `lo  ` = ols_lo_sa, `hi  ` = ols_hi_sa,
+               `SMA(E~SA)` = sma_sl_sa,  `lo   ` = sma_lo_sa,`hi   ` = sma_hi_sa),
+      caption = if (USE_REAL_DATA)
+        paste0("Family-level OLS (primary) and SMA (secondary) scaling exponents ",
+               "(families with >= ", MIN_N_FAM, " trees). lo/hi = 95% CI.")
+      else
+        paste0("\u26a0 DEMONSTRATION DATA \u2014 Family-level scaling exponents ",
+               "(families with >= ", MIN_N_FAM, " trees; simulated).")
+    )
+  } else {
+    cat("No families meet the minimum tree count (", MIN_N_FAM, ") threshold.\n")
+  }
+} else {
+  cat("family column not available in dat \u2014 run family-sp-prep first.\n")
+}
+```
     cat("Families with >=", MIN_N_FAM, "trees:", nrow(family_fits), "\n")
 
     kable(
@@ -848,42 +879,31 @@ if ("family" %in% names(dat)) {
 
 ```{r family-forest, fig.height=7, fig.cap="Forest plot of family-level OLS (filled circle, primary) and SMA (open circle, secondary) scaling exponents for E~DBH and E~SA. Colours indicate growth form; dashed lines mark theoretical predictions."}
 if (!is.null(family_fits) && nrow(family_fits) > 0) {
-  fam_long <- rbind(
-    data.frame(
-      label = paste0(family_fits$family, " (", family_fits$growth_form, ")"),
-      growth_form = family_fits$growth_form,
-      metric = "E ~ DBH", ref = 2.0,
-      ols_est = family_fits$ols_sl_dbh, ols_lo = family_fits$ols_lo_dbh,
-      ols_hi  = family_fits$ols_hi_dbh,
-      sma_est = family_fits$sma_sl_dbh, sma_lo = family_fits$sma_lo_dbh,
-      sma_hi  = family_fits$sma_hi_dbh,
-      stringsAsFactors = FALSE
-    ),
-    data.frame(
-      label = paste0(family_fits$family, " (", family_fits$growth_form, ")"),
-      growth_form = family_fits$growth_form,
-      metric = "E ~ SA", ref = 1.0,
-      ols_est = family_fits$ols_sl_sa, ols_lo = family_fits$ols_lo_sa,
-      ols_hi  = family_fits$ols_hi_sa,
-      sma_est = family_fits$sma_sl_sa, sma_lo = family_fits$sma_lo_sa,
-      sma_hi  = family_fits$sma_hi_sa,
-      stringsAsFactors = FALSE
-    )
+  fam_long <- bind_rows(
+    family_fits |>
+      transmute(label = paste0(family, " (", growth_form, ")"),
+                growth_form, metric = "E ~ DBH", ref = 2.0,
+                ols_est = ols_sl_dbh, ols_lo = ols_lo_dbh, ols_hi = ols_hi_dbh,
+                sma_est = sma_sl_dbh, sma_lo = sma_lo_dbh, sma_hi = sma_hi_dbh),
+    family_fits |>
+      transmute(label = paste0(family, " (", growth_form, ")"),
+                growth_form, metric = "E ~ SA", ref = 1.0,
+                ols_est = ols_sl_sa, ols_lo = ols_lo_sa, ols_hi = ols_hi_sa,
+                sma_est = sma_sl_sa, sma_lo = sma_lo_sa, sma_hi = sma_hi_sa)
   )
-  fam_forest <- rbind(
-    transform(fam_long, method = "OLS", est = ols_est, lo = ols_lo, hi = ols_hi),
-    transform(fam_long, method = "SMA", est = sma_est, lo = sma_lo, hi = sma_hi)
-  )
-  fam_forest <- fam_forest[!is.na(fam_forest$est), ]
+  fam_forest <- bind_rows(
+    fam_long |> mutate(method = "OLS", est = ols_est, lo = ols_lo, hi = ols_hi),
+    fam_long |> mutate(method = "SMA", est = sma_est, lo = sma_lo, hi = sma_hi)
+  ) |> filter(!is.na(est))
 
   ggplot(fam_forest,
          aes(y = reorder(label, est), x = est, xmin = lo, xmax = hi,
              colour = growth_form, shape = method)) +
     geom_pointrange(size = 0.55, position = position_dodge(width = 0.6)) +
-    geom_vline(data = unique(fam_forest[, c("metric","ref")]),
+    geom_vline(data = distinct(fam_forest, metric, ref),
                aes(xintercept = ref), linetype = "dashed",
                colour = "grey50", linewidth = 0.7, inherit.aes = FALSE) +
-    scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294"),
+    scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294"),
                         name = "Growth form") +
     scale_shape_manual(values = c(OLS = 16, SMA = 21), name = "Method") +
     facet_wrap(~ metric, scales = "free_x", ncol = 2) +
@@ -917,38 +937,36 @@ if ("pl_species" %in% names(dat) && !all(is.na(dat$pl_species))) {
   cat("Species with >=", MIN_N_SP, "trees:", length(sp_ok), "\n")
 
   if (length(sp_ok) >= 3) {
-    sp_dat    <- dat[!is.na(dat$pl_species) & dat$pl_species %in% sp_ok &
-                       !is.na(dat$log_dbh) & !is.na(dat$log_sa) &
-                       !is.na(dat$log_e), ]
+    sp_dat    <- dat |>
+      filter(pl_species %in% sp_ok, !is.na(log_dbh),
+             !is.na(log_sa), !is.na(log_e))
     sp_groups <- split(sp_dat, sp_dat$pl_species)
 
-    intra_fits <- do.call(rbind, lapply(names(sp_groups), function(sp) {
-      d   <- sp_groups[[sp]]
-      fam <- if ("family" %in% names(d)) d$family[1] else NA_character_
+    intra_fits <- bind_rows(lapply(sp_groups, function(d) {
+      fam <- if ("family" %in% names(d)) d$family[[1]] else NA_character_
       ols_d <- lm(log_e ~ log_dbh, data = d)
       sma_d <- tryCatch(sma(log_e ~ log_dbh, data = d, method = "SMA"),
                         error = function(e) NULL)
       ols_s <- lm(log_e ~ log_sa, data = d)
       sma_s <- tryCatch(sma(log_e ~ log_sa,  data = d, method = "SMA"),
                         error = function(e) NULL)
-      data.frame(
-        pl_species  = sp,
-        growth_form = d$growth_form[1],
+      tibble(
+        pl_species  = d$pl_species[[1]],
+        growth_form = d$growth_form[[1]],
         family      = fam,
         n           = nrow(d),
-        ols_sl_d = as.numeric(coef(ols_d)["log_dbh"]),
-        ols_lo_d = tryCatch(as.numeric(confint(ols_d)["log_dbh",1]), error=function(e) NA_real_),
-        ols_hi_d = tryCatch(as.numeric(confint(ols_d)["log_dbh",2]), error=function(e) NA_real_),
+        ols_sl_d = as.numeric(coef(ols_d)[2]),
+        ols_lo_d = tryCatch(as.numeric(confint(ols_d)[2,1]), error=function(e) NA_real_),
+        ols_hi_d = tryCatch(as.numeric(confint(ols_d)[2,2]), error=function(e) NA_real_),
         sma_sl_d = if (is.null(sma_d)) NA_real_ else as.numeric(coef(sma_d)[2]),
         sma_lo_d = if (is.null(sma_d)) NA_real_ else as.numeric(sma_d$coef[[1]][2,2]),
         sma_hi_d = if (is.null(sma_d)) NA_real_ else as.numeric(sma_d$coef[[1]][2,3]),
-        ols_sl_s = as.numeric(coef(ols_s)["log_sa"]),
-        ols_lo_s = tryCatch(as.numeric(confint(ols_s)["log_sa",1]), error=function(e) NA_real_),
-        ols_hi_s = tryCatch(as.numeric(confint(ols_s)["log_sa",2]), error=function(e) NA_real_),
+        ols_sl_s = as.numeric(coef(ols_s)[2]),
+        ols_lo_s = tryCatch(as.numeric(confint(ols_s)[2,1]), error=function(e) NA_real_),
+        ols_hi_s = tryCatch(as.numeric(confint(ols_s)[2,2]), error=function(e) NA_real_),
         sma_sl_s = if (is.null(sma_s)) NA_real_ else as.numeric(coef(sma_s)[2]),
         sma_lo_s = if (is.null(sma_s)) NA_real_ else as.numeric(sma_s$coef[[1]][2,2]),
-        sma_hi_s = if (is.null(sma_s)) NA_real_ else as.numeric(sma_s$coef[[1]][2,3]),
-        stringsAsFactors = FALSE
+        sma_hi_s = if (is.null(sma_s)) NA_real_ else as.numeric(sma_s$coef[[1]][2,3])
       )
     }))
     cat("Species with valid fits:", nrow(intra_fits), "\n")
@@ -986,36 +1004,29 @@ if ("pl_species" %in% names(dat) && !all(is.na(dat$pl_species))) {
 
 ```{r intraspecific-forest, fig.height=9, fig.cap="Forest plot of intraspecific OLS (filled, primary) and SMA (open, secondary) scaling exponents per species for E~DBH and E~SA. Coloured by growth form. Dashed lines mark theoretical predictions."}
 if (!is.null(intra_fits) && nrow(intra_fits) >= 3) {
-  intra_long <- rbind(
-    data.frame(pl_species = intra_fits$pl_species,
-               growth_form = intra_fits$growth_form, n = intra_fits$n,
-               metric = "E ~ DBH", ref = 2.0,
-               ols_est = intra_fits$ols_sl_d, ols_lo = intra_fits$ols_lo_d,
-               ols_hi  = intra_fits$ols_hi_d,
-               sma_est = intra_fits$sma_sl_d, sma_lo = intra_fits$sma_lo_d,
-               sma_hi  = intra_fits$sma_hi_d, stringsAsFactors = FALSE),
-    data.frame(pl_species = intra_fits$pl_species,
-               growth_form = intra_fits$growth_form, n = intra_fits$n,
-               metric = "E ~ SA", ref = 1.0,
-               ols_est = intra_fits$ols_sl_s, ols_lo = intra_fits$ols_lo_s,
-               ols_hi  = intra_fits$ols_hi_s,
-               sma_est = intra_fits$sma_sl_s, sma_lo = intra_fits$sma_lo_s,
-               sma_hi  = intra_fits$sma_hi_s, stringsAsFactors = FALSE)
+  intra_long <- bind_rows(
+    intra_fits |>
+      transmute(pl_species, growth_form, n, metric = "E ~ DBH", ref = 2.0,
+                ols_est = ols_sl_d, ols_lo = ols_lo_d, ols_hi = ols_hi_d,
+                sma_est = sma_sl_d, sma_lo = sma_lo_d, sma_hi = sma_hi_d),
+    intra_fits |>
+      transmute(pl_species, growth_form, n, metric = "E ~ SA",  ref = 1.0,
+                ols_est = ols_sl_s, ols_lo = ols_lo_s, ols_hi = ols_hi_s,
+                sma_est = sma_sl_s, sma_lo = sma_lo_s, sma_hi = sma_hi_s)
   )
-  intra_forest <- rbind(
-    transform(intra_long, method = "OLS", est = ols_est, lo = ols_lo, hi = ols_hi),
-    transform(intra_long, method = "SMA", est = sma_est, lo = sma_lo, hi = sma_hi)
-  )
-  intra_forest <- intra_forest[!is.na(intra_forest$est), ]
+  intra_forest <- bind_rows(
+    intra_long |> mutate(method = "OLS", est = ols_est, lo = ols_lo, hi = ols_hi),
+    intra_long |> mutate(method = "SMA", est = sma_est, lo = sma_lo, hi = sma_hi)
+  ) |> filter(!is.na(est))
 
   ggplot(intra_forest,
          aes(y = reorder(pl_species, est), x = est, xmin = lo, xmax = hi,
              colour = growth_form, shape = method)) +
     geom_pointrange(size = 0.5, position = position_dodge(width = 0.55)) +
-    geom_vline(data = unique(intra_forest[, c("metric","ref")]),
+    geom_vline(data = distinct(intra_forest, metric, ref),
                aes(xintercept = ref), linetype = "dashed",
                colour = "grey50", linewidth = 0.7, inherit.aes = FALSE) +
-    scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294"),
+    scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294"),
                         name = "Growth form") +
     scale_shape_manual(values = c(OLS = 16, SMA = 21), name = "Method") +
     facet_wrap(~ metric, scales = "free_x", ncol = 2) +
@@ -1102,7 +1113,7 @@ ggplot(dat_sfd, aes(x = log_dbh, y = log_sfd, colour = growth_form)) +
               colour = "black", linewidth = 1.0, linetype = "dashed") +
   geom_hline(yintercept = mean(dat_sfd$log_sfd), linetype = "dotted",
              colour = "grey40") +
-  scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
+  scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")) +
   labs(x = expression(log[10]~"Stem diameter (cm)"),
        y = expression(log[10]~"Sap flux density  (cm"^3~cm^{-2}~day^{-1}*")"),
        colour = "Growth form",
@@ -1153,7 +1164,7 @@ ggplot(dat, aes(x = log_dbh, y = log_sa, colour = growth_form)) +
   geom_abline(intercept = mean(dat$log_sa) - 1.7 * mean(dat$log_dbh),
               slope = 1.7, linetype = "dotted", colour = "#4575b4",
               linewidth = 0.9) +
-  scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
+  scale_colour_manual(values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")) +
   labs(x = expression(log[10]~"Stem diameter (cm)"),
        y = expression(log[10]~"Sapwood area (cm²)"),
        colour = "Growth form",
@@ -1531,7 +1542,7 @@ if (all(c("si_mat", "si_map", "resid_sma_dbh") %in% names(dat))) {
     geom_point(alpha = 0.12, size = 0.8) +
     geom_smooth(method = "lm", se = TRUE, linewidth = 1.0) +
     scale_colour_manual(
-      values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+      values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")
     ) +
     labs(
       x = "Mean annual temperature (\u00b0C)",
@@ -1547,7 +1558,7 @@ if (all(c("si_mat", "si_map", "resid_sma_dbh") %in% names(dat))) {
     geom_point(alpha = 0.12, size = 0.8) +
     geom_smooth(method = "lm", se = TRUE, linewidth = 1.0) +
     scale_colour_manual(
-      values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+      values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")
     ) +
     labs(
       x = expression(log[10] ~ "MAP (mm)"),
@@ -1658,7 +1669,7 @@ if ("si_biome" %in% names(dat)) {
                    position = "stack") +
     facet_wrap(~ si_biome, scales = "free_y", ncol = 2) +
     scale_fill_manual(
-      values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+      values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")
     ) +
     labs(
       x = expression(log[10] ~ "Stem diameter (cm)"),
@@ -1889,7 +1900,7 @@ ggplot(dat_sfd_qr, aes(x = log_dbh, y = log_sfd)) +
   geom_hline(yintercept = mean(dat_sfd_qr$log_sfd, na.rm = TRUE),
              linetype = "dotted", colour = "grey50", linewidth = 0.7) +
   scale_colour_manual(
-    values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")
+    values = c(Angiosperm = "#4dac26", Gymnosperm = "#7b3294")
   ) +
   scale_linetype_manual(
     values = c("tau=0.1"  = "dotdash",
@@ -2127,6 +2138,7 @@ if (USE_REAL_DATA && !is.null(sp_list)) {
     nrow(sp_list_for_tree), n_unknown
   ))
 
+  set.seed(42)  # reproducible S3 random genus placements
   phy <- tryCatch({
     result <- phylo.maker(
       sp.list        = as.data.frame(sp_list_for_tree),
@@ -2136,17 +2148,27 @@ if (USE_REAL_DATA && !is.null(sp_list)) {
       scenarios      = "S3",
       r              = 1
     )
-    result$scenario.3
+    tree_out <- result$scenario.3
+    # caper::comparative.data() fails if node labels duplicate tip labels;
+    # V.PhyloMaker2 S3 assigns internal node labels (e.g., 'Spermatophyta')
+    # that can duplicate the clade ancestor name. Clearing them is safe.
+    tree_out$node.label <- NULL
+    tree_out
   }, error = function(e) {
-    message("phylo.maker() failed: ", conditionMessage(e))
+    cat("ERROR: phylo.maker() failed:", conditionMessage(e), "\n")
     NULL
   })
 
   if (!is.null(phy)) {
+    # Zero-length branches destabilize lambda ML optimization; add epsilon floor
+    n_zero <- sum(phy$edge.length == 0)
+    if (n_zero > 0) {
+      cat(sprintf("WARNING: %d zero-length branches found; adding 1e-6 epsilon floor.\n", n_zero))
+      phy$edge.length[phy$edge.length == 0] <- 1e-6
+    }
     cat(sprintf(
-      "Phylogeny built: %d tips\nIs ultrametric: %s\n",
-      length(phy$tip.label),
-      is.ultrametric(phy)
+      "Phylogeny built: %d tips | ultrametric: %s | zero-length branches fixed: %d\n",
+      length(phy$tip.label), is.ultrametric(phy), n_zero
     ))
   } else {
     cat("Tree build failed \u2014 PGLS sections will be skipped.\n")
@@ -2192,6 +2214,7 @@ if (USE_REAL_DATA && !is.null(phy) && "pl_species" %in% names(dat)) {
   if (length(shared_tips) >= 10) {
 
     phy_pruned <- drop.tip(phy, setdiff(phy$tip.label, shared_tips))
+    phy_pruned$node.label <- NULL  # ensure no node-label conflicts after pruning
 
     sp_means_df <- sp_means |>
       filter(tip_label %in% shared_tips) |>
@@ -2206,7 +2229,7 @@ if (USE_REAL_DATA && !is.null(phy) && "pl_species" %in% names(dat)) {
         warn.dropped = FALSE
       ),
       error = function(e) {
-        message("comparative.data() failed: ", conditionMessage(e))
+        cat("ERROR: comparative.data() failed:", conditionMessage(e), "\n")
         NULL
       }
     )
@@ -2227,7 +2250,7 @@ if (USE_REAL_DATA && !is.null(phy) && "pl_species" %in% names(dat)) {
   }
 
 } else if (!USE_REAL_DATA) {
-  message("PGLS setup skipped: requires real SAPFLUXNET data (USE_REAL_DATA = TRUE).")
+  cat("PGLS setup skipped: requires real SAPFLUXNET data (USE_REAL_DATA = TRUE).\n")
 }
 ```
 
@@ -2247,20 +2270,26 @@ run_pgls_rel <- function(y_col, x_col, comp_d) {
     fit <- caper::pgls(fm, data = comp_d, lambda = "ML")
     sm  <- summary(fit)
     cm  <- sm$coefficients
+    # Guard: ensure x_col appears in coefficient table by name
+    if (!x_col %in% rownames(cm)) {
+      stop(sprintf("Coefficient '%s' not in PGLS summary. Available: %s",
+                   x_col, paste(rownames(cm), collapse = ", ")))
+    }
     sl  <- cm[x_col, "Estimate"]
-    se  <- cm[x_col, "Std. Error"]
     pv  <- cm[x_col, "Pr(>|t|)"]
     r2  <- sm$r.sq
     lam <- as.numeric(fit$param["lambda"])
+    # Use t-distribution CI from confint() — more accurate than +/- 1.96*SE at small n
+    sl_ci <- tryCatch(confint(fit)[x_col, ], error = function(e) c(NA_real_, NA_real_))
     lci <- tryCatch({
       ci <- fit$param.CI$lambda
-      c(lo = unname(ci["lower.CI"]), hi = unname(ci["upper.CI"]))
+      c(lo = as.numeric(ci[["lower.CI"]]), hi = as.numeric(ci[["upper.CI"]]))
     }, error = function(e) c(lo = NA_real_, hi = NA_real_))
-    list(fit = fit, slope = sl, ci_lo = sl - 1.96*se, ci_hi = sl + 1.96*se,
+    list(fit = fit, slope = sl, ci_lo = sl_ci[1], ci_hi = sl_ci[2],
          p = pv, r2 = r2, lambda = lam, lambda_lo = lci["lo"], lambda_hi = lci["hi"],
          n = nrow(comp_d$data))
   }, error = function(e) {
-    message("PGLS failed (", y_col, " ~ ", x_col, "): ", conditionMessage(e))
+    cat(sprintf("ERROR: PGLS failed (%s ~ %s): %s\n", y_col, x_col, conditionMessage(e)))
     NULL
   })
 }
@@ -2427,7 +2456,7 @@ if (USE_REAL_DATA && !is.null(sp_means) && nrow(sp_means) >= 10 &&
     scale_colour_manual(values = line_cols,  name = "Regression") +
     scale_linetype_manual(values = line_lty, name = "Regression") +
     scale_shape_manual(
-      values = c(Angiosperm = 16, Conifer = 17),
+      values = c(Angiosperm = 16, Gymnosperm = 17),
       name   = "Growth form"
     ) +
     guides(
@@ -2517,7 +2546,7 @@ if (USE_REAL_DATA && !is.na(pgls_lambda_val) && !is.null(fit_pgls)) {
 
   lambda_ci <- tryCatch({
     ci <- fit_pgls$param.CI$lambda
-    c(lo = unname(ci["lower.CI"]), hi = unname(ci["upper.CI"]))
+    c(lo = as.numeric(ci[["lower.CI"]]), hi = as.numeric(ci[["upper.CI"]]))
   }, error = function(e) c(lo = NA_real_, hi = NA_real_))
 
   ols_slope_val  <- coef(fit_ols)["log_dbh"]
@@ -2606,9 +2635,11 @@ if (USE_REAL_DATA && !is.na(pgls_lambda_val) && !is.null(fit_pgls)) {
 
 3. **Reliability of $\lambda$ with few species.** Pagel's $\lambda$ is estimated from the residual variance\u2013covariance structure. When the number of species in the PGLS is small (< 30), the ML estimate is unstable and the confidence interval wide. Check the reported $n_{\text{PGLS}}$; if substantially smaller than the full species count, the $\lambda$ estimate may be unreliable.
 
-4. **Phylogenetic sampling bias.** SAPFLUXNET species are not a random phylogenetic sample. Temperate Pinaceae (conifers) and Fagaceae (deciduous angiosperms) are over-represented relative to tropical and subtropical lineages. This affects both the $\lambda$ estimate and the generalisability of the PGLS slope across the broader tree of life.
+4. **Phylogenetic sampling bias.** SAPFLUXNET species are not a random phylogenetic sample. Temperate Pinaceae (gymnosperms) and Fagaceae (deciduous angiosperms) are over-represented relative to tropical and subtropical lineages. This affects both the $\lambda$ estimate and the generalisability of the PGLS slope across the broader tree of life.
 
-5. **Temporal-averaging offset.** All values use active-flow-timestep means rather than growing-season daily means as in Forrester et al.\ (2022). This affects intercepts but not slopes in the log\u2013log regression, provided the averaging bias is size-independent (see data-loading caveats above).
+5. **Single $\lambda$ across a mixed angiosperm–gymnosperm tree.** Angiosperms and gymnosperms diverged $\sim$350 Ma and differ fundamentally in wood anatomy and hydraulic architecture (vessels vs. tracheids). Fitting a single Pagel $\lambda$ assumes homogeneous Brownian-motion rates across both clades, which is unlikely. The pooled $\lambda$ should be treated as exploratory; separate within-clade PGLS (if $n \geq 15$ per clade) is needed for clade-specific inference.
+
+6. **Temporal-averaging offset.** All values use active-flow-timestep means rather than growing-season daily means as in Forrester et al.\ (2022). This affects intercepts but not slopes in the log\u2013log regression, provided the averaging bias is size-independent (see data-loading caveats above).
 
 ---
 
