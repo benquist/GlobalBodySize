@@ -1776,3 +1776,4 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-05-01 | Created BAAD summary Rmd/HTML for plant_scaling_data project.
 2026-05-01 | Created BAAD summary Rmd/HTML for plant_scaling_data project.
 2026-05-01 | Added Niklas-Enquist biomass data ingestion and summary Rmd/HTML to plant_scaling_data.
+2026-05-01 | plant_scaling_data: data source inventory — profile rFIA demo, build combined Rmd/HTML for BAAD+NE+allodb+BIOMASS+rFIA with maps, volume chart, merge notes, pending dataset table. Commits 4650083–ddb8950.
