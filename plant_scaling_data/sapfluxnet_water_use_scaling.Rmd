@@ -16,6 +16,14 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.width = 10, fig.height = 5.5)
 suppressPackageStartupMessages({
+  library(ape)
+  library(V.PhyloMaker2)
+  library(caper)
+  library(lme4)
+  library(performance)
+  library(quantreg)
+  library(leaflet)
+  library(gridExtra)
   library(dplyr)
   library(ggplot2)
   library(readr)
@@ -25,10 +33,6 @@ suppressPackageStartupMessages({
   library(smatr)
   library(purrr)
   library(stringr)
-  library(leaflet)
-  library(lme4)
-  library(performance)
-  library(quantreg)
 })
 theme_set(theme_bw(base_size = 13))
 proj_dir <- dirname(knitr::current_input(dir = TRUE))
@@ -231,7 +235,9 @@ if (USE_REAL_DATA) {
         grepl(paste0("\\b(",
           paste(c("Pinus","Picea","Abies","Larix","Pseudotsuga","Tsuga",
                   "Cedrus","Cupressus","Juniperus","Thuja","Agathis",
-                  "Cryptomeria","Sequoia","Taxus","Podocarpus",
+                  "Cryptomeria","Sequoia","Sequoiadendron",
+                  "Taxodium","Calocedrus","Platycladus",
+                  "Taxus","Podocarpus",
                   "Chamaecyparis","Araucaria"),
                 collapse = "|"),
           ")\\b"),
@@ -1065,14 +1071,15 @@ if ("si_biome" %in% names(dat)) {
     filter(!is.na(si_biome)) |>
     tidyr::nest(data = -si_biome) |>
     mutate(
-      n = map_int(data, nrow),
+      n    = map_int(data, nrow),
+      n_sp = map_int(data, ~ n_distinct(.x$pl_species, na.rm = TRUE)),
       fit_dbh = map(data, ~ {
-        if (nrow(.x) < 20) return(NULL)
+        if (nrow(.x) < 20 || n_distinct(.x$pl_species, na.rm=TRUE) < 3) return(NULL)
         tryCatch(sma(log_e ~ log_dbh, data = .x, method = "SMA"),
                  error = function(e) NULL)
       }),
       fit_sa = map(data, ~ {
-        if (nrow(.x) < 20) return(NULL)
+        if (nrow(.x) < 20 || n_distinct(.x$pl_species, na.rm=TRUE) < 3) return(NULL)
         tryCatch(sma(log_e ~ log_sa,  data = .x, method = "SMA"),
                  error = function(e) NULL)
       }),
@@ -1463,7 +1470,14 @@ if (!is.null(biome_sma) && "intercept_sa" %in% names(biome_sma)) {
         `CI low (slope)`     = ci_lo_sa,
         `CI high (slope)`    = ci_hi_sa
       ),
-    caption = "Hydraulic normalisation constant k_SA by biome"
+    caption = paste0(
+      "Hydraulic normalisation constant k_SA by biome. ",
+      "k_SA = 10^(SMA intercept for E~SA) is interpretable as effective ",
+      "hydraulic conductance per unit sapwood area (L day\u207b\u00b9 cm\u207b\u00b2) ",
+      "ONLY when the E~SA slope does not significantly depart from 1.0. ",
+      "For biomes where CI does not include 1.0, treat k_SA as the fitted ",
+      "value at SA = 1 cm\u00b2, not a size-independent hydraulic constant."
+    )
   )
 
   ggplot(hyd_norm_biome,
@@ -1524,20 +1538,29 @@ if (USE_REAL_DATA && "pl_species" %in% names(dat)) {
   # Convert backbone species to space format for matching against pl_species
   tips_sp_space <- gsub("_", " ", tips_lcvp$species)
 
+  # W1 fix: species-level family lookup first, fall back to genus-level
+  # (distinct(genus) can misassign polyphyletic genera — prefer species match)
+  sp_family_exact <- tips_lcvp |>
+    mutate(species_sp = gsub("_", " ", species)) |>
+    select(species_sp, family) |>
+    distinct(species_sp, .keep_all = TRUE)
+
   genus_family <- tips_lcvp |>
     select(genus, family) |>
     distinct(genus, .keep_all = TRUE)
 
   sp_list <- sp_list_raw |>
-    left_join(genus_family, by = "genus") |>
+    left_join(sp_family_exact, by = c("species" = "species_sp")) |>
+    left_join(genus_family,    by = "genus", suffix = c("", "_genus")) |>
     mutate(
-      family       = if_else(is.na(family), "Unknown", family),
+      family       = coalesce(family, family_genus, "Unknown"),
       match_status = case_when(
         species %in% tips_sp_space     ~ "matched",
         genus   %in% tips_lcvp$genus   ~ "genus_only",
         TRUE                            ~ "unmatched"
       )
-    )
+    ) |>
+    select(-family_genus)
 
   n_total      <- nrow(sp_list)
   n_matched    <- sum(sp_list$match_status == "matched")
@@ -1563,7 +1586,7 @@ if (USE_REAL_DATA && "pl_species" %in% names(dat)) {
         `Match status` = match_status,
         `N trees`      = n_trees
       ),
-    caption = "Taxonomy reconciliation: SAPFLUXNET species matched to V.PhyloMaker2 GBIF backbone. match_status: matched = exact species in backbone; genus_only = genus placed, species absent; unmatched = genus absent."
+    caption = "Taxonomy reconciliation: SAPFLUXNET species matched to V.PhyloMaker2 LCVP backbone (GBOTB.extended.LCVP). match_status: matched = exact species in backbone; genus_only = genus placed, species absent; unmatched = genus absent. Family assigned at species level first, with genus-level fallback."
   )
 
 } else {
@@ -1963,7 +1986,7 @@ if (USE_REAL_DATA && !is.na(pgls_lambda_val) && !is.null(fit_pgls)) {
 
 1. **Species-mean aggregation.** PGLS uses per-species means, collapsing all within-species variation. The estimated slope may therefore differ from the individual-tree slope, because between-species differences in body-size range and hydraulic architecture are confounded in the species mean. The OLS and SMA slopes on all $n$ individual trees remain the primary scaling estimates; PGLS adds a phylogenetic-signal perspective on the species-level relationship.
 
-2. **Placement uncertainty.** V.PhyloMaker2 places species absent from the GBIF backbone by binding them to their genus node (scenario S3). For poorly represented genera, this introduces error in branch lengths and therefore in the variance\u2013covariance matrix used by PGLS. Rare or taxonomically uncertain species should be treated with caution.
+2. **Placement uncertainty.** V.PhyloMaker2 places species absent from the LCVP backbone (GBOTB.extended.LCVP) by binding them to their genus node (scenario S3). For poorly represented genera, this introduces error in branch lengths and therefore in the variance\u2013covariance matrix used by PGLS. Rare or taxonomically uncertain species should be treated with caution.
 
 3. **Reliability of $\lambda$ with few species.** Pagel's $\lambda$ is estimated from the residual variance\u2013covariance structure. When the number of species in the PGLS is small (< 30), the ML estimate is unstable and the confidence interval wide. Check the reported $n_{\text{PGLS}}$; if substantially smaller than the full species count, the $\lambda$ estimate may be unreliable.
 
