@@ -64,3 +64,5 @@
 2026-05-02 | Fixed 4 PGLS bugs in kurosawa_respiration_scaling.Rmd; added Blomberg K diagnostic and 8-point phylogenetic caveats block.
 2026-05-02 | Theory review applied to kurosawa_respiration_scaling.Rmd: WBE derivation paragraph, Pagel-λ interpretation, β=2/3 forest-plot reference, root:shoot ratio OLS+SMA section.
 2026-05-02 | Fixed PGLS workflow in kurosawa_respiration_scaling.Rmd: family back-fill from phylo.maker match.table, df column restriction for caper, Whole-organ groups added, p_vs_iso, Blomberg K, Rubner 2/3 + isometric 1 reference lines, mass outlier QA, temperature caveat. Three agents consulted (phylogenetics-comparative-agent, biodiversity-science-guard, enhanced-theory). Re-rendered: 5.4MB, 73/73 chunks.
+
+2025-05-02 | sapfluxnet_water_use_scaling.Rmd PGLS fixed (node label conflict, set.seed, zero-branch epsilon, Gymnosperm label, confint CI, param.CI extraction); re-rendered sapfluxnet_water_use_scaling.html with working PGLS; pushed to master (55d9c27)
