@@ -1,0 +1,25 @@
+# R artifacts
+.Rhistory
+.RData
+.Rproj.user/
+.Ruserdata
+.Rapp.history
+
+# RStudio files
+.Rproj.user/
+.Rproj.user
+.Rhistory
+.Ruserdata
+
+# Data files
+data/raw/
+data/processed/
+*.csv
+*.tsv
+*.rds
+*.RData
+*.rdata
+
+# Misc
+.DS_Store
+Thumbs.db
