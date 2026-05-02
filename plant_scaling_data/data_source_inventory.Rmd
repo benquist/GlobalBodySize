@@ -1,0 +1,461 @@
+---
+title: "Plant Allometry Data Source Inventory"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 5)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(scales)
+library(tidyr)
+library(readr)
+
+theme_set(theme_bw(base_size = 12))
+```
+
+---
+
+# Overview
+
+This document inventories all plant allometry and scaling data sources assembled
+or evaluated for the `plant_scaling_data` project. For each source it reports:
+data type (individual measurements vs. allometric equations), taxonomic and
+geographic scope, key variables, access method, and ingestion status.
+
+---
+
+# Summary table
+
+```{r summary-table}
+inv <- data.frame(
+  Source = c("BAAD", "Niklas-Enquist", "allodb", "BIOMASS::wdData",
+             "BIOMASS::NouraguesHD", "rFIA (US)",
+             "Zanne et al. 2009 (Dryad)", "Chave et al. 2014",
+             "Poorter et al. 2012", "TRY", "FRED", "GlobAllomeTree"),
+  Type = c("Individual measurements","Individual measurements",
+           "Allometric equations","Wood density lookup",
+           "H-D paired measurements","Individual measurements (FIA plots)",
+           "Wood density lookup","Allometric equations",
+           "Biomass allocation fractions","Trait database","Root traits","Equation library"),
+  N_records = c("21,084 individuals","2,626 individuals",
+                "570 equations","16,467 species×region",
+                "1,051 H-D pairs","millions (US national)",
+                "~16,000 spp","pantropical equations",
+                "meta-analysis","~280,000 spp","~70,000 obs","~5,000 equations"),
+  Key_variables = c("height, DBH, crown, organ masses (kg)",
+                    "height, root/stem/leaf/total biomass (kg), growth rates",
+                    "DBH→AGB equations, r², bias correction",
+                    "wood density (g/cm³) by species × region",
+                    "DBH (cm), height (m), lat/lon",
+                    "DIA (in), HT (ft), DRYBIO_AG/BG, CARBON_AG/BG",
+                    "wood density (g/cm³) by species",
+                    "DBH, height, WD → AGB (Mg)",
+                    "root:shoot:leaf fraction by growth form",
+                    "SLA, LDMC, height, stem diameter",
+                    "root diameter, SRL, root N",
+                    "DBH→AGB equations, geographic metadata"),
+  Access = c("R: baad.data::baad_data()","CSV on disk (ingested)",
+             "R: allodb (ropensci/allodb)","R: BIOMASS::wdData",
+             "R: BIOMASS::NouraguesHD",
+             "R: rFIA::getFIA(states='RI') — per state download",
+             "Dryad doi:10.5061/dryad.234 — VERIFIED",
+             "New Phytologist supplement + BIOMASS param tables",
+             "New Phytologist supplement — manual download",
+             "try-db.org — registration required",
+             "UTK FRED website — free download",
+             "globallometree.org — free, no account"),
+  Status = c("Ingested ✓","Ingested ✓",
+             "Installed ✓ — not yet merged",
+             "Installed ✓ — not yet merged",
+             "Installed ✓ — not yet merged",
+             "Installed ✓ — download per state needed",
+             "DOI verified — data not yet downloaded",
+             "BIOMASS package implements — cite needed",
+             "Not yet acquired",
+             "Not yet acquired",
+             "Not yet acquired",
+             "Not yet acquired"),
+  stringsAsFactors = FALSE
+)
+
+kable(inv, caption = "Plant allometry data source inventory")
+```
+
+---
+
+# Source profiles
+
+## BAAD — Biomass And Allometry Database
+
+```{r baad-profile}
+library(baad.data)
+baad <- baad.data::baad_data()
+dat_baad <- baad$data
+
+kable(data.frame(
+  Metric = c("Total individuals","Species","Studies","Lat/lon coverage",
+             "Height (h.t) n","Total biomass (m.to) n","Leaf mass (m.lf) n",
+             "Stem mass (m.st) n","Root mass (m.rt) n","Leaf area (a.lf) n"),
+  Value  = c(
+    format(nrow(dat_baad), big.mark=","),
+    length(unique(dat_baad$speciesMatched)),
+    length(unique(dat_baad$studyName)),
+    paste0(sum(!is.na(dat_baad$latitude)), " (", round(100*mean(!is.na(dat_baad$latitude))), "%)"),
+    sum(!is.na(dat_baad$h.t)),
+    sum(!is.na(dat_baad$m.to)),
+    sum(!is.na(dat_baad$m.lf)),
+    sum(!is.na(dat_baad$m.st)),
+    sum(!is.na(dat_baad$m.rt)),
+    sum(!is.na(dat_baad$a.lf))
+  )
+), caption = "BAAD profile")
+```
+
+```{r baad-map, fig.width=10, fig.height=4.5}
+world <- map_data("world")
+pts <- dat_baad |> filter(!is.na(latitude), !is.na(longitude)) |>
+  distinct(studyName, latitude, longitude, vegetation)
+ggplot() +
+  geom_polygon(data=world, aes(x=long,y=lat,group=group), fill="grey88", color="grey70", linewidth=0.2) +
+  geom_point(data=pts, aes(x=longitude, y=latitude, color=vegetation), alpha=0.8, size=2) +
+  coord_fixed(1.3) +
+  scale_color_brewer(palette="Set1", na.value="grey50") +
+  labs(title="BAAD — study locations", color="Vegetation") +
+  theme(legend.position="bottom")
+```
+
+---
+
+## Niklas-Enquist Biomass Dataset
+
+```{r ne-profile}
+ne <- read_csv("data/raw/niklas_enquist/niklas_enquist_biomass_20040122.csv",
+  skip=2,
+  col_names=c("taxa","citation","footnotes","record_num","age_yr","log_age",
+    "height_m","log_height","root_biomass_kg","log_root","stem_biomass_kg","log_stem",
+    "leaf_biomass_kg","log_leaf","shoot_biomass_kg","log_shoot","repro_biomass_kg","log_repro",
+    "total_biomass_kg","log_total","stem_growth_kgyr","log_stem_growth","leaf_growth_kgyr",
+    "log_leaf_growth","root_growth_kgyr","log_root_growth","total_growth_kgyr","log_total_growth"),
+  locale=locale(encoding="latin1"), show_col_types=FALSE, skip_empty_rows=TRUE) |>
+  mutate(across(-c(taxa,citation,footnotes), as.numeric)) |>
+  mutate(across(where(is.numeric), ~ifelse(.==-999, NA_real_, .)))
+
+kable(data.frame(
+  Metric = c("Total records","Unique taxa strings","Unique citation sources",
+             "Height (m) n","Root biomass (kg) n","Stem biomass (kg) n",
+             "Leaf biomass (kg) n","Total biomass (kg) n","Age (yr) n",
+             "Growth rate (kg/yr) n","Geographic coordinates","Original source"),
+  Value  = c(
+    format(nrow(ne), big.mark=","),
+    length(unique(ne$taxa)),
+    length(unique(ne$citation[!is.na(ne$citation)])),
+    sum(!is.na(ne$height_m)),
+    sum(!is.na(ne$root_biomass_kg)),
+    sum(!is.na(ne$stem_biomass_kg)),
+    sum(!is.na(ne$leaf_biomass_kg)),
+    sum(!is.na(ne$total_biomass_kg)),
+    sum(!is.na(ne$age_yr)),
+    sum(!is.na(ne$total_growth_kgyr)),
+    "None — inferred from taxon/citation text",
+    "Cannell (1982) + primary literature (1920s–2003)"
+  )
+), caption = "Niklas-Enquist biomass dataset profile")
+```
+
+**Geographic note:** The Niklas-Enquist CSV contains no latitude/longitude columns.
+Geographic origin must be inferred from taxon native ranges or citation text.
+The map below shows **inferred** origin regions based on keyword parsing of
+citation journal names and taxon strings — treat as approximate and unverified.
+
+```{r ne-geo-infer, fig.width=10, fig.height=4.5}
+# Infer broad region from citation keywords — explicitly flagged as approximate
+ne_geo <- ne |>
+  mutate(region_inferred = case_when(
+    grepl("Japan|Japanese|Hokkaido|Honshu", citation, ignore.case=TRUE) |
+      grepl("japonica|japonis", taxa, ignore.case=TRUE) ~ "Japan",
+    grepl("Canada|Canadian|Can\\. J", citation, ignore.case=TRUE) |
+      grepl("papyrifera|tremuloides|canadensis", taxa, ignore.case=TRUE) ~ "Canada",
+    grepl("Australia|Australian|Snowy Mountains", citation, ignore.case=TRUE) |
+      grepl("Eucalyptus|Acacia", taxa, ignore.case=TRUE) ~ "Australia",
+    grepl("Germany|German|Harz", citation, ignore.case=TRUE) |
+      grepl("sylvatica|sylvestris", taxa, ignore.case=TRUE) &
+      grepl("Germany|German|European|Scand", citation, ignore.case=TRUE) ~ "Europe",
+    grepl("British|UK|Scotland|England|Wales", citation, ignore.case=TRUE) |
+      grepl("Journal of Ecology", citation, ignore.case=TRUE) ~ "UK / Europe",
+    grepl("USA|United States|Georgia|Oregon|Michigan|Alaska|Pacific Northwest|Appalachian", 
+          citation, ignore.case=TRUE) ~ "USA",
+    grepl("India|Indian|Gezira|Pakistan|Borneo|Malaysian|Tropical", 
+          citation, ignore.case=TRUE) ~ "Asia / Tropics",
+    grepl("Cannell", citation, ignore.case=TRUE) ~ "Global (Cannell 1982 compilation)",
+    TRUE ~ "Unknown / unclassified"
+  ))
+
+region_counts <- ne_geo |> count(region_inferred, sort=TRUE)
+
+# Approximate centroids for bubble map
+centroids <- data.frame(
+  region_inferred = c("Japan","Canada","Australia","Europe","UK / Europe",
+                      "USA","Asia / Tropics","Global (Cannell 1982 compilation)","Unknown / unclassified"),
+  lon = c(138, -96, 134, 10, -2, -98, 100, 0, NA),
+  lat = c(36, 56, -25, 50, 52, 40, 20, 0, NA)
+)
+plot_df <- region_counts |> left_join(centroids, by="region_inferred") |>
+  filter(!is.na(lon))
+
+ggplot() +
+  geom_polygon(data=world, aes(x=long,y=lat,group=group), fill="grey88", color="grey70", linewidth=0.2) +
+  geom_point(data=plot_df, aes(x=lon, y=lat, size=n, color=region_inferred), alpha=0.7) +
+  geom_text(data=plot_df, aes(x=lon, y=lat, label=n), size=3, vjust=-1.2, fontface="bold") +
+  scale_size_continuous(range=c(4,18)) +
+  coord_fixed(1.3) +
+  labs(title="Niklas-Enquist — inferred record origins (approximate, keyword-parsed)",
+       subtitle="⚠ No lat/lon in source file. Regions inferred from citation text and taxon names.",
+       size="N records", color="Region") +
+  theme(legend.position="bottom", legend.box="vertical")
+```
+
+---
+
+## allodb — ForestGEO Allometric Equations
+
+```{r allodb-profile}
+library(allodb)
+
+kable(data.frame(
+  Metric = c("Total equations","Source studies","Equations with lat/lon",
+             "Primary independent variable","Top dependent variable",
+             "DBH range covered","Equation forms (unique)","Geographic scope"),
+  Value  = c(
+    nrow(equations),
+    length(unique(equations$ref_id)),
+    sum(!is.na(equations$lat) & !equations$lat %in% c("NRA","NI","")),
+    "DBH (also: DRC, basal area)",
+    "Total aboveground biomass (AGB)",
+    paste0(min(as.numeric(equations$dbh_min_cm[equations$dbh_min_cm!="NRA"&equations$dbh_min_cm!="NI"]), na.rm=TRUE), "–",
+           max(as.numeric(equations$dbh_max_cm[equations$dbh_max_cm!="NRA"&equations$dbh_max_cm!="NI"]), na.rm=TRUE), " cm"),
+    length(unique(equations$equation_form)),
+    "Temperate N. America, E. Asia, Europe; mostly ForestGEO sites"
+  )
+), caption = "allodb profile")
+```
+
+```{r allodb-geo, fig.width=10, fig.height=4.5}
+eq_geo <- equations |>
+  mutate(lat_num  = suppressWarnings(as.numeric(lat)),
+         long_num = suppressWarnings(as.numeric(long))) |>
+  filter(!is.na(lat_num), !is.na(long_num), lat_num != 0)
+
+ggplot() +
+  geom_polygon(data=world, aes(x=long,y=lat,group=group), fill="grey88", color="grey70", linewidth=0.2) +
+  geom_point(data=eq_geo, aes(x=long_num, y=lat_num, color=ecosystem_type), alpha=0.7, size=2.5) +
+  coord_fixed(1.3) +
+  scale_color_brewer(palette="Dark2", na.value="grey60") +
+  labs(title="allodb — equation origin locations", color="Ecosystem") +
+  theme(legend.position="bottom")
+```
+
+```{r allodb-ecobar}
+equations |>
+  mutate(eco = ifelse(ecosystem_type %in% c("NRA","NI","") | is.na(ecosystem_type),
+                      "Unknown/NRA", ecosystem_type)) |>
+  count(eco, sort=TRUE) |>
+  ggplot(aes(x=reorder(eco,n), y=n, fill=eco)) +
+  geom_col(show.legend=FALSE) + coord_flip() +
+  scale_fill_brewer(palette="Paired") +
+  labs(x=NULL, y="N equations", title="allodb equations by ecosystem type")
+```
+
+---
+
+## BIOMASS — Wood Density Database (Zanne et al. 2009 backbone)
+
+```{r biomass-wd}
+library(BIOMASS)
+
+kable(data.frame(
+  Metric = c("Total records","Unique species","Families",
+             "Wood density range (g/cm³)","Regions covered"),
+  Value  = c(
+    format(nrow(wdData), big.mark=","),
+    length(unique(wdData$species)),
+    length(unique(wdData$family)),
+    paste0(round(min(wdData$wd,na.rm=TRUE),2), "–", round(max(wdData$wd,na.rm=TRUE),2)),
+    length(unique(wdData$region))
+  )
+), caption = "BIOMASS::wdData (global wood density database) profile")
+```
+
+```{r biomass-wd-region}
+wdData |>
+  count(regionId, sort=TRUE) |>
+  ggplot(aes(x=reorder(regionId,n), y=n, fill=regionId)) +
+  geom_col(show.legend=FALSE) + coord_flip() +
+  scale_y_continuous(labels=comma) +
+  scale_fill_viridis_d() +
+  labs(x=NULL, y="Records", title="BIOMASS wood density records by region")
+```
+
+## BIOMASS — Height-Diameter paired data (Nouragues, French Guiana)
+
+```{r biomass-hd}
+kable(data.frame(
+  Metric = c("Individuals","Species","Location","Variables"),
+  Value  = c(nrow(NouraguesHD),
+             length(unique(paste(NouraguesHD$genus, NouraguesHD$species))),
+             "Nouragues Reserve, French Guiana (~4°N, 53°W)",
+             "DBH (cm), height (m), genus, species, lat, lon")
+), caption = "BIOMASS::NouraguesHD profile")
+```
+
+```{r biomass-hd-plot}
+NouraguesHD |>
+  filter(D > 0, H > 0) |>
+  ggplot(aes(x=D, y=H)) +
+  geom_point(alpha=0.3, size=0.8, color="#1b7837") +
+  geom_smooth(method="lm", color="black", linewidth=1) +
+  scale_x_log10(labels=comma) + scale_y_log10(labels=comma) +
+  annotation_logticks() +
+  labs(x="DBH (cm)", y="Height (m)",
+       title=paste0("Height ~ DBH: Nouragues, French Guiana  (n=",
+                    sum(!is.na(NouraguesHD$D) & !is.na(NouraguesHD$H)), ")"))
+```
+
+---
+
+## rFIA — USDA Forest Inventory & Analysis
+
+```{r rfia-profile}
+library(rFIA)
+data("fiaRI")
+
+kable(data.frame(
+  Metric = c("Demo state","TREE table rows","TREE table columns",
+             "DBH range (inches)","Height range (ft)",
+             "DRYBIO_AG range (lbs/acre)","CARBON_AG range (lbs/acre)",
+             "Unique species codes","Key allometric columns"),
+  Value  = c(
+    "Rhode Island (demo dataset)",
+    format(nrow(fiaRI$TREE), big.mark=","),
+    ncol(fiaRI$TREE),
+    paste0(range(fiaRI$TREE$DIA, na.rm=TRUE), collapse="–"),
+    paste0(range(fiaRI$TREE$HT, na.rm=TRUE), collapse="–"),
+    paste0(round(range(fiaRI$TREE$DRYBIO_AG, na.rm=TRUE),1), collapse="–"),
+    paste0(round(range(fiaRI$TREE$CARBON_AG, na.rm=TRUE),1), collapse="–"),
+    length(unique(fiaRI$TREE$SPCD)),
+    "DIA, HT, DRYBIO_AG, DRYBIO_BG, DRYBIO_BOLE, DRYBIO_FOLIAGE, CARBON_AG, CARBON_BG, DRYBIO_STEM, DRYBIO_BRANCH"
+  )
+), caption = "rFIA profile (Rhode Island demo data)")
+```
+
+**To download a full US state:**
+```r
+# downloads ~10-500 MB depending on state
+wy <- rFIA::getFIA(states = "WY", dir = "data/raw/fia/")
+```
+National coverage: all 50 states + territories. Updated annually by USDA FS.
+Units: DIA in inches, HT in feet, biomass in lbs/acre — conversion to SI required
+before merging with BAAD or Niklas-Enquist.
+
+---
+
+## Datasets not yet acquired (require download/registration)
+
+```{r not-yet}
+pending <- data.frame(
+  Dataset = c(
+    "Zanne et al. 2009 — Global wood density",
+    "Poorter et al. 2012 — Biomass allocation",
+    "Chave et al. 2014 — Pantropical AGB equations",
+    "TRY Plant Trait Database",
+    "FRED Fine Root Ecology Database",
+    "GlobAllomeTree (FAO)"
+  ),
+  Citation_note = c(
+    "Zanne AE et al. (2009) Global wood density. Dryad doi:10.5061/dryad.234 — DOI VERIFIED",
+    "Poorter H et al. (2012) Biomass allocation. New Phytol 193:30–50 — cite needs DOI verification",
+    "Chave J et al. (2014) Pantropical allometry. Global Change Biol — cite needs DOI verification",
+    "Kattge J et al. (2020) TRY — a global database. Global Change Biol — cite needs verification",
+    "Iversen CM et al. FRED. Ecosphere — cite needs verification",
+    "FAO GlobAllomeTree — web portal, no single citable paper"
+  ),
+  Access = c(
+    "datadryad.org/stash/dataset/doi:10.5061/dryad.234 — free download",
+    "New Phytologist online supplement — manual download",
+    "BIOMASS package implements equations internally",
+    "try-db.org — free but requires registration + data request",
+    "roots.ornl.gov — free download",
+    "globallometree.org — free, no account needed"
+  ),
+  Priority = c("HIGH — needed for AGB estimation","HIGH — biomass partitioning",
+               "MEDIUM — equations in BIOMASS package","MEDIUM — broad trait coverage",
+               "LOW — roots only","LOW — equations only, no raw data"),
+  stringsAsFactors = FALSE
+)
+kable(pending, caption = "Datasets not yet ingested — acquisition plan")
+```
+
+---
+
+# Data volume summary
+
+```{r volume-bar}
+vol <- data.frame(
+  Source = c("BAAD","Niklas-Enquist","rFIA (1 state demo)","BIOMASS wdData","allodb","BIOMASS NouraguesHD"),
+  N = c(21084, 2626, nrow(fiaRI$TREE), nrow(wdData), nrow(equations), nrow(NouraguesHD)),
+  Type = c("Individual","Individual","Individual","Species lookup","Equations","Individual"),
+  Status = c("Ingested","Ingested","Demo only","In package","In package","In package")
+)
+
+ggplot(vol, aes(x=reorder(Source,N), y=N, fill=Type)) +
+  geom_col() +
+  geom_text(aes(label=format(N, big.mark=",")), hjust=-0.1, size=3.5) +
+  coord_flip() +
+  scale_y_continuous(labels=comma, expand=expansion(mult=c(0,0.2))) +
+  scale_fill_brewer(palette="Set2") +
+  facet_grid(Status ~ ., scales="free_y", space="free_y") +
+  labs(x=NULL, y="N records / equations", fill="Data type",
+       title="Data volume by source and ingestion status")
+```
+
+---
+
+# Key decisions for merging
+
+1. **Unit harmonization required before merge:**
+   - rFIA: DIA in inches → cm, HT in feet → m, DRYBIO in lbs/acre → kg/plant (requires TPA)
+   - Niklas-Enquist: already kg dry weight and metres
+   - BAAD: already kg and metres (SI throughout)
+   - allodb: equations output in g, lbs, or metric tonnes — conversion factors are in `output_units_CF` column
+
+2. **Taxonomy harmonization:** all sources use different taxon string formats.
+   BAAD has `speciesMatched`; rFIA uses USDA `SPCD` codes; Niklas-Enquist uses
+   free text; allodb uses `equation_taxa`. A single backbone (TPL, TNRS, or GBIF)
+   is required.
+
+3. **Data type distinction:** `allodb` and `BIOMASS` contain *equations*, not
+   raw measurements. They should be used to *predict* biomass from DBH/height,
+   not as independent observations of the same individuals.
+
+4. **Pseudoreplication / stand-level data:** rFIA `DRYBIO_AG` is in lbs/acre
+   (plot-level expansion), not per-tree dry weight. Use `DRYBIO_AG * (1/TPA_UNADJ)`
+   to convert to per-tree lbs, then × 0.4536 to kg.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```
