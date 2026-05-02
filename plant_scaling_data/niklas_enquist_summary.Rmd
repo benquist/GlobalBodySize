@@ -1,0 +1,396 @@
+---
+title: "Niklas & Enquist Biomass Database — Detailed Summary"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 5)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+library(scales)
+library(stringr)
+
+theme_set(theme_bw(base_size = 12))
+
+# ── Load and clean ────────────────────────────────────────────────────────────
+raw_path <- file.path(dirname(knitr::current_input(dir = TRUE)),
+                      "data/raw/niklas_enquist/niklas_enquist_biomass_20040122.csv")
+
+dat <- read_csv(raw_path, skip = 2,
+  col_names = c(
+    "taxa", "citation", "footnotes", "record_num",
+    "age_yr", "log_age", "height_m", "log_height",
+    "root_biomass_kg", "log_root", "stem_biomass_kg", "log_stem",
+    "leaf_biomass_kg", "log_leaf", "shoot_biomass_kg", "log_shoot",
+    "repro_biomass_kg", "log_repro", "total_biomass_kg", "log_total",
+    "stem_growth_kgyr", "log_stem_growth", "leaf_growth_kgyr", "log_leaf_growth",
+    "root_growth_kgyr", "log_root_growth", "total_growth_kgyr", "log_total_growth"
+  ),
+  locale = locale(encoding = "latin1"),
+  show_col_types = FALSE, skip_empty_rows = TRUE) |>
+  mutate(across(-c(taxa, citation, footnotes), as.numeric)) |>
+  mutate(across(where(is.numeric), ~ ifelse(. == -999, NA_real_, .)))
+```
+
+---
+
+# Overview
+
+The **Niklas & Enquist biomass dataset** is a cross-species compilation of
+plant biomass, height, age, and growth-rate measurements drawn from the primary
+literature, originally assembled by Enquist and Niklas as the empirical backbone
+for their metabolic scaling theory papers published in *Nature* and related journals
+(2001–2004). The primary published data compilation is described in:
+
+> Niklas KJ & Enquist BJ (2001). Invariant scaling relationships for interspecific
+> plant biomass production rates and body size. *PNAS*, 98(5): 2922–2927.
+> DOI: [10.1073/pnas.041590298](https://doi.org/10.1073/pnas.041590298)
+
+> Enquist BJ & Niklas KJ (2002). Global allocation rules for patterns of
+> biomass partitioning in seed plants. *Science*, 295: 1517–1520.
+> DOI: [10.1126/science.1066360](https://doi.org/10.1126/science.1066360)
+
+The source CSV (`niklas_enquist_biomass_20040122.csv`) was compiled January 2004
+and sourced from Cannell (1982) and other primary literature. Missing values are
+encoded as −999 in the original file and have been recoded to NA here.
+
+> **⚠ Citation note:** The citations above should be independently verified
+> before use in any manuscript. DOIs have not been checked against Crossref
+> in this exploratory summary.
+
+```{r top-counts}
+n_rows  <- nrow(dat)
+n_taxa  <- length(unique(dat$taxa))
+n_cites <- length(unique(dat$citation))
+
+kable(data.frame(
+  Metric  = c("Total records", "Unique taxa strings", "Unique citations"),
+  Value   = format(c(n_rows, n_taxa, n_cites), big.mark = ",")
+), caption = "Top-level database summary")
+```
+
+---
+
+# Data structure
+
+## Column dictionary
+
+```{r dict-table}
+col_dict <- data.frame(
+  Column            = c("taxa","citation","footnotes","record_num",
+                        "age_yr","height_m",
+                        "root_biomass_kg","stem_biomass_kg","leaf_biomass_kg",
+                        "shoot_biomass_kg","repro_biomass_kg","total_biomass_kg",
+                        "stem_growth_kgyr","leaf_growth_kgyr",
+                        "root_growth_kgyr","total_growth_kgyr"),
+  Unit              = c("—","—","—","—",
+                        "yr","m",
+                        "kg dry wt","kg dry wt","kg dry wt",
+                        "kg dry wt","kg dry wt","kg dry wt",
+                        "kg yr⁻¹","kg yr⁻¹","kg yr⁻¹","kg yr⁻¹"),
+  Description       = c("Taxon name (may include mixed stands)",
+                        "Literature citation string",
+                        "Footnotes from Cannell (1982) pages",
+                        "Original sort order from source table",
+                        "Plant age","Plant height",
+                        "Root dry biomass per plant",
+                        "Stem dry biomass per plant",
+                        "Leaf dry biomass per plant",
+                        "Shoot (stem+leaf) dry biomass per plant",
+                        "Reproductive organ dry biomass",
+                        "Total dry biomass (root+stem+leaf)",
+                        "Annual stem dry mass increment",
+                        "Annual leaf dry mass increment",
+                        "Annual root dry mass increment",
+                        "Annual total dry mass increment")
+)
+kable(col_dict, caption = "Column dictionary for Niklas-Enquist dataset")
+```
+
+## Data availability per column
+
+```{r availability, fig.height=6}
+num_cols <- c("age_yr","height_m","root_biomass_kg","stem_biomass_kg",
+              "leaf_biomass_kg","shoot_biomass_kg","repro_biomass_kg",
+              "total_biomass_kg","stem_growth_kgyr","leaf_growth_kgyr",
+              "root_growth_kgyr","total_growth_kgyr")
+
+avail <- dat |>
+  summarise(across(all_of(num_cols), ~ sum(!is.na(.)))) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "n") |>
+  arrange(desc(n))
+
+ggplot(avail, aes(x = reorder(variable, n), y = n)) +
+  geom_col(fill = "#2166ac") +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  labs(x = NULL, y = "Non-missing records",
+       title = "Data availability per column",
+       subtitle = paste0("Total rows = ", format(n_rows, big.mark = ",")))
+```
+
+```{r range-table}
+rng <- dat |>
+  summarise(across(all_of(num_cols),
+    list(n = ~ sum(!is.na(.)),
+         min = ~ round(min(., na.rm = TRUE), 4),
+         max = ~ round(max(., na.rm = TRUE), 2)),
+    .names = "{.col}__{.fn}")) |>
+  pivot_longer(everything(),
+    names_to = c("variable", "stat"), names_sep = "__") |>
+  pivot_wider(names_from = stat, values_from = value)
+
+kable(rng, caption = "Non-missing counts and value ranges for numeric columns")
+```
+
+---
+
+# Taxonomic coverage
+
+## Top taxa by record count
+
+```{r top-taxa}
+taxa_counts <- dat |>
+  filter(!is.na(taxa)) |>
+  count(taxa, sort = TRUE)
+
+kable(head(taxa_counts, 50),
+      col.names = c("Taxon string", "N records"),
+      caption = "Top 50 taxa by record count (note: includes mixed stands and crop species)")
+```
+
+## Taxa string composition
+
+The dataset spans vascular plants including wild woody species, crops, and
+annual herbs. Taxon strings are free-text from the original publications
+and have not been harmonized to a taxonomic backbone in this exploratory summary.
+
+```{r taxa-type-guess}
+# Rough classification by keywords
+dat2 <- dat |>
+  filter(!is.na(taxa)) |>
+  mutate(likely_type = case_when(
+    str_detect(taxa, regex("Pinus|Picea|Abies|Larix|Tsuga|Pseudotsuga|Cryptomeria|Chamaecyparis|Cedrus|Taxus", ignore_case=TRUE)) ~ "Conifer",
+    str_detect(taxa, regex("wheat|barley|maize|corn|rice|soya|soybean|pea|bean|millet|oat|rye|cotton|sunflower|tobacco|potato", ignore_case=TRUE)) ~ "Crop/herb",
+    str_detect(taxa, regex("Quercus|Fagus|Betula|Populus|Acer|Fraxinus|Alnus|Eucalyptus|Acacia", ignore_case=TRUE)) ~ "Broadleaf tree",
+    TRUE ~ "Other / unclassified"
+  ))
+
+dat2 |>
+  count(likely_type, sort = TRUE) |>
+  ggplot(aes(x = reorder(likely_type, n), y = n, fill = likely_type)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(x = NULL, y = "Records",
+       title = "Rough functional group classification (keyword-based)",
+       subtitle = "Formal taxonomy reconciliation required before analysis")
+```
+
+---
+
+# Age and size distributions
+
+```{r age-dist}
+dat |> filter(!is.na(age_yr), age_yr > 0) |>
+  ggplot(aes(x = age_yr)) +
+  geom_histogram(bins = 60, fill = "#4dac26", color = "white") +
+  scale_x_log10(labels = comma) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(x = "Age (yr, log scale)", y = "Count",
+       title = paste0("Age distribution  (n = ", sum(!is.na(dat$age_yr) & dat$age_yr > 0), ")"))
+```
+
+```{r height-dist}
+dat |> filter(!is.na(height_m), height_m > 0) |>
+  ggplot(aes(x = height_m)) +
+  geom_histogram(bins = 60, fill = "#1b7837", color = "white") +
+  scale_x_log10(labels = comma) +
+  scale_y_continuous(labels = comma) +
+  annotation_logticks(sides = "b") +
+  labs(x = "Height (m, log scale)", y = "Count",
+       title = paste0("Height distribution  (n = ", sum(!is.na(dat$height_m) & dat$height_m > 0), ")"))
+```
+
+---
+
+# Scaling relationships
+
+All biomass variables are in **kg dry weight per plant**.
+Height is in **m**. Age is in **yr**.
+All regressions below are **exploratory OLS on log10-transformed data**.
+Standardized Major Axis (SMA) regression using `smatr` is required for
+unbiased allometric exponent estimation and will be applied in the formal
+analysis phase.
+
+## Total biomass vs. height
+
+```{r total-height}
+d1 <- dat |> filter(total_biomass_kg > 0, height_m > 0)
+lm1 <- lm(log10(total_biomass_kg) ~ log10(height_m), data = d1)
+b1 <- round(coef(lm1)[2], 3)
+a1 <- round(10^coef(lm1)[1], 4)
+n1 <- nrow(d1)
+
+ggplot(d1, aes(x = height_m, y = total_biomass_kg)) +
+  geom_point(alpha = 0.35, size = 1, color = "#1b7837") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "Height (m)", y = "Total biomass (kg)",
+       title = paste0("Total biomass ~ height  |  β = ", b1, "  |  n = ", format(n1, big.mark=",")))
+```
+
+> OLS: total_biomass = `r a1` × height^`r b1`  (n = `r format(n1, big.mark=",")`).
+
+## Stem biomass vs. total biomass
+
+```{r stem-total}
+d2 <- dat |> filter(stem_biomass_kg > 0, total_biomass_kg > 0)
+lm2 <- lm(log10(stem_biomass_kg) ~ log10(total_biomass_kg), data = d2)
+b2 <- round(coef(lm2)[2], 3); n2 <- nrow(d2)
+
+ggplot(d2, aes(x = total_biomass_kg, y = stem_biomass_kg)) +
+  geom_point(alpha = 0.35, size = 1, color = "#2166ac") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "Total biomass (kg)", y = "Stem biomass (kg)",
+       title = paste0("Stem ~ total biomass  |  β = ", b2, "  |  n = ", format(n2, big.mark=",")))
+```
+
+## Leaf biomass vs. total biomass
+
+```{r leaf-total}
+d3 <- dat |> filter(leaf_biomass_kg > 0, total_biomass_kg > 0)
+lm3 <- lm(log10(leaf_biomass_kg) ~ log10(total_biomass_kg), data = d3)
+b3 <- round(coef(lm3)[2], 3); n3 <- nrow(d3)
+
+ggplot(d3, aes(x = total_biomass_kg, y = leaf_biomass_kg)) +
+  geom_point(alpha = 0.35, size = 1, color = "#d6604d") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "Total biomass (kg)", y = "Leaf biomass (kg)",
+       title = paste0("Leaf ~ total biomass  |  β = ", b3, "  |  n = ", format(n3, big.mark=",")))
+```
+
+## Root biomass vs. total biomass
+
+```{r root-total}
+d4 <- dat |> filter(root_biomass_kg > 0, total_biomass_kg > 0)
+lm4 <- lm(log10(root_biomass_kg) ~ log10(total_biomass_kg), data = d4)
+b4 <- round(coef(lm4)[2], 3); n4 <- nrow(d4)
+
+ggplot(d4, aes(x = total_biomass_kg, y = root_biomass_kg)) +
+  geom_point(alpha = 0.35, size = 1, color = "#762a83") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "Total biomass (kg)", y = "Root biomass (kg)",
+       title = paste0("Root ~ total biomass  |  β = ", b4, "  |  n = ", format(n4, big.mark=",")))
+```
+
+## Total growth rate vs. total biomass
+
+```{r growth-total}
+d5 <- dat |> filter(total_growth_kgyr > 0, total_biomass_kg > 0)
+lm5 <- lm(log10(total_growth_kgyr) ~ log10(total_biomass_kg), data = d5)
+b5 <- round(coef(lm5)[2], 3); n5 <- nrow(d5)
+
+ggplot(d5, aes(x = total_biomass_kg, y = total_growth_kgyr)) +
+  geom_point(alpha = 0.35, size = 1, color = "#f4a582") +
+  geom_smooth(method = "lm", color = "black", linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  labs(x = "Total biomass (kg)", y = "Total growth rate (kg yr⁻¹)",
+       title = paste0("Growth rate ~ total biomass  |  β = ", b5, "  |  n = ", format(n5, big.mark=",")))
+```
+
+> The WBE metabolic scaling prediction is β ≈ 0.75 for production ∝ biomass.
+
+## Summary of scaling exponents (exploratory OLS)
+
+```{r exponent-table}
+exponents <- data.frame(
+  Relationship      = c("total_biomass ~ height",
+                        "stem_biomass ~ total_biomass",
+                        "leaf_biomass ~ total_biomass",
+                        "root_biomass ~ total_biomass",
+                        "total_growth ~ total_biomass"),
+  OLS_beta          = c(b1, b2, b3, b4, b5),
+  n                 = c(n1, n2, n3, n4, n5)
+)
+kable(exponents, caption = "Exploratory OLS scaling exponents (log10-log10). Use SMA for formal inference.")
+```
+
+---
+
+# Source citations
+
+```{r citations-table}
+cites <- dat |>
+  filter(!is.na(citation)) |>
+  mutate(citation = iconv(citation, to = "UTF-8", sub = "?"),
+         citation = substr(citation, 1, 200)) |>
+  count(citation, sort = TRUE)
+
+kable(cites, col.names = c("Citation string", "N records"), escape = TRUE,
+      caption = paste0("All ", nrow(cites), " source citation strings in the dataset"))
+```
+
+---
+
+# Key caveats
+
+1. **Taxon strings are unharmonized.** Many entries are free-text names from
+   Cannell (1982) and include mixed-stand descriptions, common names, and
+   synonyms. Taxonomy reconciliation against a backbone (TPL, TNRS, or GBIF)
+   is required before cross-dataset merging.
+
+2. **Missing data sentinel.** The original file uses −999 for missing values.
+   These have been recoded to NA here; downstream scripts must not treat −999
+   as a valid observation.
+
+3. **Crops and annuals.** The dataset includes crop species (pearl millet,
+   wheat, pea, soybean) alongside forest trees. Analyses of interspecific
+   woody-plant scaling should filter on functional group or growth form.
+
+4. **Shoot vs. total biomass.** `shoot_biomass_kg` = stem + leaf (above-ground
+   except reproduction). `total_biomass_kg` = root + stem + leaf. These must
+   not be used interchangeably.
+
+5. **Log columns.** Pre-computed log10 columns are present in the source file
+   but are derived quantities. The raw biomass columns should be used for
+   independent analysis.
+
+6. **OLS bias.** All exponents reported here are OLS on log-transformed data.
+   These underestimate true allometric exponents when both axes have error.
+   Use SMA (`smatr::sma()`) for publication-quality inference.
+
+7. **Citation verification required.** The Niklas & Enquist (2001) and
+   Enquist & Niklas (2002) references listed in the Overview need independent
+   DOI and metadata verification before inclusion in any methods narrative.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```

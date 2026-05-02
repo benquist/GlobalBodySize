@@ -1775,3 +1775,4 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-05-01 | Created plant_scaling_data project scaffold and reproducible workflow files for plant allometry scaling data.
 2026-05-01 | Created BAAD summary Rmd/HTML for plant_scaling_data project.
 2026-05-01 | Created BAAD summary Rmd/HTML for plant_scaling_data project.
+2026-05-01 | Added Niklas-Enquist biomass data ingestion and summary Rmd/HTML to plant_scaling_data.
