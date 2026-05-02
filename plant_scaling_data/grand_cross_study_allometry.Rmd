@@ -1547,7 +1547,7 @@ if (nrow(norm_rows) > 0) {
 > ⚠️ **Normalization caveat:** Normalizations (intercepts) integrate climate,
 > wood density, and architectural differences among biomes. Expected to vary
 > even when exponents are conserved (Enquist et al. 2007, *Nature* 449:218,
-> DOI: 10.1038/nature06061 [verify citation before publication]).
+> DOI: 10.1038/nature06061).
 
 ## WBE theory scorecard {#sec-theory-scorecard}
 
