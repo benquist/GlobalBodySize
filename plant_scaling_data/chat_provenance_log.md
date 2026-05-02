@@ -2,6 +2,7 @@
 2026-05-01 | Created baad_summary.Rmd and baad_summary.html with full BAAD dataset breakdown: species, geography, vegetation, growing conditions, PFTs, scaling exponents, and source study table.
 2026-05-01 | Created baad_summary.Rmd and baad_summary.html with full BAAD dataset breakdown: species, geography, vegetation, growing conditions, PFTs, scaling exponents, and source study table.
 2026-05-01 | Ingested Niklas-Enquist biomass CSV (2626 rows, 390 taxa, 360 citations). Created niklas_enquist_summary.Rmd/html with full column profile, taxonomy breakdown, and scaling exponents.
+2026-05-02 | Added comprehensive `# Niklas-Enquist WBE & MST Analysis: Complete Assessment {#sec-ne-wbe}` section to grand_cross_study_allometry.Rmd (~840 lines). Implements: genus taxonomy lookup (73 genera, APG IV), ne_parse_taxa() cleaning, species-means aggregation with coupling-corrected complements, V.PhyloMaker2 S3 phylogeny, phylogenetic signal (Pagel's λ, Blomberg's K), run_one_allom() helper for OLS/SMA/PGLS, 8 WBE/MST allometric relationships, gymno/angio ANCOVA, family-level SMA + within-family PGLS + I²/τ² heterogeneity, BAAD intraspecific organ scaling, and WBE scorecard. Rendered successfully.
 
 ## 2025-01-01 — Data Source Inventory
 
@@ -60,3 +61,5 @@
 2026-05-02 | Added BIEN export readiness section to tallo_summary.Rmd; created scripts/tallo_bien_preexport.R with full Darwin Core pre-export pipeline (coord precision, reverse geocoding, QA flags, rejected records log).
 2026-05-02 | Audit fixes applied: (1) dead synthetic data code removed from kurosawa_respiration_scaling.Rmd and sapfluxnet_water_use_scaling.Rmd; (2) star tree PGLS fallback replaced with NULL skip in grand_cross_study_allometry.Rmd (both occurrences); (3) set.seed moved before multi2di(); (4) tallo_bien_preexport.R: eventDate set to NA (not fabricated from pub year), year_from_citation field added, establishmentMeans field added with curation note.
 2026-05-02 | Scholarly rigor review complete; 5 Critical + 8 Warning fixes applied to grand_cross_study_allometry.Rmd. Re-rendered 7.0MB HTML.
+2026-05-02 | Fixed 4 PGLS bugs in kurosawa_respiration_scaling.Rmd; added Blomberg K diagnostic and 8-point phylogenetic caveats block.
+2026-05-02 | Theory review applied to kurosawa_respiration_scaling.Rmd: WBE derivation paragraph, Pagel-λ interpretation, β=2/3 forest-plot reference, root:shoot ratio OLS+SMA section.

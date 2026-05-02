@@ -1157,6 +1157,852 @@ kable(nik_summary, digits = 3,
 
 ---
 
+# Niklas-Enquist WBE & MST Analysis: Complete Assessment {#sec-ne-wbe}
+
+> **Theoretical basis:** West, Brown & Enquist (1997) *Science* 276:122; West et al. (1999) *Science* 284:1677; Niklas & Enquist (2001) *PNAS* 98:2922 (DOI: 10.1073/pnas.041590298); Enquist & Niklas (2002) *Science* 295:1517 (DOI: 10.1126/science.1066360). WBE predicts: metabolic rate B ∝ M^(3/4); leaf biomass ∝ non-photosynthetic biomass^(3/4); total growth rate ∝ M^(3/4). Enquist & Niklas (2002) extend this to full biomass partitioning — leaf ~ stem^(3/4) is the central cross-species prediction.
+
+## Taxonomy parsing and division assignment {#sec-ne-wbe-taxonomy}
+
+```{r ne-wbe-taxonomy}
+# ── Genus-to-family-and-division lookup ──────────────────────────────────────
+# Family assignments follow APG IV (Chase et al. 2016, Bot J Linn Soc 181:1);
+# gymnosperm orders follow Christenhusz et al. (2011). UNVERIFIED: DOIs not
+# checked against Crossref.
+ne_genus_lookup <- tibble::tribble(
+  ~genus,            ~ne_family,         ~ne_division,
+  "Abies",           "Pinaceae",         "Gymnosperm",
+  "Picea",           "Pinaceae",         "Gymnosperm",
+  "Pinus",           "Pinaceae",         "Gymnosperm",
+  "Pseudotsuga",     "Pinaceae",         "Gymnosperm",
+  "Larix",           "Pinaceae",         "Gymnosperm",
+  "Tsuga",           "Pinaceae",         "Gymnosperm",
+  "Cedrus",          "Pinaceae",         "Gymnosperm",
+  "Keteleeria",      "Pinaceae",         "Gymnosperm",
+  "Juniperus",       "Cupressaceae",     "Gymnosperm",
+  "Thuja",           "Cupressaceae",     "Gymnosperm",
+  "Cupressus",       "Cupressaceae",     "Gymnosperm",
+  "Sequoia",         "Cupressaceae",     "Gymnosperm",
+  "Sequoiadendron",  "Cupressaceae",     "Gymnosperm",
+  "Taxodium",        "Cupressaceae",     "Gymnosperm",
+  "Chamaecyparis",   "Cupressaceae",     "Gymnosperm",
+  "Cryptomeria",     "Cupressaceae",     "Gymnosperm",
+  "Metasequoia",     "Cupressaceae",     "Gymnosperm",
+  "Podocarpus",      "Podocarpaceae",    "Gymnosperm",
+  "Dacrydium",       "Podocarpaceae",    "Gymnosperm",
+  "Araucaria",       "Araucariaceae",    "Gymnosperm",
+  "Agathis",         "Araucariaceae",    "Gymnosperm",
+  "Taxus",           "Taxaceae",         "Gymnosperm",
+  "Ginkgo",          "Ginkgoaceae",      "Gymnosperm",
+  "Cycas",           "Cycadaceae",       "Gymnosperm",
+  "Ephedra",         "Ephedraceae",      "Gymnosperm",
+  "Quercus",         "Fagaceae",         "Angiosperm",
+  "Fagus",           "Fagaceae",         "Angiosperm",
+  "Castanea",        "Fagaceae",         "Angiosperm",
+  "Castanopsis",     "Fagaceae",         "Angiosperm",
+  "Lithocarpus",     "Fagaceae",         "Angiosperm",
+  "Nothofagus",      "Nothofagaceae",    "Angiosperm",
+  "Betula",          "Betulaceae",       "Angiosperm",
+  "Alnus",           "Betulaceae",       "Angiosperm",
+  "Carpinus",        "Betulaceae",       "Angiosperm",
+  "Corylus",         "Betulaceae",       "Angiosperm",
+  "Ostrya",          "Betulaceae",       "Angiosperm",
+  "Populus",         "Salicaceae",       "Angiosperm",
+  "Salix",           "Salicaceae",       "Angiosperm",
+  "Eucalyptus",      "Myrtaceae",        "Angiosperm",
+  "Melaleuca",       "Myrtaceae",        "Angiosperm",
+  "Acacia",          "Fabaceae",         "Angiosperm",
+  "Robinia",         "Fabaceae",         "Angiosperm",
+  "Prosopis",        "Fabaceae",         "Angiosperm",
+  "Leucaena",        "Fabaceae",         "Angiosperm",
+  "Gleditsia",       "Fabaceae",         "Angiosperm",
+  "Tilia",           "Malvaceae",        "Angiosperm",
+  "Fraxinus",        "Oleaceae",         "Angiosperm",
+  "Olea",            "Oleaceae",         "Angiosperm",
+  "Ulmus",           "Ulmaceae",         "Angiosperm",
+  "Zelkova",         "Ulmaceae",         "Angiosperm",
+  "Acer",            "Sapindaceae",      "Angiosperm",
+  "Platanus",        "Platanaceae",      "Angiosperm",
+  "Juglans",         "Juglandaceae",     "Angiosperm",
+  "Carya",           "Juglandaceae",     "Angiosperm",
+  "Magnolia",        "Magnoliaceae",     "Angiosperm",
+  "Liriodendron",    "Magnoliaceae",     "Angiosperm",
+  "Cinnamomum",      "Lauraceae",        "Angiosperm",
+  "Shorea",          "Dipterocarpaceae", "Angiosperm",
+  "Dipterocarpus",   "Dipterocarpaceae", "Angiosperm",
+  "Swietenia",       "Meliaceae",        "Angiosperm",
+  "Cedrela",         "Meliaceae",        "Angiosperm",
+  "Ficus",           "Moraceae",         "Angiosperm",
+  "Rhizophora",      "Rhizophoraceae",   "Angiosperm",
+  "Avicennia",       "Acanthaceae",      "Angiosperm",
+  "Casuarina",       "Casuarinaceae",    "Angiosperm",
+  "Prunus",          "Rosaceae",         "Angiosperm",
+  "Sorbus",          "Rosaceae",         "Angiosperm",
+  "Malus",           "Rosaceae",         "Angiosperm",
+  "Crataegus",       "Rosaceae",         "Angiosperm",
+  "Cornus",          "Cornaceae",        "Angiosperm",
+  "Liquidambar",     "Altingiaceae",     "Angiosperm",
+  "Nyssa",           "Nyssaceae",        "Angiosperm",
+  "Celtis",          "Cannabaceae",      "Angiosperm"
+) |> dplyr::distinct(genus, .keep_all = TRUE)
+
+# ── Name cleaning function ────────────────────────────────────────────────────
+ne_parse_taxa <- function(taxa_vec) {
+  cleaned <- taxa_vec |>
+    stringr::str_trim() |>
+    stringr::str_squish() |>
+    stringr::str_remove_all("\\s*\\([^)]*\\)") |>
+    stringr::str_remove("\\s*\\[[^\\]]*\\]$") |>
+    stringr::str_remove("\\s+(ssp\\.|subsp\\.|var\\.|f\\.|cv\\.)\\s+\\S+.*$") |>
+    stringr::str_remove("(?i)\\s+sp+\\.?\\s*$") |>
+    stringr::str_trim()
+
+  genus_vec  <- stringr::word(cleaned, 1)
+  second_wd  <- stringr::word(cleaned, 2)
+  has_epi    <- !is.na(second_wd) &
+    stringr::str_detect(second_wd, "^[a-z][a-z\\-]+$") &
+    !second_wd %in% c("sp", "spp", "sp.", "spp.")
+
+  binomial <- dplyr::if_else(has_epi, paste(genus_vec, second_wd), NA_character_)
+
+  flag_community <- stringr::str_detect(
+    taxa_vec, stringr::regex("community|stand|mixed|plot|forest|woodland",
+                              ignore_case = TRUE))
+
+  dplyr::tibble(
+    taxa_orig      = taxa_vec,
+    taxa_cleaned   = cleaned,
+    binomial       = binomial,
+    genus          = genus_vec,
+    flag_sp_only   = !has_epi & !is.na(genus_vec),
+    flag_community = flag_community,
+    flag_uncertain = is.na(binomial) | flag_community
+  )
+}
+
+ne_parsed <- ne_parse_taxa(nik_enq$taxa) |>
+  dplyr::left_join(ne_genus_lookup, by = "genus")
+
+taxa_diag <- ne_parsed |>
+  dplyr::count(ne_division, flag_uncertain, name = "n_records") |>
+  dplyr::arrange(ne_division)
+kable(taxa_diag, caption = "Niklas-Enquist taxonomy parsing diagnostics by division.")
+
+cat(sprintf(
+  "Gymnosperms: %d records | Angiosperms: %d records | NA division: %d | Uncertain (communities/sp-only): %d\n",
+  sum(ne_parsed$ne_division == "Gymnosperm", na.rm = TRUE),
+  sum(ne_parsed$ne_division == "Angiosperm", na.rm = TRUE),
+  sum(is.na(ne_parsed$ne_division)),
+  sum(ne_parsed$flag_uncertain)))
+```
+
+## Species-means aggregation {#sec-ne-wbe-means}
+
+```{r ne-wbe-means}
+# Merge taxonomy back onto NE data (pgls_eligible records only)
+ne_annotated <- nik_enq |>
+  dplyr::mutate(taxa_orig = taxa) |>
+  dplyr::left_join(
+    ne_parsed |> dplyr::select(taxa_orig, binomial, genus,
+                                ne_family, ne_division,
+                                flag_uncertain, flag_sp_only),
+    by = c("taxa" = "taxa_orig")) |>
+  dplyr::filter(pgls_eligible, !flag_uncertain, !is.na(binomial),
+                !is.na(total_biomass_kg), total_biomass_kg > 0) |>
+  dplyr::mutate(
+    non_leaf_kg  = dplyr::if_else(!is.na(leaf_biomass_kg)  & leaf_biomass_kg  > 0 &
+                                    total_biomass_kg > leaf_biomass_kg,
+                                  total_biomass_kg - leaf_biomass_kg,  NA_real_),
+    non_root_kg  = dplyr::if_else(!is.na(root_biomass_kg)  & root_biomass_kg  > 0 &
+                                    total_biomass_kg > root_biomass_kg,
+                                  total_biomass_kg - root_biomass_kg,  NA_real_),
+    non_stem_kg  = dplyr::if_else(!is.na(stem_biomass_kg)  & stem_biomass_kg  > 0 &
+                                    total_biomass_kg > stem_biomass_kg,
+                                  total_biomass_kg - stem_biomass_kg,  NA_real_)
+  )
+
+ne_sp_means <- ne_annotated |>
+  dplyr::group_by(binomial, genus, ne_family, ne_division) |>
+  dplyr::summarise(
+    log_height_m          = mean(log10(pmax(height_m,         1e-9)), na.rm = TRUE),
+    log_total_biomass_kg  = mean(log10(pmax(total_biomass_kg, 1e-9)), na.rm = TRUE),
+    log_stem_biomass_kg   = mean(log10(pmax(stem_biomass_kg,  1e-9)[stem_biomass_kg  > 0 & !is.na(stem_biomass_kg)]),  na.rm = TRUE),
+    log_leaf_biomass_kg   = mean(log10(pmax(leaf_biomass_kg,  1e-9)[leaf_biomass_kg  > 0 & !is.na(leaf_biomass_kg)]),  na.rm = TRUE),
+    log_root_biomass_kg   = mean(log10(pmax(root_biomass_kg,  1e-9)[root_biomass_kg  > 0 & !is.na(root_biomass_kg)]),  na.rm = TRUE),
+    log_shoot_biomass_kg  = mean(log10(pmax(shoot_biomass_kg, 1e-9)[shoot_biomass_kg > 0 & !is.na(shoot_biomass_kg)]), na.rm = TRUE),
+    log_stem_growth_kgyr  = mean(log10(pmax(stem_growth_kgyr, 1e-9)[stem_growth_kgyr > 0 & !is.na(stem_growth_kgyr)]),  na.rm = TRUE),
+    log_total_growth_kgyr = mean(log10(pmax(total_growth_kgyr,1e-9)[total_growth_kgyr> 0 & !is.na(total_growth_kgyr)]), na.rm = TRUE),
+    log_non_leaf_kg       = mean(log10(pmax(non_leaf_kg, 1e-9)[non_leaf_kg > 0 & !is.na(non_leaf_kg)]), na.rm = TRUE),
+    log_non_root_kg       = mean(log10(pmax(non_root_kg, 1e-9)[non_root_kg > 0 & !is.na(non_root_kg)]), na.rm = TRUE),
+    log_non_stem_kg       = mean(log10(pmax(non_stem_kg, 1e-9)[non_stem_kg > 0 & !is.na(non_stem_kg)]), na.rm = TRUE),
+    n_obs                 = dplyr::n(),
+    .groups               = "drop"
+  ) |>
+  dplyr::mutate(
+    across(starts_with("log_"), ~ ifelse(is.nan(.) | is.infinite(.), NA_real_, .)),
+    singleton = (n_obs == 1L),
+    sp_tree   = gsub(" ", "_", binomial)
+  )
+
+cat(sprintf("ne_sp_means: %d species — Gymno: %d, Angio: %d, NA division: %d\n",
+  nrow(ne_sp_means),
+  sum(ne_sp_means$ne_division == "Gymnosperm", na.rm = TRUE),
+  sum(ne_sp_means$ne_division == "Angiosperm", na.rm = TRUE),
+  sum(is.na(ne_sp_means$ne_division))))
+
+# Coverage by variable
+cov_tbl <- ne_sp_means |>
+  dplyr::summarise(across(starts_with("log_"), ~ sum(!is.na(.)))) |>
+  tidyr::pivot_longer(everything(), names_to = "variable", values_to = "n_species")
+kable(cov_tbl, caption = "Number of species with valid data per log-variable (ne_sp_means).")
+```
+
+## Phylogeny for Niklas-Enquist PGLS {#sec-ne-wbe-phylo}
+
+```{r ne-wbe-phylo}
+ne_pgls_tree <- NULL
+
+if (HAS_PHYLOMAKER && nrow(ne_sp_means) >= 20) {
+  sp_list_ne <- ne_sp_means |>
+    dplyr::filter(!is.na(binomial), !is.na(ne_family)) |>
+    dplyr::select(species = binomial, genus, family = ne_family) |>
+    dplyr::distinct(species, .keep_all = TRUE)
+
+  set.seed(42)
+  ne_tree_out <- tryCatch({
+    V.PhyloMaker2::phylo.maker(
+      sp.list   = sp_list_ne,
+      tree      = V.PhyloMaker2::GBOTB.extended.WP,
+      nodes     = V.PhyloMaker2::nodes.info.1.WP,
+      scenarios = "S3")
+  }, error = function(e) {
+    message("ne_pgls_tree: phylo.maker S3 failed — ", conditionMessage(e))
+    NULL
+  })
+
+  if (!is.null(ne_tree_out)) {
+    ne_pgls_tree <- ne_tree_out$scenario.3
+    set.seed(42)
+    ne_pgls_tree <- ape::multi2di(ne_pgls_tree, random = TRUE)
+    if (!ape::is.ultrametric(ne_pgls_tree, tol = 1e-5))
+      ne_pgls_tree <- phytools::force.ultrametric(ne_pgls_tree, method = "extend")
+    ne_pgls_tree$node.label <- NULL
+
+    n_tree_tips <- ape::Ntip(ne_pgls_tree)
+    n_matched   <- sum(gsub(" ", "_", sp_list_ne$species) %in% ne_pgls_tree$tip.label)
+    pct_match   <- round(100 * n_matched / nrow(sp_list_ne), 1)
+    cat(sprintf("NE phylogeny: %d tips; %d/%d species matched (%.1f%%).\n",
+                n_tree_tips, n_matched, nrow(sp_list_ne), pct_match))
+    if (pct_match < 70)
+      warning(sprintf("Only %.1f%% of NE species matched to tree.", pct_match))
+  }
+} else {
+  message("PGLS skipped for NE dataset: V.PhyloMaker2 unavailable or < 20 species.")
+}
+```
+
+## Phylogenetic signal in NE biomass traits {#sec-ne-wbe-signal}
+
+```{r ne-wbe-signal}
+if (!is.null(ne_pgls_tree)) {
+  ne_sig_df <- ne_sp_means |>
+    dplyr::filter(sp_tree %in% ne_pgls_tree$tip.label) |>
+    as.data.frame()
+
+  ne_sig_rows <- purrr::map_dfr(
+    c("log_total_biomass_kg", "log_stem_biomass_kg",
+      "log_leaf_biomass_kg",  "log_root_biomass_kg",
+      "log_height_m",         "log_total_growth_kgyr"),
+    function(trait) {
+      vals <- setNames(ne_sig_df[[trait]], ne_sig_df$sp_tree)
+      vals <- vals[is.finite(vals)]
+      if (length(vals) < 5) return(NULL)
+      tr2  <- ape::keep.tip(ne_pgls_tree, names(vals))
+      vals <- vals[tr2$tip.label]
+      lam  <- tryCatch(phytools::phylosig(tr2, vals, method = "lambda", test = TRUE),
+                       error = function(e) list(lambda = NA_real_, P = NA_real_))
+      K    <- tryCatch(phytools::phylosig(tr2, vals, method = "K",      test = TRUE),
+                       error = function(e) list(K = NA_real_, P = NA_real_))
+      tibble::tibble(
+        trait    = trait,
+        N        = length(vals),
+        lambda   = if (is.list(lam)) lam$lambda else as.numeric(lam)[1],
+        p_lambda = if (is.list(lam) && !is.null(lam$P)) lam$P else NA_real_,
+        K        = if (is.list(K)) K$K else as.numeric(K)[1],
+        p_K      = if (is.list(K) && !is.null(K$P)) K$P else NA_real_
+      )
+    })
+
+  kable(ne_sig_rows |> dplyr::mutate(across(where(is.numeric), ~ round(., 3))),
+        caption = "Phylogenetic signal (Pagel's λ, Blomberg's K) for NE biomass traits. λ = 1: Brownian motion; λ = 0: no signal. High λ indicates PGLS will produce wider CIs than OLS.")
+}
+```
+
+## Eight allometric relationships: OLS, SMA, PGLS {#sec-ne-wbe-eight}
+
+```{r ne-wbe-helper}
+# ── Helper: fit OLS + SMA + PGLS for one y~x pair on species means ────────────
+run_one_allom <- function(df, tree, y_col, x_col, rel_label, wbe_slope = NA_real_,
+                           group_label = "All") {
+  sub <- df |>
+    dplyr::filter(is.finite(.data[[y_col]]), is.finite(.data[[x_col]]))
+  if (!is.null(tree)) sub <- sub |> dplyr::filter(sp_tree %in% tree$tip.label)
+  n <- nrow(sub)
+  if (n < 8) {
+    message(sprintf("run_one_allom: skipping %s ~ %s [%s/%s] — only %d rows",
+                    y_col, x_col, rel_label, group_label, n))
+    return(NULL)
+  }
+
+  # OLS
+  ols_f  <- lm(as.formula(paste(y_col, "~", x_col)), data = sub)
+  ols_s  <- summary(ols_f)
+  ols_b  <- coef(ols_f)[2];  ols_se <- coef(ols_s)[2, 2]
+  ols_ci <- confint(ols_f)[2, ]
+  ols_r2 <- ols_s$r.squared
+  ols_p  <- if (!is.na(wbe_slope))
+    2 * pt(abs((ols_b - wbe_slope) / ols_se), n - 2, lower.tail = FALSE)
+  else NA_real_
+
+  # SMA
+  sma_f <- tryCatch(
+    smatr::sma(as.formula(paste(y_col, "~", x_col)), data = sub),
+    error = function(e) NULL)
+  if (!is.null(sma_f)) {
+    sma_b    <- sma_f$coef[[1]][2, 1]
+    sma_cilo <- sma_f$coef[[1]][2, 2]
+    sma_cihi <- sma_f$coef[[1]][2, 3]
+    sma_r2   <- sma_f$r2[[1]]
+    sma_p    <- if (!is.na(wbe_slope))
+      tryCatch({
+        st <- smatr::slope.test(sub[[y_col]], sub[[x_col]],
+                                test.value = wbe_slope, method = "SMA")
+        st$p
+      }, error = function(e) NA_real_)
+    else NA_real_
+  } else {
+    sma_b <- sma_cilo <- sma_cihi <- sma_r2 <- sma_p <- NA_real_
+  }
+
+  # PGLS (only when tree available and n >= 8)
+  pgls_b <- pgls_se <- pgls_r2 <- pgls_lam <- pgls_p <- NA_real_
+  pgls_cilo <- pgls_cihi <- NA_real_
+
+  if (!is.null(tree) && n >= 8) {
+    tr2 <- ape::keep.tip(tree, sub$sp_tree)
+    tr2$node.label <- NULL
+    df_p <- as.data.frame(sub); rownames(df_p) <- df_p$sp_tree
+    cd <- tryCatch(
+      caper::comparative.data(phy = tr2, data = df_p, names.col = "sp_tree",
+                               vcv = TRUE, warn.dropped = FALSE),
+      error = function(e) NULL)
+    if (!is.null(cd)) {
+      pg <- tryCatch(
+        caper::pgls(as.formula(paste(y_col, "~", x_col)), data = cd,
+                    lambda = "ML", bounds = list(lambda = c(1e-6, 1))),
+        error = function(e) {
+          message("PGLS ML failed [", rel_label, "/", group_label, "]: ", e$message,
+                  " — retrying lambda=1")
+          tryCatch(
+            caper::pgls(as.formula(paste(y_col, "~", x_col)), data = cd, lambda = 1),
+            error = function(e2) NULL)
+        })
+      if (!is.null(pg)) {
+        pg_s    <- summary(pg)
+        pgls_b  <- coef(pg)[2];  pgls_se <- coef(pg_s)[2, 2]
+        pgls_ci <- pgls_b + c(-1, 1) * 1.96 * pgls_se
+        pgls_cilo <- pgls_ci[1]; pgls_cihi <- pgls_ci[2]
+        pgls_r2 <- pg_s$r.squared
+        pgls_lam <- tryCatch(pg$param["lambda"], error = function(e) NA_real_)
+        pgls_p  <- if (!is.na(wbe_slope))
+          2 * pt(abs((pgls_b - wbe_slope) / pgls_se), n - 2, lower.tail = FALSE)
+        else NA_real_
+      }
+    }
+  }
+
+  tibble::tibble(
+    relationship = rel_label, group = group_label,
+    y_var = y_col, x_var = x_col,
+    wbe_slope = wbe_slope, n_species = n,
+    method    = c("OLS",   "SMA",    "PGLS"),
+    slope     = c(ols_b,   sma_b,    pgls_b),
+    slope_se  = c(ols_se,  NA_real_, pgls_se),
+    ci_lower  = c(ols_ci[1], sma_cilo, pgls_cilo),
+    ci_upper  = c(ols_ci[2], sma_cihi, pgls_cihi),
+    r_squared = c(ols_r2, sma_r2,   pgls_r2),
+    lambda_ml = c(NA_real_, NA_real_, pgls_lam),
+    p_vs_wbe  = c(ols_p,  sma_p,    pgls_p)
+  )
+}
+```
+
+```{r ne-wbe-eight-rel, fig.height=9}
+# WBE / MST predicted slopes for 8 relationships
+# ⚠ β_WBE for Stem ~ Non-stem (~4/3) is a derived prediction, not directly
+# stated in Enquist & Niklas (2002). Treat as UNVERIFIED and interpret cautiously.
+ne_rel_list <- list(
+  list(y = "log_total_biomass_kg",  x = "log_height_m",         wbe = 8/3,  label = "TotalBM ~ Height"),
+  list(y = "log_leaf_biomass_kg",   x = "log_non_leaf_kg",       wbe = 3/4,  label = "Leaf ~ Non-leaf"),
+  list(y = "log_root_biomass_kg",   x = "log_non_root_kg",       wbe = 1.0,  label = "Root ~ Non-root"),
+  list(y = "log_stem_biomass_kg",   x = "log_non_stem_kg",       wbe = 4/3,  label = "Stem ~ Non-stem*"),
+  list(y = "log_leaf_biomass_kg",   x = "log_stem_biomass_kg",   wbe = 3/4,  label = "Leaf ~ Stem"),
+  list(y = "log_root_biomass_kg",   x = "log_shoot_biomass_kg",  wbe = 1.0,  label = "Root ~ Shoot"),
+  list(y = "log_total_growth_kgyr", x = "log_total_biomass_kg",  wbe = 3/4,  label = "Growth ~ TotalBM"),
+  list(y = "log_stem_growth_kgyr",  x = "log_total_biomass_kg",  wbe = 3/4,  label = "StemGrowth ~ TotalBM")
+)
+
+ne_results_all <- purrr::map_dfr(ne_rel_list, function(r)
+  run_one_allom(ne_sp_means, ne_pgls_tree, r$y, r$x,
+                rel_label = r$label, wbe_slope = r$wbe, group_label = "All"))
+
+# Master summary table
+ne_wide <- ne_results_all |>
+  dplyr::mutate(
+    slope_ci = sprintf("%.3f [%.3f, %.3f]", slope, ci_lower, ci_upper),
+    lambda_str = dplyr::if_else(!is.na(lambda_ml), sprintf("%.3f", lambda_ml), "—"),
+    p_str = dplyr::if_else(!is.na(p_vs_wbe), sprintf("%.4f", p_vs_wbe), "—"),
+    r2_str = dplyr::if_else(!is.na(r_squared), sprintf("%.3f", r_squared), "—")
+  ) |>
+  dplyr::select(relationship, wbe_slope, n_species, method, slope_ci, lambda_str, r2_str, p_str) |>
+  tidyr::pivot_wider(names_from = method,
+                     values_from = c(slope_ci, lambda_str, r2_str, p_str),
+                     names_glue = "{method}_{.value}")
+
+kable(ne_wide |>
+        dplyr::select(relationship, wbe_slope, n_species,
+                       `OLS_slope_ci`, `OLS_p_str`,
+                       `SMA_slope_ci`, `SMA_p_str`,
+                       `PGLS_slope_ci`, `PGLS_lambda_str`, `PGLS_p_str`),
+      col.names = c("Relationship", "WBE β", "N spp",
+                    "OLS slope [95% CI]", "OLS p vs WBE",
+                    "SMA slope [95% CI]", "SMA p vs WBE",
+                    "PGLS slope [95% CI]", "PGLS λ", "PGLS p vs WBE"),
+      caption = "Eight allometric relationships in Niklas-Enquist: OLS, SMA, and PGLS slopes with 95% CIs and p-values tested against WBE/MST predicted exponents. * Stem ~ Non-stem WBE β ≈ 4/3 is a derived prediction (UNVERIFIED; verify against Enquist & Niklas 2002 Table 1).")
+
+# Forest plot: slopes by method and relationship
+ne_forest_dat <- ne_results_all |>
+  dplyr::filter(!is.na(slope), !is.na(ci_lower), !is.na(ci_upper)) |>
+  dplyr::mutate(
+    rel_method = paste0(relationship, " [", method, "]"),
+    rel_method = factor(rel_method, levels = rev(unique(rel_method))))
+
+wbe_refs_ne <- purrr::map_dfr(ne_rel_list, function(r)
+  tibble::tibble(relationship = r$label, wbe_slope = r$wbe))
+
+ggplot(ne_forest_dat, aes(slope, rel_method, colour = method)) +
+  geom_pointrange(aes(xmin = ci_lower, xmax = ci_upper), size = 0.5) +
+  geom_vline(data = ne_results_all |> dplyr::distinct(relationship, wbe_slope),
+             aes(xintercept = wbe_slope), colour = "red",
+             linetype = "dashed", linewidth = 0.7, inherit.aes = FALSE) +
+  scale_colour_manual(values = c(OLS = "#1565C0", SMA = "#2E7D32", PGLS = "#6A1B9A")) +
+  facet_wrap(~relationship, scales = "free_x", ncol = 2) +
+  labs(title = "OLS / SMA / PGLS slopes for 8 NE allometric relationships",
+       subtitle = "Red dashed = WBE/MST predicted exponent",
+       x = "Slope ± 95% CI", y = NULL, colour = "Method") +
+  theme(strip.text = element_text(size = 8), axis.text.y = element_text(size = 7))
+```
+
+## Gymnosperm vs Angiosperm analysis {#sec-ne-wbe-division}
+
+```{r ne-wbe-division, fig.height=7}
+ne_div_results <- purrr::map_dfr(
+  c("Gymnosperm", "Angiosperm"),
+  function(div) {
+    df_div <- ne_sp_means |> dplyr::filter(ne_division == div)
+    if (nrow(df_div) < 8) {
+      message(sprintf("Division %s: only %d rows — skipping", div, nrow(df_div)))
+      return(NULL)
+    }
+    # Use sub-tree for PGLS
+    tree_div <- if (!is.null(ne_pgls_tree)) {
+      tips_div <- df_div$sp_tree[df_div$sp_tree %in% ne_pgls_tree$tip.label]
+      if (length(tips_div) >= 8) ape::keep.tip(ne_pgls_tree, tips_div) else NULL
+    } else NULL
+
+    purrr::map_dfr(ne_rel_list, function(r)
+      run_one_allom(df_div, tree_div, r$y, r$x,
+                    rel_label = r$label, wbe_slope = r$wbe,
+                    group_label = div))
+  })
+
+# Division comparison table (OLS only for brevity, plus PGLS where available)
+ne_div_ols <- ne_div_results |>
+  dplyr::filter(method == "OLS") |>
+  dplyr::select(relationship, group, n_species, slope, ci_lower, ci_upper, p_vs_wbe) |>
+  dplyr::mutate(across(where(is.numeric), ~ round(., 3)))
+
+kable(ne_div_ols,
+      col.names = c("Relationship", "Division", "N spp", "OLS slope",
+                    "CI lower", "CI upper", "p vs WBE"),
+      caption = "Gymnosperm vs Angiosperm OLS slopes for 8 allometric relationships. WBE predicts identical slopes across divisions with differing intercepts.")
+
+# ANCOVA: test slope and intercept heterogeneity between divisions
+ne_ancova_key <- purrr::map_dfr(ne_rel_list, function(r) {
+  df_anc <- ne_sp_means |>
+    dplyr::filter(!is.na(ne_division),
+                  is.finite(.data[[r$y]]), is.finite(.data[[r$x]]))
+  if (nrow(df_anc) < 15 || dplyr::n_distinct(df_anc$ne_division) < 2) return(NULL)
+
+  m2 <- lm(as.formula(paste(r$y, "~", r$x, "* ne_division")), data = df_anc)
+  m1 <- lm(as.formula(paste(r$y, "~", r$x, "+ ne_division")), data = df_anc)
+  m0 <- lm(as.formula(paste(r$y, "~", r$x)),                  data = df_anc)
+
+  f21 <- tryCatch(anova(m1, m2), error = function(e) NULL)
+  f10 <- tryCatch(anova(m0, m1), error = function(e) NULL)
+
+  tibble::tibble(
+    relationship     = r$label,
+    n_total          = nrow(df_anc),
+    p_slope_hetero   = if (!is.null(f21)) f21$`Pr(>F)`[2] else NA_real_,
+    p_intercept_diff = if (!is.null(f10)) f10$`Pr(>F)`[2] else NA_real_,
+    angio_intercept_shift = tryCatch(
+      coef(m1)[grep("ne_divisionGymnosperm|ne_divisionAngiosperm", names(coef(m1)))][1],
+      error = function(e) NA_real_)
+  )
+})
+
+kable(ne_ancova_tbl <- ne_ancova_key |>
+        dplyr::mutate(
+          slopes_homogeneous = dplyr::if_else(!is.na(p_slope_hetero),
+                                              dplyr::if_else(p_slope_hetero > 0.05,
+                                                             "Yes", "No"), "?"),
+          intercept_different = dplyr::if_else(!is.na(p_intercept_diff),
+                                               dplyr::if_else(p_intercept_diff < 0.05,
+                                                              "Yes", "No"), "?"),
+          across(c(p_slope_hetero, p_intercept_diff, angio_intercept_shift),
+                 ~ round(., 4))) |>
+        dplyr::select(relationship, n_total, p_slope_hetero, slopes_homogeneous,
+                      p_intercept_diff, intercept_different, angio_intercept_shift),
+      col.names = c("Relationship", "N", "p (slope hetero)", "Slopes equal?",
+                    "p (intercept)", "Intercepts differ?", "Intercept shift"),
+      caption = "ANCOVA tests for division (gymno vs angio): slope homogeneity (M2 vs M1) and intercept difference (M1 vs M0). WBE predicts slopes homogeneous, intercepts may differ due to hydraulic and LMA differences.")
+
+# Forest plot: gymno vs angio slopes for key relationships
+ne_div_sma <- ne_div_results |> dplyr::filter(method == "SMA", !is.na(slope))
+if (nrow(ne_div_sma) > 0) {
+  ggplot(ne_div_sma, aes(slope, relationship, colour = group)) +
+    geom_pointrange(aes(xmin = ci_lower, xmax = ci_upper),
+                    position = position_dodge(width = 0.5), size = 0.6) +
+    geom_vline(data = wbe_refs_ne, aes(xintercept = wbe_slope),
+               colour = "red", linetype = "dashed", linewidth = 0.7,
+               inherit.aes = FALSE) +
+    scale_colour_manual(values = c(Gymnosperm = "#E65100", Angiosperm = "#1565C0")) +
+    labs(title = "SMA slopes: Gymnosperm vs Angiosperm",
+         subtitle = "Red dashed = WBE prediction per relationship",
+         x = "SMA slope ± 95% CI", y = NULL, colour = "Division")
+}
+```
+
+## Family-level analysis {#sec-ne-wbe-family}
+
+```{r ne-wbe-family, fig.height=6}
+# Identify families with ≥5 species for OLS/SMA analysis
+ne_fam_coverage <- ne_sp_means |>
+  dplyr::filter(!is.na(ne_family)) |>
+  dplyr::group_by(ne_family, ne_division) |>
+  dplyr::summarise(
+    n_species = dplyr::n(),
+    n_with_leaf_stem = sum(!is.na(log_leaf_biomass_kg) & !is.na(log_stem_biomass_kg)),
+    n_with_growth    = sum(!is.na(log_total_growth_kgyr) & !is.na(log_total_biomass_kg)),
+    .groups = "drop") |>
+  dplyr::filter(n_species >= 5) |>
+  dplyr::arrange(dplyr::desc(n_species))
+
+kable(ne_fam_coverage,
+      caption = "Niklas-Enquist: families with ≥5 species in species-means table.")
+
+# Family-level OLS and SMA for Leaf ~ Stem (key WBE prediction: β = 3/4)
+ne_fam_ls <- purrr::map_dfr(ne_fam_coverage$ne_family, function(fam) {
+  df_f <- ne_sp_means |>
+    dplyr::filter(ne_family == fam,
+                  is.finite(log_leaf_biomass_kg),
+                  is.finite(log_stem_biomass_kg))
+  n_f <- nrow(df_f)
+  if (n_f < 5) return(NULL)
+  ols_f <- lm(log_leaf_biomass_kg ~ log_stem_biomass_kg, data = df_f)
+  sma_f <- tryCatch(smatr::sma(log_leaf_biomass_kg ~ log_stem_biomass_kg,
+                                data = df_f), error = function(e) NULL)
+  ci_o  <- tryCatch(confint(ols_f)[2, ], error = function(e) c(NA, NA))
+  tibble::tibble(
+    family       = fam,
+    division     = unique(df_f$ne_division[!is.na(df_f$ne_division)])[1],
+    n_species    = n_f,
+    ols_slope    = coef(ols_f)[2],
+    ols_se       = summary(ols_f)$coefficients[2, 2],
+    ols_intercept = coef(ols_f)[1],
+    ols_cilo     = ci_o[1], ols_cihi = ci_o[2],
+    sma_slope    = if (!is.null(sma_f)) sma_f$coef[[1]][2, 1] else NA_real_,
+    sma_cilo     = if (!is.null(sma_f)) sma_f$coef[[1]][2, 2] else NA_real_,
+    sma_cihi     = if (!is.null(sma_f)) sma_f$coef[[1]][2, 3] else NA_real_
+  )
+})
+
+if (nrow(ne_fam_ls) > 0) {
+  kable(ne_fam_ls |> dplyr::mutate(across(where(is.numeric), ~ round(., 3))),
+        caption = "Family-level OLS and SMA slopes for Leaf ~ Stem (WBE β = 3/4). Families with ≥5 species.")
+
+  # Forest plot: SMA slopes per family
+  ne_fam_ls |>
+    dplyr::filter(!is.na(sma_slope)) |>
+    dplyr::mutate(family = reorder(family, sma_slope)) |>
+    ggplot(aes(sma_slope, family, colour = division)) +
+    geom_pointrange(aes(xmin = sma_cilo, xmax = sma_cihi), size = 0.5) +
+    geom_vline(xintercept = 3/4, colour = "red", linetype = "dashed", linewidth = 0.8) +
+    scale_colour_manual(values = c(Gymnosperm = "#E65100", Angiosperm = "#1565C0"),
+                        na.value = "grey50") +
+    labs(title = "Family-level SMA slopes — Leaf ~ Stem biomass",
+         subtitle = "Red dashed = WBE prediction β = 3/4; colour = division",
+         x = "SMA slope ± 95% CI", y = NULL, colour = "Division")
+}
+```
+
+```{r ne-wbe-family-pgls}
+# Within-family PGLS where N ≥ 15 species in NE tree
+ne_fam_pgls_fits <- NULL
+if (!is.null(ne_pgls_tree)) {
+  fam_pgls_eligible <- ne_fam_coverage |>
+    dplyr::filter(n_with_leaf_stem >= 15) |>
+    dplyr::pull(ne_family)
+
+  ne_fam_pgls_fits <- purrr::map_dfr(fam_pgls_eligible, function(fam) {
+    df_f <- ne_sp_means |>
+      dplyr::filter(ne_family == fam,
+                    sp_tree %in% ne_pgls_tree$tip.label,
+                    is.finite(log_leaf_biomass_kg),
+                    is.finite(log_stem_biomass_kg))
+    if (nrow(df_f) < 10) return(NULL)
+    tr_f <- ape::keep.tip(ne_pgls_tree, df_f$sp_tree)
+    tr_f$node.label <- NULL
+    df_fp <- as.data.frame(df_f); rownames(df_fp) <- df_fp$sp_tree
+    cd_f  <- tryCatch(
+      caper::comparative.data(phy = tr_f, data = df_fp, names.col = "sp_tree",
+                               vcv = TRUE, warn.dropped = FALSE),
+      error = function(e) NULL)
+    if (is.null(cd_f)) return(NULL)
+    pg_f <- tryCatch(
+      caper::pgls(log_leaf_biomass_kg ~ log_stem_biomass_kg, data = cd_f,
+                  lambda = "ML", bounds = list(lambda = c(1e-6, 1))),
+      error = function(e) NULL)
+    if (is.null(pg_f)) return(NULL)
+    pg_s <- summary(pg_f)
+    sl <- coef(pg_f)[2]; se <- coef(pg_s)[2, 2]
+    tibble::tibble(
+      family = fam, n_species = nrow(df_f),
+      pgls_slope = sl, pgls_se = se,
+      pgls_cilo  = sl - 1.96 * se, pgls_cihi = sl + 1.96 * se,
+      pgls_lambda = tryCatch(pg_f$param["lambda"], error = function(e) NA_real_),
+      pgls_r2 = pg_s$r.squared)
+  })
+
+  if (!is.null(ne_fam_pgls_fits) && nrow(ne_fam_pgls_fits) > 0) {
+    kable(ne_fam_pgls_fits |> dplyr::mutate(across(where(is.numeric), ~ round(., 3))),
+          caption = "Within-family PGLS slopes — Leaf ~ Stem (families with ≥15 matched species). WBE β = 3/4.")
+  } else {
+    message("Within-family PGLS: no families met ≥15 species threshold in tree.")
+  }
+}
+```
+
+```{r ne-wbe-family-hetero}
+# Meta-analytic heterogeneity in family slopes (Leaf ~ Stem)
+if (nrow(ne_fam_ls) >= 3) {
+  w_fam    <- 1 / ne_fam_ls$ols_se^2
+  wm_fam   <- weighted.mean(ne_fam_ls$ols_slope, w_fam, na.rm = TRUE)
+  Q_fam    <- sum(w_fam * (ne_fam_ls$ols_slope - wm_fam)^2, na.rm = TRUE)
+  df_fam   <- sum(!is.na(ne_fam_ls$ols_slope)) - 1
+  I2_fam   <- max(0, (Q_fam - df_fam) / Q_fam * 100)
+  tau2_fam <- max(0, (Q_fam - df_fam) / (sum(w_fam) - sum(w_fam^2) / sum(w_fam)))
+
+  if (HAS_METAFOR) {
+    rma_fam_slope <- tryCatch(
+      metafor::rma(yi = ne_fam_ls$ols_slope, sei = ne_fam_ls$ols_se, method = "REML"),
+      error = function(e) NULL)
+    if (!is.null(rma_fam_slope)) {
+      I2_fam   <- rma_fam_slope$I2
+      tau2_fam <- rma_fam_slope$tau2
+    }
+  }
+
+  cat(sprintf("Slope heterogeneity (Leaf ~ Stem, family level): I² = %.1f%%, τ² = %.4f, Q(%d) = %.2f\n",
+              I2_fam, tau2_fam, df_fam, Q_fam))
+  if (I2_fam > 50)
+    cat("High I² (>50%): allometric exponents vary substantially across plant families beyond sampling error.\n")
+  else
+    cat("Low I² (≤50%): slope variation is consistent with sampling error — exponent is relatively conserved across families.\n")
+
+  # Intercept heterogeneity
+  w_int  <- 1 / ne_fam_ls$ols_se^2  # approximate weight using slope SE
+  wm_int <- weighted.mean(ne_fam_ls$ols_intercept, w_int, na.rm = TRUE)
+  Q_int  <- sum(w_int * (ne_fam_ls$ols_intercept - wm_int)^2, na.rm = TRUE)
+  df_int <- sum(!is.na(ne_fam_ls$ols_intercept)) - 1
+  I2_int <- max(0, (Q_int - df_int) / Q_int * 100)
+  cat(sprintf("Intercept heterogeneity (Leaf ~ Stem, family level): I² = %.1f%%, Q(%d) = %.2f\n",
+              I2_int, df_int, Q_int))
+
+  # Intercept forest plot
+  ne_fam_ls |>
+    dplyr::filter(!is.na(ols_intercept)) |>
+    dplyr::mutate(family = reorder(family, ols_intercept)) |>
+    ggplot(aes(ols_intercept, family, colour = division)) +
+    geom_point(size = 2.5) +
+    geom_vline(xintercept = wm_int, colour = "red", linetype = "dashed",
+               linewidth = 0.8) +
+    scale_colour_manual(values = c(Gymnosperm = "#E65100", Angiosperm = "#1565C0"),
+                        na.value = "grey50") +
+    labs(title = "Family-level OLS intercepts — Leaf ~ Stem",
+         subtitle = sprintf("Red = weighted mean (%.3f); I² = %.1f%% intercept heterogeneity",
+                            wm_int, I2_int),
+         x = "OLS intercept (log10 scale)", y = NULL, colour = "Division")
+}
+```
+
+## Intraspecific organ-level scaling (BAAD) {#sec-ne-wbe-intra-organ}
+
+> ⚠️ **Data note:** The Niklas-Enquist dataset contains predominantly one record per taxon (species-level literature compilation). Intraspecific (ontogenetic) organ-level scaling requires individual-level data. BAAD (Falster et al. 2015, *Ecology* 96:1445) provides individual-level measurements of leaf, stem, root, and total biomass, enabling genuine intraspecific allometry.
+
+```{r ne-wbe-intra-organ}
+if (HAS_BAAD && exists("baad_raw") && !is.null(baad_raw)) {
+  # Extract BAAD organ-level data with species
+  baad_organs <- baad_raw |>
+    dplyr::filter(!is.na(m.lf), m.lf > 0,
+                  !is.na(m.st), m.st > 0,
+                  !is.na(speciesMatched)) |>
+    dplyr::mutate(
+      log_leaf  = log10(m.lf),
+      log_stem  = log10(m.st),
+      log_total = log10(m.to + 1e-9),
+      log_root  = if ("m.rt" %in% names(baad_raw)) log10(pmax(m.rt, 1e-9)) else NA_real_,
+      species   = speciesMatched)
+
+  # Intraspecific criteria: ≥10 records, >2 orders of magnitude in stem mass
+  intra_organ_sp <- baad_organs |>
+    dplyr::group_by(species) |>
+    dplyr::filter(
+      dplyr::n() >= 10,
+      log10(max(m.st, na.rm = TRUE) / pmax(min(m.st, na.rm = TRUE), 1e-9)) >= 2) |>
+    dplyr::ungroup() |>
+    dplyr::pull(species) |>
+    unique()
+
+  cat(sprintf("BAAD: %d species meet intraspecific criteria (n≥10, >2 OOM in stem mass)\n",
+              length(intra_organ_sp)))
+
+  intra_ls <- purrr::map_dfr(intra_organ_sp, function(sp) {
+    df_sp <- baad_organs |>
+      dplyr::filter(species == sp, is.finite(log_leaf), is.finite(log_stem))
+    if (nrow(df_sp) < 10) return(NULL)
+    ols_sp <- lm(log_leaf ~ log_stem, data = df_sp)
+    ci_sp  <- tryCatch(confint(ols_sp)[2, ], error = function(e) c(NA, NA))
+    tibble::tibble(
+      species  = sp,
+      n        = nrow(df_sp),
+      slope    = coef(ols_sp)[2],
+      ci_lower = ci_sp[1], ci_upper = ci_sp[2],
+      r2       = summary(ols_sp)$r.squared,
+      intercept = coef(ols_sp)[1]
+    )
+  })
+
+  if (nrow(intra_ls) > 0) {
+    t_intra_ls <- t.test(intra_ls$slope, mu = 3/4)
+    cat(sprintf(
+      "Intraspecific Leaf~Stem (BAAD): mean β = %.3f ± %.3f SD; t-test vs 3/4: t = %.3f, p = %.4f\n",
+      mean(intra_ls$slope, na.rm = TRUE),
+      sd(intra_ls$slope,   na.rm = TRUE),
+      t_intra_ls$statistic, t_intra_ls$p.value))
+
+    # Compare intraspecific mean vs interspecific (NE pooled)
+    ne_inter_ls <- ne_results_all |>
+      dplyr::filter(relationship == "Leaf ~ Stem", method == "OLS")
+    if (nrow(ne_inter_ls) > 0)
+      cat(sprintf("Interspecific Leaf~Stem (NE pooled OLS): β = %.3f\n",
+                  ne_inter_ls$slope[1]))
+
+    kable(intra_ls |> dplyr::arrange(dplyr::desc(n)) |> head(20) |>
+            dplyr::mutate(across(where(is.numeric), ~ round(., 3))),
+          caption = "Top 20 species by N: intraspecific Leaf ~ Stem slopes (BAAD).")
+
+    ggplot(intra_ls, aes(slope)) +
+      geom_histogram(bins = 30, fill = "#66BB6A", colour = "white") +
+      geom_vline(xintercept = 3/4, colour = "red", linetype = "dashed",
+                 linewidth = 1) +
+      geom_vline(xintercept = mean(intra_ls$slope, na.rm = TRUE),
+                 colour = "black", linewidth = 1) +
+      labs(title = paste0("Intraspecific Leaf ~ Stem slopes (N = ",
+                          nrow(intra_ls), " BAAD species)"),
+           subtitle = "Red dashed = WBE 3/4; Black = observed mean",
+           x = "OLS slope (intraspecific)", y = "Count")
+
+    # Intercept heterogeneity across species
+    I2_intra <- {
+      se_intra <- (intra_ls$ci_upper - intra_ls$ci_lower) / (2 * 1.96)
+      w_i      <- 1 / se_intra^2
+      wm_i     <- weighted.mean(intra_ls$slope, w_i, na.rm = TRUE)
+      Q_i      <- sum(w_i * (intra_ls$slope - wm_i)^2, na.rm = TRUE)
+      df_i     <- sum(!is.na(intra_ls$slope)) - 1
+      max(0, (Q_i - df_i) / Q_i * 100)
+    }
+    cat(sprintf("Intraspecific slope heterogeneity (Leaf~Stem, species level): I² = %.1f%%\n",
+                I2_intra))
+  } else {
+    message("No BAAD species met intraspecific criteria for Leaf ~ Stem.")
+  }
+} else {
+  message("BAAD not available — intraspecific organ-level scaling skipped.")
+}
+```
+
+## Comprehensive WBE scorecard (Niklas-Enquist) {#sec-ne-wbe-scorecard}
+
+```{r ne-wbe-scorecard}
+# Compile scorecard from the 8-relationship results
+ne_scorecard <- ne_results_all |>
+  dplyr::filter(!is.na(slope), !is.na(ci_lower), !is.na(ci_upper)) |>
+  dplyr::mutate(
+    wbe_in_ci = (ci_lower <= wbe_slope) & (wbe_slope <= ci_upper),
+    verdict   = dplyr::case_when(
+      is.na(wbe_slope)  ~ "No prediction",
+      is.na(wbe_in_ci)  ~ "Insufficient data",
+      wbe_in_ci         ~ "SUPPORTED",
+      TRUE              ~ "NOT SUPPORTED")
+  ) |>
+  dplyr::select(relationship, method, wbe_slope, n_species,
+                slope, ci_lower, ci_upper, r_squared, lambda_ml, p_vs_wbe, verdict) |>
+  dplyr::mutate(across(where(is.numeric) & !dplyr::any_of("n_species"),
+                       ~ round(., 3)))
+
+kable(ne_scorecard |>
+        dplyr::select(relationship, method, wbe_slope, n_species,
+                      slope, ci_lower, ci_upper, r_squared, lambda_ml, verdict),
+      col.names = c("Relationship", "Method", "WBE β", "N spp",
+                    "Slope", "CI lo", "CI hi", "R²", "λ (PGLS)", "Verdict"),
+      caption = "Comprehensive WBE scorecard (Niklas-Enquist). SUPPORTED = WBE predicted exponent lies within 95% CI. * Stem ~ Non-stem WBE β is UNVERIFIED derivation.")
+
+# Scorecard plot
+ne_scorecard |>
+  dplyr::filter(!is.na(slope)) |>
+  ggplot(aes(slope, paste0(relationship, " [", method, "]"),
+             colour = verdict)) +
+  geom_pointrange(aes(xmin = ci_lower, xmax = ci_upper), size = 0.5) +
+  geom_vline(data = ne_scorecard |> dplyr::distinct(relationship, wbe_slope),
+             aes(xintercept = wbe_slope),
+             colour = "red", linetype = "dashed", linewidth = 0.6,
+             inherit.aes = FALSE) +
+  scale_colour_manual(
+    values = c("SUPPORTED"         = "#2E7D32",
+               "NOT SUPPORTED"     = "#C62828",
+               "Insufficient data" = "grey50",
+               "No prediction"     = "grey80")) +
+  facet_wrap(~relationship, scales = "free_x", ncol = 2) +
+  labs(title = "WBE/MST scorecard: Niklas-Enquist (OLS, SMA, PGLS)",
+       subtitle = "Red dashed = WBE predicted exponent",
+       x = "Slope ± 95% CI", y = NULL, colour = "WBE status") +
+  theme(strip.text = element_text(size = 7.5),
+        axis.text.y = element_text(size = 7))
+```
+
+---
+
 # Intraspecific Scaling Synthesis {#sec-intra-synth}
 
 > ⚠️ **Intra- vs interspecific scaling:** Intraspecific and interspecific scaling

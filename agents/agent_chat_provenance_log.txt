@@ -1,3 +1,10 @@
+[20] Date: 2026-05-02
+Source: active chat request (@m supervisor agent mode)
+Request summary: For the Niklas-Enquist dataset, design a detailed assessment of WBE predictions and Enquist-Niklas predictions for static biomass partitioning and dynamic growth scaling. Break analyses between all plants, gymno/angiosperms, within family, and intraspecific (≥10 samples, >2 OOM). Report OLS, SMA, and PGLS exponents. Analyze heterogeneity in scaling intercepts. Conduct PGLS analysis.
+Files affected: plant_scaling_data/grand_cross_study_allometry.Rmd (new section ~840 lines inserted), plant_scaling_data/chat_provenance_log.md, agents/prompt_log.md, agents/agent_chat_provenance_log.txt
+Action taken: Added comprehensive new section `# Niklas-Enquist WBE & MST Analysis: Complete Assessment {#sec-ne-wbe}` with 12 chunks covering: genus lookup (73 genera, APG IV/Christenhusz), ne_parse_taxa() cleaning, species-means aggregation, V.PhyloMaker2 S3 NE phylogeny, phylogenetic signal (Pagel's λ, Blomberg's K), run_one_allom() helper (OLS+SMA+PGLS), 8 allometric relationships, gymno/angio ANCOVA, family OLS/SMA + within-family PGLS + Cochran Q/I²/τ² heterogeneity, BAAD intraspecific organ scaling, WBE scorecard. Fixed forcats dependency and geom_vline label bug. API correctness verified for caper/smatr accessors.
+Outcome: Document rendered successfully (exit code 0, pandoc deprecation warning only). All API access patterns confirmed correct via live R session tests.
+
 [19] Date: 2026-05-01
 Source: active chat request
 Request summary: Add agent guidance for a Macroecology AI agent library, document selected agents and workflow prompts for new graduate students, and prepare the collection for synchronization with https://github.com/benquist/MacroecologyLab_Agents.
@@ -1190,3 +1197,6 @@ Actions: Replaced single SDM worked example with four parallel worked examples (
 2026-05-02 | Tallo QA assessment for BIEN export — reviewed coordinate precision, species completeness, trait units, and BIEN/Darwin Core readiness in plant_scaling_data project.
 2026-05-02 | tallo_summary.Rmd updated with BIEN QA section; tallo_bien_preexport.R created in plant_scaling_data/scripts/.
 2026-05-02 | scholarly-rigor-reviewer + biodiversity-science-guard audit of plant_scaling_data: removed dead synthetic fallback code from kurosawa and sapfluxnet Rmds; fixed star tree PGLS mislabeling in grand_cross_study_allometry.Rmd; fixed Darwin Core eventDate and added establishmentMeans in tallo_bien_preexport.R.
+2026-05-02 | always.agent.md updated in agents/ and .github/agents/: Rmd check now requires html_document render and .html file freshness verification.
+2026-05-02 | kurosawa_respiration_scaling.Rmd: 4 PGLS bugs fixed; Blomberg K added; PGLS caveats block added.
+2026-05-02 | kurosawa_respiration_scaling.Rmd: added WBE theory derivation, Pagel-λ 4-scenario block, Rubner 2/3 forest-plot reference, and root:shoot paired-test section (Thornley 1972 vs WBE).
