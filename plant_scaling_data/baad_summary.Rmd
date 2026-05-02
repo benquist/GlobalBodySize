@@ -1,0 +1,438 @@
+---
+title: "BAAD: Biomass And Allometry Database — Detailed Summary"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 5)
+library(baad.data)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+library(scales)
+
+theme_set(theme_bw(base_size = 12))
+
+# Load BAAD once
+baad   <- baad.data::baad_data()
+dat    <- baad$data
+refs   <- baad$references
+dict   <- baad$dictionary
+meta   <- baad$metadata
+```
+
+---
+
+# Overview
+
+The **Biomass And Allometry Database (BAAD)** is a curated, open-access compilation of
+individual-level plant structural measurements drawn from the primary literature.
+It was assembled and published by Falster et al. (2015) and is freely accessible
+via the `baad.data` R package (GitHub: traitecoevo/baad.data).
+
+> **Reference:** Falster DS, Duursma RA, Ishihara MI, et al. (2015). BAAD: a Biomass
+> And Allometry Database for woody plants. *Ecology*, 96(5):1445.
+> DOI: [10.1890/14-1889.1](https://doi.org/10.1890/14-1889.1)
+
+```{r top-level-counts}
+n_rows    <- nrow(dat)
+n_sp      <- length(unique(dat$speciesMatched))
+n_studies <- length(unique(dat$studyName))
+n_geo     <- sum(!is.na(dat$latitude))
+
+kable(data.frame(
+  Metric  = c("Total individual records", "Species (matched)", "Source studies",
+               "Records with coordinates"),
+  Value   = format(c(n_rows, n_sp, n_studies, n_geo), big.mark = ",")
+), caption = "Top-level database summary")
+```
+
+---
+
+# Data structure
+
+## Column dictionary
+
+All trait columns have consistent units. The table below reproduces the BAAD
+data dictionary — the canonical reference for variable meanings and units.
+
+```{r dictionary}
+kable(dict, caption = "BAAD data dictionary (all variables)")
+```
+
+## Column-level data availability
+
+Not all traits are measured for every individual. The chart below shows the
+number of non-missing values per column.
+
+```{r availability, fig.height=7}
+avail <- dat %>%
+  summarise(across(where(is.numeric), ~ sum(!is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "n") %>%
+  left_join(dict %>% select(variable, units, group), by = "variable") %>%
+  arrange(desc(n))
+
+ggplot(avail, aes(x = reorder(variable, n), y = n, fill = group)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  labs(x = NULL, y = "Non-missing records", fill = "Group",
+       title = "Data availability per trait column in BAAD",
+       subtitle = paste0("Total rows = ", format(n_rows, big.mark = ","))) +
+  scale_fill_brewer(palette = "Set2")
+```
+
+---
+
+# Taxonomic coverage
+
+## Family breakdown
+
+```{r family-bar, fig.height=6}
+fam <- dat %>%
+  filter(!is.na(family)) %>%
+  count(family, sort = TRUE)
+
+ggplot(fam[1:25, ], aes(x = reorder(family, n), y = n)) +
+  geom_col(fill = "#2c7bb6") +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  labs(x = NULL, y = "Number of records",
+       title = "Top 25 plant families in BAAD")
+```
+
+```{r family-table}
+kable(fam, col.names = c("Family", "N records"),
+      caption = paste0("All ", nrow(fam), " families in BAAD"))
+```
+
+## Top species by record count
+
+```{r species-table}
+sp_counts <- dat %>%
+  filter(!is.na(speciesMatched)) %>%
+  count(speciesMatched, family, sort = TRUE)
+
+kable(head(sp_counts, 40),
+      col.names = c("Species (matched)", "Family", "N records"),
+      caption = "Top 40 species by individual record count")
+```
+
+## Plant functional types (PFT)
+
+```{r pft-bar}
+pft_labels <- c(DA = "Deciduous Angiosperm", DG = "Deciduous Gymnosperm",
+                EA = "Evergreen Angiosperm", EG = "Evergreen Gymnosperm")
+
+dat %>%
+  filter(!is.na(pft)) %>%
+  count(pft) %>%
+  mutate(label = pft_labels[pft]) %>%
+  ggplot(aes(x = reorder(label, n), y = n, fill = pft)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = NULL, y = "Records", title = "Records by plant functional type")
+```
+
+---
+
+# Geographic coverage
+
+## Map of sampling locations
+
+```{r world-map, fig.width=10, fig.height=5}
+world <- map_data("world")
+
+site_pts <- dat %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  distinct(studyName, latitude, longitude, vegetation)
+
+ggplot() +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group),
+               fill = "grey85", color = "grey60", linewidth = 0.2) +
+  geom_point(data = site_pts, aes(x = longitude, y = latitude, color = vegetation),
+             alpha = 0.7, size = 1.8) +
+  coord_fixed(1.3) +
+  scale_color_brewer(palette = "Set1", na.value = "grey50") +
+  labs(title = "BAAD sampling locations by vegetation type",
+       x = "Longitude", y = "Latitude", color = "Vegetation") +
+  theme(legend.position = "bottom")
+```
+
+## Vegetation type breakdown
+
+```{r veg-bar}
+veg_labels <- c(TempF  = "Temperate Forest", TropRF = "Tropical Rainforest",
+                BorF   = "Boreal Forest",    TropSF = "Tropical Seasonal Forest",
+                Wo     = "Woodland",         TempRF = "Temperate Rainforest",
+                Sav    = "Savanna",          Sh     = "Shrubland",  Gr = "Grassland")
+
+dat %>%
+  filter(!is.na(vegetation)) %>%
+  count(vegetation, sort = TRUE) %>%
+  mutate(label = veg_labels[vegetation]) %>%
+  ggplot(aes(x = reorder(label, n), y = n, fill = label)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  scale_fill_brewer(palette = "Paired") +
+  labs(x = NULL, y = "Records", title = "Records by vegetation biome")
+```
+
+## Growing conditions
+
+```{r growing-condition}
+gc_labels <- c(CG = "Common Garden", FE = "Field – Even-aged",
+               FW = "Field – Wide-aged", GH = "Greenhouse",
+               PM = "Plantation – Monoculture", PU = "Plantation – Uneven-aged")
+
+dat %>%
+  filter(!is.na(growingCondition)) %>%
+  count(growingCondition, sort = TRUE) %>%
+  mutate(label = ifelse(growingCondition %in% names(gc_labels),
+                        gc_labels[growingCondition], growingCondition)) %>%
+  ggplot(aes(x = reorder(label, n), y = n, fill = label)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  scale_fill_brewer(palette = "Set3") +
+  labs(x = NULL, y = "Records", title = "Records by growing condition")
+```
+
+---
+
+# Scaling relationships
+
+All mass variables are in **kg**; all length/diameter variables are in **m**;
+all area variables are in **m²**. Scaling is assessed on log-transformed data
+following standard allometric practice. A regression slope $\beta$ in log-log
+space gives the power-law exponent: $Y = \alpha \cdot X^\beta$.
+
+## Total biomass vs. height
+
+```{r mto-ht, fig.width=8, fig.height=5}
+d_mto_ht <- dat %>% filter(m.to > 0, h.t > 0)
+
+lm1 <- lm(log10(m.to) ~ log10(h.t), data = d_mto_ht)
+b1  <- round(coef(lm1)[2], 3)
+a1  <- round(10^coef(lm1)[1], 4)
+n1  <- nrow(d_mto_ht)
+
+ggplot(d_mto_ht, aes(x = h.t, y = m.to, color = pft)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(method = "lm", color = "black", se = TRUE,
+              aes(group = 1), linewidth = 1) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_color_brewer(palette = "Dark2", na.value = "grey60") +
+  labs(x = "Height h.t (m)", y = "Total biomass m.to (kg)", color = "PFT",
+       title = paste0("Total biomass ~ height  |  β = ", b1,
+                      "  |  n = ", format(n1, big.mark = ","))) +
+  annotation_logticks()
+```
+
+> OLS in log-log space: m.to = `r a1` × h.t^`r b1`
+> (n = `r format(n1, big.mark=",")`). Note: OLS on log-transformed data
+> is exploratory; use SMA regression for allometric inference.
+
+## Total biomass vs. stem diameter at breast height (DBH)
+
+```{r mto-dbh, fig.width=8, fig.height=5}
+d_mto_dbh <- dat %>% filter(m.to > 0, d.bh > 0)
+
+lm2 <- lm(log10(m.to) ~ log10(d.bh), data = d_mto_dbh)
+b2  <- round(coef(lm2)[2], 3)
+a2  <- round(10^coef(lm2)[1], 4)
+n2  <- nrow(d_mto_dbh)
+
+ggplot(d_mto_dbh, aes(x = d.bh * 100, y = m.to, color = pft)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(method = "lm", color = "black", se = TRUE,
+              aes(group = 1), linewidth = 1) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_color_brewer(palette = "Dark2", na.value = "grey60") +
+  labs(x = "DBH (cm)", y = "Total biomass m.to (kg)", color = "PFT",
+       title = paste0("Total biomass ~ DBH  |  β = ", b2,
+                      "  |  n = ", format(n2, big.mark = ","))) +
+  annotation_logticks()
+```
+
+> OLS in log-log space: m.to = `r a2` × d.bh^`r b2`
+> (n = `r format(n2, big.mark=",")`). Diameter in metres for regression.
+
+## Leaf mass vs. total biomass
+
+```{r mlf-mto}
+d_lf_to <- dat %>% filter(m.lf > 0, m.to > 0)
+
+lm3 <- lm(log10(m.lf) ~ log10(m.to), data = d_lf_to)
+b3  <- round(coef(lm3)[2], 3)
+a3  <- round(10^coef(lm3)[1], 5)
+n3  <- nrow(d_lf_to)
+
+ggplot(d_lf_to, aes(x = m.to, y = m.lf, color = pft)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(method = "lm", color = "black", se = TRUE,
+              aes(group = 1), linewidth = 1) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_color_brewer(palette = "Dark2", na.value = "grey60") +
+  labs(x = "Total biomass m.to (kg)", y = "Leaf mass m.lf (kg)", color = "PFT",
+       title = paste0("Leaf mass ~ total biomass  |  β = ", b3,
+                      "  |  n = ", format(n3, big.mark = ","))) +
+  annotation_logticks()
+```
+
+## Stem mass vs. total biomass
+
+```{r mst-mto}
+d_st_to <- dat %>% filter(m.st > 0, m.to > 0)
+
+lm4 <- lm(log10(m.st) ~ log10(m.to), data = d_st_to)
+b4  <- round(coef(lm4)[2], 3)
+n4  <- nrow(d_st_to)
+
+ggplot(d_st_to, aes(x = m.to, y = m.st, color = pft)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(method = "lm", color = "black", se = TRUE,
+              aes(group = 1), linewidth = 1) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_color_brewer(palette = "Dark2", na.value = "grey60") +
+  labs(x = "Total biomass m.to (kg)", y = "Stem mass m.st (kg)", color = "PFT",
+       title = paste0("Stem mass ~ total biomass  |  β = ", b4,
+                      "  |  n = ", format(n4, big.mark = ","))) +
+  annotation_logticks()
+```
+
+## Root mass vs. total biomass
+
+```{r mrt-mto}
+d_rt_to <- dat %>% filter(m.rt > 0, m.to > 0)
+
+lm5 <- lm(log10(m.rt) ~ log10(m.to), data = d_rt_to)
+b5  <- round(coef(lm5)[2], 3)
+n5  <- nrow(d_rt_to)
+
+ggplot(d_rt_to, aes(x = m.to, y = m.rt, color = pft)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(method = "lm", color = "black", se = TRUE,
+              aes(group = 1), linewidth = 1) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_color_brewer(palette = "Dark2", na.value = "grey60") +
+  labs(x = "Total biomass m.to (kg)", y = "Root mass m.rt (kg)", color = "PFT",
+       title = paste0("Root mass ~ total biomass  |  β = ", b5,
+                      "  |  n = ", format(n5, big.mark = ","))) +
+  annotation_logticks()
+```
+
+## Leaf area vs. total biomass
+
+```{r alf-mto}
+d_alf_to <- dat %>% filter(a.lf > 0, m.to > 0)
+
+lm6 <- lm(log10(a.lf) ~ log10(m.to), data = d_alf_to)
+b6  <- round(coef(lm6)[2], 3)
+n6  <- nrow(d_alf_to)
+
+ggplot(d_alf_to, aes(x = m.to, y = a.lf, color = pft)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(method = "lm", color = "black", se = TRUE,
+              aes(group = 1), linewidth = 1) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_color_brewer(palette = "Dark2", na.value = "grey60") +
+  labs(x = "Total biomass m.to (kg)", y = "Leaf area a.lf (m²)", color = "PFT",
+       title = paste0("Leaf area ~ total biomass  |  β = ", b6,
+                      "  |  n = ", format(n6, big.mark = ","))) +
+  annotation_logticks()
+```
+
+## Summary of scaling exponents (interspecific, OLS)
+
+All regressions are OLS on log10-transformed data and are **exploratory only**.
+Standardized major axis (SMA) regression is recommended for allometric inference
+and will be applied in the formal analysis phase.
+
+```{r exponent-summary}
+exponents <- data.frame(
+  Relationship      = c("m.to ~ h.t", "m.to ~ d.bh",
+                        "m.lf ~ m.to", "m.st ~ m.to",
+                        "m.rt ~ m.to", "a.lf ~ m.to"),
+  Y_variable        = c("Total biomass (kg)", "Total biomass (kg)",
+                        "Leaf mass (kg)", "Stem mass (kg)",
+                        "Root mass (kg)", "Leaf area (m²)"),
+  X_variable        = c("Height (m)", "DBH (m)",
+                        "Total biomass (kg)", "Total biomass (kg)",
+                        "Total biomass (kg)", "Total biomass (kg)"),
+  OLS_exponent_beta = c(b1, b2, b3, b4, b5, b6),
+  n                 = c(n1, n2, n3, n4, n5, n6)
+)
+
+kable(exponents, caption = "Interspecific OLS scaling exponents (log-log, all PFTs pooled). Exploratory only — see Methods note.")
+```
+
+---
+
+# Source studies
+
+## Studies sorted by record count
+
+```{r studies-table}
+study_counts <- dat %>%
+  count(studyName, sort = TRUE) %>%
+  left_join(refs %>% select(studyName, citation, doi), by = "studyName")
+
+kable(study_counts, col.names = c("Study", "Records", "Citation", "DOI"),
+      caption = paste0("All ", nrow(study_counts), " source studies in BAAD"))
+```
+
+---
+
+# Key caveats and notes for downstream analysis
+
+1. **OLS vs SMA**: Log-log OLS exponents reported here underestimate true
+   allometric slopes when both variables have measurement error. Standardised
+   Major Axis (SMA) regression using the `smatr` package is required for
+   unbiased allometric exponent estimation.
+
+2. **Intra- vs interspecific**: All plots above pool all species. Intraspecific
+   regressions are expected to differ from interspecific ones and must be
+   assessed separately.
+
+3. **Growing conditions**: Field-grown, greenhouse, and plantation individuals
+   span very different ontogenetic stages; analyses should stratify or account
+   for `growingCondition`.
+
+4. **Leaf mass dominance**: `m.lf` has the highest data availability (n = 17,069)
+   but `m.to` coverage is limited (n = 8,878). Biomass allocation fractions
+   should only be computed where all required organ masses are present.
+
+5. **Unit consistency**: All BAAD variables use SI units (kg, m, m²) as specified
+   in the dictionary. No unit conversion is required within BAAD itself.
+
+6. **Taxonomy**: `speciesMatched` is the harmonized species name column; use this
+   rather than the raw `species` field for cross-study comparisons.
+
+---
+
+# Session info
+
+```{r session}
+sessionInfo()
+```

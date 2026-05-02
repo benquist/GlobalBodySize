@@ -20,6 +20,9 @@ data/processed/
 *.RData
 *.rdata
 
+# Allow rendered HTML reports
+!*.html
+
 # Misc
 .DS_Store
 Thumbs.db

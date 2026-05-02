@@ -1772,3 +1772,6 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 2026-05-01 | "I dont want all of our examples to be SDM examples from Merow... that is just one example" — Diversified MacroecologyLab_Agents README worked examples to four cases (trait harmonization with bio-units-specialist, GBIF occurrence cleaning with biodiversity-informatics-checker + biodiversity-science-guard, community ordination with ter-braak-multivariate + stats-specialist, SDM with merow-ecology); restructured pitfalls table into Cross-cutting / Trait & allometry / Occurrence & taxonomy / Modeling & inference sections so SDM is one of several. Pushed as commit 208c0f1 to MacroecologyLab_Agents main.
 
 2026-05-01 | "Back up agents to biodiversity-agents-lab, update README to agents-only, remove EvoPowerEfficiencyExplorer, cacti, and calipoppySDM" — Staged agent backup (richard-telford, scandinavian-design, scholarly-rigor-reviewer, scientific-implementation-agent), rewrote README as agents-only reference, removed 3 project trees and associated root files via git rm.
+2026-05-01 | Created plant_scaling_data project scaffold and reproducible workflow files for plant allometry scaling data.
+2026-05-01 | Created BAAD summary Rmd/HTML for plant_scaling_data project.
+2026-05-01 | Created BAAD summary Rmd/HTML for plant_scaling_data project.
