@@ -19,3 +19,4 @@
 - rFIA biomass is in lbs/acre (plot expansion) — needs per-tree conversion: lbs/acre ÷ TPA_UNADJ × 0.4536 = kg/tree
 - allodb/BIOMASS contain equations, not raw observations — must be kept separate from measurement data in merged table
 - Niklas-Enquist has NO lat/lon; geographic map is keyword-inferred from citation text and is approximate
+2026-05-01 | ForestGEO Panama summary, cross-study allometry, inventory update — forestgeo_panama_summary.Rmd/html; cross_study_allometry.Rmd/html; data_source_inventory updated. Committed 10fe5f9.
