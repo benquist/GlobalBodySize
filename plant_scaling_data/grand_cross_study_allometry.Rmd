@@ -579,8 +579,13 @@ sma_pgls_hd <- tryCatch(sma(log_h_m ~ log_dbh_m, data = spp_hd),
                          error = function(e) NULL)
 
 if (HAS_PHYLOMAKER && nrow(spp_hd) > 20) {
-  sp_list_hd <- spp_hd |>
+  # Cap to 600 species for tractable phylogeny building; prefer higher-n species
+  spp_hd_phy <- spp_hd |>
     filter(!is.na(family)) |>
+    arrange(desc(n)) |>
+    slice_head(n = 600)
+
+  sp_list_hd <- spp_hd_phy |>
     mutate(genus_col = word(species, 1)) |>
     distinct(species, genus_col, family) |>
     rename(species_col = species)
@@ -596,7 +601,7 @@ if (HAS_PHYLOMAKER && nrow(spp_hd) > 20) {
     res$scenario.3
   }, error = function(e) {
     message("V.PhyloMaker2 failed — using star tree fallback.")
-    spp_tmp <- gsub(" ","_", spp_hd$species)
+    spp_tmp <- gsub(" ","_", spp_hd_phy$species)
     stree   <- ape::stree(length(spp_tmp), type = "star")
     stree$tip.label <- spp_tmp; stree
   })
@@ -605,7 +610,7 @@ if (HAS_PHYLOMAKER && nrow(spp_hd) > 20) {
   phy_hd <- phytools::force.ultrametric(phy_hd, method = "extend")
   phy_hd$node.label <- NULL
 
-  pgls_df_hd <- spp_hd |>
+  pgls_df_hd <- spp_hd_phy |>
     filter(sp_tree %in% phy_hd$tip.label) |>
     distinct(sp_tree, .keep_all = TRUE) |>
     as.data.frame()
@@ -624,7 +629,7 @@ if (HAS_PHYLOMAKER && nrow(spp_hd) > 20) {
 
     if (!is.null(pgls_fit_hd)) {
       pgls_slope  <- coef(pgls_fit_hd)["log_dbh_m"]
-      pgls_se     <- sqrt(diag(vcov(pgls_fit_hd)))["log_dbh_m"]
+      pgls_se     <- sqrt(diag(pgls_fit_hd$VCV))["log_dbh_m"]
       pgls_ci     <- pgls_slope + c(-1, 1) *
                        qt(0.975, length(pgls_fit_hd$residuals) - 2) * pgls_se
       pgls_lambda <- pgls_fit_hd$param["lambda"]
@@ -1219,8 +1224,13 @@ spp_pool <- allom |>
   distinct(sp_tree, .keep_all = TRUE)
 
 if (HAS_PHYLOMAKER && nrow(spp_pool) > 20) {
-  sp_list_phy <- spp_pool |>
+  # Cap to 600 species for tractable phylogeny; prefer higher-n species
+  spp_pool_phy <- spp_pool |>
     filter(!is.na(family)) |>
+    arrange(desc(n)) |>
+    slice_head(n = 600)
+
+  sp_list_phy <- spp_pool_phy |>
     distinct(sp_tree, genus, family)
 
   phy_grand <- tryCatch({
@@ -1234,8 +1244,8 @@ if (HAS_PHYLOMAKER && nrow(spp_pool) > 20) {
     res$scenario.3
   }, error = function(e) {
     message("V.PhyloMaker2 failed — using star tree.")
-    st <- ape::stree(nrow(spp_pool), type = "star")
-    st$tip.label <- spp_pool$sp_tree; st
+    st <- ape::stree(nrow(spp_pool_phy), type = "star")
+    st$tip.label <- spp_pool_phy$sp_tree; st
   })
 
   phy_grand <- multi2di(phy_grand, random = TRUE)
@@ -1243,9 +1253,9 @@ if (HAS_PHYLOMAKER && nrow(spp_pool) > 20) {
   phy_grand <- phytools::force.ultrametric(phy_grand, method = "extend")
   phy_grand$node.label <- NULL
 
-  n_matched <- sum(spp_pool$sp_tree %in% phy_grand$tip.label)
+  n_matched <- sum(spp_pool_phy$sp_tree %in% phy_grand$tip.label)
   cat(sprintf("Phylogeny: %d tips; %d/%d species matched.\n",
-              length(phy_grand$tip.label), n_matched, nrow(spp_pool)))
+              length(phy_grand$tip.label), n_matched, nrow(spp_pool_phy)))
 } else {
   message("V.PhyloMaker2 not available or insufficient species. Phylo sections skipped.")
   phy_grand <- NULL
@@ -1256,7 +1266,7 @@ if (HAS_PHYLOMAKER && nrow(spp_pool) > 20) {
 
 ```{r phylo-signal}
 if (!is.null(phy_grand)) {
-  sig_df <- spp_pool |>
+  sig_df <- spp_pool_phy |>
     filter(sp_tree %in% phy_grand$tip.label) |>
     as.data.frame()
 
@@ -1267,12 +1277,17 @@ if (!is.null(phy_grand)) {
     if (length(pruned$tip.label) < 5) return(NULL)
     vals   <- vals[pruned$tip.label]
     lam <- tryCatch(phytools::phylosig(pruned, vals, method = "lambda", test = TRUE),
-                    error = function(e) list(lambda = NA, P = NA))
+                    error = function(e) list(lambda = NA_real_, P = NA_real_))
     K   <- tryCatch(phytools::phylosig(pruned, vals, method = "K", test = TRUE),
-                    error = function(e) list(K = NA, P = NA))
+                    error = function(e) list(K = NA_real_, P = NA_real_))
+    # phylosig may return a bare numeric when test=FALSE or tree is degenerate
+    lam_val <- if (is.list(lam)) lam$lambda else as.numeric(lam)[1]
+    lam_p   <- if (is.list(lam) && !is.null(lam$P)) lam$P else NA_real_
+    K_val   <- if (is.list(K)) K$K else as.numeric(K)[1]
+    K_p     <- if (is.list(K) && !is.null(K$P)) K$P else NA_real_
     tibble(Trait = trait_name, N = length(vals),
-           lambda = lam$lambda, p_lambda = lam$P,
-           K = K$K, p_K = K$P)
+           lambda = lam_val, p_lambda = lam_p,
+           K = K_val, p_K = K_p)
   }
 
   sig_table <- bind_rows(
@@ -1290,7 +1305,7 @@ if (!is.null(phy_grand)) {
 
 ```{r phylo-pgls-h}
 if (!is.null(phy_grand)) {
-  pgls_df_grand <- spp_pool |>
+  pgls_df_grand <- spp_pool_phy |>
     filter(sp_tree %in% phy_grand$tip.label,
            !is.na(log_dbh_m), !is.na(log_h_m)) |>
     distinct(sp_tree, .keep_all = TRUE) |>
@@ -1310,7 +1325,7 @@ if (!is.null(phy_grand)) {
 
     if (!is.null(pgls_hd_grand)) {
       pg_sl  <- coef(pgls_hd_grand)["log_dbh_m"]
-      pg_se  <- sqrt(diag(vcov(pgls_hd_grand)))["log_dbh_m"]
+      pg_se  <- sqrt(diag(pgls_hd_grand$VCV))["log_dbh_m"]
       pg_ci  <- pg_sl + c(-1, 1) * qt(0.975, length(pgls_hd_grand$residuals) - 2) * pg_se
       pg_lam <- pgls_hd_grand$param["lambda"]
 
@@ -1382,7 +1397,7 @@ if (!is.null(phy_grand) && HAS_BAAD && nrow(pool_agb_primary) > 20) {
 
       if (!is.null(pgls_agb_g)) {
         ag_sl <- coef(pgls_agb_g)["log_dbh_m"]
-        ag_se <- sqrt(diag(vcov(pgls_agb_g)))["log_dbh_m"]
+        ag_se <- sqrt(diag(pgls_agb_g$VCV))["log_dbh_m"]
         ag_ci <- ag_sl + c(-1, 1) * qt(0.975, length(pgls_agb_g$residuals) - 2) * ag_se
         cat(sprintf("PGLS AGB~DBH: slope = %.3f [%.3f, %.3f], λ = %.3f\n",
                     ag_sl, ag_ci[1], ag_ci[2], pgls_agb_g$param["lambda"]))
@@ -1420,7 +1435,7 @@ if (!is.null(phy_grand)) {
       error = function(e) NULL)
     if (is.null(pg_f)) return(NULL)
     sl <- coef(pg_f)["log_dbh_m"]
-    se <- sqrt(diag(vcov(pg_f)))["log_dbh_m"]
+    se <- sqrt(diag(pg_f$VCV))["log_dbh_m"]
     ci <- sl + c(-1, 1) * qt(0.975, length(pg_f$residuals) - 2) * se
     tibble(family = fam, n = nrow(d), pgls_slope = sl,
            ci_lo = ci[1], ci_hi = ci[2],
