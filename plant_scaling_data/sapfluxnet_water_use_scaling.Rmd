@@ -442,94 +442,138 @@ if (!is.null(site_md)) {
 
 ## Water use ~ Stem diameter
 
-```{r sma-dbh, fig.cap="SMA regression: log E vs log DBH. Reference lines at slope = 2.0 (E ~ D²) and 1.0."}
+```{r sma-dbh, fig.cap="OLS (primary, blue solid) and SMA (secondary, black dashed): log E vs log DBH. Theoretical reference slopes at 2.0 (E~D², orange dotted) and 1.0 (light-blue dotted)."}
+# OLS — Model I: minimises y-residuals; primary regression for inference
+fit_ols_dbh <- lm(log_e ~ log_dbh, data = dat)
+ols_cf_dbh  <- coef(fit_ols_dbh)
+ols_ci_dbh  <- confint(fit_ols_dbh)["log_dbh", ]
+ols_r2_dbh  <- summary(fit_ols_dbh)$r.squared
+
+# SMA — Model II (RMA): minimises residuals symmetrically; also reported
 fit_dbh <- sma(log_e ~ log_dbh, data = dat, method = "SMA")
 cf_dbh  <- coef(fit_dbh)
 ci_dbh  <- fit_dbh$coef[[1]][2, 2:3]
 
+cat(sprintf("E ~ DBH  OLS slope = %.3f  (95%% CI: %.3f – %.3f;  R² = %.3f)\n",
+            ols_cf_dbh["log_dbh"], ols_ci_dbh[1], ols_ci_dbh[2], ols_r2_dbh))
 cat(sprintf("E ~ DBH  SMA slope = %.3f  (95%% CI: %.3f – %.3f)\n",
             cf_dbh[2], ci_dbh[1], ci_dbh[2]))
 t2_dbh  <- slope.test(dat$log_e, dat$log_dbh, test.value = 2.0, method = "SMA")
 t1_dbh  <- slope.test(dat$log_e, dat$log_dbh, test.value = 1.0, method = "SMA")
-cat(sprintf("  H0: slope = 2.0 → p = %.4f\n  H0: slope = 1.0 → p = %.4f\n",
+cat(sprintf("  SMA H0: slope = 2.0 → p = %.4f\n  SMA H0: slope = 1.0 → p = %.4f\n",
             t2_dbh$p, t1_dbh$p))
 
 ggplot(dat, aes(x = log_dbh, y = log_e, colour = growth_form)) +
   geom_point(alpha = 0.18, size = 1.1) +
+  # OLS — primary fit
+  geom_abline(intercept = ols_cf_dbh["(Intercept)"], slope = ols_cf_dbh["log_dbh"],
+              colour = "#2166ac", linewidth = 1.4) +
+  # SMA — secondary fit
   geom_abline(intercept = cf_dbh[1], slope = cf_dbh[2],
-              colour = "black", linewidth = 1.2) +
+              colour = "black", linewidth = 1.0, linetype = "dashed") +
+  # Theoretical reference slopes (anchored at data centroid)
   geom_abline(intercept = mean(dat$log_e) - 2.0 * mean(dat$log_dbh),
-              slope = 2.0, linetype = "dashed", colour = "#d6604d",
+              slope = 2.0, linetype = "dotted", colour = "#d6604d",
               linewidth = 0.9) +
   geom_abline(intercept = mean(dat$log_e) - 1.0 * mean(dat$log_dbh),
-              slope = 1.0, linetype = "dotted", colour = "#2166ac",
+              slope = 1.0, linetype = "dotted", colour = "#92c5de",
               linewidth = 0.9) +
   scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
   labs(x = expression(log[10]~"Stem diameter (cm)"),
        y = expression(log[10]~"Whole-tree water use (L day"^{-1}*")"),
        colour = "Growth form",
-       title = expression(E[tree]~"~ Stem diameter — SMA scaling"),
+       title = expression(E[tree]~"~ Stem diameter — OLS (primary) + SMA (secondary)"),
        subtitle = sprintf(
-         "Fitted slope = %.3f  |  red dashed = 2.0 (E∝D²)  |  blue dotted = 1.0",
-         cf_dbh[2])) +
+         "OLS = %.3f (blue solid)  |  SMA = %.3f (black dashed)  |  ref: 2.0 & 1.0 (dotted)",
+         ols_cf_dbh["log_dbh"], cf_dbh[2])) +
   theme(legend.position = "bottom")
 ```
 
 ## Water use ~ Basal area
 
-```{r sma-ba, fig.cap="SMA regression: log E vs log basal area. Reference line at slope = 1.0 (size-symmetric)."}
+```{r sma-ba, fig.cap="OLS (primary, blue solid) and SMA (secondary, black dashed): log E vs log basal area. Theoretical reference at slope = 1.0 (orange dotted)."}
+# OLS — Model I: primary regression
+fit_ols_ba <- lm(log_e ~ log_ba, data = dat)
+ols_cf_ba  <- coef(fit_ols_ba)
+ols_ci_ba  <- confint(fit_ols_ba)["log_ba", ]
+ols_r2_ba  <- summary(fit_ols_ba)$r.squared
+
+# SMA — Model II: also reported
 fit_ba <- sma(log_e ~ log_ba, data = dat, method = "SMA")
 cf_ba  <- coef(fit_ba)
 ci_ba  <- fit_ba$coef[[1]][2, 2:3]
 
+cat(sprintf("E ~ BA  OLS slope = %.3f  (95%% CI: %.3f – %.3f;  R² = %.3f)\n",
+            ols_cf_ba["log_ba"], ols_ci_ba[1], ols_ci_ba[2], ols_r2_ba))
 cat(sprintf("E ~ BA  SMA slope = %.3f  (95%% CI: %.3f – %.3f)\n",
             cf_ba[2], ci_ba[1], ci_ba[2]))
 t1_ba  <- slope.test(dat$log_e, dat$log_ba, test.value = 1.0, method = "SMA")
-cat(sprintf("  H0: slope = 1.0 → p = %.4f\n", t1_ba$p))
+cat(sprintf("  SMA H0: slope = 1.0 → p = %.4f\n", t1_ba$p))
 
 ggplot(dat, aes(x = log_ba, y = log_e, colour = growth_form)) +
   geom_point(alpha = 0.18, size = 1.1) +
+  # OLS — primary
+  geom_abline(intercept = ols_cf_ba["(Intercept)"], slope = ols_cf_ba["log_ba"],
+              colour = "#2166ac", linewidth = 1.4) +
+  # SMA — secondary
   geom_abline(intercept = cf_ba[1], slope = cf_ba[2],
-              colour = "black", linewidth = 1.2) +
+              colour = "black", linewidth = 1.0, linetype = "dashed") +
+  # Theoretical reference
   geom_abline(intercept = mean(dat$log_e) - 1.0 * mean(dat$log_ba),
-              slope = 1.0, linetype = "dashed", colour = "#d6604d",
+              slope = 1.0, linetype = "dotted", colour = "#d6604d",
               linewidth = 0.9) +
   scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
   labs(x = expression(log[10]~"Basal area (cm²)"),
        y = expression(log[10]~"Whole-tree water use (L day"^{-1}*")"),
        colour = "Growth form",
-       title = expression(E[tree]~"~ Basal area — SMA scaling"),
+       title = expression(E[tree]~"~ Basal area — OLS (primary) + SMA (secondary)"),
        subtitle = sprintf(
-         "Fitted slope = %.3f  |  red dashed = 1.0 (size-symmetric)", cf_ba[2])) +
+         "OLS = %.3f (blue solid)  |  SMA = %.3f (black dashed)  |  ref: 1.0 (orange dotted)",
+         ols_cf_ba["log_ba"], cf_ba[2])) +
   theme(legend.position = "bottom")
 ```
 
 ## Water use ~ Sapwood area
 
-```{r sma-sa, fig.cap="SMA regression: log E vs log sapwood area. Reference line at slope = 1.0 (pipe model)."}
+```{r sma-sa, fig.cap="OLS (primary, blue solid) and SMA (secondary, black dashed): log E vs log sapwood area. Theoretical reference at slope = 1.0 (orange dotted, pipe model)."}
+# OLS — Model I: primary regression
+fit_ols_sa <- lm(log_e ~ log_sa, data = dat)
+ols_cf_sa  <- coef(fit_ols_sa)
+ols_ci_sa  <- confint(fit_ols_sa)["log_sa", ]
+ols_r2_sa  <- summary(fit_ols_sa)$r.squared
+
+# SMA — Model II: also reported
 fit_sa <- sma(log_e ~ log_sa, data = dat, method = "SMA")
 cf_sa  <- coef(fit_sa)
 ci_sa  <- fit_sa$coef[[1]][2, 2:3]
 
+cat(sprintf("E ~ SA  OLS slope = %.3f  (95%% CI: %.3f – %.3f;  R² = %.3f)\n",
+            ols_cf_sa["log_sa"], ols_ci_sa[1], ols_ci_sa[2], ols_r2_sa))
 cat(sprintf("E ~ SA  SMA slope = %.3f  (95%% CI: %.3f – %.3f)\n",
             cf_sa[2], ci_sa[1], ci_sa[2]))
 t1_sa  <- slope.test(dat$log_e, dat$log_sa, test.value = 1.0, method = "SMA")
-cat(sprintf("  H0: slope = 1.0 → p = %.4f\n", t1_sa$p))
+cat(sprintf("  SMA H0: slope = 1.0 → p = %.4f\n", t1_sa$p))
 
 ggplot(dat, aes(x = log_sa, y = log_e, colour = growth_form)) +
   geom_point(alpha = 0.18, size = 1.1) +
+  # OLS — primary
+  geom_abline(intercept = ols_cf_sa["(Intercept)"], slope = ols_cf_sa["log_sa"],
+              colour = "#2166ac", linewidth = 1.4) +
+  # SMA — secondary
   geom_abline(intercept = cf_sa[1], slope = cf_sa[2],
-              colour = "black", linewidth = 1.2) +
+              colour = "black", linewidth = 1.0, linetype = "dashed") +
+  # Theoretical reference
   geom_abline(intercept = mean(dat$log_e) - 1.0 * mean(dat$log_sa),
-              slope = 1.0, linetype = "dashed", colour = "#d6604d",
+              slope = 1.0, linetype = "dotted", colour = "#d6604d",
               linewidth = 0.9) +
   scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
   labs(x = expression(log[10]~"Sapwood area (cm²)"),
        y = expression(log[10]~"Whole-tree water use (L day"^{-1}*")"),
        colour = "Growth form",
-       title = expression(E[tree]~"~ Sapwood area — SMA scaling"),
+       title = expression(E[tree]~"~ Sapwood area — OLS (primary) + SMA (secondary)"),
        subtitle = sprintf(
-         "Fitted slope = %.3f  |  red dashed = 1.0 (pipe model)", cf_sa[2])) +
+         "OLS = %.3f (blue solid)  |  SMA = %.3f (black dashed)  |  ref: 1.0 (orange dotted)",
+         ols_cf_sa["log_sa"], cf_sa[2])) +
   theme(legend.position = "bottom")
 ```
 
@@ -537,7 +581,7 @@ ggplot(dat, aes(x = log_sa, y = log_e, colour = growth_form)) +
 
 # By growth form: angiosperm vs. conifer
 
-```{r sma-by-gf-all, fig.cap="SMA slopes by growth form for three size metrics."}
+```{r sma-by-gf-all, fig.cap="OLS and SMA slopes by growth form for three size metrics."}
 gf_combos <- expand_grid(
   growth_form = c("Angiosperm", "Conifer"),
   metric      = c("DBH", "BA", "SA")
@@ -554,6 +598,16 @@ gf_fits <- gf_combos |>
   mutate(
     sub = list(filter(dat, growth_form == .data$growth_form)),
     n   = nrow(sub),
+    # OLS — Model I (primary)
+    fit_ols = list(if (n >= 10) {
+      x_v <- sub[[x_col]]; y_v <- sub$log_e
+      lm(y_v ~ x_v)
+    } else NULL),
+    ols_slope = if (is.null(fit_ols)) NA_real_ else coef(fit_ols)[2],
+    ols_ci_lo = if (is.null(fit_ols)) NA_real_ else confint(fit_ols)[2, 1],
+    ols_ci_hi = if (is.null(fit_ols)) NA_real_ else confint(fit_ols)[2, 2],
+    ols_r2    = if (is.null(fit_ols)) NA_real_ else summary(fit_ols)$r.squared,
+    # SMA — Model II (secondary)
     fit = list(if (n >= 10) {
       x_v <- sub[[x_col]]; y_v <- sub$log_e
       d_fit <- tibble(x = x_v, y = y_v)
@@ -565,7 +619,6 @@ gf_fits <- gf_combos |>
     r2      = if (is.null(fit)) NA_real_ else fit$r2[[1]],
     p_vs_ref= if (is.null(fit)) NA_real_ else {
       x_v <- sub[[x_col]]; y_v <- sub$log_e
-      d_t <- tibble(x = x_v, y = y_v)
       tryCatch(slope.test(y_v, x_v, test.value = ref, method = "SMA")$p,
                error = function(e) NA_real_)
     }
@@ -574,38 +627,50 @@ gf_fits <- gf_combos |>
 
 kable(
   gf_fits |>
-    filter(!is.na(slope)) |>
+    filter(!is.na(ols_slope)) |>
     mutate(label = paste0(growth_form, " ~ ", metric)) |>
-    select(label, n, slope, ci_lo, ci_hi, r2, ref, p_vs_ref) |>
-    rename(Group = label, N = n, `SMA slope` = slope,
-           `CI low` = ci_lo, `CI high` = ci_hi,
-           `R²` = r2, `Ref. slope` = ref, `p (≠ ref)` = p_vs_ref) |>
+    select(label, n, ols_slope, ols_ci_lo, ols_ci_hi, ols_r2,
+           slope, ci_lo, ci_hi, ref, p_vs_ref) |>
+    rename(Group = label, N = n,
+           `OLS slope` = ols_slope, `OLS CI lo` = ols_ci_lo, `OLS CI hi` = ols_ci_hi,
+           `OLS R²` = ols_r2,
+           `SMA slope` = slope, `SMA CI lo` = ci_lo, `SMA CI hi` = ci_hi,
+           `Ref.` = ref, `p (SMA ≠ ref)` = p_vs_ref) |>
     mutate(across(where(is.numeric), ~ round(.x, 3))),
-  caption = "SMA scaling of E_tree by growth form and size metric"
+  caption = "OLS (primary) and SMA (secondary) scaling of E_tree by growth form and size metric"
 )
 ```
 
-```{r forest-gf, fig.height=5.5, fig.cap="Forest plot: SMA slopes by growth form and size metric. Reference lines at expected slopes."}
+```{r forest-gf, fig.height=6.5, fig.cap="Forest plot: OLS (filled circle) and SMA (open circle) slopes by growth form and size metric. Blue = OLS, black = SMA. Reference lines at expected slopes."}
 forest_df <- gf_fits |>
-  filter(!is.na(slope)) |>
+  filter(!is.na(ols_slope)) |>
   mutate(label = paste0(growth_form, " ~ ", metric))
 
-ggplot(forest_df,
-       aes(y = reorder(label, slope), x = slope, xmin = ci_lo, xmax = ci_hi,
-           colour = growth_form)) +
-  geom_pointrange(size = 0.8) +
-  geom_vline(data = tibble(ref = c(2.0, 1.0), metric = c("DBH","BA|SA")),
-             aes(xintercept = ref), linetype = "dashed", colour = "grey50") +
+# Long format for paired OLS+SMA display
+forest_long <- bind_rows(
+  forest_df |> mutate(method = "OLS",
+                      est = ols_slope, lo = ols_ci_lo, hi = ols_ci_hi),
+  forest_df |> mutate(method = "SMA",
+                      est = slope,     lo = ci_lo,     hi = ci_hi)
+) |>
+  filter(!is.na(est))
+
+ggplot(forest_long,
+       aes(y = reorder(label, est), x = est, xmin = lo, xmax = hi,
+           colour = method, shape = method)) +
+  geom_pointrange(size = 0.7, position = position_dodge(width = 0.55)) +
+  geom_vline(xintercept = c(1.0, 2.0), linetype = "dashed", colour = "grey50") +
   annotate("text", x = 2.0, y = Inf, label = "  D² ref", vjust = 2,
            colour = "grey30", size = 3.5, hjust = 0) +
   annotate("text", x = 1.0, y = Inf, label = "  BA=SA ref", vjust = 2,
            colour = "grey30", size = 3.5, hjust = 0) +
-  scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
-  labs(x = "SMA slope  (log E ~ log size metric)",
+  scale_colour_manual(values = c(OLS = "#2166ac", SMA = "#333333"),
+                      name = "Method") +
+  scale_shape_manual(values = c(OLS = 16, SMA = 21), name = "Method") +
+  labs(x = "Slope  (log E ~ log size metric)",
        y = NULL,
-       colour = "Growth form",
-       title = "Forest plot: whole-tree water-use scaling",
-       subtitle = "Forrester et al. (2022) SAPFLUXNET analysis — 95% CI from smatr") +
+       title = "Forest plot: whole-tree water-use scaling by growth form",
+       subtitle = "OLS (blue filled) and SMA (black open) — 95% CI | SAPFLUXNET") +
   theme(legend.position = "bottom")
 ```
 
@@ -618,29 +683,42 @@ approximately size-independent — the invariance of SFD underpins the pipe-mode
 assumption. If $E \propto SA^1$, then $SFD = E/SA$ should have a slope near zero
 with respect to stem diameter.
 
-```{r sfd-diameter, fig.cap="Sap flux density (E/SA) vs. stem diameter. Slope near zero = size-independent SFD."}
+```{r sfd-diameter, fig.cap="Sap flux density (E/SA) vs. stem diameter: OLS (primary, blue) and SMA (secondary, black dashed). Slope near zero = size-independent SFD."}
 dat_sfd <- dat |>
   mutate(sfd       = e_tree / pl_sapw_area,
          log_sfd   = log10(sfd)) |>
   filter(is.finite(log_sfd))
 
+# OLS — primary
+fit_ols_sfd <- lm(log_sfd ~ log_dbh, data = dat_sfd)
+ols_cf_sfd  <- coef(fit_ols_sfd)
+cat(sprintf("SFD ~ DBH  OLS slope = %.3f  (R² = %.3f)\n",
+            ols_cf_sfd["log_dbh"], summary(fit_ols_sfd)$r.squared))
+
+# SMA — secondary
 fit_sfd <- sma(log_sfd ~ log_dbh, data = dat_sfd, method = "SMA")
 cf_sfd  <- coef(fit_sfd)
 cat(sprintf("SFD ~ DBH  SMA slope = %.3f\n", cf_sfd[2]))
 
 ggplot(dat_sfd, aes(x = log_dbh, y = log_sfd, colour = growth_form)) +
   geom_point(alpha = 0.18, size = 1.1) +
+  # OLS — primary
+  geom_abline(intercept = ols_cf_sfd["(Intercept)"], slope = ols_cf_sfd["log_dbh"],
+              colour = "#2166ac", linewidth = 1.4) +
+  # SMA — secondary
   geom_abline(intercept = cf_sfd[1], slope = cf_sfd[2],
-              colour = "black", linewidth = 1.2) +
-  geom_hline(yintercept = mean(dat_sfd$log_sfd), linetype = "dashed",
+              colour = "black", linewidth = 1.0, linetype = "dashed") +
+  geom_hline(yintercept = mean(dat_sfd$log_sfd), linetype = "dotted",
              colour = "grey40") +
   scale_colour_manual(values = c(Angiosperm = "#4dac26", Conifer = "#7b3294")) +
   labs(x = expression(log[10]~"Stem diameter (cm)"),
        y = expression(log[10]~"Sap flux density  (cm"^3~cm^{-2}~day^{-1}*")"),
        colour = "Growth form",
-       title = "Sap flux density vs. stem diameter",
-       subtitle = sprintf("SMA slope = %.3f  |  dashed = mean SFD", cf_sfd[2])) +
+       title = "Sap flux density vs. stem diameter — OLS (primary) + SMA (secondary)",
+       subtitle = sprintf("OLS = %.3f (blue solid)  |  SMA = %.3f (black dashed)  |  dotted = mean SFD",
+                          ols_cf_sfd["log_dbh"], cf_sfd[2])) +
   theme(legend.position = "bottom")
+```
 ```
 
 ---
@@ -651,20 +729,34 @@ The scaling of sapwood area with stem diameter is a key sub-allometry linking
 the three size metrics. $SA \propto D^{\gamma}$ with $\gamma$ typically
 1.7–2.0 across species and sites.
 
-```{r sa-dbh, fig.cap="Sapwood area ~ stem diameter SMA scaling. Reference lines at γ = 2.0 (isometric in cross-section) and γ = 1.7 (Meinzer 2005 central estimate)."}
+```{r sa-dbh, fig.cap="Sapwood area ~ stem diameter: OLS (primary, blue solid) and SMA (secondary, black dashed). Reference lines at γ = 2.0 (orange dotted) and γ = 1.7 (blue dotted)."}
+# OLS — Model I: primary regression
+fit_ols_sadbh <- lm(log_sa ~ log_dbh, data = dat)
+ols_cf_sadbh  <- coef(fit_ols_sadbh)
+ols_ci_sadbh  <- confint(fit_ols_sadbh)["log_dbh", ]
+ols_r2_sadbh  <- summary(fit_ols_sadbh)$r.squared
+
+# SMA — Model II: also reported
 fit_sadbh <- sma(log_sa ~ log_dbh, data = dat, method = "SMA")
 cf_sadbh  <- coef(fit_sadbh)
 ci_sadbh  <- fit_sadbh$coef[[1]][2, 2:3]
 
+cat(sprintf("SA ~ DBH  OLS slope = %.3f  (95%% CI: %.3f – %.3f;  R² = %.3f)\n",
+            ols_cf_sadbh["log_dbh"], ols_ci_sadbh[1], ols_ci_sadbh[2], ols_r2_sadbh))
 cat(sprintf("SA ~ DBH  SMA slope = %.3f  (95%% CI: %.3f – %.3f)\n",
             cf_sadbh[2], ci_sadbh[1], ci_sadbh[2]))
 
 ggplot(dat, aes(x = log_dbh, y = log_sa, colour = growth_form)) +
   geom_point(alpha = 0.18, size = 1.1) +
+  # OLS — primary
+  geom_abline(intercept = ols_cf_sadbh["(Intercept)"], slope = ols_cf_sadbh["log_dbh"],
+              colour = "#2166ac", linewidth = 1.4) +
+  # SMA — secondary
   geom_abline(intercept = cf_sadbh[1], slope = cf_sadbh[2],
-              colour = "black", linewidth = 1.2) +
+              colour = "black", linewidth = 1.0, linetype = "dashed") +
+  # Theoretical references
   geom_abline(intercept = mean(dat$log_sa) - 2.0 * mean(dat$log_dbh),
-              slope = 2.0, linetype = "dashed", colour = "#d6604d",
+              slope = 2.0, linetype = "dotted", colour = "#d6604d",
               linewidth = 0.9) +
   geom_abline(intercept = mean(dat$log_sa) - 1.7 * mean(dat$log_dbh),
               slope = 1.7, linetype = "dotted", colour = "#4575b4",
@@ -673,10 +765,10 @@ ggplot(dat, aes(x = log_dbh, y = log_sa, colour = growth_form)) +
   labs(x = expression(log[10]~"Stem diameter (cm)"),
        y = expression(log[10]~"Sapwood area (cm²)"),
        colour = "Growth form",
-       title = "Sapwood area ~ stem diameter — SMA scaling",
+       title = "Sapwood area ~ stem diameter — OLS (primary) + SMA (secondary)",
        subtitle = sprintf(
-         "Fitted γ = %.3f  |  red dashed = 2.0  |  blue dotted = 1.7",
-         cf_sadbh[2])) +
+         "OLS γ = %.3f (blue solid)  |  SMA γ = %.3f (black dashed)  |  ref: 2.0 & 1.7 (dotted)",
+         ols_cf_sadbh["log_dbh"], cf_sadbh[2])) +
   theme(legend.position = "bottom")
 ```
 
@@ -685,37 +777,50 @@ ggplot(dat, aes(x = log_dbh, y = log_sa, colour = growth_form)) +
 # Summary: all scaling exponents
 
 ```{r summary-table}
+# Helper to pull OLS CI safely
+ols_ci_val <- function(fit, term, bound) tryCatch(confint(fit)[term, bound], error = function(e) NA_real_)
+
 summary_df <- tibble(
-  Relationship          = c("E ~ D",    "E ~ BA",  "E ~ SA",
-                            "SA ~ D"),
-  `x metric`           = c("DBH (cm)", "BA (cm²)","SA (cm²)",
-                            "DBH (cm)"),
-  `Expected slope`     = c(2.0,  1.0,  1.0,  1.7),
-  `SMA slope`          = c(round(coef(fit_dbh)[2],  3),
-                            round(coef(fit_ba)[2],   3),
-                            round(coef(fit_sa)[2],   3),
-                            round(coef(fit_sadbh)[2],3)),
-  `CI low`             = c(round(fit_dbh$coef[[1]][2,2],   3),
-                            round(fit_ba$coef[[1]][2,2],    3),
-                            round(fit_sa$coef[[1]][2,2],    3),
-                            round(fit_sadbh$coef[[1]][2,2], 3)),
-  `CI high`            = c(round(fit_dbh$coef[[1]][2,3],   3),
-                            round(fit_ba$coef[[1]][2,3],    3),
-                            round(fit_sa$coef[[1]][2,3],    3),
-                            round(fit_sadbh$coef[[1]][2,3], 3)),
-  R2                   = c(round(fit_dbh$r2[[1]],   3),
-                            round(fit_ba$r2[[1]],    3),
-                            round(fit_sa$r2[[1]],    3),
-                            round(fit_sadbh$r2[[1]], 3))
+  Relationship     = c("E ~ D",    "E ~ BA",  "E ~ SA",   "SA ~ D"),
+  `x metric`       = c("DBH (cm)", "BA (cm²)","SA (cm²)", "DBH (cm)"),
+  `Exp. slope`     = c(2.0,  1.0,  1.0,  1.7),
+  # OLS — primary
+  `OLS slope`      = c(round(coef(fit_ols_dbh)["log_dbh"],  3),
+                        round(coef(fit_ols_ba)["log_ba"],    3),
+                        round(coef(fit_ols_sa)["log_sa"],    3),
+                        round(coef(fit_ols_sadbh)["log_dbh"],3)),
+  `OLS CI lo`      = c(round(ols_ci_val(fit_ols_dbh,  "log_dbh", 1), 3),
+                        round(ols_ci_val(fit_ols_ba,   "log_ba",  1), 3),
+                        round(ols_ci_val(fit_ols_sa,   "log_sa",  1), 3),
+                        round(ols_ci_val(fit_ols_sadbh,"log_dbh", 1), 3)),
+  `OLS CI hi`      = c(round(ols_ci_val(fit_ols_dbh,  "log_dbh", 2), 3),
+                        round(ols_ci_val(fit_ols_ba,   "log_ba",  2), 3),
+                        round(ols_ci_val(fit_ols_sa,   "log_sa",  2), 3),
+                        round(ols_ci_val(fit_ols_sadbh,"log_dbh", 2), 3)),
+  `OLS R²`         = c(round(summary(fit_ols_dbh)$r.squared,  3),
+                        round(summary(fit_ols_ba)$r.squared,   3),
+                        round(summary(fit_ols_sa)$r.squared,   3),
+                        round(summary(fit_ols_sadbh)$r.squared,3)),
+  # SMA — secondary
+  `SMA slope`      = c(round(coef(fit_dbh)[2],  3),
+                        round(coef(fit_ba)[2],   3),
+                        round(coef(fit_sa)[2],   3),
+                        round(coef(fit_sadbh)[2],3)),
+  `SMA CI lo`      = c(round(fit_dbh$coef[[1]][2,2],   3),
+                        round(fit_ba$coef[[1]][2,2],    3),
+                        round(fit_sa$coef[[1]][2,2],    3),
+                        round(fit_sadbh$coef[[1]][2,2], 3)),
+  `SMA CI hi`      = c(round(fit_dbh$coef[[1]][2,3],   3),
+                        round(fit_ba$coef[[1]][2,3],    3),
+                        round(fit_sa$coef[[1]][2,3],    3),
+                        round(fit_sadbh$coef[[1]][2,3], 3))
 )
 
 kable(summary_df,
-      col.names = c("Relationship","x metric","Expected slope",
-                    "SMA slope","CI low","CI high","R²"),
       caption = if (USE_REAL_DATA)
-        "Summary: SMA scaling exponents for whole-tree water use (SAPFLUXNET)"
+        "Summary: OLS (primary) and SMA (secondary) scaling exponents. OLS minimises y-residuals (Model I); SMA minimises residuals symmetrically (Model II / RMA). See Regression method comparison section for PGLS slopes."
       else
-        "⚠ DEMONSTRATION DATA — SMA scaling exponents (simulated to match Forrester et al. 2022)")
+        "⚠ DEMONSTRATION DATA — OLS and SMA scaling exponents (simulated to match Forrester et al. 2022)")
 ```
 
 ---
@@ -723,15 +828,20 @@ kable(summary_df,
 # Ecological interpretation
 
 ```{r interpretation, echo=FALSE, results='asis'}
-slope_e_dbh <- round(coef(fit_dbh)[2], 2)
-slope_e_ba  <- round(coef(fit_ba)[2],  2)
-slope_e_sa  <- round(coef(fit_sa)[2],  2)
+ols_slope_e_dbh <- round(coef(fit_ols_dbh)["log_dbh"], 2)
+ols_slope_e_ba  <- round(coef(fit_ols_ba)["log_ba"],   2)
+ols_slope_e_sa  <- round(coef(fit_ols_sa)["log_sa"],   2)
+sma_slope_e_dbh <- round(coef(fit_dbh)[2], 2)
+sma_slope_e_ba  <- round(coef(fit_ba)[2],  2)
+sma_slope_e_sa  <- round(coef(fit_sa)[2],  2)
 cat(sprintf("
-**Observed scaling exponents:**
+**Observed scaling exponents (OLS primary; SMA in parentheses):**
 
-* $E \\propto D^{%.2f}$  — close to $D^2$ (basal-area scaling)
-* $E \\propto BA^{%.2f}$ — close to linear (size-symmetric with cross-sectional area)
-* $E \\propto SA^{%.2f}$ — close to linear (pipe-model prediction)
+* $E \\propto D^{%.2f}$ (SMA: %.2f) — close to $D^2$ (basal-area scaling)
+* $E \\propto BA^{%.2f}$ (SMA: %.2f) — close to linear (size-symmetric)
+* $E \\propto SA^{%.2f}$ (SMA: %.2f) — close to linear (pipe-model prediction)
+
+OLS (Model I) slopes are attenuated toward zero relative to SMA (Model II) because OLS does not account for measurement error in the predictor. SMA slopes are the symmetric major-axis estimates. See the *Regression method comparison* section for PGLS slopes and Pagel\\'s \\u03bb.
 
 **Mechanistic interpretation:**
 
@@ -755,13 +865,17 @@ size-asymmetric.
 * The $E \\propto D^2$ relationship is an average over enormous among-site,
   among-species, and seasonal variation. Species-level or site-level slopes
   can deviate substantially.
+* OLS slopes are lower bounds on the true allometric exponent; SMA slopes assume
+  equal proportional error in both axes, which may not hold here.
 * Sap flux density is not perfectly constant with tree size. Significant among-
   tree and among-species variation exists (CV typically 30–60%%).
-* The SAPFLUXNET dataset is not a random sample of the world's forests; it
+* The SAPFLUXNET dataset is not a random sample of the world\\'s forests; it
   over-represents temperate Europe and North America.
 * Meinzer et al. (2005) found $E \\propto D^{1.8}$ — slightly below 2.0 — in
   a smaller multi-site dataset, illustrating real uncertainty in the exponent.
-", slope_e_dbh, slope_e_ba, slope_e_sa))
+", ols_slope_e_dbh, sma_slope_e_dbh,
+   ols_slope_e_ba,  sma_slope_e_ba,
+   ols_slope_e_sa,  sma_slope_e_sa))
 ```
 
 ---
@@ -821,35 +935,66 @@ biomes and functional types.
 | $E \sim S_A$  | **1.0** | —   |
 | $S_A \sim D$  | **2.0** | 1.0 |
 
-```{r exponent-synthesis, fig.height=4.5, fig.cap="Exponent synthesis plot: empirical SMA slopes (blue ± 95% CI) versus theoretical predictions (red diamond). Theoretical values inside the CI = consistent with prediction."}
-synth_df <- tibble(
-  relationship  = factor(
-    c("E ~ D", "E ~ BA", "E ~ SA", "SA ~ D"),
-    levels = c("SA ~ D", "E ~ SA", "E ~ BA", "E ~ D")
+```{r exponent-synthesis, fig.height=5.5, fig.cap="Exponent synthesis: OLS (blue filled, primary) and SMA (black open, secondary) slopes vs. theoretical predictions (red diamond). OLS slopes are attenuated relative to SMA; the true exponent lies between OLS and SMA when both axes carry measurement error."}
+synth_df <- bind_rows(
+  tibble(
+    relationship = factor(
+      c("E ~ D", "E ~ BA", "E ~ SA", "SA ~ D"),
+      levels = c("SA ~ D", "E ~ SA", "E ~ BA", "E ~ D")
+    ),
+    slope  = c(coef(fit_ols_dbh)["log_dbh"],
+               coef(fit_ols_ba)["log_ba"],
+               coef(fit_ols_sa)["log_sa"],
+               coef(fit_ols_sadbh)["log_dbh"]),
+    ci_lo  = c(ols_ci_val(fit_ols_dbh,  "log_dbh", 1),
+               ols_ci_val(fit_ols_ba,   "log_ba",  1),
+               ols_ci_val(fit_ols_sa,   "log_sa",  1),
+               ols_ci_val(fit_ols_sadbh,"log_dbh", 1)),
+    ci_hi  = c(ols_ci_val(fit_ols_dbh,  "log_dbh", 2),
+               ols_ci_val(fit_ols_ba,   "log_ba",  2),
+               ols_ci_val(fit_ols_sa,   "log_sa",  2),
+               ols_ci_val(fit_ols_sadbh,"log_dbh", 2)),
+    theory = c(2.0, 1.0, 1.0, 2.0),
+    method = "OLS"
   ),
-  slope  = c(coef(fit_dbh)[2],   coef(fit_ba)[2],
-             coef(fit_sa)[2],    coef(fit_sadbh)[2]),
-  ci_lo  = c(fit_dbh$coef[[1]][2,2],   fit_ba$coef[[1]][2,2],
-             fit_sa$coef[[1]][2,2],    fit_sadbh$coef[[1]][2,2]),
-  ci_hi  = c(fit_dbh$coef[[1]][2,3],   fit_ba$coef[[1]][2,3],
-             fit_sa$coef[[1]][2,3],    fit_sadbh$coef[[1]][2,3]),
-  theory = c(2.0, 1.0, 1.0, 2.0)
+  tibble(
+    relationship = factor(
+      c("E ~ D", "E ~ BA", "E ~ SA", "SA ~ D"),
+      levels = c("SA ~ D", "E ~ SA", "E ~ BA", "E ~ D")
+    ),
+    slope  = c(coef(fit_dbh)[2],   coef(fit_ba)[2],
+               coef(fit_sa)[2],    coef(fit_sadbh)[2]),
+    ci_lo  = c(fit_dbh$coef[[1]][2,2],   fit_ba$coef[[1]][2,2],
+               fit_sa$coef[[1]][2,2],    fit_sadbh$coef[[1]][2,2]),
+    ci_hi  = c(fit_dbh$coef[[1]][2,3],   fit_ba$coef[[1]][2,3],
+               fit_sa$coef[[1]][2,3],    fit_sadbh$coef[[1]][2,3]),
+    theory = c(2.0, 1.0, 1.0, 2.0),
+    method = "SMA"
+  )
 )
 
-ggplot(synth_df, aes(y = relationship, x = slope,
-                     xmin = ci_lo, xmax = ci_hi)) +
-  geom_pointrange(colour = "#2166ac", size = 0.9) +
+ggplot(synth_df,
+       aes(y = relationship, x = slope, xmin = ci_lo, xmax = ci_hi,
+           colour = method, shape = method)) +
+  geom_pointrange(size = 0.9,
+                  position = position_dodge(width = 0.55)) +
   geom_point(aes(x = theory), shape = 18, size = 6,
-             colour = "#d6604d", alpha = 0.9) +
+             colour = "#d6604d", alpha = 0.9,
+             inherit.aes = FALSE,
+             data = distinct(synth_df, relationship, theory)) +
   geom_vline(xintercept = c(1.0, 2.0), linetype = "dashed",
              colour = "grey65", linewidth = 0.6) +
+  scale_colour_manual(values = c(OLS = "#2166ac", SMA = "#333333"),
+                      name = "Method") +
+  scale_shape_manual(values = c(OLS = 16, SMA = 21), name = "Method") +
   labs(
-    x = "SMA slope (log–log)",
+    x = "Slope (log\u2013log)",
     y = NULL,
-    title = "Exponent synthesis: empirical vs. theoretical scaling slopes",
-    subtitle = "Blue circle ± 95% CI = empirical  |  Red diamond = pipe-model / WBE prediction"
+    title = "Exponent synthesis: OLS (primary) and SMA vs. theoretical predictions",
+    subtitle = "Filled = OLS (blue)  |  Open = SMA (black)  |  Red diamond = pipe-model / WBE"
   ) +
-  theme_bw(base_size = 13)
+  theme_bw(base_size = 13) +
+  theme(legend.position = "bottom")
 ```
 
 ---
@@ -1510,9 +1655,13 @@ if (!is.null(biome_sma) && "intercept_sa" %in% names(biome_sma)) {
 
 ---
 
-# Regression method comparison: OLS, RMA (SMA), and PGLS
+# Regression method comparison: OLS (primary), SMA, and PGLS
 
-Ordinary least squares (OLS), standardised major axis regression (SMA, equivalent to RMA for the bivariate case), and phylogenetic generalised least squares (PGLS) make different assumptions about measurement error, data independence, and evolutionary history. OLS minimises residuals in the $y$-direction only, producing a slope attenuated toward zero when both variables carry error. SMA minimises residuals symmetrically and is preferred when both axes carry measurement uncertainty, as is standard for allometric data. PGLS operates on species means and accounts for shared evolutionary history via Pagel's $\lambda$, which quantifies the degree to which residual variance tracks the phylogenetic covariance matrix.
+This section consolidates OLS (Model I), standardised major axis regression (SMA, Model II / RMA), and phylogenetic generalised least squares (PGLS) slopes for all three core scaling relationships ($E \sim D$, $E \sim BA$, $E \sim SA$).
+
+**OLS (Model I)** minimises residuals in the response ($y$) direction only; it is the appropriate estimator for prediction and hypothesis testing about the conditional mean but is attenuated toward zero when the predictor carries measurement error.
+**SMA (Model II / RMA)** minimises residuals symmetrically and is often preferred for allometric log–log relationships where both axes carry error; it provides the slope of the major axis of the bivariate distribution and is always ≥ the OLS slope in magnitude.
+**PGLS** operates on species means and adjusts for shared evolutionary history via a Pagel $\lambda$ covariance structure estimated by maximum likelihood. $\lambda = 1$ = Brownian-motion covariance; $\lambda = 0$ = star phylogeny (equivalent to OLS on species means).
 
 ```{r taxon-reconciliation}
 # Required for this section: V.PhyloMaker2, caper, ape
@@ -1657,6 +1806,7 @@ if (USE_REAL_DATA && !is.null(phy) && "pl_species" %in% names(dat)) {
     summarise(
       log_e   = mean(log_e,   na.rm = TRUE),
       log_dbh = mean(log_dbh, na.rm = TRUE),
+      log_ba  = mean(log_ba,  na.rm = TRUE),
       log_sa  = mean(log_sa,  na.rm = TRUE),
       n       = n(),
       .groups = "drop"
@@ -1716,91 +1866,136 @@ if (USE_REAL_DATA && !is.null(phy) && "pl_species" %in% names(dat)) {
 ```
 
 ```{r reg-comparison}
-fit_ols         <- NULL
-fit_pgls        <- NULL
+# ── Per-relationship helper: run OLS + SMA (already fitted) + PGLS ────────────
+# Relationships: E~DBH, E~BA, E~SA
+# Returns a one-row tibble for the comparison table.
+
+fit_ols         <- NULL   # E~DBH OLS (kept for reg-comparison-plot)
+fit_pgls        <- NULL   # E~DBH PGLS (kept for lambda-interpretation)
 pgls_lambda_val <- NA_real_
 pgls_n          <- NA_integer_
+
+run_pgls_rel <- function(y_col, x_col, comp_d) {
+  tryCatch({
+    fm  <- as.formula(paste(y_col, "~", x_col))
+    fit <- caper::pgls(fm, data = comp_d, lambda = "ML")
+    sm  <- summary(fit)
+    cm  <- sm$coefficients
+    sl  <- cm[x_col, "Estimate"]
+    se  <- cm[x_col, "Std. Error"]
+    pv  <- cm[x_col, "Pr(>|t|)"]
+    r2  <- sm$r.sq
+    lam <- as.numeric(fit$param["lambda"])
+    lci <- tryCatch({
+      ci <- fit$param.CI$lambda
+      c(lo = unname(ci["lower.CI"]), hi = unname(ci["upper.CI"]))
+    }, error = function(e) c(lo = NA_real_, hi = NA_real_))
+    list(fit = fit, slope = sl, ci_lo = sl - 1.96*se, ci_hi = sl + 1.96*se,
+         p = pv, r2 = r2, lambda = lam, lambda_lo = lci["lo"], lambda_hi = lci["hi"],
+         n = nrow(comp_d$data))
+  }, error = function(e) {
+    message("PGLS failed (", y_col, " ~ ", x_col, "): ", conditionMessage(e))
+    NULL
+  })
+}
 
 if (USE_REAL_DATA && !is.null(sp_means) && nrow(sp_means) >= 10 &&
     !is.null(comp_data)) {
 
-  # OLS on all individual trees
-  fit_ols  <- lm(log_e ~ log_dbh, data = dat)
-  ols_summ <- summary(fit_ols)
-  ols_ci   <- confint(fit_ols)
-  ols_n    <- nrow(model.frame(fit_ols))
+  # ── OLS on all individual trees for each relationship ──────────────────────
+  fit_ols     <- lm(log_e ~ log_dbh, data = dat)   # kept for plot below
+  fit_ols_ba2 <- lm(log_e ~ log_ba,  data = dat)
+  fit_ols_sa2 <- lm(log_e ~ log_sa,  data = dat)
 
-  # RMA/SMA \u2014 reuse fit_dbh from the sma-dbh chunk
-  sma_slope <- coef(fit_dbh)[2]
-  sma_ci_lo <- fit_dbh$coef[[1]][2, 2]
-  sma_ci_hi <- fit_dbh$coef[[1]][2, 3]
-  sma_r2    <- fit_dbh$r2[[1]]
-  sma_p     <- tryCatch(fit_dbh$pval[[1]], error = function(e) NA_real_)
-  sma_n     <- nrow(dat)
+  ols_n <- nrow(dat)
+  sma_n <- nrow(dat)
 
-  # PGLS on species means with ML Pagel lambda
-  fit_pgls <- tryCatch(
-    caper::pgls(log_e ~ log_dbh, data = comp_data, lambda = "ML"),
-    error = function(e) {
-      message("PGLS failed: ", conditionMessage(e))
-      NULL
-    }
+  ols_rows <- list(
+    list(rel = "E ~ DBH", x = "log_dbh",
+         fit = fit_ols,     sma_fit = fit_dbh,
+         ols_ci = confint(fit_ols)["log_dbh", ],
+         sma_ci_lo = fit_dbh$coef[[1]][2,2], sma_ci_hi = fit_dbh$coef[[1]][2,3]),
+    list(rel = "E ~ BA",  x = "log_ba",
+         fit = fit_ols_ba2, sma_fit = fit_ba,
+         ols_ci = confint(fit_ols_ba2)["log_ba", ],
+         sma_ci_lo = fit_ba$coef[[1]][2,2],  sma_ci_hi = fit_ba$coef[[1]][2,3]),
+    list(rel = "E ~ SA",  x = "log_sa",
+         fit = fit_ols_sa2, sma_fit = fit_sa,
+         ols_ci = confint(fit_ols_sa2)["log_sa", ],
+         sma_ci_lo = fit_sa$coef[[1]][2,2],  sma_ci_hi = fit_sa$coef[[1]][2,3])
   )
 
-  if (!is.null(fit_pgls)) {
+  # ── PGLS for each relationship ─────────────────────────────────────────────
+  pgls_dbh <- run_pgls_rel("log_e", "log_dbh", comp_data)
+  pgls_ba  <- run_pgls_rel("log_e", "log_ba",  comp_data)
+  pgls_sa  <- run_pgls_rel("log_e", "log_sa",  comp_data)
 
-    pgls_summ      <- summary(fit_pgls)
-    pgls_coef_mat  <- pgls_summ$coefficients
-    pgls_slope     <- pgls_coef_mat["log_dbh", "Estimate"]
-    pgls_slope_se  <- pgls_coef_mat["log_dbh", "Std. Error"]
-    pgls_p         <- pgls_coef_mat["log_dbh", "Pr(>|t|)"]
-    pgls_r2        <- pgls_summ$r.sq
-    pgls_lambda_val <- as.numeric(fit_pgls$param["lambda"])
-    pgls_n          <- nrow(comp_data$data)
-
-    pgls_ci_lo <- pgls_slope - 1.96 * pgls_slope_se
-    pgls_ci_hi <- pgls_slope + 1.96 * pgls_slope_se
-
-    lambda_ci <- tryCatch({
-      ci <- fit_pgls$param.CI$lambda
-      c(lo = unname(ci["lower.CI"]), hi = unname(ci["upper.CI"]))
-    }, error = function(e) c(lo = NA_real_, hi = NA_real_))
-
-    comp_table <- tibble(
-      Method    = c("OLS", "RMA/SMA", "PGLS"),
-      n         = c(ols_n, sma_n, pgls_n),
-      Slope     = round(c(coef(fit_ols)["log_dbh"], sma_slope, pgls_slope), 3),
-      CI_low    = round(c(ols_ci["log_dbh", 1], sma_ci_lo, pgls_ci_lo), 3),
-      CI_high   = round(c(ols_ci["log_dbh", 2], sma_ci_hi, pgls_ci_hi), 3),
-      R2        = round(c(ols_summ$r.squared, sma_r2, pgls_r2), 3),
-      pvalue    = signif(c(
-                    ols_summ$coefficients["log_dbh", "Pr(>|t|)"],
-                    sma_p,
-                    pgls_p), 3),
-      lambda_ML = c(NA_real_, NA_real_, round(pgls_lambda_val, 3))
-    )
-
-    kable(
-      comp_table,
-      col.names = c("Method", "n", "Slope", "CI low", "CI high",
-                    "R\u00b2", "p-value", "\u03bb (Pagel)"),
-      caption = sprintf(
-        "Regression method comparison for E ~ DBH (log-log scale). OLS and SMA use all individual trees (n = %d); PGLS uses species means (n = %d species). Pagel's lambda estimated by ML. R\u00b2 for SMA is the squared Pearson correlation.",
-        ols_n, pgls_n
-      )
-    )
-
-    cat(sprintf(
-      "\nPagel's lambda: %.3f  (95%% CI: %.3f \u2013 %.3f, n = %d species)\n",
-      pgls_lambda_val,
-      lambda_ci["lo"],
-      lambda_ci["hi"],
-      pgls_n
-    ))
-
-  } else {
-    message("PGLS fit failed \u2014 method comparison table not available.")
+  # Store primary (E~DBH) PGLS for downstream chunks
+  if (!is.null(pgls_dbh)) {
+    fit_pgls        <- pgls_dbh$fit
+    pgls_lambda_val <- pgls_dbh$lambda
+    pgls_n          <- pgls_dbh$n
   }
+
+  # ── Build unified comparison table ────────────────────────────────────────
+  make_rows <- function(row_spec, pgls_res, method_prefix = NULL) {
+    x_col   <- row_spec$x
+    rel     <- row_spec$rel
+    sma_summ <- summary(lm(log_e ~ ., data = dat[, c("log_e", x_col)]))  # for SMA p unused
+    ols_sl  <- coef(row_spec$fit)[x_col]
+    sma_sl  <- coef(row_spec$sma_fit)[2]
+    sma_p   <- tryCatch(row_spec$sma_fit$pval[[1]], error = function(e) NA_real_)
+
+    tibble(
+      Relationship = rel,
+      Method       = c("OLS (all trees)", "SMA / RMA (all trees)", "PGLS (sp. means)"),
+      n            = c(ols_n, sma_n, if (!is.null(pgls_res)) pgls_res$n else NA_integer_),
+      Slope        = round(c(ols_sl, sma_sl,
+                              if (!is.null(pgls_res)) pgls_res$slope else NA_real_), 3),
+      CI_low       = round(c(row_spec$ols_ci[1], row_spec$sma_ci_lo,
+                              if (!is.null(pgls_res)) pgls_res$ci_lo else NA_real_), 3),
+      CI_high      = round(c(row_spec$ols_ci[2], row_spec$sma_ci_hi,
+                              if (!is.null(pgls_res)) pgls_res$ci_hi else NA_real_), 3),
+      R2           = round(c(summary(row_spec$fit)$r.squared,
+                              row_spec$sma_fit$r2[[1]],
+                              if (!is.null(pgls_res)) pgls_res$r2 else NA_real_), 3),
+      pvalue       = signif(c(
+                       summary(row_spec$fit)$coefficients[x_col, "Pr(>|t|)"],
+                       sma_p,
+                       if (!is.null(pgls_res)) pgls_res$p else NA_real_), 3),
+      lambda_ML    = c(NA_real_, NA_real_,
+                       if (!is.null(pgls_res)) round(pgls_res$lambda, 3) else NA_real_)
+    )
+  }
+
+  comp_table_full <- bind_rows(
+    make_rows(ols_rows[[1]], pgls_dbh),
+    make_rows(ols_rows[[2]], pgls_ba),
+    make_rows(ols_rows[[3]], pgls_sa)
+  )
+
+  kable(
+    comp_table_full,
+    col.names = c("Relationship", "Method", "n", "Slope", "CI low", "CI high",
+                  "R\u00b2", "p-value", "\u03bb (Pagel)"),
+    caption = sprintf(
+      "Regression method comparison for E ~ DBH, E ~ BA, and E ~ SA (log-log scale). OLS and SMA use all individual trees (n = %d); PGLS uses species means (n = %d species in pruned phylogeny). Pagel\u2019s \u03bb estimated by ML. OLS is the primary regression (Model I); SMA is Model II (symmetric residuals). PGLS accounts for shared evolutionary history.",
+      ols_n, if (!is.null(pgls_dbh)) pgls_dbh$n else NA_integer_
+    )
+  )
+
+  # Summary of PGLS lambda across relationships
+  lambda_summary <- bind_rows(
+    if (!is.null(pgls_dbh)) tibble(Relationship="E~DBH", lambda=pgls_dbh$lambda,
+                                    lambda_lo=pgls_dbh$lambda_lo, lambda_hi=pgls_dbh$lambda_hi),
+    if (!is.null(pgls_ba))  tibble(Relationship="E~BA",  lambda=pgls_ba$lambda,
+                                    lambda_lo=pgls_ba$lambda_lo,  lambda_hi=pgls_ba$lambda_hi),
+    if (!is.null(pgls_sa))  tibble(Relationship="E~SA",  lambda=pgls_sa$lambda,
+                                    lambda_lo=pgls_sa$lambda_lo,  lambda_hi=pgls_sa$lambda_hi)
+  )
+
+  cat("\nPagel's lambda (ML) per relationship:\n")
+  print(lambda_summary)
 
 } else {
   message(
@@ -1810,7 +2005,7 @@ if (USE_REAL_DATA && !is.null(sp_means) && nrow(sp_means) >= 10 &&
 }
 ```
 
-```{r reg-comparison-plot, fig.height=5.5, fig.cap="Scatter plot of log10 whole-tree water use vs. log10 stem diameter (grey points, shape by growth form). Three regression lines overlaid: OLS on all trees (blue solid), SMA on all trees (black solid), PGLS on species means (red dashed). Open circles are species means used in PGLS. Note: OLS and SMA degrees of freedom are the number of individual trees; PGLS degrees of freedom are the number of species in the pruned phylogeny."}
+```{r reg-comparison-plot, fig.height=5.5, fig.cap="E ~ DBH: OLS (blue solid, primary), SMA (black solid, secondary), PGLS (red dashed, species means). Open circles = species means in PGLS. OLS and SMA use all individual trees; PGLS degrees of freedom = species in the pruned phylogeny."}
 if (USE_REAL_DATA && !is.null(sp_means) && nrow(sp_means) >= 10 &&
     !is.null(fit_pgls) && !is.null(phy_pruned)) {
 
