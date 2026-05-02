@@ -54,13 +54,18 @@ proj_dir <- tryCatch(dirname(knitr::current_input(dir = TRUE)),
                      error = function(e) getwd())
 
 # Theory prediction constants
-WBE_H_DBH      <- 2/3   # H ~ DBH: West, Brown, Enquist (elastic similarity)
-ELASTIC_H_DBH  <- 2/3   # elastic similarity (same value, different justification)
-STRESS_H_DBH   <- 1/2   # stress similarity (McMahon 1973) [UNVERIFIED]
-WBE_AGB_DBH    <- 8/3   # AGB ~ DBH: WBE 1997
-WBE_GROWTH_M   <- 3/4   # dM/dt ~ M: metabolic scaling
-WBE_CROWN_DBH  <- 1.0   # Crown radius ~ DBH: pipe model prediction
-WBE_LEAF_TOTAL <- 3/4   # leaf ~ total biomass: WBE
+# WBE vascular network model (West et al. 1997, Science 276:122; 1999, Science 284:1677)
+# numerically coincides with elastic similarity (McMahon 1973, Science 179:1201) but
+# derived independently from vascular branching geometry, NOT from Euler buckling mechanics.
+WBE_H_DBH      <- 2/3   # H ~ DBH: WBE vascular network model (West et al. 1997, 1999)
+ELASTIC_H_DBH  <- 2/3   # elastic similarity (McMahon 1973); same value, distinct mechanism
+STRESS_H_DBH   <- 1/2   # stress similarity: source UNVERIFIED;
+                         # McMahon (1973) derives ELASTIC similarity (2/3), NOT this value
+WBE_AGB_DBH    <- 8/3   # AGB ~ D^(8/3): from H~D^(2/3) + cylindrical stem + const density
+                         # (Enquist 2002, Tree Physiology 22:1045, DOI:10.1093/treephys/22.15-16.1045)
+WBE_GROWTH_M   <- 3/4   # dM/dt ~ M^(3/4): WBE metabolic scaling (West et al. 1997)
+WBE_CROWN_DBH  <- 1.0   # Crown radius ~ DBH^1: pipe model (Shinozaki et al. 1964, Jpn J Ecol 14:97)
+WBE_LEAF_TOTAL <- 3/4   # leaf ~ non-photosynthetic biomass^(3/4): WBE
 WBE_STEM_TOTAL <- 1.0   # stem ~ total: isometric
 ```
 
@@ -570,7 +575,7 @@ spp_hd <- allom |>
   summarise(log_dbh_m = mean(log_dbh, na.rm = TRUE),
             log_h_m   = mean(log_h, na.rm = TRUE),
             n = n(), .groups = "drop") |>
-  filter(n >= 3, !is.na(species)) |>
+  filter(n >= 5, !is.na(species)) |>  # n >= 5 for reliable species means in PGLS
   mutate(sp_tree = gsub(" ", "_", species)) |>
   distinct(sp_tree, .keep_all = TRUE)
 
@@ -1029,7 +1034,8 @@ if (nrow(nik_h) > 10) {
   ols_h_dM <- lm(log_dMdt ~ log_h, data = nik_h)
   sma_h_dM <- tryCatch(sma(log_dMdt ~ log_h, data = nik_h),
                         error = function(e) NULL)
-  cat(sprintf("dM/dt ~ H: OLS slope = %.3f (WBE-derived ~2.0 from H~M^0.25~M^0.375 chain)\n",
+  # WBE chain: H \u221d M^(1/4) \u2192 dM/dt \u221d M^(3/4) \u221d H^3; WBE predicted exponent = 3
+  cat(sprintf("dM/dt ~ H: OLS slope = %.3f (WBE prediction: H \u221d M^(1/4) \u2192 dM/dt ~ H^3, expected = 3.0)\n",
               coef(ols_h_dM)["log_h"]))
   ggplot(nik_h, aes(log_h, log_dMdt)) +
     geom_point(alpha = 0.5, colour = "#AB47BC") +
@@ -1213,13 +1219,14 @@ spp_pool <- allom |>
   filter(!is.na(DBH_cm), !is.na(Height_m), DBH_cm > 0, Height_m > 0,
          !is.na(species), !grepl("sp\\.?$|cf\\.", species)) |>
   mutate(log_dbh = log10(DBH_cm), log_h = log10(Height_m),
-         log_agb = ifelse(!is.na(AGB_kg) & AGB_kg > 0, log10(AGB_kg), NA_real_)) |>
+         # AGB species means: exclude Chojnacky-derived NEON values (partly circular with DBH)
+         log_agb = ifelse(!is.na(AGB_kg) & AGB_kg > 0 & agb_eligible, log10(AGB_kg), NA_real_)) |>
   group_by(species, family) |>
   summarise(log_dbh_m = mean(log_dbh, na.rm = TRUE),
             log_h_m   = mean(log_h, na.rm = TRUE),
             log_agb_m = mean(log_agb, na.rm = TRUE),
             n = n(), .groups = "drop") |>
-  filter(n >= 3) |>
+  filter(n >= 5) |>  # n >= 5 for reliable species means in PGLS
   mutate(sp_tree = gsub(" ", "_", species),
          genus   = word(species, 1)) |>
   distinct(sp_tree, .keep_all = TRUE)
@@ -1539,7 +1546,8 @@ if (nrow(norm_rows) > 0) {
 
 > ⚠️ **Normalization caveat:** Normalizations (intercepts) integrate climate,
 > wood density, and architectural differences among biomes. Expected to vary
-> even when exponents are conserved (Enquist et al. 2007 [UNVERIFIED]).
+> even when exponents are conserved (Enquist et al. 2007, *Nature* 449:218,
+> DOI: 10.1038/nature06061 [verify citation before publication]).
 
 ## WBE theory scorecard {#sec-theory-scorecard}
 
@@ -1606,37 +1614,41 @@ if (!is.na(I2_val) && I2_val > 50)
 # Methods {#sec-methods}
 
 **Data sources:**
-Tallo v1.0 (Jucker et al. 2022, *Glob. Change Biol.*, DOI: 10.1111/gcb.16302 [UNVERIFIED]);
-BAAD (Falster et al. 2015, *Ecology* 96:1445, DOI: 10.1890/14-1309.1 [UNVERIFIED]);
-NEONForestAGBv2 (Atkins et al. 2024, DOI: 10.6084/m9.figshare.25625352.v1 [UNVERIFIED]);
+Tallo v1.0 (Jucker et al. 2022, *Glob. Change Biol.* 28:5254, DOI: 10.1111/gcb.16302);
+BAAD (Falster et al. 2015, *Ecology* 96:1445, DOI: 10.1890/14-1889.1);
+NEONForestAGBv2 (Atkins et al. 2024, DOI: 10.6084/m9.figshare.25625352.v1 [UNVERIFIED — verify before publication]);
 ForestGEO Panama small-plots 2024;
-Niklas-Enquist biomass compilation (Niklas & Enquist 2001, *PNAS* 98:2922, DOI: 10.1073/pnas.041590298 [UNVERIFIED]).
+Niklas-Enquist biomass compilation (Niklas & Enquist 2001, *PNAS* 98:2922, DOI: 10.1073/pnas.041590298).
 
 **Unit harmonisation:** BAAD `d.bh` converted from metres to centimetres (× 100); NEON `stemDiameter` already in cm; ForestGEO `DBH_mm` divided by 10. All AGB in kg; all height in m.
 
-**Regression methods:** OLS = `lm()`; SMA = `smatr::sma()`; PGLS = `caper::pgls()` with Pagel's λ estimated by ML.
+**Regression methods:** OLS = `lm()`; SMA = `smatr::sma()`; PGLS = `caper::pgls()` with Pagel's λ estimated by ML. OLS is used for pooled and study-level regressions (prediction from DBH to height); SMA is used for theory-testing comparisons where both axes carry measurement error. Intraspecific slopes use OLS; note that SMA would give steeper slopes if DBH measurement error is non-negligible.
+
+**Species means for PGLS:** Requires n ≥ 5 records per species. For AGB species means, Chojnacky-derived NEON values are excluded (see AGB circularity caveat) to maintain consistency with the primary AGB pooled analyses.
 
 **Intraspecific criteria:** ≥ 10 records per species; log₁₀(DBH_max/DBH_min) ≥ 1.5.
 
-**Phylogenetic signal:** `phytools::phylosig()`, methods "lambda" and "K".
+**Phylogenetic signal:** `phytools::phylosig()`, methods "lambda" and "K". Note: `force.ultrametric(method = "extend")` lengthens shorter branches; this can inflate Pagel's λ. Results should be treated as approximate.
 
-**Theory predictions:** WBE (West, Brown & Enquist 1997, *Science* 276:122 [UNVERIFIED]; 1999, *Science* 284:1677 [UNVERIFIED]); elastic similarity (McMahon 1973 [UNVERIFIED]).
+**Phylogenetic tree:** V.PhyloMaker2 (scenario S3) with GBOTB.extended.WP backbone; capped at 600 species (highest-n prioritised) for computational tractability. If V.PhyloMaker2 fails, a star tree fallback is used (λ = 0 by construction). Species with n < 5 records or missing family names are excluded from phylogenetic analyses.
 
-**NEON AGB circularity:** AGB derived from DBH via Chojnacky et al. (2014, *Forestry* 87:129 [UNVERIFIED]); AGB ~ DBH is partly circular for NEON and excluded from primary analyses.
+**Theory predictions:** WBE vascular network model (West et al. 1997, *Science* 276:122, DOI: 10.1126/science.276.5309.122; West et al. 1999, *Science* 284:1677, DOI: 10.1126/science.284.5420.1677); AGB ~ D^(8/3) derivation (Enquist 2002, *Tree Physiology* 22:1045, DOI: 10.1093/treephys/22.15-16.1045); crown radius ~ DBH from pipe model (Shinozaki et al. 1964, *Jpn J Ecol* 14:97); elastic similarity (McMahon 1973, *Science* 179:1201, DOI: 10.1126/science.179.4079.1201).
 
-**Mathematical coupling:** Organ ~ Total regressions use corrected denominator (Total − organ) per Pearson (1897) to avoid spurious correlation.
+**NEON AGB circularity:** AGB derived from DBH via Chojnacky et al. (2014, *Forestry* 87:129, DOI: 10.1093/forestry/cpt053); AGB ~ DBH is partly circular for NEON and excluded from primary analyses and PGLS species means.
+
+**Mathematical coupling:** Organ ~ Total regressions use corrected denominator (Total − organ) per Pearson (1897) to avoid spurious correlation. Note: the corrected regression (leaf ~ other biomass) tests leaf ~ M_non-photosynthetic, directly comparable to the WBE prediction M_leaf ~ M_non-photosynthetic^(3/4).
 
 ---
 
 # Caveats {#sec-caveats}
 
-> ⚠️ **1. AGB provenance:** Primary AGB analyses use BAAD only (direct harvest/measurement). NEON AGB is allometric (Chojnacky equations) and excluded from primary AGB scaling tests.
+> ⚠️ **1. AGB provenance:** Primary AGB analyses use BAAD only (direct harvest/measurement). NEON AGB is allometric (Chojnacky equations) and excluded from primary AGB scaling tests and PGLS species means.
 
 > ⚠️ **2. Mathematical coupling:** Regressing a component against its total containing whole inflates correlation (Pearson 1897). Corrected denominators (total − component) are used throughout Section 7.
 
 > ⚠️ **3. Growth rate measurement:** Net annual biomass increment ≠ instantaneous metabolic rate. The Niklas-Enquist dM/dt data are not a direct test of WBE metabolic scaling.
 
-> ⚠️ **4. Phylogenetic uncertainty:** The V.PhyloMaker2 tree is a hypothesis; placement of taxa without family assignment defaults to stochastic grafting. PGLS results should be interpreted with tree uncertainty in mind.
+> ⚠️ **4. Phylogenetic uncertainty:** The V.PhyloMaker2 tree is a hypothesis; placement of taxa without family assignment defaults to stochastic grafting. PGLS results should be interpreted with tree uncertainty in mind. The `force.ultrametric(method = "extend")` step can inflate Pagel's λ by lengthening terminal branches; λ estimates should be treated as approximate upper bounds.
 
 > ⚠️ **5. Sampling bias:** NEON covers USA biomes only; Niklas-Enquist draws heavily from temperate northern hemisphere literature (Cannell 1982). Global inferences may not hold uniformly.
 
@@ -1645,6 +1657,12 @@ Niklas-Enquist biomass compilation (Niklas & Enquist 2001, *PNAS* 98:2922, DOI: 
 > ⚠️ **7. Palm allometry:** Arecaceae (palms) have non-woody stems and are architecturally incommensurable with WBE assumptions based on branching networks. Results for Arecaceae should be interpreted separately.
 
 > ⚠️ **8. Taxonomic name uncertainty:** Species names across datasets have not been fully reconciled via TNRS or a consistent backbone. Synonymy may inflate apparent species richness and introduce duplicates in cross-dataset aggregations.
+
+> ⚠️ **9. Pooled regression CIs are artifactually narrow:** With N > 100,000 records, OLS CIs on the slope (e.g., ± 0.001) reflect sampling precision under the assumption of i.i.d. errors, which is violated across heterogeneous datasets and sites. Ecological uncertainty far exceeds these statistical CIs.
+
+> ⚠️ **10. Heterogeneity (I²) with k = 5 studies:** I² computed from only 4–5 datasets is highly uncertain (wide CI on I² itself). Qualitative interpretation of heterogeneity patterns is tentative.
+
+> ⚠️ **11. LMM source random effect (k ≤ 5):** Random effects variance components estimated from k ≤ 5 groups are unreliable (Gelman & Hill 2006). The LMM slope is reported for context but its variance component should not be over-interpreted.
 
 ---
 
