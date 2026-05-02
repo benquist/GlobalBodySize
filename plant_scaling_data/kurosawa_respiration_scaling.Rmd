@@ -317,7 +317,7 @@ ggplot(dat, aes(x = log_resp, fill = life_form)) +
   facet_grid(plant_part ~ life_form, scales = "free_y") +
   scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                unknown = "grey60")) +
-  labs(x = expression(log[10]~"Respiration rate"),
+  labs(x = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
        y = "Count",
        fill = "Life form",
        title = "Respiration rate distribution") +
@@ -355,7 +355,7 @@ ggplot(dat, aes(x = log_mass, y = log_resp, colour = life_form)) +
   scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                  unknown = "grey60")) +
   labs(x = expression(log[10]~"Fresh mass (g)"),
-       y = expression(log[10]~"Respiration rate"),
+       y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
        colour = "Life form",
        title = "Overall SMA scaling: R ~ Mass",
        subtitle = sprintf("Pooled slope = %.3f  [WBE 3/4 reference = dashed]",
@@ -421,7 +421,7 @@ ggplot(groups, aes(x = log_mass, y = log_resp, colour = life_form)) +
   scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                  unknown = "grey60")) +
   labs(x = expression(log[10]~"Fresh mass (g)"),
-       y = expression(log[10]~"Respiration rate"),
+       y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
        colour = "Life form",
        title = "SMA scaling by life form and plant part",
        subtitle = "Grey dashed = WBE 3/4 reference") +
@@ -491,7 +491,7 @@ if (length(unique(woody_dat$dataset_source)) > 1) {
     facet_wrap(~ plant_part, scales = "free") +
     scale_colour_brewer(palette = "Set1") +
     labs(x = expression(log[10]~"Fresh mass (g)"),
-         y = expression(log[10]~"Respiration rate"),
+         y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
          colour = "Dataset source",
          title = "Woody-plant respiration by dataset source") +
     theme(legend.position = "bottom")
@@ -1223,7 +1223,7 @@ if (nrow(fagus_dat) >= 10) {
     scale_colour_manual(values = c(Shoot = "#4dac26", Root = "#d01c8b",
                                    unknown = "grey50")) +
     labs(x = expression(log[10]~"Fresh mass (g)"),
-         y = expression(log[10]~"Respiration rate"),
+         y = expression(log[10]~"Respiration rate (nmol CO"[2]~"g"^{-1}~"s"^{-1}~")"),
          colour = "Plant part", shape = "Plant part",
          title = expression(italic("Fagus crenata")~"ontogenetic scaling"),
          subtitle = "Kurosawa et al. 2023 subset") +
@@ -1275,10 +1275,17 @@ if (!USE_REAL_DATA) {
       "  3. Re-render this Rmd.\n\n")
 }
 cat("General caveats:\n",
-    "• Respiration units vary across studies (nmol CO2 g-1 s-1, µmol CO2 g-1 s-1);\n",
-    "  the Dryad README should be consulted for units and normalisation.\n",
-    "• Measurement temperature affects respiration rates; temperature correction\n",
-    "  (e.g., Q10 normalisation to 15°C or 20°C) is advised for cross-study comparison.\n",
+    "• Respiration units (Fix #3): Kurosawa et al. (2025) report rates in\n",
+    "  nmol CO2 g-1 s-1 (per unit fresh mass). Axis labels in this Rmd assume\n",
+    "  those units. When loading real Dryad data, verify units from the README at\n",
+    "  DOI 10.5061/dryad.sxksn03cj before interpreting intercepts.\n",
+    "• Temperature standardisation (Fix #4): measurement temperature varies across\n",
+    "  experiments. Raw rates at different temperatures are not directly comparable.\n",
+    "  For cross-study slope estimation, standardise to a common reference temperature\n",
+    "  (e.g. 15 degrees C as in Mori et al. 2010, Global Ecol. Biogeogr. 19:127-139)\n",
+    "  using a Q10 correction: R_ref = R_meas / Q10^((T_meas - T_ref)/10) [Q10 ~ 2].\n",
+    "  The demo data used here has no temperature metadata; intercept estimates from\n",
+    "  demo mode should not be compared across groups or to published values.\n",
     "• SMA slopes are sensitive to the range of body sizes included; a very broad\n",
     "  mass range will tend to push slopes toward 1 if allometry is non-linear.\n",
     "• The herbaceous and woody plants span very different ecological contexts;\n",
