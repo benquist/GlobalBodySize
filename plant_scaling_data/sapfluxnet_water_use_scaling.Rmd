@@ -978,7 +978,7 @@ ggplot(synth_df,
            colour = method, shape = method)) +
   geom_pointrange(size = 0.9,
                   position = position_dodge(width = 0.55)) +
-  geom_point(aes(x = theory), shape = 18, size = 6,
+  geom_point(aes(x = theory, y = relationship), shape = 18, size = 6,
              colour = "#d6604d", alpha = 0.9,
              inherit.aes = FALSE,
              data = distinct(synth_df, relationship, theory)) +
