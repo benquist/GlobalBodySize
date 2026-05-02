@@ -1640,10 +1640,26 @@ measurements</strong>.</p>
 </div>
 <div id="data-preparation" class="section level1" number="2">
 <h1><span class="header-section-number">2</span> Data preparation</h1>
-<pre class="r"><code>neon_sites &lt;- c(&quot;BART&quot;,&quot;BLAN&quot;,&quot;CLBJ&quot;,&quot;DELA&quot;,&quot;DSNY&quot;,&quot;GRSM&quot;,&quot;GUAN&quot;,&quot;HARV&quot;,
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Load all 23 NEON sites, build a longitudinal individual × year table,
+# compute annual growth increments, and create two analysis-ready subsets:
+#   pos_dbh  — intervals with positive diameter increment (for ΔD ~ D SMA)
+#   pos_agb  — intervals with positive AGB increment   (for ΔAGB ~ AGB SMA)
+#
+# Why exclude negative increments?
+# Log-log regression requires positive values. Negative DBH increments (~20%
+# of intervals) reflect measurement error, bark sloughing, or height-of-
+# measurement changes — not genuine stem shrinkage. Excluding them selects
+# for intervals where real growth was detected; this introduces mild upward
+# bias in mean increment but is standard practice in growth allometry studies.
+# The fraction excluded is reported in the Overview section for transparency.
+
+neon_sites &lt;- c(&quot;BART&quot;,&quot;BLAN&quot;,&quot;CLBJ&quot;,&quot;DELA&quot;,&quot;DSNY&quot;,&quot;GRSM&quot;,&quot;GUAN&quot;,&quot;HARV&quot;,
                 &quot;JERC&quot;,&quot;KONZ&quot;,&quot;LENO&quot;,&quot;MLBS&quot;,&quot;ORNL&quot;,&quot;OSBS&quot;,&quot;RMNP&quot;,&quot;SCBI&quot;,
                 &quot;SERC&quot;,&quot;STEI&quot;,&quot;TALL&quot;,&quot;TREE&quot;,&quot;UKFS&quot;,&quot;UNDE&quot;,&quot;YELL&quot;)
 
+# Read one CSV per site, then stack all sites into a single data frame.
+# Each file contains individual-level repeated measurements across years.
 live_raw &lt;- lapply(neon_sites, function(s) {
   read_csv(
     file.path(proj_dir, &quot;data/raw/neon_forest_agb/biomass&quot;,
@@ -1652,36 +1668,53 @@ live_raw &lt;- lapply(neon_sites, function(s) {
   )
 }) |&gt;
   bind_rows() |&gt;
+  # Retain only living stems with valid DBH.
+  # &quot;Live&quot; status filter removes dead/fallen/harvested trees that would
+  # create spurious negative increments in consecutive measurements.
   filter(grepl(&quot;^Live&quot;, plantStatus, ignore.case = TRUE),
          !is.na(stemDiameter), stemDiameter &gt; 0) |&gt;
+  # Aggregate within-year repeat measurements (some individuals measured
+  # twice in one year due to field crew overlap or data entry replicates).
+  # Taking the mean is conservative; max or first measurement would also be defensible.
   group_by(individualID, siteID, domainID, scientificName, Family,
            growthForm, year) |&gt;
   summarise(DBH_cm = mean(stemDiameter, na.rm = TRUE),
             AGB_kg = mean(AGBChojnacky, na.rm = TRUE),
             .groups = &quot;drop&quot;)
 
+# ── Compute annual growth intervals ───────────────────────────────────────────
+# For each individual, sort measurements by year and compute the change between
+# consecutive measurement years. delta_yr handles non-annual remeasurement
+# intervals (some NEON sites are measured every 1, 2, or 3 years) by dividing
+# the observed increment by the number of elapsed years to get an annual rate.
 annual &lt;- live_raw |&gt;
   arrange(individualID, year) |&gt;
   group_by(individualID, siteID, domainID, scientificName, Family, growthForm) |&gt;
   mutate(
-    delta_yr      = year    - lag(year),
-    DBH_start     = lag(DBH_cm),
-    AGB_start     = lag(AGB_kg),
-    DBH_inc_cm_yr = (DBH_cm - DBH_start) / delta_yr,
-    AGB_inc_kg_yr = (AGB_kg - AGB_start) / delta_yr,
-    RGR_DBH       = (log(DBH_cm)  - log(DBH_start))  / delta_yr
+    delta_yr      = year    - lag(year),          # years between measurements (≥1)
+    DBH_start     = lag(DBH_cm),                   # DBH at the start of the interval
+    AGB_start     = lag(AGB_kg),                   # AGB at the start of the interval
+    DBH_inc_cm_yr = (DBH_cm - DBH_start) / delta_yr,   # annual diameter increment (cm/yr)
+    AGB_inc_kg_yr = (AGB_kg - AGB_start) / delta_yr,   # annual AGB increment (kg/yr)
+    RGR_DBH       = (log(DBH_cm)  - log(DBH_start))  / delta_yr  # relative growth rate (yr⁻¹)
   ) |&gt;
-  filter(!is.na(delta_yr), delta_yr &gt;= 1) |&gt;
+  filter(!is.na(delta_yr), delta_yr &gt;= 1) |&gt;  # remove first year (no lag) and negative intervals
   ungroup()
 
-# Positive-increment subsets for log-log SMA
+# ── Positive-increment subsets for log-log SMA ────────────────────────────────
+# SMA regression requires log-transformed variables; log(x) is only defined
+# for x &gt; 0. Both the size at the start of the interval AND the growth
+# increment must be positive. The fraction of excluded intervals is ~20% for
+# DBH and is reported in the Overview section.
 pos_dbh &lt;- annual |&gt;
   filter(DBH_inc_cm_yr &gt; 0, DBH_start &gt; 0) |&gt;
-  mutate(log_D0 = log(DBH_start), log_dD = log(DBH_inc_cm_yr))
+  mutate(log_D0 = log(DBH_start),         # natural log of initial DBH (cm)
+         log_dD = log(DBH_inc_cm_yr))      # natural log of annual diameter increment
 
 pos_agb &lt;- annual |&gt;
   filter(AGB_inc_kg_yr &gt; 0, AGB_start &gt; 0, is.finite(AGB_start)) |&gt;
-  mutate(log_M0 = log(AGB_start), log_dM = log(AGB_inc_kg_yr))
+  mutate(log_M0 = log(AGB_start),         # natural log of initial AGB (kg)
+         log_dM = log(AGB_inc_kg_yr))      # natural log of annual AGB increment
 
 cat(&quot;Annual intervals:                &quot;, format(nrow(annual),   big.mark=&quot;,&quot;), &quot;\n&quot;)</code></pre>
 <pre><code>## Annual intervals:                 75,657</code></pre>
@@ -1703,10 +1736,26 @@ theoretical test</h2>
 <code>smatr::sma(log_dD ~ log_D0, slope.test = 1/3)</code>. The
 <code>slope.test</code> argument embeds the one-sample test H₀: β = 1/3
 into the fit object, returning a p-value and 95% CI for the slope.</p>
-<pre class="r"><code>fit_sma_dD &lt;- sma(log_dD ~ log_D0, data = pos_dbh, method = &quot;SMA&quot;,
-                  slope.test = 1/3)
-fit_ols_dD &lt;- lm(log_dD ~ log_D0, data = pos_dbh)
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Fit a global SMA regression of log(ΔD) ~ log(D₀) and test whether the
+# slope equals the MST prediction β = 1/3.
+#
+# smatr API reminder:
+#   slope.test = 1/3  embeds the one-sample slope test in the fit object.
+#   The p-value for H₀: β = 1/3 is in fit$slopetest[[1]]$p.
+#   The 95% CI is in fit$coef[[1]][&quot;slope&quot;, c(&quot;lower limit&quot;,&quot;upper limit&quot;)].
+# 
+# Note: fitting SMA on &gt;50,000 observations takes a few seconds. The full
+# dataset is used here (not a subsample) because the slope and CI are the
+# key inferential outputs; scatter plots use a 25k subsample for rendering.
 
+fit_sma_dD &lt;- sma(log_dD ~ log_D0, data = pos_dbh, method = &quot;SMA&quot;,
+                  slope.test = 1/3)   # test H₀: β = 1/3 (MST pipe model)
+fit_ols_dD &lt;- lm(log_dD ~ log_D0, data = pos_dbh)  # OLS for comparison
+
+# Extract SMA coefficient matrix for this fit.
+# Row &quot;slope&quot; contains: coef(SMA), lower limit, upper limit (95% CI).
+# Row &quot;elevation&quot; contains the intercept (called &quot;elevation&quot; in smatr, not &quot;intercept&quot;).
 cf_dD &lt;- fit_sma_dD$coef[[1]]
 
 kable(data.frame(
@@ -1716,8 +1765,8 @@ kable(data.frame(
                round(coef(fit_ols_dD)[2], 4)),
   CI_lo    = c(round(cf_dD[&quot;slope&quot;,&quot;lower limit&quot;], 4), NA),
   CI_hi    = c(round(cf_dD[&quot;slope&quot;,&quot;upper limit&quot;], 4), NA),
-  R2       = round(summary(fit_ols_dD)$r.squared, 3),
-  p_vs_1_3 = c(round(fit_sma_dD$slopetest[[1]]$p, 6), NA),
+  R2       = round(summary(fit_ols_dD)$r.squared, 3),  # R² from OLS (not SMA)
+  p_vs_1_3 = c(round(fit_sma_dD$slopetest[[1]]$p, 6), NA),  # p for H₀: β = 1/3
   stringsAsFactors = FALSE
 ),
 col.names = c(&quot;Method&quot;,&quot;N&quot;,&quot;Slope&quot;,&quot;95% CI lo&quot;,&quot;95% CI hi&quot;,&quot;R\u00b2&quot;,
@@ -1779,25 +1828,40 @@ caption = paste0(
 <div id="scatter-with-sma-ols-and-mst-reference" class="section level2" number="3.2">
 <h2><span class="header-section-number">3.2</span> Scatter with SMA,
 OLS, and MST reference</h2>
-<pre class="r"><code>set.seed(42)
-sub &lt;- pos_dbh |&gt; sample_n(min(25000, n()))
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Scatter plot of ΔD vs D₀ with three fitted lines overlaid:
+#   SMA (red solid)          — symmetric regression, best estimate of exponent
+#   OLS (orange dashed)      — for comparison; expected to be below SMA
+#   MST reference (blue dot-dash) — β = 1/3, anchored at the median point
+#
+# The MST reference line is not a regression line; it is a power law Y = α·X^(1/3)
+# where α is chosen so the line passes through the median (DBH_start, DBH_inc).
+# This anchoring strategy shows the shape of the theoretical prediction without
+# imposing an intercept from a different dataset.
 
+set.seed(42)  # reproducible subsample for scatter plot
+sub &lt;- pos_dbh |&gt; sample_n(min(25000, n()))  # 25k points for legibility
+
+# Generate fitted line values across the observed DBH range.
 rng_D  &lt;- range(sub$log_D0)
 xs_D   &lt;- seq(rng_D[1], rng_D[2], length.out = 200)
-cf_dD  &lt;- fit_sma_dD$coef[[1]]
+cf_dD  &lt;- fit_sma_dD$coef[[1]]  # reuse fit from global SMA chunk
+# SMA fitted line: log(ŷ) = intercept + slope × log(x)
+# Back-transform to original scale for plotting with scale_x_log10.
 ys_sma &lt;- cf_dD[&quot;elevation&quot;,&quot;coef(SMA)&quot;] + cf_dD[&quot;slope&quot;,&quot;coef(SMA)&quot;] * xs_D
 ys_ols &lt;- coef(fit_ols_dD)[1] + coef(fit_ols_dD)[2] * xs_D
 
-# MST reference anchored at median
-med_D     &lt;- median(pos_dbh$DBH_start)
-med_dD    &lt;- median(pos_dbh$DBH_inc_cm_yr)
-alpha_mst &lt;- med_dD / med_D^(1/3)
+# MST reference: anchored at the bivariate median of the full dataset
+# (not the subsample) so the reference line position is stable.
+med_D     &lt;- median(pos_dbh$DBH_start)    # median initial DBH (cm)
+med_dD    &lt;- median(pos_dbh$DBH_inc_cm_yr)  # median annual increment (cm/yr)
+alpha_mst &lt;- med_dD / med_D^(1/3)  # prefactor α: ensures MST line passes through median
 
 lines_df &lt;- data.frame(
   DBH_cm = exp(xs_D),
   SMA    = exp(ys_sma),
   OLS    = exp(ys_ols),
-  MST    = alpha_mst * exp(xs_D)^(1/3)
+  MST    = alpha_mst * exp(xs_D)^(1/3)  # MST theoretical: ΔD ~ D^(1/3)
 ) |&gt; pivot_longer(-DBH_cm, names_to = &quot;fit&quot;, values_to = &quot;dD&quot;)
 
 ggplot(sub, aes(x = DBH_start, y = DBH_inc_cm_yr)) +
@@ -1828,19 +1892,29 @@ ggplot(sub, aes(x = DBH_start, y = DBH_inc_cm_yr)) +
 <div id="binned-means-sma-vs-ols-vs-mst" class="section level2" number="3.3">
 <h2><span class="header-section-number">3.3</span> Binned means: SMA vs
 OLS vs MST</h2>
-<pre class="r"><code>bin_dbh &lt;- pos_dbh |&gt;
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Reduce noise from individual-level variation by binning initial DBH on a
+# log scale and fitting SMA to the 24 bin means. This is a robustness check:
+# if the individual-level and binned slopes agree, the result is not artefact
+# of high individual-to-individual variance dominating the regression.
+#
+# Binning strategy: 24 equal-width intervals on log scale from log(1) to log(200).
+# Each bin summarises mean(ΔD) ± SE. Bins with fewer than 10 intervals excluded.
+# alpha_mst is computed in the scatter chunk and is reused here (same reference).
+bin_dbh &lt;- pos_dbh |&gt;
   mutate(DBH_bin = cut(log_D0,
                        breaks = seq(log(1), log(200), length.out = 25),
                        include.lowest = TRUE)) |&gt;
   filter(!is.na(DBH_bin)) |&gt;
   group_by(DBH_bin) |&gt;
-  summarise(n = n(), DBH_mid = exp(mean(log_D0)),
+  summarise(n = n(), DBH_mid = exp(mean(log_D0)),  # geometric midpoint of bin
             mean_inc = mean(DBH_inc_cm_yr),
-            se_inc   = sd(DBH_inc_cm_yr) / sqrt(n()),
+            se_inc   = sd(DBH_inc_cm_yr) / sqrt(n()),  # standard error (not SD)
             .groups = &quot;drop&quot;) |&gt;
-  filter(n &gt;= 10) |&gt;
+  filter(n &gt;= 10) |&gt;   # require at least 10 intervals per bin for stability
   mutate(log_D0 = log(DBH_mid), log_dD = log(mean_inc))
 
+# SMA on bin means: same API as individual-level fit above.
 fit_sma_bin &lt;- sma(log_dD ~ log_D0, data = bin_dbh, method = &quot;SMA&quot;,
                    slope.test = 1/3)
 fit_ols_bin &lt;- lm(log_dD ~ log_D0, data = bin_dbh)
@@ -1852,13 +1926,15 @@ lines_bin &lt;- data.frame(
   DBH_mid  = exp(xs_b),
   SMA      = exp(cf_bin[&quot;elevation&quot;,&quot;coef(SMA)&quot;] + cf_bin[&quot;slope&quot;,&quot;coef(SMA)&quot;] * xs_b),
   OLS      = exp(coef(fit_ols_bin)[1] + coef(fit_ols_bin)[2] * xs_b),
-  MST      = alpha_mst * exp(xs_b)^(1/3)
+  MST      = alpha_mst * exp(xs_b)^(1/3)  # same reference prefactor from scatter chunk
 ) |&gt; pivot_longer(-DBH_mid, names_to = &quot;fit&quot;, values_to = &quot;mean_inc&quot;)
 
 ggplot(bin_dbh, aes(x = DBH_mid, y = mean_inc)) +
+  # ribbon shows ±SE around bin mean (grey band)
   geom_ribbon(aes(ymin = pmax(mean_inc - se_inc, 1e-4),
                   ymax = mean_inc + se_inc),
               fill = &quot;#1a9850&quot;, alpha = 0.25) +
+  # point size proportional to number of intervals in bin (reader can see weight)
   geom_point(aes(size = n), color = &quot;#1a9850&quot;) +
   geom_line(data = lines_bin,
             aes(x = DBH_mid, y = mean_inc, color = fit, linetype = fit),
@@ -1892,11 +1968,23 @@ ggplot(bin_dbh, aes(x = DBH_mid, y = mean_inc)) +
 <p>AGB is model-derived from DBH — slopes here primarily reflect the
 Chojnacky allometric equations embedded in NEON data processing.</p>
 </blockquote>
-<pre class="r"><code>fit_sma_dM &lt;- sma(log_dM ~ log_M0, data = pos_agb, method = &quot;SMA&quot;,
-                  slope.test = 3/4)
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Fit global SMA and OLS for log(ΔAGB) ~ log(AGB) and test slope vs β = 3/4.
+#
+# MST/WBE metabolic scaling predicts that biomass growth rate (dM/dt) ∝ M^(3/4),
+# which means the log-log exponent should be 3/4 ≈ 0.75 (Enquist et al. 1999).
+#
+# ⚠️  CRITICAL CAVEAT: In NEON, AGBChojnacky is computed from DBH via species-
+# specific allometric equations (Chojnacky et al. 2014). This means ΔAGB and
+# AGB are NOT independent variables — both are deterministic functions of DBH
+# measurements. Any slope in this regression partially reflects the mathematical
+# structure of the allometric equations, not empirical mass measurements. The
+# exponent should be interpreted with this constraint in mind.
+fit_sma_dM &lt;- sma(log_dM ~ log_M0, data = pos_agb, method = &quot;SMA&quot;,
+                  slope.test = 3/4)    # test H₀: β = 3/4 (MST metabolic scaling)
 fit_ols_dM &lt;- lm(log_dM ~ log_M0, data = pos_agb)
 
-cf_dM &lt;- fit_sma_dM$coef[[1]]
+cf_dM &lt;- fit_sma_dM$coef[[1]]  # smatr coef matrix: rows &quot;elevation&quot;,&quot;slope&quot;
 
 kable(data.frame(
   Method   = c(&quot;SMA&quot;, &quot;OLS&quot;),
@@ -1906,7 +1994,7 @@ kable(data.frame(
   CI_lo    = c(round(cf_dM[&quot;slope&quot;,&quot;lower limit&quot;], 4), NA),
   CI_hi    = c(round(cf_dM[&quot;slope&quot;,&quot;upper limit&quot;], 4), NA),
   R2       = round(summary(fit_ols_dM)$r.squared, 3),
-  p_vs_3_4 = c(round(fit_sma_dM$slopetest[[1]]$p, 6), NA),
+  p_vs_3_4 = c(round(fit_sma_dM$slopetest[[1]]$p, 6), NA),  # H₀: β = 3/4
   stringsAsFactors = FALSE
 ),
 col.names = c(&quot;Method&quot;,&quot;N&quot;,&quot;Slope&quot;,&quot;95% CI lo&quot;,&quot;95% CI hi&quot;,&quot;R\u00b2&quot;,
@@ -1967,25 +2055,32 @@ independent).</caption>
 </table>
 <div id="delta-m-scatter-sma-vs-ols-vs-mst" class="section level2" number="4.1">
 <h2><span class="header-section-number">4.1</span> <span class="math inline">\(\Delta M\)</span> scatter: SMA vs OLS vs MST</h2>
-<pre class="r"><code>set.seed(42)
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Scatter plot of ΔAGB vs AGB₀ analogous to the ΔD scatter chunk.
+# Extreme outliers (AGB &gt; 20,000 kg or increment &gt; 1,000 kg/yr) are removed
+# before subsampling; these are real but are likely data entry anomalies or
+# very large trees that would compress the visual axis scale.
+# The MST reference is anchored at the median of the unfiltered pos_agb data.
+set.seed(42)
 sub_agb &lt;- pos_agb |&gt;
-  filter(AGB_start &lt; 20000, AGB_inc_kg_yr &lt; 1000) |&gt;
-  sample_n(min(25000, n()))
+  filter(AGB_start &lt; 20000, AGB_inc_kg_yr &lt; 1000) |&gt;  # trim extreme outliers for plot
+  sample_n(min(25000, n()))  # subsample for rendering speed
 
 rng_M    &lt;- range(sub_agb$log_M0)
 xs_M     &lt;- seq(rng_M[1], rng_M[2], length.out = 200)
 ys_sma_M &lt;- cf_dM[&quot;elevation&quot;,&quot;coef(SMA)&quot;] + cf_dM[&quot;slope&quot;,&quot;coef(SMA)&quot;] * xs_M
 ys_ols_M &lt;- coef(fit_ols_dM)[1] + coef(fit_ols_dM)[2] * xs_M
 
+# MST reference: anchor at the median of the full (unfiltered) pos_agb data
 med_M         &lt;- median(pos_agb$AGB_start)
 med_dM        &lt;- median(pos_agb$AGB_inc_kg_yr)
-alpha_mst_agb &lt;- med_dM / med_M^(3/4)
+alpha_mst_agb &lt;- med_dM / med_M^(3/4)  # prefactor so MST line passes through median
 
 lines_agb &lt;- data.frame(
   AGB_start = exp(xs_M),
   SMA       = exp(ys_sma_M),
   OLS       = exp(ys_ols_M),
-  MST       = alpha_mst_agb * exp(xs_M)^(3/4)
+  MST       = alpha_mst_agb * exp(xs_M)^(3/4)  # MST theoretical: ΔAGB ~ AGB^(3/4)
 ) |&gt; pivot_longer(-AGB_start, names_to = &quot;fit&quot;, values_to = &quot;AGB_inc&quot;)
 
 ggplot(sub_agb, aes(x = AGB_start, y = AGB_inc_kg_yr)) +
@@ -2019,12 +2114,21 @@ ggplot(sub_agb, aes(x = AGB_start, y = AGB_inc_kg_yr)) +
 <div id="per-site-sma-exponents-delta-d-sim-d" class="section level1" number="5">
 <h1><span class="header-section-number">5</span> Per-site SMA exponents:
 <span class="math inline">\(\Delta D \sim D\)</span></h1>
-<pre class="r"><code>site_sma &lt;- pos_dbh |&gt;
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Fit site-level SMA exponents for ΔD ~ D to test for geographic/ecological
+# heterogeneity in the diameter growth scaling relationship. If MST is a
+# universal physiological rule, all 23 sites should show β ≈ 1/3 regardless
+# of climate, biome, or canopy structure.
+#
+# Minimum site sample = 50 positive intervals (n ≥ 50) for SMA stability.
+# Sites that pass this filter are sorted by SMA slope (descending) in the table.
+site_sma &lt;- pos_dbh |&gt;
   group_by(siteID) |&gt;
-  filter(n() &gt;= 50) |&gt;
+  filter(n() &gt;= 50) |&gt;   # require ≥ 50 intervals per site for SMA stability
   group_split() |&gt;
   lapply(function(d) {
     site    &lt;- unique(d$siteID)
+    # Site-level SMA fit with test against 1/3 — same API as global fit above
     fit_sma &lt;- sma(log_dD ~ log_D0, data = d, method = &quot;SMA&quot;,
                    slope.test = 1/3)
     fit_ols &lt;- lm(log_dD ~ log_D0, data = d)
@@ -2032,16 +2136,16 @@ ggplot(sub_agb, aes(x = AGB_start, y = AGB_inc_kg_yr)) +
     data.frame(
       siteID    = site,
       n         = nrow(d),
-      SMA_beta  = round(cf[&quot;slope&quot;,&quot;coef(SMA)&quot;], 3),
+      SMA_beta  = round(cf[&quot;slope&quot;,&quot;coef(SMA)&quot;],  3),
       CI_lo     = round(cf[&quot;slope&quot;,&quot;lower limit&quot;], 3),
       CI_hi     = round(cf[&quot;slope&quot;,&quot;upper limit&quot;], 3),
       OLS_beta  = round(coef(fit_ols)[2], 3),
       R2        = round(summary(fit_ols)$r.squared, 3),
-      p_vs_1_3  = round(fit_sma$slopetest[[1]]$p, 4),
-      med_inc   = round(median(d$DBH_inc_cm_yr), 3),
+      p_vs_1_3  = round(fit_sma$slopetest[[1]]$p, 4),  # H₀: β = 1/3
+      med_inc   = round(median(d$DBH_inc_cm_yr), 3),    # median annual increment (cm/yr)
       stringsAsFactors = FALSE
     )
-  }) |&gt; bind_rows() |&gt; arrange(desc(SMA_beta))
+  }) |&gt; bind_rows() |&gt; arrange(desc(SMA_beta))  # sort by slope to see range
 
 kable(site_sma,
   col.names = c(&quot;Site&quot;,&quot;N&quot;,&quot;SMA \u03b2&quot;,&quot;CI lo&quot;,&quot;CI hi&quot;,&quot;OLS \u03b2&quot;,
@@ -2370,16 +2474,23 @@ plot</h2>
 <div id="ols-vs-sma-per-site" class="section level2" number="5.2">
 <h2><span class="header-section-number">5.2</span> OLS vs SMA per
 site</h2>
-<pre class="r"><code>site_sma |&gt;
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Paired comparison of OLS vs SMA slopes per site. SMA slopes should always
+# exceed OLS slopes when both variables have measurement error (SMA does not
+# minimise Y-residuals alone). The gap between OLS and SMA is smaller when
+# R² is high (i.e., when variance in X dominates noise).
+# The vertical blue dashed line marks the MST prediction β = 1/3.
+# Sites are sorted by SMA slope for readability.
+site_sma |&gt;
   pivot_longer(cols = c(SMA_beta, OLS_beta),
                names_to = &quot;method&quot;, values_to = &quot;beta&quot;) |&gt;
   mutate(method = recode(method, SMA_beta = &quot;SMA&quot;, OLS_beta = &quot;OLS&quot;),
-         siteID = reorder(siteID, beta)) |&gt;
+         siteID = reorder(siteID, beta)) |&gt;  # sort by slope
   ggplot(aes(x = beta, y = siteID, color = method, shape = method)) +
   geom_vline(xintercept = 1/3, linetype = &quot;dashed&quot;, color = &quot;#4575b4&quot;,
-             linewidth = 0.8) +
+             linewidth = 0.8) +  # MST reference line
   geom_point(size = 2.5, alpha = 0.9) +
-  geom_line(aes(group = siteID), color = &quot;grey60&quot;, linewidth = 0.5) +
+  geom_line(aes(group = siteID), color = &quot;grey60&quot;, linewidth = 0.5) +  # connect OLS-SMA pair
   scale_color_manual(values = c(SMA = &quot;#d73027&quot;, OLS = &quot;#f46d43&quot;),
                      name = &quot;Method&quot;) +
   scale_shape_manual(values = c(SMA = 16, OLS = 1), name = &quot;Method&quot;) +
@@ -2395,17 +2506,25 @@ site</h2>
 <div id="summary-comparison-table" class="section level1" number="6">
 <h1><span class="header-section-number">6</span> Summary comparison
 table</h1>
-<pre class="r"><code>kable(data.frame(
+<pre class="r"><code># ── Purpose of this chunk ─────────────────────────────────────────────────────
+# Collate all SMA slope estimates, 95% CIs, OLS slopes, and p-values from the
+# three main analyses into a single comparison table. This is the primary
+# quantitative summary that a reader would cite.
+#
+# All three fit objects are already in memory (fit_sma_dD, fit_sma_bin, fit_sma_dM),
+# so we simply extract the coefficient matrices and format them into a data frame.
+kable(data.frame(
   Relationship  = c(
-    &quot;\u0394D ~ D\u1da6 (global raw)&quot;,
-    &quot;\u0394D ~ D\u1da6 (binned means)&quot;,
-    &quot;\u0394AGB ~ AGB\u1da7 (global raw)&quot;
+    &quot;\u0394D ~ D\u1da6 (global raw)&quot;,    # all individual-level intervals
+    &quot;\u0394D ~ D\u1da6 (binned means)&quot;,  # 24 log-DBH bins — cleaner signal
+    &quot;\u0394AGB ~ AGB\u1da7 (global raw)&quot; # ⚠ AGB derived from DBH
   ),
   SMA_slope = c(
     round(fit_sma_dD$coef[[1]][&quot;slope&quot;,&quot;coef(SMA)&quot;], 3),
     round(fit_sma_bin$coef[[1]][&quot;slope&quot;,&quot;coef(SMA)&quot;], 3),
     round(fit_sma_dM$coef[[1]][&quot;slope&quot;,&quot;coef(SMA)&quot;], 3)
   ),
+  # 95% CI: from smatr coef matrix, &quot;lower limit&quot; and &quot;upper limit&quot; columns
   CI_lo = c(
     round(fit_sma_dD$coef[[1]][&quot;slope&quot;,&quot;lower limit&quot;], 3),
     round(fit_sma_bin$coef[[1]][&quot;slope&quot;,&quot;lower limit&quot;], 3),
@@ -2422,6 +2541,7 @@ table</h1>
     round(coef(fit_ols_dM)[2], 3)
   ),
   MST_pred = c(&quot;1/3 \u2248 0.333&quot;,&quot;1/3 \u2248 0.333&quot;,&quot;3/4 = 0.75&quot;),
+  # p-values from fit$slopetest[[1]]$p — embedded at fit time (slope.test = X)
   p_vs_MST = c(
     round(fit_sma_dD$slopetest[[1]]$p, 5),
     round(fit_sma_bin$slopetest[[1]]$p, 5),
@@ -2430,7 +2550,7 @@ table</h1>
   Note = c(
     &quot;High variance; OLS R\u00b2 \u2248 0.06&quot;,
     &quot;Cleaner central tendency&quot;,
-    &quot;AGB not independent of DBH&quot;
+    &quot;AGB not independent of DBH&quot;  # critical caveat for interpretation
   ),
   stringsAsFactors = FALSE
 ),
