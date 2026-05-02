@@ -1181,3 +1181,6 @@ Actions: Invoked optimizer, merow-ecology, scholarly-rigor-reviewer subagents to
 Source: active chat request
 Request summary: Diversify README worked examples beyond SDM/Merow.
 Actions: Replaced single SDM worked example with four parallel worked examples (trait harmonization, GBIF occurrence cleaning, community ordination, SDM) sharing the same five-step pattern. Restructured pitfalls table into Cross-cutting, Trait & allometry, Occurrence & taxonomy, Modeling & inference (incl. SDM, ordination) sections. Public mirror commit: 208c0f1 on main.
+2026-05-01 | Created plant_scaling_data project scaffold with initial README, methods, workflow scripts, and provenance log.
+
+2026-05-02 | Created phylogenetics-comparative-agent.agent.md in both agents/ and .github/agents/. Agent covers phylogenetic comparative methods: PGLS, phylogenetic signal, ancestral state reconstruction, diversification analysis, trait evolution models, and key R packages.
