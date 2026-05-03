@@ -187,18 +187,25 @@ pts_country <- st_join(pts,
 # Points outside polygons (ocean, coastal) — try 1 km buffer snap
 na_country <- pts_country[is.na(pts_country$NAME_0), ]
 cat("Points unmatched to country:", nrow(na_country),
-    "(coastal/ocean; attempting 1 km buffer snap)\n")
+    "(coastal/ocean; attempting nearest-land snap)\n")
 if (nrow(na_country) > 0) {
-  na_buffered <- st_buffer(na_country["tree_id"], dist = 1000)
-  na_snap     <- st_join(na_buffered,
-                         world_sf[, c("NAME_0", "GID_0")],
-                         join = st_intersects, left = TRUE)
-  na_snap     <- st_drop_geometry(na_snap)
+  # Use nearest-feature join (no buffer distance needed, tolerant of coastal offsets)
+  na_nearest <- st_join(na_country["tree_id"],
+                        world_sf[, c("NAME_0", "GID_0")],
+                        join = st_nearest_feature)
+  na_nearest <- st_drop_geometry(na_nearest)
+  # Drop duplicates — take first match per tree_id
+  na_nearest <- na_nearest[!duplicated(na_nearest$tree_id), ]
   pts_country <- st_drop_geometry(pts_country)
-  pts_country <- rows_update(pts_country,
-                              na_snap[, c("tree_id","NAME_0","GID_0")],
-                              by = "tree_id", unmatched = "ignore")
-  cat("After buffer snap, still unmatched:",
+  # Update only the rows that were NA
+  for (i in seq_len(nrow(na_nearest))) {
+    idx <- which(pts_country$tree_id == na_nearest$tree_id[i])
+    if (length(idx) == 1L) {
+      pts_country$NAME_0[idx] <- na_nearest$NAME_0[i]
+      pts_country$GID_0[idx]  <- na_nearest$GID_0[i]
+    }
+  }
+  cat("After nearest-land snap, still unmatched:",
       sum(is.na(pts_country$NAME_0)), "\n")
 } else {
   pts_country <- st_drop_geometry(pts_country)
