@@ -24,8 +24,9 @@ Whenever scientific methods, trait ranges, ecological assumptions, statistical m
 2. R Markdown compile check:
 - Detect changed or newly added *.Rmd files in the current branch/worktree.
 - For each changed Rmd, verify a successful render occurred in this run context.
-- If not verifiable, run render now and capture pass/fail.
-- Any failed render is BLOCKED.
+- If not verifiable, run render now using `rmarkdown::render('<file>.Rmd', output_format = 'html_document')` and capture pass/fail.
+- After each render, verify the corresponding `.html` file exists alongside the `.Rmd` and has a modification timestamp matching or newer than the render run. If the `.html` is missing or stale, treat the render as FAILED.
+- Any failed render or missing/stale HTML is BLOCKED.
 - If no Rmd files changed, mark this check PASS (not applicable) and do not render.
 
 3. R package build check:

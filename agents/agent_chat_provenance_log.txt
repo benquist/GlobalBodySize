@@ -1203,3 +1203,4 @@ Actions: Replaced single SDM worked example with four parallel worked examples (
 2026-05-02 | kurosawa_respiration_scaling.Rmd: fixed 4 PGLS bugs, added Blomberg K, isometric null test, Rubner reference line, mass QA, temperature caveat. Re-rendered 5.4MB HTML clean.
 2026-05-02 | Created plant_scaling_data/niklas_enquist_organ_scaling.Rmd — full organ-mass scaling analysis.
 2026-05-02 | Created niklas_enquist_organ_scaling.Rmd in plant_scaling_data/; 68 chunks; renders clean.
+2026-05-02 | Committed unstaged session changes: tallo_summary.Rmd + HTML, tallo_bien_preexport.R path fix, agent definition updates.

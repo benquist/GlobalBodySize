@@ -396,6 +396,185 @@ kable(refs, escape = TRUE,
 
 ---
 
+# BIEN export readiness assessment
+
+This section documents a coordinate, taxonomy, and trait QA performed in May 2026
+to assess Tallo v1.0.0 for loading into the BIEN biodiversity database as
+georeferenced species observations.
+
+## Species completeness
+
+```{r bien-species-completeness}
+sp_complete <- tallo |>
+  summarise(
+    n_total          = n(),
+    n_with_species   = sum(!is.na(species)),
+    n_missing_species = sum(is.na(species)),
+    pct_missing      = round(100 * mean(is.na(species)), 1)
+  )
+kable(sp_complete,
+      caption = "Species completeness — records lacking a species binomial cannot be imported to BIEN")
+
+# Top references contributing missing species
+missing_by_ref <- tallo |>
+  filter(is.na(species)) |>
+  count(reference_id, sort = TRUE) |>
+  head(10)
+kable(missing_by_ref,
+      caption = "Top 10 references contributing NA species (see Tallo_references.csv for source details)")
+```
+
+**Conclusion:** 61,230 records (12.3%) lack a species binomial and must be excluded from
+any BIEN occurrence export. This leaves **437,608 candidate records**.
+
+## Coordinate precision and uncertainty
+
+Coordinates in Tallo range from GPS-precise individual-tree locations (≥3 decimal
+places, ~100 m precision) to coarse plot centroids (0–2 decimal places, 1–100 km
+precision). The number of decimal places provides a conservative estimate of
+`coordinateUncertaintyInMeters` required by Darwin Core.
+
+```{r bien-coord-precision}
+tallo_id <- tallo |> filter(!is.na(species))
+
+tallo_id <- tallo_id |>
+  mutate(
+    lat_dp  = nchar(sub("^[^.]*[.]?", "", as.character(abs(latitude)))),
+    lon_dp  = nchar(sub("^[^.]*[.]?", "", as.character(abs(longitude)))),
+    min_dp  = pmin(as.integer(lat_dp), as.integer(lon_dp)),
+    coord_precision_class = case_when(
+      min_dp == 0 ~ "0 dp  (~100 km) — integer",
+      min_dp == 1 ~ "1 dp  (~11 km)  — likely centroid",
+      min_dp == 2 ~ "2 dp  (~1 km)   — likely centroid",
+      min_dp >= 3 ~ "3+ dp (~100 m)  — acceptable"
+    ),
+    coordinateUncertaintyInMeters = case_when(
+      min_dp == 0 ~ 111000L,
+      min_dp == 1 ~  11100L,
+      min_dp == 2 ~   1100L,
+      TRUE        ~     NA_integer_
+    ),
+    is_plot_centroid = min_dp <= 2
+  )
+
+prec_summary <- tallo_id |>
+  count(coord_precision_class) |>
+  mutate(pct = round(100 * n / sum(n), 1)) |>
+  arrange(coord_precision_class)
+kable(prec_summary,
+      caption = "Coordinate precision classes in BIEN-candidate records (species non-NA only)")
+```
+
+```{r bien-coord-precision-bar, fig.height=3.5}
+ggplot(prec_summary, aes(x = reorder(coord_precision_class, -n), y = n, fill = coord_precision_class)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(format(n, big.mark=","), "  (", pct, "%)")),
+            hjust = -0.05, size = 3.2) +
+  coord_flip() +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.3))) +
+  scale_fill_manual(values = c(
+    "0 dp  (~100 km) — integer"    = "#d73027",
+    "1 dp  (~11 km)  — likely centroid" = "#fc8d59",
+    "2 dp  (~1 km)   — likely centroid" = "#fee090",
+    "3+ dp (~100 m)  — acceptable" = "#1a9641"
+  )) +
+  labs(x = NULL, y = "N records",
+       title = "Coordinate precision classes — BIEN candidate records",
+       subtitle = "Records with ≤2 decimal places are plot centroids, not individual tree GPS")
+```
+
+```{r bien-repeated-coords}
+top_coords <- tallo_id |>
+  count(latitude, longitude, sort = TRUE) |>
+  head(10)
+kable(top_coords,
+      caption = "Top 10 most-repeated coordinate pairs (confirms plot centroid structure)")
+```
+
+## Coordinate anomalies
+
+```{r bien-coord-anomalies}
+# lon = 0 cases
+lon0 <- tallo |> filter(longitude == 0)
+kable(lon0 |> select(tree_id, genus, species, latitude, longitude,
+                     stem_diameter_cm, height_m, reference_id),
+      caption = "Records with longitude = 0 (reference 35; Quercus ilex, Spain — verify against source publication)")
+
+# Implausible height record
+implausible <- tallo |> filter(is.na(species) & !is.na(height_m) & height_m > 90)
+if (nrow(implausible) > 0) {
+  kable(implausible |> select(tree_id, genus, species, latitude, longitude,
+                               height_m, stem_diameter_cm, reference_id),
+        caption = "Unidentified records with height > 90 m — ecologically implausible for most regions; quarantine before BIEN import")
+}
+```
+
+## BIEN candidate pool summary
+
+```{r bien-candidate-summary}
+pool <- tallo_id |>
+  summarise(
+    `Total BIEN candidates (species non-NA)` = n(),
+    `With 3+ dp coords (GPS quality)`        = sum(min_dp >= 3),
+    `Plot centroids (≤2 dp)`                 = sum(is_plot_centroid),
+    `With height_m`                          = sum(!is.na(height_m)),
+    `With crown_radius_m`                    = sum(!is.na(crown_radius_m)),
+    `height_outlier flagged`                 = sum(height_outlier == "Y"),
+    `crown_radius_outlier flagged`           = sum(crown_radius_outlier == "Y"),
+    `Height < 2 m (sapling/juvenile)`        = sum(!is.na(height_m) & height_m < 2)
+  ) |>
+  tidyr::pivot_longer(everything(), names_to = "Metric", values_to = "N") |>
+  mutate(Pct = round(100 * N / n(), 1))
+kable(pool, caption = "BIEN candidate pool summary (437,608 records with species binomial)")
+```
+
+## Trait units — BIEN canonical mapping
+
+All three Tallo trait fields are already in appropriate SI-derived units; no
+numeric conversion is required. Field renaming and protocol flagging are needed.
+
+```{r bien-trait-units}
+kable(data.frame(
+  `Tallo field`        = c("stem_diameter_cm", "height_m", "crown_radius_m"),
+  `BIEN canonical`     = c("stem_diameter_cm", "plant_height_m", "crown_radius_m"),
+  Unit                 = c("cm", "m", "m"),
+  `Conversion needed`  = c("None", "None", "None"),
+  Notes = c(
+    "Multi-stemmed trees use sqrt(sum(Di²)) — flag with measurement_protocol = 'multi_stem_quadratic_sum'",
+    "Outliers flagged by source authors; preserve flag as measurementRemarks",
+    "37.3% missing; missingness is by-reference (non-random) — do not impute"
+  )
+), caption = "Tallo → BIEN canonical trait unit mapping")
+```
+
+## Outstanding items before BIEN import
+
+```{r bien-outstanding}
+kable(data.frame(
+  Priority  = c("CRITICAL","CRITICAL","CRITICAL","CRITICAL","HIGH","HIGH","HIGH"),
+  Issue = c(
+    "Exclude 61,230 NA-species records",
+    "Attach coordinateUncertaintyInMeters (see precision class above)",
+    "Extract eventDate/year from Tallo_references.csv per reference_id",
+    "TNRS taxonomic reconciliation of 5,164 species against BIEN/WCVP backbone",
+    "Reverse-geocode country/state/county via GADM (sf + geodata)",
+    "Flag multi-stem compound diameter records by reference",
+    "Quarantine T_481206 (102.7 m tree, no species, Georgia USA — likely unit error)"
+  ),
+  Status = c(
+    "Pipeline implemented in scripts/tallo_bien_preexport.R",
+    "Pipeline implemented in scripts/tallo_bien_preexport.R",
+    "Year range extraction requires manual review of Tallo_references.csv",
+    "Requires TNRS package or API call — not yet run",
+    "Pipeline implemented in scripts/tallo_bien_preexport.R",
+    "Requires per-reference study metadata — flag added for known refs",
+    "Record quarantined in pipeline"
+  )
+), caption = "BIEN import outstanding action items (May 2026)")
+```
+
+---
+
 # Key caveats
 
 1. **Crown radius only available for 63% of records.** Stem diameter is
@@ -404,8 +583,9 @@ kable(refs, escape = TRUE,
    this non-random missingness.
 
 2. **Outlier flags.** Tallo provides `height_outlier` and `crown_radius_outlier`
-   columns. Records flagged `"yes"` should be excluded when fitting allometric
-   equations (see Jucker et al. 2022, Table S1 for criteria).
+   columns. Records flagged `"Y"` are statistical outliers within allometric
+   regressions fitted by Jucker et al. (2022) — they are not necessarily
+   biologically implausible. Preserve these flags; do not silently delete.
 
 3. **No biomass column.** Tallo records structural dimensions only (DBH, height,
    crown radius). Biomass must be *estimated* from allometric equations (e.g.,
@@ -416,8 +596,13 @@ kable(refs, escape = TRUE,
    List (v1.1) by Jucker et al. — additional reconciliation against a current
    backbone (World Flora Online, TNRS) is recommended before merging.
 
-5. **Georeferenced:** All 498,838 records have exact decimal-degree coordinates —
-   making Tallo the only fully georeferenced dataset in this collection.
+5. **Georeferenced:** All 498,838 records carry decimal-degree coordinates, but
+   ~38% are plot centroids (≤2 decimal places) rather than individual-tree GPS.
+   See the BIEN export section above for precision classes and
+   `coordinateUncertaintyInMeters` assignments.
+
+6. **No observation date.** Individual records carry no measurement date; date
+   information must be extracted per source publication via `reference_id`.
 
 ---
 

@@ -50,14 +50,16 @@ suppressPackageStartupMessages({
 })
 
 ## ---- Paths ------------------------------------------------------------------
-RAW_DIR   <- file.path(dirname(dirname(rstudioapi::getActiveDocumentContext()$path)),
-                       "data/raw/tallo")
-# Fallback for non-RStudio execution
-if (!dir.exists(RAW_DIR)) {
-  script_dir <- tryCatch(dirname(normalizePath(sys.frames()[[1]]$ofile)),
-                         error = function(e) getwd())
-  RAW_DIR <- file.path(dirname(script_dir), "data/raw/tallo")
-}
+# Resolve project root from script location (works from Rscript CLI, source(), or RStudio)
+script_self <- tryCatch(
+  normalizePath(sys.frames()[[1]]$ofile),
+  error = function(e) tryCatch(
+    normalizePath(rstudioapi::getActiveDocumentContext()$path),
+    error = function(e2) normalizePath(file.path(getwd(), "scripts/tallo_bien_preexport.R"))
+  )
+)
+PROJECT_ROOT <- dirname(dirname(script_self))   # scripts/ -> project root
+RAW_DIR  <- file.path(PROJECT_ROOT, "data/raw/tallo")
 OUT_DIR   <- file.path(dirname(RAW_DIR), "..", "processed")
 GADM_DIR  <- file.path(dirname(RAW_DIR), "..", "gadm_cache")
 dir.create(OUT_DIR,  showWarnings = FALSE, recursive = TRUE)
@@ -140,7 +142,8 @@ tallo_id[!is.na(height_m) & height_m < 2,
 # Attempt to extract 4-digit year from source string
 # Many citations contain the year immediately after the first author
 refs[, year_extracted := as.integer(
-  regmatches(source, regexpr("(?<=\\()\\d{4}(?=\\))", source, perl = TRUE))
+  sub(".*\\((\\d{4})\\).*", "\\1", source, perl = TRUE) |>
+    (\(x) ifelse(grepl("^\\d{4}$", x), x, NA_character_))()
 )]
 # Where extraction fails, set NA — these need manual lookup
 refs_year <- refs[, .(reference_id, year_extracted)]
@@ -172,8 +175,9 @@ pts <- st_as_sf(tallo_id[, .(tree_id, longitude, latitude)],
                 crs = 4326, remove = FALSE)
 
 cat("Loading world polygons (GADM admin-0) ...\n")
+sf::sf_use_s2(FALSE)   # GADM polygons have minor topology issues; disable S2
 world_sv  <- geodata::world(resolution = 1, path = GADM_DIR)
-world_sf  <- st_as_sf(world_sv)
+world_sf  <- st_make_valid(st_as_sf(world_sv))
 
 cat("Joining country ...\n")
 pts_country <- st_join(pts,
