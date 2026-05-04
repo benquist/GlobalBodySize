@@ -50,28 +50,32 @@ MIN_N <- 10   # minimum records per species for regression
 # whole-plant size measure in BAAD but is NOT purely above-ground. m.st = all
 # stem tissue (branches, bark) and approximates AGB without leaves.
 
+# wbe_ref: WBE-predicted exponent for each combination.
+#   d.ba combos : 2.0  (area-preserving branching → leaf area/mass ~ d^2)
+#   m.to combos : 0.75 (WBE metabolic scaling → leaf ~ total mass^(3/4))
+#   m.st combos : NA   (no explicit WBE prediction for leaf ~ stem mass)
 combos <- list(
-  list(x = "d.ba",  y = "m.lf",
+  list(x = "d.ba",  y = "m.lf", wbe_ref = 2.00,
        xlab = "Basal diameter d.ba (m)",        ylab = "Leaf mass m.lf (kg)",
        xlab_log = "log₁₀ basal diameter (m)",   ylab_log = "log₁₀ leaf mass (kg)",
        title_short = "Leaf mass ~ basal diameter"),
-  list(x = "d.ba",  y = "a.lf",
+  list(x = "d.ba",  y = "a.lf", wbe_ref = 2.00,
        xlab = "Basal diameter d.ba (m)",        ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ basal diameter (m)",   ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ basal diameter"),
-  list(x = "m.to",  y = "m.lf",
+  list(x = "m.to",  y = "m.lf", wbe_ref = 0.75,
        xlab = "Total plant biomass m.to (kg)",  ylab = "Leaf mass m.lf (kg)",
        xlab_log = "log₁₀ total biomass (kg)",   ylab_log = "log₁₀ leaf mass (kg)",
        title_short = "Leaf mass ~ total plant biomass"),
-  list(x = "m.to",  y = "a.lf",
+  list(x = "m.to",  y = "a.lf", wbe_ref = 0.75,
        xlab = "Total plant biomass m.to (kg)",  ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ total biomass (kg)",   ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ total plant biomass"),
-  list(x = "m.st",  y = "m.lf",
+  list(x = "m.st",  y = "m.lf", wbe_ref = NA_real_,
        xlab = "Stem mass m.st (kg)",            ylab = "Leaf mass m.lf (kg)",
        xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf mass (kg)",
        title_short = "Leaf mass ~ stem mass"),
-  list(x = "m.st",  y = "a.lf",
+  list(x = "m.st",  y = "a.lf", wbe_ref = NA_real_,
        xlab = "Stem mass m.st (kg)",            ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ stem mass")
@@ -156,6 +160,11 @@ database with ≥ `r MIN_N` individual records per species.
 | Leaf mass | Stem mass | `m.lf ~ m.st` | kg ~ kg |
 | Leaf area | Stem mass | `a.lf ~ m.st` | m² ~ kg |
 
+> **WBE predictions tested:**
+> - Leaf area and leaf mass vs. **basal diameter**: exponent = **2** (area-preserving branching: conduit cross-sectional area is conserved across branching levels, so total leaf area ∝ d²; Enquist et al. 1998; West et al. 1999).
+> - Leaf area and leaf mass vs. **total plant biomass**: exponent = **3/4** (metabolic scaling: whole-plant resource flux ∝ M^(3/4), so leaf area, which sets gas exchange capacity, also scales as M^(3/4); Enquist & Niklas 2001).
+> - Leaf area and leaf mass vs. **stem mass**: no explicit WBE exponent stated here; isometry (1.0) shown as a reference.
+>
 > **Variable notes:**  
 > `d.ba` = stem diameter at base [m] (more commonly measured in BAAD than DBH).  
 > `m.to` = total plant biomass including roots (= `m.rt + m.so`); used as the best available whole-plant size indicator.  
@@ -233,10 +242,13 @@ plot_slope_vs_range <- function(res, co) {
       method = recode(method, ols_slope = "OLS", sma_slope = "SMA")
     )
 
-  ggplot(long, aes(x = log_x_range, y = slope,
+  wbe_label <- if (!is.na(co$wbe_ref))
+    paste0("Dashed = ", co$wbe_ref, " (WBE); dotted = 1.0 (isometry). ")
+  else
+    "Dotted = 1.0 (isometry); no specific WBE prediction for this predictor. "
+
+  p <- ggplot(long, aes(x = log_x_range, y = slope,
                    colour = clade, shape = method)) +
-    geom_hline(yintercept = 2.00, linetype = "dashed",
-               colour = "grey50", linewidth = 0.8) +
     geom_hline(yintercept = 1.00, linetype = "dotted",
                colour = "grey70", linewidth = 0.6) +
     geom_errorbar(aes(ymin = lo, ymax = hi),
@@ -254,8 +266,12 @@ plot_slope_vs_range <- function(res, co) {
       x = paste0("log₁₀ size range  [log₁₀(max) − log₁₀(min) of ", co$x, "]"),
       y = "Intraspecific slope",
       title = paste0("Slope vs. size range — ", co$title_short),
-      subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry). Black line: OLS trend across species."
+      subtitle = paste0(wbe_label, "Black line: OLS trend across species.")
     )
+  if (!is.na(co$wbe_ref))
+    p <- p + geom_hline(yintercept = co$wbe_ref, linetype = "dashed",
+                        colour = "grey50", linewidth = 0.8)
+  p
 }
 
 # ── Shared helper: slopes table ───────────────────────────────────────────────
@@ -429,14 +445,14 @@ r3_long <- r3 %>%
 
 ggplot(r3_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf mass ~ total plant biomass: intraspecific slope distribution",
-       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+       subtitle = "Dashed = 3/4 (WBE prediction); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -480,14 +496,14 @@ r4_long <- r4 %>%
 
 ggplot(r4_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf area ~ total plant biomass: intraspecific slope distribution",
-       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+       subtitle = "Dashed = 3/4 (WBE prediction); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -531,14 +547,13 @@ r5_long <- r5 %>%
 
 ggplot(r5_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf mass ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+       subtitle = "Dotted = 1.0 (isometry); no explicit WBE prediction for leaf ~ stem mass")
 ```
 
 ---
@@ -582,14 +597,13 @@ r6_long <- r6 %>%
 
 ggplot(r6_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf area ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+       subtitle = "Dotted = 1.0 (isometry); no explicit WBE prediction for leaf ~ stem mass")
 ```
 
 ---
@@ -602,34 +616,39 @@ ggplot(r6_long, aes(x = slope, fill = clade)) +
 all_res <- bind_rows(
   lapply(seq_along(combos), function(i) {
     results[[i]] %>%
-      mutate(combo = names(results)[i],
-             response = combos[[i]]$y,
-             predictor = combos[[i]]$x)
+      mutate(combo     = names(results)[i],
+             response  = combos[[i]]$y,
+             predictor = combos[[i]]$x,
+             wbe_ref   = combos[[i]]$wbe_ref)
   })
 )
 
 cross_sum <- all_res %>%
   group_by(combo) %>%
   summarise(
-    n_species     = n(),
-    med_ols       = round(median(ols_slope, na.rm = TRUE), 3),
-    iqr_ols       = round(IQR(ols_slope, na.rm = TRUE), 3),
-    pct_ols_lt2   = round(mean(ols_slope < 2.00, na.rm = TRUE) * 100, 1),
-    pct_ols_gt100 = round(mean(ols_slope > 1.00, na.rm = TRUE) * 100, 1),
-    med_sma       = round(median(sma_slope, na.rm = TRUE), 3),
-    iqr_sma       = round(IQR(sma_slope, na.rm = TRUE), 3),
-    med_r2        = round(median(r2, na.rm = TRUE), 3),
-    med_range     = round(median(log_x_range, na.rm = TRUE), 3),
+    n_species        = n(),
+    wbe_pred         = ifelse(is.na(wbe_ref[1]), "none", as.character(wbe_ref[1])),
+    med_ols          = round(median(ols_slope, na.rm = TRUE), 3),
+    iqr_ols          = round(IQR(ols_slope, na.rm = TRUE), 3),
+    pct_ols_lt_wbe   = round(mean(ols_slope < ifelse(is.na(wbe_ref[1]), Inf, wbe_ref[1]),
+                                  na.rm = TRUE) * 100, 1),
+    pct_ols_gt_iso   = round(mean(ols_slope > 1.00, na.rm = TRUE) * 100, 1),
+    med_sma          = round(median(sma_slope, na.rm = TRUE), 3),
+    iqr_sma          = round(IQR(sma_slope, na.rm = TRUE), 3),
+    med_r2           = round(median(r2, na.rm = TRUE), 3),
+    med_range        = round(median(log_x_range, na.rm = TRUE), 3),
     .groups = "drop"
   )
 
 kable(cross_sum,
-      col.names = c("Combination", "N species",
+      col.names = c("Combination", "WBE exponent", "N species",
                     "Median OLS slope", "IQR (OLS)",
-                    "% OLS < 2.0", "% OLS > 1.0",
+                    "% OLS < WBE", "% OLS > 1.0",
                     "Median SMA slope", "IQR (SMA)",
                     "Median R²", "Median log₁₀ range"),
-      caption = paste0("Cross-combination summary of intraspecific slopes (≥ ", MIN_N, " records/species)"))
+      caption = paste0("Cross-combination summary of intraspecific slopes (≥ ", MIN_N,
+                       " records/species). WBE exponent: 2.0 for diameter predictors,",
+                       " 3/4 for total biomass, none stated for stem mass."))
 ```
 
 ## OLS vs. SMA slope comparison — all combinations
@@ -681,10 +700,19 @@ all_res %>%
   mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA")) %>%
   filter(!is.na(slope)) %>%
   ggplot(aes(x = log_x_range, y = slope, colour = method)) +
-  geom_hline(yintercept = 2.00, linetype = "dashed",
-             colour = "grey60", linewidth = 0.6) +
   geom_hline(yintercept = 1.00, linetype = "dotted",
              colour = "grey80", linewidth = 0.5) +
+  # Per-combo WBE reference lines (different exponents for d.ba vs m.to)
+  geom_hline(data = data.frame(
+               combo   = c("m.lf~d.ba", "a.lf~d.ba"),
+               wbe_ref = 2.00),
+             aes(yintercept = wbe_ref), inherit.aes = FALSE,
+             linetype = "dashed", colour = "#e66101", linewidth = 0.7) +
+  geom_hline(data = data.frame(
+               combo   = c("m.lf~m.to", "a.lf~m.to"),
+               wbe_ref = 0.75),
+             aes(yintercept = wbe_ref), inherit.aes = FALSE,
+             linetype = "dashed", colour = "#5e3c99", linewidth = 0.7) +
   geom_point(alpha = 0.35, size = 1.2) +
   geom_smooth(method = "lm", se = FALSE, linewidth = 1.2, alpha = 0.9) +
   scale_colour_manual(values = c(OLS = "#1b7837", SMA = "#762a83"),
@@ -694,7 +722,7 @@ all_res %>%
     x = "log₁₀ size range",
     y = "Intraspecific slope",
     title = "Intraspecific slope vs. log₁₀ body size range — all six combinations",
-    subtitle = "OLS slopes are typically compressed toward zero at small size ranges (regression dilution).\nSMA slopes are more consistent across size range. Dashed = 2 (WBE); dotted = 1.0 (isometry)."
+    subtitle = "OLS slopes are typically compressed toward zero at small size ranges (regression dilution).\nSMA slopes are more consistent across size range.\nOrange dashed = 2.0 (WBE, d.ba); purple dashed = 3/4 (WBE, m.to); dotted = 1.0 (isometry)."
   ) +
   theme(strip.text = element_text(size = 9))
 ```
@@ -719,11 +747,16 @@ all_res %>%
 - **Size range:** log₁₀(max predictor) − log₁₀(min predictor) within each species.
   A key diagnostic: OLS slopes estimated from narrow size ranges are strongly biased
   downward; SMA slopes are less affected but CIs widen with small range.
-- **Reference slopes:** 2.0-power (dashed) = WBE/MST prediction for leaf area and
-  leaf mass scaling. Under WBE, area-preserving branching dictates that total leaf
-  area (and by extension leaf mass) scales as the square of stem diameter (exponent = 2;
-  Enquist et al. 1998, 2009; West et al. 1997, 1999); 1.0 (dotted) = geometric
-  (isometric) scaling.
+- **Reference slopes — two distinct WBE predictions:**
+  1. **Leaf area/mass vs. basal diameter (`d.ba`):** WBE exponent = **2** (dashed orange).
+     Under area-preserving branching, conduit cross-section is conserved across branching
+     levels, so total leaf area ∝ d² (West et al. 1999; Enquist et al. 1998).
+  2. **Leaf area/mass vs. total plant biomass (`m.to`):** WBE exponent = **3/4** (dashed
+     purple). Whole-plant metabolic rate ∝ M^(3/4), and leaf area sets gas exchange
+     capacity, so leaf area ∝ M^(3/4) (Enquist & Niklas 2001; Enquist et al. 2009).
+  3. **Leaf area/mass vs. stem mass (`m.st`):** No explicit WBE exponent; dotted line
+     at 1.0 (isometry) shown for reference only.
+  - 1.0 (dotted, all panels) = isometric (geometric) scaling.
 - **BAAD variable notes:**
   - `d.ba` = diameter at base of stem [m]; more commonly measured than DBH in BAAD.
   - `m.to` = total plant biomass [kg] (= `m.rt + m.so`; includes root mass).
