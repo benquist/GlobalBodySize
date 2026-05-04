@@ -235,7 +235,7 @@ plot_slope_vs_range <- function(res, co) {
 
   ggplot(long, aes(x = log_x_range, y = slope,
                    colour = clade, shape = method)) +
-    geom_hline(yintercept = 0.75, linetype = "dashed",
+    geom_hline(yintercept = 2.00, linetype = "dashed",
                colour = "grey50", linewidth = 0.8) +
     geom_hline(yintercept = 1.00, linetype = "dotted",
                colour = "grey70", linewidth = 0.6) +
@@ -254,7 +254,7 @@ plot_slope_vs_range <- function(res, co) {
       x = paste0("log₁₀ size range  [log₁₀(max) − log₁₀(min) of ", co$x, "]"),
       y = "Intraspecific slope",
       title = paste0("Slope vs. size range — ", co$title_short),
-      subtitle = "Dashed = 3/4 reference; dotted = isometry. Black line: OLS trend across species."
+      subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry). Black line: OLS trend across species."
     )
 }
 
@@ -327,14 +327,14 @@ r1_long <- r1 %>%
 
 ggplot(r1_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf mass ~ basal diameter: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4; dotted = 1.0")
+       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -378,14 +378,14 @@ r2_long <- r2 %>%
 
 ggplot(r2_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf area ~ basal diameter: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4; dotted = 1.0")
+       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -429,14 +429,14 @@ r3_long <- r3 %>%
 
 ggplot(r3_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf mass ~ total plant biomass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4; dotted = 1.0")
+       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -480,14 +480,14 @@ r4_long <- r4 %>%
 
 ggplot(r4_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf area ~ total plant biomass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4; dotted = 1.0")
+       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -531,14 +531,14 @@ r5_long <- r5 %>%
 
 ggplot(r5_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf mass ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4; dotted = 1.0")
+       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -582,14 +582,14 @@ r6_long <- r6 %>%
 
 ggplot(r6_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf area ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4; dotted = 1.0")
+       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -614,7 +614,7 @@ cross_sum <- all_res %>%
     n_species     = n(),
     med_ols       = round(median(ols_slope, na.rm = TRUE), 3),
     iqr_ols       = round(IQR(ols_slope, na.rm = TRUE), 3),
-    pct_ols_lt075 = round(mean(ols_slope < 0.75, na.rm = TRUE) * 100, 1),
+    pct_ols_lt2   = round(mean(ols_slope < 2.00, na.rm = TRUE) * 100, 1),
     pct_ols_gt100 = round(mean(ols_slope > 1.00, na.rm = TRUE) * 100, 1),
     med_sma       = round(median(sma_slope, na.rm = TRUE), 3),
     iqr_sma       = round(IQR(sma_slope, na.rm = TRUE), 3),
@@ -626,7 +626,7 @@ cross_sum <- all_res %>%
 kable(cross_sum,
       col.names = c("Combination", "N species",
                     "Median OLS slope", "IQR (OLS)",
-                    "% OLS < 0.75", "% OLS > 1.0",
+                    "% OLS < 2.0", "% OLS > 1.0",
                     "Median SMA slope", "IQR (SMA)",
                     "Median R²", "Median log₁₀ range"),
       caption = paste0("Cross-combination summary of intraspecific slopes (≥ ", MIN_N, " records/species)"))
@@ -681,7 +681,7 @@ all_res %>%
   mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA")) %>%
   filter(!is.na(slope)) %>%
   ggplot(aes(x = log_x_range, y = slope, colour = method)) +
-  geom_hline(yintercept = 0.75, linetype = "dashed",
+  geom_hline(yintercept = 2.00, linetype = "dashed",
              colour = "grey60", linewidth = 0.6) +
   geom_hline(yintercept = 1.00, linetype = "dotted",
              colour = "grey80", linewidth = 0.5) +
@@ -694,7 +694,7 @@ all_res %>%
     x = "log₁₀ size range",
     y = "Intraspecific slope",
     title = "Intraspecific slope vs. log₁₀ body size range — all six combinations",
-    subtitle = "OLS slopes are typically compressed toward zero at small size ranges (regression dilution).\nSMA slopes are more consistent across size range. Dashed = 3/4; dotted = 1.0."
+    subtitle = "OLS slopes are typically compressed toward zero at small size ranges (regression dilution).\nSMA slopes are more consistent across size range. Dashed = 2 (WBE); dotted = 1.0 (isometry)."
   ) +
   theme(strip.text = element_text(size = 9))
 ```
@@ -719,8 +719,11 @@ all_res %>%
 - **Size range:** log₁₀(max predictor) − log₁₀(min predictor) within each species.
   A key diagnostic: OLS slopes estimated from narrow size ranges are strongly biased
   downward; SMA slopes are less affected but CIs widen with small range.
-- **Reference slopes:** 3/4-power (dashed) = WBE/MST prediction for metabolic
-  scaling; 1.0 (dotted) = geometric (isometric) scaling of leaf mass with body size.
+- **Reference slopes:** 2.0-power (dashed) = WBE/MST prediction for leaf area and
+  leaf mass scaling. Under WBE, area-preserving branching dictates that total leaf
+  area (and by extension leaf mass) scales as the square of stem diameter (exponent = 2;
+  Enquist et al. 1998, 2009; West et al. 1997, 1999); 1.0 (dotted) = geometric
+  (isometric) scaling.
 - **BAAD variable notes:**
   - `d.ba` = diameter at base of stem [m]; more commonly measured than DBH in BAAD.
   - `m.to` = total plant biomass [kg] (= `m.rt + m.so`; includes root mass).
