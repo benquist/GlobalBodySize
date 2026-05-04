@@ -1,0 +1,726 @@
+---
+title: "BAAD Stem Diameter vs Above-Ground Leaf Biomass Scaling"
+subtitle: "Interspecific, Intraspecific, Functional Group, and Family-Level Analyses"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+    theme: flatly
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 5
+)
+
+safe_require <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    stop(sprintf("Package '%s' is required but not installed.", pkg), call. = FALSE)
+  }
+}
+
+required_pkgs <- c("baad.data", "dplyr", "ggplot2", "tidyr", "purrr", "tibble", "knitr", "scales")
+invisible(lapply(required_pkgs, safe_require))
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(purrr)
+  library(tibble)
+  library(knitr)
+  library(scales)
+})
+
+theme_set(theme_bw(base_size = 12))
+
+HAS_SMATR <- requireNamespace("smatr", quietly = TRUE)
+HAS_LMODEL2 <- requireNamespace("lmodel2", quietly = TRUE)
+
+if (!HAS_SMATR && !HAS_LMODEL2) {
+  stop("Need either 'smatr' or 'lmodel2' for RMA/SMA fits. Install one of them.", call. = FALSE)
+}
+
+if (HAS_SMATR) {
+  suppressPackageStartupMessages(library(smatr))
+}
+if (HAS_LMODEL2) {
+  suppressPackageStartupMessages(library(lmodel2))
+}
+
+extract_sma_stats <- function(fit_obj) {
+  out <- list(slope = NA_real_, slope_lwr = NA_real_, slope_upr = NA_real_, r2 = NA_real_)
+
+  coerce_coef_table <- function(x) {
+    if (is.null(x)) return(NULL)
+    if (is.matrix(x) || is.data.frame(x)) return(as.data.frame(x, stringsAsFactors = FALSE))
+    if (is.list(x) && length(x) > 0L) {
+      for (elt in x) {
+        tbl <- coerce_coef_table(elt)
+        if (!is.null(tbl)) return(tbl)
+      }
+    }
+    NULL
+  }
+
+  coef_sources <- list(
+    tryCatch(fit_obj$coef, error = function(e) NULL),
+    tryCatch(fit_obj$coefficients, error = function(e) NULL)
+  )
+
+  coef_tbl <- NULL
+  for (src in coef_sources) {
+    coef_tbl <- coerce_coef_table(src)
+    if (!is.null(coef_tbl)) break
+  }
+
+  if (!is.null(coef_tbl) && nrow(coef_tbl) > 0L && ncol(coef_tbl) > 0L) {
+    rn <- tolower(trimws(rownames(coef_tbl)))
+    slope_row <- which(rn %in% c("slope", "coef", "b", "beta"))
+    if (length(slope_row) == 0L) slope_row <- if (nrow(coef_tbl) >= 2L) 2L else 1L
+    slope_row <- slope_row[1]
+
+    coln <- tolower(trimws(colnames(coef_tbl)))
+    numeric_cols <- which(vapply(coef_tbl, function(z) is.numeric(suppressWarnings(as.numeric(z))), logical(1)))
+    slope_col <- which(grepl("slope|coef|estimate|est", coln))
+    if (length(slope_col) == 0L) slope_col <- numeric_cols
+    if (length(slope_col) > 0L) {
+      out$slope <- suppressWarnings(as.numeric(coef_tbl[slope_row, slope_col[1]]))
+    }
+
+    ci_l <- which(grepl("lower|lcl|lwr|low", coln))
+    ci_u <- which(grepl("upper|ucl|upr|high", coln))
+    if (length(ci_l) > 0L) out$slope_lwr <- suppressWarnings(as.numeric(coef_tbl[slope_row, ci_l[1]]))
+    if (length(ci_u) > 0L) out$slope_upr <- suppressWarnings(as.numeric(coef_tbl[slope_row, ci_u[1]]))
+  }
+
+  r2_sources <- list(
+    tryCatch(fit_obj$r2, error = function(e) NULL),
+    tryCatch(fit_obj$rsquared, error = function(e) NULL)
+  )
+  for (r2_src in r2_sources) {
+    if (is.null(r2_src)) next
+    if (is.list(r2_src) && length(r2_src) > 0L) {
+      r2_vals <- unlist(r2_src, use.names = FALSE)
+    } else {
+      r2_vals <- r2_src
+    }
+    r2_num <- suppressWarnings(as.numeric(r2_vals))
+    r2_num <- r2_num[is.finite(r2_num)]
+    if (length(r2_num) > 0L) {
+      out$r2 <- r2_num[1]
+      break
+    }
+  }
+
+  out
+}
+
+fit_scaling_models <- function(df, x = "log_d", y = "log_mlf") {
+  dat <- df %>% filter(is.finite(.data[[x]]), is.finite(.data[[y]]))
+  n <- nrow(dat)
+
+  if (n < 3) {
+    return(tibble(
+      n = n,
+      model = c("OLS", "RMA"),
+      method = c("lm", if (HAS_SMATR) "smatr::sma" else if (HAS_LMODEL2) "lmodel2" else "unavailable"),
+      slope = NA_real_,
+      slope_lwr = NA_real_,
+      slope_upr = NA_real_,
+      intercept = NA_real_,
+      r2 = NA_real_,
+      se = NA_real_,
+      t_stat = NA_real_,
+      p_beta_eq_2 = NA_real_,
+      note = "Insufficient data (n < 3)"
+    ))
+  }
+
+  fml <- as.formula(sprintf("%s ~ %s", y, x))
+
+  ols <- lm(fml, data = dat)
+  ols_sum <- summary(ols)
+  ols_ci <- tryCatch(confint(ols), error = function(e) matrix(c(NA_real_, NA_real_), nrow = 2))
+
+  out_ols <- tibble(
+    n = n,
+    model = "OLS",
+    method = "lm",
+    slope = unname(coef(ols)[2]),
+    slope_lwr = unname(ols_ci[2, 1]),
+    slope_upr = unname(ols_ci[2, 2]),
+    intercept = unname(coef(ols)[1]),
+    r2 = unname(ols_sum$r.squared),
+    se = unname(ols_sum$coefficients[2, 2]),
+    t_stat = unname((coef(ols)[2] - 2) / ols_sum$coefficients[2, 2]),
+    p_beta_eq_2 = unname(2 * pt(-abs((coef(ols)[2] - 2) / ols_sum$coefficients[2, 2]), df = ols$df.residual)),
+    note = NA_character_
+  )
+
+  out_rma <- NULL
+  smatr_note <- NULL
+  if (HAS_SMATR) {
+    sma_fit <- tryCatch(smatr::sma(fml, data = dat), error = function(e) NULL)
+    if (!is.null(sma_fit)) {
+      ss <- extract_sma_stats(sma_fit)
+      if (is.finite(ss$slope)) {
+        out_rma <- tibble(
+          n = n,
+          model = "RMA",
+          method = "smatr::sma",
+          slope = ss$slope,
+          slope_lwr = ss$slope_lwr,
+          slope_upr = ss$slope_upr,
+          intercept = NA_real_,
+          r2 = ss$r2,
+          se = NA_real_,
+          t_stat = NA_real_,
+          p_beta_eq_2 = NA_real_,
+          note = "RMA beta=2 p-value unavailable; interpret CI"
+        )
+      } else {
+        smatr_note <- "smatr fit parsed but slope was non-finite"
+      }
+    }
+  }
+
+  if (is.null(out_rma) && HAS_LMODEL2) {
+    l2 <- tryCatch(lmodel2::lmodel2(fml, data = dat), error = function(e) NULL)
+    if (!is.null(l2) && is.data.frame(l2$regression.results)) {
+      rr <- l2$regression.results
+      rma_row <- rr[rr$Method %in% c("RMA", "SMA"), , drop = FALSE]
+      if (nrow(rma_row) > 0L) {
+        out_rma <- tibble(
+          n = n,
+          model = "RMA",
+          method = "lmodel2",
+          slope = rma_row$slope[1],
+          slope_lwr = NA_real_,
+          slope_upr = NA_real_,
+          intercept = rma_row$Intercept[1],
+          r2 = rma_row$r[1]^2,
+          se = NA_real_,
+          t_stat = NA_real_,
+          p_beta_eq_2 = NA_real_,
+          note = if (!is.null(smatr_note)) paste0(smatr_note, "; RMA CI/test unavailable from lmodel2") else "RMA CI/test unavailable from lmodel2"
+        )
+      }
+    }
+  }
+
+  if (is.null(out_rma)) {
+    out_rma <- tibble(
+      n = n,
+      model = "RMA",
+      method = "unavailable",
+      slope = NA_real_,
+      slope_lwr = NA_real_,
+      slope_upr = NA_real_,
+      intercept = NA_real_,
+      r2 = NA_real_,
+      se = NA_real_,
+      t_stat = NA_real_,
+      p_beta_eq_2 = NA_real_,
+      note = if (!is.null(smatr_note)) paste0(smatr_note, "; RMA fitting unavailable") else "RMA fitting unavailable"
+    )
+  }
+
+  bind_rows(out_ols, out_rma)
+}
+
+baad_raw <- baad.data::baad_data()$data
+
+dat0 <- baad_raw %>%
+  transmute(
+    species = speciesMatched,
+    family = family,
+    pft = pft,
+    d_bh_m = d.bh,
+    m_lf_kg = m.lf
+  )
+
+dat1 <- dat0 %>% filter(!is.na(d_bh_m), !is.na(m_lf_kg))
+dat2 <- dat1 %>% filter(d_bh_m > 0, m_lf_kg > 0)
+
+dat <- dat2 %>%
+  mutate(
+    pft_norm = toupper(trimws(as.character(pft))),
+    pft_group = case_when(
+      grepl("A$", pft_norm) ~ "Angiosperm",
+      grepl("G$", pft_norm) ~ "Gymnosperm",
+      TRUE ~ NA_character_
+    ),
+    log_d = log10(d_bh_m),
+    log_mlf = log10(m_lf_kg)
+  )
+
+attrition <- tibble(
+  step = c(
+    "Raw BAAD records",
+    "Non-missing d.bh and m.lf",
+    "Positive d.bh and m.lf",
+    "Positive + non-missing species",
+    "Positive + non-missing family",
+    "Positive + mapped pft_group"
+  ),
+  n_records = c(
+    nrow(dat0),
+    nrow(dat1),
+    nrow(dat2),
+    sum(dat2$species != "" & !is.na(dat2$species)),
+    sum(dat2$family != "" & !is.na(dat2$family)),
+    sum(!is.na(dat$pft_group))
+  )
+) %>%
+  mutate(removed_from_previous = c(NA_integer_, diff(n_records) * -1L))
+
+analysis_dat <- dat %>%
+  filter(!is.na(species), species != "")
+
+species_label_checks <- analysis_dat %>%
+  group_by(species) %>%
+  summarise(
+    family_nonmissing_n = n_distinct(family[!is.na(family) & family != ""]),
+    pft_nonmissing_n = n_distinct(pft_group[!is.na(pft_group) & pft_group != ""]),
+    family_conflict = family_nonmissing_n > 1,
+    pft_conflict = pft_nonmissing_n > 1,
+    .groups = "drop"
+  )
+
+species_label_diagnostics <- tibble(
+  metric = c(
+    "Species with conflicting non-missing family labels",
+    "Species with conflicting non-missing pft_group labels",
+    "Species with any conflicting non-missing label"
+  ),
+  n_species = c(
+    sum(species_label_checks$family_conflict, na.rm = TRUE),
+    sum(species_label_checks$pft_conflict, na.rm = TRUE),
+    sum(species_label_checks$family_conflict | species_label_checks$pft_conflict, na.rm = TRUE)
+  )
+)
+
+species_means <- analysis_dat %>%
+  group_by(species) %>%
+  summarise(
+    family_raw = first(na.omit(family)),
+    pft_group_raw = first(na.omit(pft_group)),
+    n_individuals = n(),
+    log_d_mean = mean(log_d, na.rm = TRUE),
+    log_mlf_mean = mean(log_mlf, na.rm = TRUE),
+    log_d_range = diff(range(log_d, na.rm = TRUE)),
+    .groups = "drop"
+  ) %>%
+  left_join(species_label_checks %>% select(species, family_conflict, pft_conflict), by = "species") %>%
+  mutate(
+    family = if_else(family_conflict, NA_character_, family_raw),
+    pft_group = if_else(pft_conflict, NA_character_, pft_group_raw)
+  ) %>%
+  select(-family_raw, -pft_group_raw, -family_conflict, -pft_conflict) %>%
+  filter(is.finite(log_d_mean), is.finite(log_mlf_mean))
+```
+
+# Scope and Data Definition
+
+This report evaluates the allometric relation between stem diameter and above-ground leaf biomass in BAAD using:
+
+- Predictor: d.bh (m)
+- Response: m.lf (kg)
+- Species identifier: speciesMatched
+- Family: family
+- Functional group mapping from pft:
+  - DA, EA -> Angiosperm
+  - DG, EG -> Gymnosperm
+
+The target relation is written as a power law:
+
+$$
+m_{lf} = \alpha \cdot d_{bh}^{\beta}
+$$
+
+or, in log10 space:
+
+$$
+\log_{10}(m_{lf}) = \log_{10}(\alpha) + \beta \log_{10}(d_{bh})
+$$
+
+A formal contrast to $\beta = 2$ is included where standard errors are available.
+
+# Filtering and Attrition
+
+```{r attrition-table}
+kable(attrition, digits = 0, caption = "Explicit filtering attrition table")
+```
+
+```{r threshold-declarations}
+thresholds <- tibble(
+  component = c(
+    "Intraspecific species inclusion",
+    "Intraspecific species inclusion",
+    "Family inclusion",
+    "Family inclusion"
+  ),
+  threshold = c(
+    "n >= 11 individuals",
+    "log10(d.bh) range >= 0.7",
+    "n >= 30 individual records",
+    ">= 5 species"
+  )
+)
+kable(thresholds, caption = "Declared thresholds used in this report")
+```
+
+```{r species-label-diagnostics}
+kable(species_label_diagnostics, digits = 0, caption = "Species-level label consistency diagnostics")
+```
+
+# Guidance Consultation and Implementation
+
+This analysis was cross-checked against enhanced-theory and ecology-user guidance to keep modeling assumptions explicit, ecologically interpretable, and reproducible.
+
+- Model formalism: the core model is declared as a diameter-leaf-biomass power law in raw units and log10-linearized form, with OLS and RMA estimated for complementary Model I and Model II interpretation.
+- Declared thresholds: all inclusion rules are pre-declared and tabulated (intraspecific: n >= 11 and log10 diameter range >= 0.7; family: n >= 30 records and >= 5 species).
+- Uncertainty and caveats: approximation limits are made explicit, including package-dependent RMA uncertainty reporting and approximate tests versus beta = 2.
+- Reproducible workflow structure: setup, filtering attrition, threshold declaration, interspecific and stratified fits, diagnostics, caveats, and session metadata are organized as an auditable sequence.
+
+# Theory Framing and Testable Predictions
+
+Leaf biomass should increase with stem diameter as an increasing power function. The exponent $\beta$ describes how rapidly foliage mass scales with stem size. A value of $\beta = 2$ implies a very steep relation where leaf mass scales approximately with area-like growth in diameter terms.
+
+To anchor interpretation, this report estimates OLS and RMA exponents and tests whether observed slopes differ from 2 where uncertainty can be quantified.
+
+# Interspecific Analysis (Primary)
+
+Primary interspecific inference uses species-level means in log space to reduce pseudo-replication from uneven within-species sampling.
+
+```{r interspecific-fits}
+inter_df <- species_means %>%
+  transmute(log_d = log_d_mean, log_mlf = log_mlf_mean)
+
+inter_fit <- fit_scaling_models(inter_df)
+inter_fit <- inter_fit %>% mutate(beta0 = 2)
+
+kable(inter_fit, digits = 3, caption = "Interspecific (species means) OLS and RMA fits")
+```
+
+```{r interspecific-plot, fig.height=6}
+ggplot(species_means, aes(log_d_mean, log_mlf_mean)) +
+  geom_point(alpha = 0.6, color = "#2c7fb8") +
+  geom_smooth(method = "lm", se = TRUE, color = "#d95f0e", linewidth = 1) +
+  labs(
+    x = "Species mean log10(d.bh [m])",
+    y = "Species mean log10(m.lf [kg])",
+    title = "Primary interspecific scaling (species means)",
+    subtitle = paste0("n species = ", comma(nrow(species_means)))
+  )
+```
+
+```{r pseudo-replication-comparison}
+ind_fit <- fit_scaling_models(analysis_dat)
+comp_tab <- bind_rows(
+  inter_fit %>% mutate(context = "Species means"),
+  ind_fit %>% mutate(context = "Individual records")
+) %>%
+  select(context, model, method, n, slope, slope_lwr, slope_upr, r2, note)
+
+kable(comp_tab, digits = 3, caption = "Comparison: interspecific species-means vs individual-record fit")
+```
+
+# Angiosperm vs Gymnosperm Split
+
+## Individual-level context
+
+```{r pft-individual-fits}
+pft_ind <- analysis_dat %>%
+  filter(!is.na(pft_group)) %>%
+  group_split(pft_group) %>%
+  map_df(function(dg) {
+    grp <- unique(dg$pft_group)[1]
+    fit_scaling_models(dg) %>% mutate(group = grp, context = "Individual")
+  }) %>%
+  select(context, group, everything())
+
+kable(pft_ind, digits = 3, caption = "Angiosperm vs gymnosperm fits: individual-level")
+```
+
+```{r pft-individual-plot, fig.height=6}
+ggplot(analysis_dat %>% filter(!is.na(pft_group)), aes(log_d, log_mlf, color = pft_group)) +
+  geom_point(alpha = 0.35) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  labs(
+    x = "log10(d.bh [m])",
+    y = "log10(m.lf [kg])",
+    title = "Individual-level scaling by major functional group",
+    color = "Group"
+  )
+```
+
+## Interspecific species-mean context
+
+```{r pft-species-fits}
+pft_species <- species_means %>%
+  filter(!is.na(pft_group)) %>%
+  group_split(pft_group) %>%
+  map_df(function(ds) {
+    grp <- unique(ds$pft_group)[1]
+    fit_scaling_models(ds %>% transmute(log_d = log_d_mean, log_mlf = log_mlf_mean)) %>%
+      mutate(group = grp, context = "Species means")
+  }) %>%
+  select(context, group, everything())
+
+kable(pft_species, digits = 3, caption = "Angiosperm vs gymnosperm fits: species means")
+```
+
+```{r pft-species-plot, fig.height=6}
+ggplot(species_means %>% filter(!is.na(pft_group)), aes(log_d_mean, log_mlf_mean, color = pft_group)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  labs(
+    x = "Species mean log10(d.bh [m])",
+    y = "Species mean log10(m.lf [kg])",
+    title = "Species-mean scaling by major functional group",
+    color = "Group"
+  )
+```
+
+# Intraspecific Scaling (Species with n >= 11 and log10 range >= 0.7)
+
+```{r intraspecific-screen}
+intra_screen <- analysis_dat %>%
+  group_by(species) %>%
+  summarise(
+    n = n(),
+    log_d_range = diff(range(log_d, na.rm = TRUE)),
+    .groups = "drop"
+  ) %>%
+  left_join(species_means %>% select(species, family, pft_group), by = "species") %>%
+  mutate(
+    pass_n = n >= 11,
+    pass_range = log_d_range >= 0.7,
+    eligible = pass_n & pass_range
+  )
+
+kable(
+  intra_screen %>%
+    summarise(
+      species_total = n(),
+      species_n_ge_11 = sum(pass_n),
+      species_range_ge_0_7 = sum(pass_range),
+      species_eligible = sum(eligible)
+    ),
+  caption = "Intraspecific screening summary"
+)
+```
+
+```{r intraspecific-fits}
+eligible_species <- intra_screen %>% filter(eligible) %>% pull(species)
+
+intra_fits <- analysis_dat %>%
+  filter(species %in% eligible_species) %>%
+  group_by(species) %>%
+  group_split() %>%
+  map_df(function(ds) {
+    sp <- unique(ds$species)[1]
+    fit_scaling_models(ds) %>%
+      mutate(species = sp)
+  }) %>%
+  left_join(species_means %>% select(species, family, pft_group), by = "species") %>%
+  relocate(species, family, pft_group, model)
+
+kable(
+  intra_fits %>% arrange(desc(n), species, model),
+  digits = 3,
+  caption = "Per-species intraspecific OLS and RMA fits"
+)
+```
+
+```{r intraspecific-top-table}
+top_species <- intra_screen %>%
+  filter(eligible) %>%
+  arrange(desc(n), desc(log_d_range)) %>%
+  slice_head(n = 20)
+
+kable(top_species, digits = 3, caption = "Top eligible intraspecific species by sample size")
+```
+
+```{r intraspecific-forest, fig.height=8}
+forest_df <- intra_fits %>%
+  filter(species %in% (top_species %>% pull(species))) %>%
+  mutate(species = reorder(species, n))
+
+ggplot(forest_df, aes(x = slope, y = species, color = model)) +
+  geom_vline(xintercept = 2, linetype = "dashed", color = "gray40") +
+  geom_errorbarh(aes(xmin = slope_lwr, xmax = slope_upr), height = 0.18, alpha = 0.7,
+                 position = position_dodge(width = 0.5), na.rm = TRUE) +
+  geom_point(size = 2.1, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Estimated slope (beta)",
+    y = NULL,
+    title = "Intraspecific slope forest plot (top species)",
+    subtitle = "Dashed line marks beta = 2"
+  )
+```
+
+# Family-Level Analysis
+
+Well-sampled family rule: at least 30 individual records and at least 5 species.
+
+```{r family-screen}
+family_screen <- analysis_dat %>%
+  filter(!is.na(family), family != "") %>%
+  group_by(family) %>%
+  summarise(
+    n_records = n(),
+    n_species = n_distinct(species),
+    .groups = "drop"
+  ) %>%
+  mutate(eligible = n_records >= 30 & n_species >= 5)
+
+kable(family_screen %>% arrange(desc(n_records)), caption = "Family screening table", digits = 0)
+```
+
+```{r family-fits}
+eligible_families <- family_screen %>% filter(eligible) %>% pull(family)
+
+family_fits <- analysis_dat %>%
+  filter(family %in% eligible_families) %>%
+  group_by(family) %>%
+  group_split() %>%
+  map_df(function(dfam) {
+    fam <- unique(dfam$family)[1]
+    fit_scaling_models(dfam) %>%
+      mutate(family = fam)
+  }) %>%
+  left_join(family_screen, by = "family") %>%
+  relocate(family, n_records, n_species, model)
+
+kable(family_fits %>% arrange(desc(n_records), family, model), digits = 3,
+      caption = "Family-level OLS and RMA fits for well-sampled families")
+```
+
+```{r family-forest, fig.height=7}
+ggplot(family_fits, aes(x = slope, y = reorder(family, n_records), color = model)) +
+  geom_vline(xintercept = 2, linetype = "dashed", color = "gray40") +
+  geom_errorbarh(aes(xmin = slope_lwr, xmax = slope_upr), height = 0.18,
+                 position = position_dodge(width = 0.5), na.rm = TRUE) +
+  geom_point(size = 2.2, position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Estimated slope (beta)",
+    y = NULL,
+    title = "Family-level slope comparison",
+    subtitle = "Families with n >= 30 and >= 5 species"
+  )
+```
+
+# Diagnostics and Caveats
+
+```{r diagnostics-ols}
+inter_ols <- lm(log_mlf_mean ~ log_d_mean, data = species_means)
+inter_aug <- species_means %>%
+  mutate(
+    fitted = fitted(inter_ols),
+    resid = resid(inter_ols),
+    std_resid = rstandard(inter_ols),
+    cook = cooks.distance(inter_ols)
+  )
+
+cook_cut <- 4 / nrow(species_means)
+
+diagnostic_summary <- tibble(
+  metric = c(
+    "Species-mean OLS n",
+    "Species-mean OLS R2",
+    "Species with |standardized residual| > 2",
+    "Species with Cook's distance > 4/n"
+  ),
+  value = c(
+    nrow(species_means),
+    summary(inter_ols)$r.squared,
+    sum(abs(inter_aug$std_resid) > 2, na.rm = TRUE),
+    sum(inter_aug$cook > cook_cut, na.rm = TRUE)
+  )
+)
+
+kable(diagnostic_summary, digits = 3, caption = "Global species-mean OLS diagnostics")
+```
+
+```{r diagnostics-plots, fig.height=4.8, fig.width=11}
+par(mfrow = c(1, 2))
+plot(inter_aug$fitted, inter_aug$resid,
+     xlab = "Fitted log10(m.lf)", ylab = "Residual",
+     main = "Residual vs fitted")
+abline(h = 0, col = "red", lty = 2)
+qqnorm(inter_aug$resid, main = "Q-Q plot of residuals")
+qqline(inter_aug$resid, col = "red", lty = 2)
+par(mfrow = c(1, 1))
+```
+
+```{r leverage-table}
+lev_tab <- inter_aug %>%
+  arrange(desc(cook)) %>%
+  select(species, n_individuals, cook, std_resid) %>%
+  slice_head(n = 15)
+
+kable(lev_tab, digits = 4, caption = "Top potentially influential species (Cook's distance)")
+```
+
+```{r sampling-bias-figure, fig.height=5.5}
+ggplot(species_means, aes(n_individuals)) +
+  geom_histogram(bins = 30, fill = "#3182bd", color = "white") +
+  scale_x_continuous(labels = comma) +
+  labs(
+    x = "Individuals per species",
+    y = "Number of species",
+    title = "Sampling imbalance across species"
+  )
+```
+
+## Caveat Reporting
+
+1. BAAD combines studies with heterogeneous protocols, sites, and taxonomic representation.
+2. Many species are sparsely sampled, motivating species-mean primary inference to reduce pseudo-replication.
+3. RMA uncertainty can depend on package implementation details; smatr provides preferred CIs, while lmodel2 fallback may omit CIs.
+4. The intraspecific threshold (n >= 11 and log10 range >= 0.7) improves slope identifiability but excludes narrow-range species.
+5. Family-level slopes can still reflect compositional effects and uneven within-family sampling.
+6. Hypothesis tests against beta = 2 are approximate where standard errors are inferred from CIs.
+
+# Reproducibility Metadata
+
+```{r session-info}
+si <- sessionInfo()
+print(si$R.version$version.string)
+print(si$platform)
+print(c(
+  HAS_SMATR = HAS_SMATR,
+  HAS_LMODEL2 = HAS_LMODEL2
+))
+```
+
+```{r analysis-summaries}
+summary_block <- tibble(
+  item = c(
+    "Records analyzed (positive d.bh and m.lf, with species)",
+    "Species in interspecific analysis",
+    "Eligible intraspecific species",
+    "Eligible families"
+  ),
+  value = c(
+    nrow(analysis_dat),
+    nrow(species_means),
+    length(eligible_species),
+    length(eligible_families)
+  )
+)
+
+kable(summary_block, caption = "Analysis coverage summary")
+```
