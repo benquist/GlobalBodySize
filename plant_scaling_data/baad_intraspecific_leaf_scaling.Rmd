@@ -1,5 +1,5 @@
 ---
-title: "BAAD: Intraspecific Leaf Scaling — OLS and SMA Slopes per Species"
+title: "BAAD: Intraspecific Leaf Scaling — OLS, SMA, and OLS Bisector Slopes per Species"
 author: "plant_scaling_data project"
 date: "`r Sys.Date()`"
 output:
@@ -50,36 +50,65 @@ MIN_N <- 10   # minimum records per species for regression
 # whole-plant size measure in BAAD but is NOT purely above-ground. m.st = all
 # stem tissue (branches, bark) and approximates AGB without leaves.
 
-# wbe_ref: WBE-predicted exponent for each combination.
-#   d.ba combos : 2.0  (area-preserving branching → leaf area/mass ~ d^2)
-#   m.to combos : 0.75 (WBE metabolic scaling → leaf ~ total mass^(3/4))
-#   m.st combos : NA   (no explicit WBE prediction for leaf ~ stem mass)
+# Prediction metadata per combination:
+#   - "numeric prediction": theory gives a direct exponent reference.
+#   - "assumption-conditional prediction": exponent applies only if the
+#     stated assumption is reasonable for this predictor/response context.
+#   - "no specific prediction": no exponent reference line is asserted.
 combos <- list(
   list(x = "d.ba",  y = "m.lf", wbe_ref = 2.00,
+    prediction_category = "numeric prediction", prediction_value = 2.00,
+    prediction_assumption = NA_character_,
        xlab = "Basal diameter d.ba (m)",        ylab = "Leaf mass m.lf (kg)",
        xlab_log = "log₁₀ basal diameter (m)",   ylab_log = "log₁₀ leaf mass (kg)",
        title_short = "Leaf mass ~ basal diameter"),
   list(x = "d.ba",  y = "a.lf", wbe_ref = 2.00,
+    prediction_category = "numeric prediction", prediction_value = 2.00,
+    prediction_assumption = NA_character_,
        xlab = "Basal diameter d.ba (m)",        ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ basal diameter (m)",   ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ basal diameter"),
   list(x = "m.to",  y = "m.lf", wbe_ref = 0.75,
+    prediction_category = "numeric prediction", prediction_value = 0.75,
+    prediction_assumption = NA_character_,
        xlab = "Total plant biomass m.to (kg)",  ylab = "Leaf mass m.lf (kg)",
        xlab_log = "log₁₀ total biomass (kg)",   ylab_log = "log₁₀ leaf mass (kg)",
        title_short = "Leaf mass ~ total plant biomass"),
   list(x = "m.to",  y = "a.lf", wbe_ref = 0.75,
+    prediction_category = "numeric prediction", prediction_value = 0.75,
+    prediction_assumption = NA_character_,
        xlab = "Total plant biomass m.to (kg)",  ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ total biomass (kg)",   ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ total plant biomass"),
   list(x = "m.st",  y = "m.lf", wbe_ref = 0.75,
+    prediction_category = "assumption-conditional prediction",
+    prediction_value = 0.75,
+    prediction_assumption = "Assumes stem biomass tracks transport-network-supported above-ground structure and near-steady allocation.",
        xlab = "Stem mass m.st (kg)",            ylab = "Leaf mass m.lf (kg)",
        xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf mass (kg)",
        title_short = "Leaf mass ~ stem mass"),
   list(x = "m.st",  y = "a.lf", wbe_ref = 0.75,
+    prediction_category = "assumption-conditional prediction",
+    prediction_value = 0.75,
+    prediction_assumption = "Assumes stem biomass tracks transport-network-supported above-ground structure and near-steady allocation.",
        xlab = "Stem mass m.st (kg)",            ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ stem mass")
 )
+
+prediction_subtitle <- function(co) {
+  if (identical(co$prediction_category, "numeric prediction")) {
+    return(paste0("Prediction category: numeric prediction (dashed = ",
+         co$prediction_value, "); dotted = 1.0 (isometry)."))
+  }
+  if (identical(co$prediction_category, "assumption-conditional prediction")) {
+    return(paste0("Prediction category: assumption-conditional prediction (dashed = ",
+         co$prediction_value, "). Assumption: ",
+         co$prediction_assumption,
+         " Dotted = 1.0 (isometry)."))
+  }
+  "Prediction category: no specific prediction; dotted = 1.0 (isometry)."
+}
 
 # ─── OLS Bisector slope helper (Isobe et al. 1990) ───────────────────────────
 # Returns c(slope, lo, hi) for the OLS bisector of log-transformed vectors.
@@ -199,16 +228,35 @@ database with ≥ `r MIN_N` individual records per species.
 | Leaf mass | Stem mass | `m.lf ~ m.st` | kg ~ kg |
 | Leaf area | Stem mass | `a.lf ~ m.st` | m² ~ kg |
 
-> **WBE predictions tested:**
-> - Leaf area and leaf mass vs. **basal diameter**: exponent = **2** (area-preserving branching: conduit cross-sectional area is conserved across branching levels, so total leaf area ∝ d²; Enquist et al. 1998; West et al. 1999).
-> - Leaf area and leaf mass vs. **total plant biomass**: exponent = **3/4** (metabolic scaling: whole-plant resource flux ∝ M^(3/4), so leaf area, which sets gas exchange capacity, also scales as M^(3/4); Enquist & Niklas 2001).
-> - Leaf area and leaf mass vs. **stem mass**: exponent = **3/4** (Enquist & Niklas 2002 predict that leaf biomass and leaf area both scale as stem mass^(3/4), consistent with the general 3/4-power metabolic scaling framework).
->
-> **Variable notes:**  
+```{r predicted-exponents-overview}
+predicted_exponents <- bind_rows(lapply(combos, function(co) {
+  data.frame(
+    Combination = paste0(co$y, " ~ ", co$x),
+    `Prediction category` = co$prediction_category,
+    `Predicted exponent` = ifelse(is.finite(co$prediction_value),
+                                  as.character(co$prediction_value), "none"),
+    `Assumption (if conditional)` = ifelse(
+      is.null(co$prediction_assumption) || is.na(co$prediction_assumption),
+      "",
+      co$prediction_assumption
+    ),
+    stringsAsFactors = FALSE
+  )
+}))
+
+kable(
+  predicted_exponents,
+  caption = "Predicted scaling exponents by relationship. Categories: numeric prediction, assumption-conditional prediction, or no specific prediction."
+)
+```
+
+Assumption-conditional stem-mass references use Enquist and Niklas (2002, *Science* 295:1517-1520, https://doi.org/10.1126/science.1066360), but are treated as conditional because stem mass is a proxy variable in this workflow.
+
+**Variable notes:**  
 > `d.ba` = stem diameter at base [m] (more commonly measured in BAAD than DBH).  
 > `m.to` = total plant biomass including roots (= `m.rt + m.so`); used as the best available whole-plant size indicator.  
 > `m.st` = all stem tissue including branches; approximates above-ground structural biomass (AGB excluding leaves and roots).  
-> Both **OLS** and **SMA** regression slopes are reported. OLS minimises residuals in Y and is appropriate for prediction; SMA minimises residuals in both directions and is the standard for allometric inference (Warton et al. 2006).
+> **OLS**, **SMA**, and **OLS Bisector** regression slopes are reported. OLS minimises residuals in Y and is appropriate for prediction; SMA minimises residuals in both directions and is the standard for allometric inference (Warton et al. 2006); OLS Bisector provides a symmetric alternative when neither axis is error-free.
 
 ```{r data-coverage}
 cov <- data.frame(
@@ -287,10 +335,7 @@ plot_slope_vs_range <- function(res, co) {
                       bis_slope = "OLS Bisector")
     )
 
-  wbe_label <- if (!is.na(co$wbe_ref))
-    paste0("Dashed = ", co$wbe_ref, " (WBE); dotted = 1.0 (isometry). ")
-  else
-    "Dotted = 1.0 (isometry); no specific WBE prediction for this predictor. "
+  wbe_label <- prediction_subtitle(co)
 
   p <- ggplot(long, aes(x = log_x_range, y = slope,
                    colour = clade, shape = method)) +
@@ -346,6 +391,52 @@ table_slopes <- function(res, caption_txt) {
       escape    = FALSE
     )
 }
+
+# ── Shared helper: slope distribution summary stats ──────────────────────────
+slope_distribution_stats <- function(res, caption_txt) {
+  if (nrow(res) == 0) {
+    return(kable(
+      data.frame(Note = "No species met the minimum record threshold."),
+      caption = caption_txt
+    ))
+  }
+
+  method_stats <- function(x) {
+    x <- x[!is.na(x) & is.finite(x)]
+    n <- length(x)
+    if (n == 0) {
+      return(data.frame(n = 0, mean_slope = NA, median_slope = NA,
+                        ci_lo = NA, ci_hi = NA))
+    }
+    mn <- mean(x)
+    md <- median(x)
+    if (n < 2) {
+      lo <- NA
+      hi <- NA
+    } else {
+      se <- sd(x) / sqrt(n)
+      t_crit <- qt(0.975, df = n - 1)
+      lo <- mn - t_crit * se
+      hi <- mn + t_crit * se
+    }
+    data.frame(n = n, mean_slope = mn, median_slope = md,
+               ci_lo = lo, ci_hi = hi)
+  }
+
+  out <- bind_rows(
+    cbind(method = "OLS", method_stats(res$ols_slope)),
+    cbind(method = "SMA", method_stats(res$sma_slope)),
+    cbind(method = "OLS Bisector", method_stats(res$bis_slope))
+  ) %>%
+    mutate(across(c(mean_slope, median_slope, ci_lo, ci_hi), ~ round(.x, 3)))
+
+  kable(
+    out,
+    col.names = c("Method", "N", "Mean slope", "Median slope",
+                  "Mean 95% CI lo", "Mean 95% CI hi"),
+    caption = caption_txt
+  )
+}
 ```
 
 ---
@@ -366,7 +457,7 @@ cat("Median Bisector slope:", round(median(r1$bis_slope, na.rm=TRUE), 3), "\n")
 ### All species (sorted by N)
 
 ```{r sec1-table, results='asis'}
-table_slopes(r1, paste0("Leaf mass ~ basal diameter: per-species OLS and SMA slopes (≥ ",
+table_slopes(r1, paste0("Leaf mass ~ basal diameter: per-species OLS, SMA, and OLS Bisector slopes (≥ ",
                          MIN_N, " records per species, sorted by N)"))
 ```
 
@@ -384,23 +475,43 @@ plot_slope_vs_range(r1, co1)
 
 ## Slope distributions
 
-```{r sec1-dist, fig.height=5}
-r1_long <- r1 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
-               names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
-                         bis_slope = "OLS Bisector"))
+```{r sec1-dist-stats, results='asis'}
+slope_distribution_stats(
+  r1,
+  "Leaf mass ~ basal diameter: slope distribution summary statistics"
+)
+```
 
-ggplot(r1_long, aes(x = slope, fill = clade)) +
-  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
-  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
-  facet_wrap(~ method) +
-  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
-                    na.value="grey60", name="Clade") +
-  labs(x = "Intraspecific slope", y = "N species",
-       title = "Leaf mass ~ basal diameter: intraspecific slope distribution",
-       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+```{r sec1-dist, fig.height=5}
+if (nrow(r1) == 0) {
+  ggplot() +
+    theme_void() +
+    labs(title = "Leaf mass ~ basal diameter: no qualifying species for slope distribution")
+} else {
+  r1_long <- r1 %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
+                 names_to = "method", values_to = "slope") %>%
+    mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                           bis_slope = "OLS Bisector")) %>%
+    filter(!is.na(slope), is.finite(slope))
+
+  if (nrow(r1_long) == 0) {
+    ggplot() +
+      theme_void() +
+      labs(title = "Leaf mass ~ basal diameter: no finite slope values available")
+  } else {
+    ggplot(r1_long, aes(x = slope, fill = clade)) +
+      geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+      geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+      facet_wrap(~ method) +
+      scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                        na.value="grey60", name="Clade") +
+      labs(x = "Intraspecific slope", y = "N species",
+           title = "Leaf mass ~ basal diameter: intraspecific slope distribution",
+           subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+  }
+}
 ```
 
 ---
@@ -419,7 +530,7 @@ cat("Median Bisector slope:", round(median(r2$bis_slope, na.rm=TRUE), 3), "\n")
 ## Per-species slopes table
 
 ```{r sec2-table, results='asis'}
-table_slopes(r2, paste0("Leaf area ~ basal diameter: per-species OLS and SMA slopes (≥ ",
+table_slopes(r2, paste0("Leaf area ~ basal diameter: per-species OLS, SMA, and OLS Bisector slopes (≥ ",
                          MIN_N, " records per species, sorted by N)"))
 ```
 
@@ -437,23 +548,43 @@ plot_slope_vs_range(r2, co2)
 
 ## Slope distributions
 
-```{r sec2-dist, fig.height=5}
-r2_long <- r2 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
-               names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
-                         bis_slope = "OLS Bisector"))
+```{r sec2-dist-stats, results='asis'}
+slope_distribution_stats(
+  r2,
+  "Leaf area ~ basal diameter: slope distribution summary statistics"
+)
+```
 
-ggplot(r2_long, aes(x = slope, fill = clade)) +
-  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
-  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
-  facet_wrap(~ method) +
-  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
-                    na.value="grey60", name="Clade") +
-  labs(x = "Intraspecific slope", y = "N species",
-       title = "Leaf area ~ basal diameter: intraspecific slope distribution",
-       subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+```{r sec2-dist, fig.height=5}
+if (nrow(r2) == 0) {
+  ggplot() +
+    theme_void() +
+    labs(title = "Leaf area ~ basal diameter: no qualifying species for slope distribution")
+} else {
+  r2_long <- r2 %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
+                 names_to = "method", values_to = "slope") %>%
+    mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                           bis_slope = "OLS Bisector")) %>%
+    filter(!is.na(slope), is.finite(slope))
+
+  if (nrow(r2_long) == 0) {
+    ggplot() +
+      theme_void() +
+      labs(title = "Leaf area ~ basal diameter: no finite slope values available")
+  } else {
+    ggplot(r2_long, aes(x = slope, fill = clade)) +
+      geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+      geom_vline(xintercept = 2.00, linetype = "dashed", colour = "grey40") +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+      facet_wrap(~ method) +
+      scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                        na.value="grey60", name="Clade") +
+      labs(x = "Intraspecific slope", y = "N species",
+           title = "Leaf area ~ basal diameter: intraspecific slope distribution",
+           subtitle = "Dashed = 2 (WBE); dotted = 1.0 (isometry)")
+  }
+}
 ```
 
 ---
@@ -472,7 +603,7 @@ cat("Median Bisector slope:", round(median(r3$bis_slope, na.rm=TRUE), 3), "\n")
 ## Per-species slopes table
 
 ```{r sec3-table, results='asis'}
-table_slopes(r3, paste0("Leaf mass ~ total biomass: per-species OLS and SMA slopes (≥ ",
+table_slopes(r3, paste0("Leaf mass ~ total biomass: per-species OLS, SMA, and OLS Bisector slopes (≥ ",
                          MIN_N, " records per species, sorted by N)"))
 ```
 
@@ -490,23 +621,43 @@ plot_slope_vs_range(r3, co3)
 
 ## Slope distributions
 
-```{r sec3-dist, fig.height=5}
-r3_long <- r3 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
-               names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
-                         bis_slope = "OLS Bisector"))
+```{r sec3-dist-stats, results='asis'}
+slope_distribution_stats(
+  r3,
+  "Leaf mass ~ total plant biomass: slope distribution summary statistics"
+)
+```
 
-ggplot(r3_long, aes(x = slope, fill = clade)) +
-  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
-  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
-  facet_wrap(~ method) +
-  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
-                    na.value="grey60", name="Clade") +
-  labs(x = "Intraspecific slope", y = "N species",
-       title = "Leaf mass ~ total plant biomass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4 (WBE prediction); dotted = 1.0 (isometry)")
+```{r sec3-dist, fig.height=5}
+if (nrow(r3) == 0) {
+  ggplot() +
+    theme_void() +
+    labs(title = "Leaf mass ~ total plant biomass: no qualifying species for slope distribution")
+} else {
+  r3_long <- r3 %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
+                 names_to = "method", values_to = "slope") %>%
+    mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                           bis_slope = "OLS Bisector")) %>%
+    filter(!is.na(slope), is.finite(slope))
+
+  if (nrow(r3_long) == 0) {
+    ggplot() +
+      theme_void() +
+      labs(title = "Leaf mass ~ total plant biomass: no finite slope values available")
+  } else {
+    ggplot(r3_long, aes(x = slope, fill = clade)) +
+      geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+      geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+      facet_wrap(~ method) +
+      scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                        na.value="grey60", name="Clade") +
+      labs(x = "Intraspecific slope", y = "N species",
+           title = "Leaf mass ~ total plant biomass: intraspecific slope distribution",
+           subtitle = "Dashed = 3/4 (WBE prediction); dotted = 1.0 (isometry)")
+  }
+}
 ```
 
 ---
@@ -525,7 +676,7 @@ cat("Median Bisector slope:", round(median(r4$bis_slope, na.rm=TRUE), 3), "\n")
 ## Per-species slopes table
 
 ```{r sec4-table, results='asis'}
-table_slopes(r4, paste0("Leaf area ~ total biomass: per-species OLS and SMA slopes (≥ ",
+table_slopes(r4, paste0("Leaf area ~ total biomass: per-species OLS, SMA, and OLS Bisector slopes (≥ ",
                          MIN_N, " records per species, sorted by N)"))
 ```
 
@@ -543,23 +694,43 @@ plot_slope_vs_range(r4, co4)
 
 ## Slope distributions
 
-```{r sec4-dist, fig.height=5}
-r4_long <- r4 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
-               names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
-                         bis_slope = "OLS Bisector"))
+```{r sec4-dist-stats, results='asis'}
+slope_distribution_stats(
+  r4,
+  "Leaf area ~ total plant biomass: slope distribution summary statistics"
+)
+```
 
-ggplot(r4_long, aes(x = slope, fill = clade)) +
-  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
-  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
-  facet_wrap(~ method) +
-  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
-                    na.value="grey60", name="Clade") +
-  labs(x = "Intraspecific slope", y = "N species",
-       title = "Leaf area ~ total plant biomass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4 (WBE prediction); dotted = 1.0 (isometry)")
+```{r sec4-dist, fig.height=5}
+if (nrow(r4) == 0) {
+  ggplot() +
+    theme_void() +
+    labs(title = "Leaf area ~ total plant biomass: no qualifying species for slope distribution")
+} else {
+  r4_long <- r4 %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
+                 names_to = "method", values_to = "slope") %>%
+    mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                           bis_slope = "OLS Bisector")) %>%
+    filter(!is.na(slope), is.finite(slope))
+
+  if (nrow(r4_long) == 0) {
+    ggplot() +
+      theme_void() +
+      labs(title = "Leaf area ~ total plant biomass: no finite slope values available")
+  } else {
+    ggplot(r4_long, aes(x = slope, fill = clade)) +
+      geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+      geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+      facet_wrap(~ method) +
+      scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                        na.value="grey60", name="Clade") +
+      labs(x = "Intraspecific slope", y = "N species",
+           title = "Leaf area ~ total plant biomass: intraspecific slope distribution",
+           subtitle = "Dashed = 3/4 (WBE prediction); dotted = 1.0 (isometry)")
+  }
+}
 ```
 
 ---
@@ -578,7 +749,7 @@ cat("Median Bisector slope:", round(median(r5$bis_slope, na.rm=TRUE), 3), "\n")
 ## Per-species slopes table
 
 ```{r sec5-table, results='asis'}
-table_slopes(r5, paste0("Leaf mass ~ stem mass: per-species OLS and SMA slopes (≥ ",
+table_slopes(r5, paste0("Leaf mass ~ stem mass: per-species OLS, SMA, and OLS Bisector slopes (≥ ",
                          MIN_N, " records per species, sorted by N)"))
 ```
 
@@ -596,23 +767,43 @@ plot_slope_vs_range(r5, co5)
 
 ## Slope distributions
 
-```{r sec5-dist, fig.height=5}
-r5_long <- r5 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
-               names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
-                         bis_slope = "OLS Bisector"))
+```{r sec5-dist-stats, results='asis'}
+slope_distribution_stats(
+  r5,
+  "Leaf mass ~ stem mass: slope distribution summary statistics"
+)
+```
 
-ggplot(r5_long, aes(x = slope, fill = clade)) +
-  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
-  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
-  facet_wrap(~ method) +
-  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
-                    na.value="grey60", name="Clade") +
-  labs(x = "Intraspecific slope", y = "N species",
-       title = "Leaf mass ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4 (Enquist & Niklas 2002 prediction); dotted = 1.0 (isometry)")
+```{r sec5-dist, fig.height=5}
+if (nrow(r5) == 0) {
+  ggplot() +
+    theme_void() +
+    labs(title = "Leaf mass ~ stem mass: no qualifying species for slope distribution")
+} else {
+  r5_long <- r5 %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
+                 names_to = "method", values_to = "slope") %>%
+    mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                           bis_slope = "OLS Bisector")) %>%
+    filter(!is.na(slope), is.finite(slope))
+
+  if (nrow(r5_long) == 0) {
+    ggplot() +
+      theme_void() +
+      labs(title = "Leaf mass ~ stem mass: no finite slope values available")
+  } else {
+    ggplot(r5_long, aes(x = slope, fill = clade)) +
+      geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+      geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+      facet_wrap(~ method) +
+      scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                        na.value="grey60", name="Clade") +
+       labs(x = "Intraspecific slope", y = "N species",
+         title = "Leaf mass ~ stem mass: intraspecific slope distribution",
+         subtitle = "Prediction category: assumption-conditional prediction (dashed = 3/4). Dotted = 1.0 (isometry).")
+  }
+}
 ```
 
 ---
@@ -631,7 +822,7 @@ cat("Median Bisector slope:", round(median(r6$bis_slope, na.rm=TRUE), 3), "\n")
 ## Per-species slopes table
 
 ```{r sec6-table, results='asis'}
-table_slopes(r6, paste0("Leaf area ~ stem mass: per-species OLS and SMA slopes (≥ ",
+table_slopes(r6, paste0("Leaf area ~ stem mass: per-species OLS, SMA, and OLS Bisector slopes (≥ ",
                          MIN_N, " records per species, sorted by N)"))
 ```
 
@@ -649,23 +840,43 @@ plot_slope_vs_range(r6, co6)
 
 ## Slope distributions
 
-```{r sec6-dist, fig.height=5}
-r6_long <- r6 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
-               names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
-                         bis_slope = "OLS Bisector"))
+```{r sec6-dist-stats, results='asis'}
+slope_distribution_stats(
+  r6,
+  "Leaf area ~ stem mass: slope distribution summary statistics"
+)
+```
 
-ggplot(r6_long, aes(x = slope, fill = clade)) +
-  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
-  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
-  facet_wrap(~ method) +
-  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
-                    na.value="grey60", name="Clade") +
-  labs(x = "Intraspecific slope", y = "N species",
-       title = "Leaf area ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dashed = 3/4 (Enquist & Niklas 2002 prediction); dotted = 1.0 (isometry)")
+```{r sec6-dist, fig.height=5}
+if (nrow(r6) == 0) {
+  ggplot() +
+    theme_void() +
+    labs(title = "Leaf area ~ stem mass: no qualifying species for slope distribution")
+} else {
+  r6_long <- r6 %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
+                 names_to = "method", values_to = "slope") %>%
+    mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                           bis_slope = "OLS Bisector")) %>%
+    filter(!is.na(slope), is.finite(slope))
+
+  if (nrow(r6_long) == 0) {
+    ggplot() +
+      theme_void() +
+      labs(title = "Leaf area ~ stem mass: no finite slope values available")
+  } else {
+    ggplot(r6_long, aes(x = slope, fill = clade)) +
+      geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+      geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+      facet_wrap(~ method) +
+      scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                        na.value="grey60", name="Clade") +
+       labs(x = "Intraspecific slope", y = "N species",
+         title = "Leaf area ~ stem mass: intraspecific slope distribution",
+         subtitle = "Prediction category: assumption-conditional prediction (dashed = 3/4). Dotted = 1.0 (isometry).")
+  }
+}
 ```
 
 ---
@@ -704,7 +915,13 @@ cross_sum <- all_res %>%
     .groups = "drop"
   )
 
-kable(cross_sum,
+kable(cross_sum %>%
+    select(combo, wbe_pred, n_species,
+       med_ols, iqr_ols,
+       pct_ols_lt_wbe, pct_ols_gt_iso,
+       med_sma, iqr_sma,
+       med_bis, iqr_bis,
+       med_r2, med_range),
       col.names = c("Combination", "WBE exponent", "N species",
                     "Median OLS slope", "IQR (OLS)",
                     "% OLS < WBE", "% OLS > 1.0",
@@ -712,8 +929,8 @@ kable(cross_sum,
                     "Median Bisector slope", "IQR (Bis)",
                     "Median R²", "Median log₁₀ range"),
       caption = paste0("Cross-combination summary of intraspecific slopes (≥ ", MIN_N,
-                       " records/species). WBE exponent: 2.0 for diameter predictors,",
-                       " 3/4 for total biomass, none stated for stem mass."))
+               " records/species). Prediction categories: numeric 2.0 for diameter predictors,",
+               " numeric 3/4 for total biomass, and assumption-conditional 3/4 for stem mass."))
 ```
 
 ## OLS vs. SMA slope comparison — all combinations
@@ -826,10 +1043,10 @@ all_res %>%
   2. **Leaf area/mass vs. total plant biomass (`m.to`):** WBE exponent = **3/4** (dashed
      purple). Whole-plant metabolic rate ∝ M^(3/4), and leaf area sets gas exchange
      capacity, so leaf area ∝ M^(3/4) (Enquist & Niklas 2001; Enquist et al. 2009).
-  3. **Leaf area/mass vs. stem mass (`m.st`):** WBE/Enquist-Niklas exponent = **3/4**
-     (dashed purple). Enquist & Niklas (2002) predict that leaf biomass and leaf area
-     scale with above-ground stem mass as M^(3/4), consistent with the general
-     metabolic scaling framework.
+    3. **Leaf area/mass vs. stem mass (`m.st`):** **assumption-conditional** exponent =
+      **3/4** (dashed purple). This reference is applied conditionally if stem biomass is
+      a good proxy for transport-network-supported above-ground structure and allocation
+      remains near steady state.
   - 1.0 (dotted, all panels) = isometric (geometric) scaling.
 - **BAAD variable notes:**
   - `d.ba` = diameter at base of stem [m]; more commonly measured than DBH in BAAD.

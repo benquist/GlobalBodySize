@@ -1,0 +1,683 @@
+---
+title: "Niklas-Enquist: Intraspecific Leaf-Centric Scaling"
+subtitle: "Per-species OLS, SMA, and OLS Bisector slopes across multiple relationships"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6
+)
+
+suppressPackageStartupMessages({
+  library(readr)
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(knitr)
+  library(smatr)
+  library(purrr)
+  library(stringr)
+})
+
+theme_set(theme_bw(base_size = 12))
+
+MIN_N <- 10
+WOOD_DENSITY_KG_M3 <- 600
+
+proj_dir <- tryCatch(dirname(knitr::current_input(dir = TRUE)), error = function(e) getwd())
+
+nik_col_names <- c(
+  "taxa", "citation", "footnotes", "record_num", "age_yr", "log_age",
+  "height_m", "log_height", "root_biomass_kg", "log_root", "stem_biomass_kg",
+  "log_stem", "leaf_biomass_kg", "log_leaf", "shoot_biomass_kg", "log_shoot",
+  "repro_biomass_kg", "log_repro", "total_biomass_kg", "log_total",
+  "stem_growth_kgyr", "log_stem_growth", "leaf_growth_kgyr", "log_leaf_growth",
+  "root_growth_kgyr", "log_root_growth", "total_growth_kgyr", "log_total_growth"
+)
+
+extract_species <- function(x) {
+  if (is.na(x) || !nzchar(trimws(x))) return(NA_character_)
+  x0 <- str_squish(x)
+  if (str_detect(x0, regex("\\b(and|with|community|mixed|stand|forest|woodland|grassland)\\b", ignore_case = TRUE))) {
+    return(NA_character_)
+  }
+  toks <- str_split(x0, "\\s+")[[1]]
+  if (length(toks) < 2) return(NA_character_)
+  g <- toks[1]
+  s <- toks[2]
+  if (!str_detect(g, "^[A-Z][a-zA-Z.-]+$") || !str_detect(s, "^[a-z][a-zA-Z.-]+$")) return(NA_character_)
+  paste(g, s)
+}
+
+nik <- read_csv(
+  file.path(proj_dir, "data/raw/niklas_enquist/niklas_enquist_biomass_20040122.csv"),
+  skip = 2,
+  col_names = nik_col_names,
+  locale = locale(encoding = "latin1"),
+  show_col_types = FALSE
+) %>%
+  mutate(across(-c(taxa, citation, footnotes), as.numeric)) %>%
+  mutate(across(where(is.numeric), ~ ifelse(. == -999, NA_real_, .))) %>%
+  mutate(
+    species = vapply(taxa, extract_species, character(1)),
+    study = citation,
+    basal_diameter_m_proxy = ifelse(
+      !is.na(stem_biomass_kg) & stem_biomass_kg > 0 &
+        !is.na(height_m) & height_m > 0,
+      sqrt(4 * stem_biomass_kg / (pi * WOOD_DENSITY_KG_M3 * height_m)),
+      NA_real_
+    )
+  )
+
+combos <- list(
+  list(
+    id = "leaf_biomass~stem_biomass",
+    x = "stem_biomass_kg", y = "leaf_biomass_kg", wbe_ref = 0.75,
+    prediction_category = "assumption-conditional prediction",
+    prediction_assumption = "Assumes stem biomass tracks transport-network-supported above-ground structure and near-steady allocation.",
+    title = "Leaf biomass ~ stem biomass",
+    xlab = "log10 stem biomass (kg)", ylab = "log10 leaf biomass (kg)"
+  ),
+  list(
+    id = "leaf_biomass~total_biomass",
+    x = "total_biomass_kg", y = "leaf_biomass_kg", wbe_ref = 0.75,
+    prediction_category = "numeric prediction",
+    prediction_assumption = NA_character_,
+    title = "Leaf biomass ~ total biomass",
+    xlab = "log10 total biomass (kg)", ylab = "log10 leaf biomass (kg)"
+  ),
+  list(
+    id = "leaf_biomass~shoot_biomass",
+    x = "shoot_biomass_kg", y = "leaf_biomass_kg", wbe_ref = NA_real_,
+    prediction_category = "no specific prediction",
+    prediction_assumption = NA_character_,
+    title = "Leaf biomass ~ shoot biomass",
+    xlab = "log10 shoot biomass (kg)", ylab = "log10 leaf biomass (kg)"
+  ),
+  list(
+    id = "leaf_biomass~root_biomass",
+    x = "root_biomass_kg", y = "leaf_biomass_kg", wbe_ref = NA_real_,
+    prediction_category = "no specific prediction",
+    prediction_assumption = NA_character_,
+    title = "Leaf biomass ~ root biomass",
+    xlab = "log10 root biomass (kg)", ylab = "log10 leaf biomass (kg)"
+  ),
+  list(
+    id = "leaf_biomass~height",
+    x = "height_m", y = "leaf_biomass_kg", wbe_ref = NA_real_,
+    prediction_category = "no specific prediction",
+    prediction_assumption = NA_character_,
+    title = "Leaf biomass ~ height",
+    xlab = "log10 height (m)", ylab = "log10 leaf biomass (kg)"
+  ),
+  list(
+    id = "leaf_growth~total_biomass",
+    x = "total_biomass_kg", y = "leaf_growth_kgyr", wbe_ref = 0.75,
+    prediction_category = "numeric prediction",
+    prediction_assumption = NA_character_,
+    title = "Leaf growth ~ total biomass",
+    xlab = "log10 total biomass (kg)", ylab = "log10 leaf growth (kg yr-1)"
+  ),
+  list(
+    id = "total_growth~stem_biomass",
+    x = "stem_biomass_kg", y = "total_growth_kgyr", wbe_ref = 0.75,
+    prediction_category = "numeric prediction",
+    prediction_assumption = NA_character_,
+    title = "Total growth (dM/dt) ~ stem biomass",
+    xlab = "log10 stem biomass (kg)", ylab = "log10 total growth dM/dt (kg yr-1)"
+  ),
+  list(
+    id = "total_growth~shoot_biomass",
+    x = "shoot_biomass_kg", y = "total_growth_kgyr", wbe_ref = 0.75,
+    prediction_category = "numeric prediction",
+    prediction_assumption = NA_character_,
+    title = "Total growth (dM/dt) ~ shoot biomass (aboveground proxy)",
+    xlab = "log10 shoot biomass (kg)", ylab = "log10 total growth dM/dt (kg yr-1)"
+  ),
+  list(
+    id = "total_growth~basal_diameter_proxy",
+    x = "basal_diameter_m_proxy", y = "total_growth_kgyr", wbe_ref = NA_real_,
+    prediction_category = "no specific prediction",
+    prediction_assumption = NA_character_,
+    title = "Total growth (dM/dt) ~ basal stem diameter proxy",
+    xlab = "log10 basal stem diameter proxy (m)", ylab = "log10 total growth dM/dt (kg yr-1)"
+  )
+)
+
+prediction_subtitle <- function(co) {
+  if (identical(co$prediction_category, "numeric prediction")) {
+    return(paste0("Prediction category: numeric prediction (dashed = ",
+                  co$wbe_ref, "); dotted = 1.0 (isometry)."))
+  }
+  if (identical(co$prediction_category, "assumption-conditional prediction")) {
+    return(paste0("Prediction category: assumption-conditional prediction (dashed = ",
+                  co$wbe_ref, "). Assumption: ",
+                  co$prediction_assumption,
+                  " Dotted = 1.0 (isometry)."))
+  }
+  "Prediction category: no specific prediction; dotted = 1.0 (isometry)."
+}
+
+bisector_slope_ci <- function(lx, ly) {
+  n <- length(lx)
+  if (n < 3) return(c(slope = NA_real_, lo = NA_real_, hi = NA_real_))
+
+  xc <- lx - mean(lx)
+  yc <- ly - mean(ly)
+  SXX <- sum(xc^2)
+  SYY <- sum(yc^2)
+  SXY <- sum(xc * yc)
+
+  if (!is.finite(SXX) || !is.finite(SYY) || !is.finite(SXY) || SXX == 0 || SXY == 0) {
+    return(c(slope = NA_real_, lo = NA_real_, hi = NA_real_))
+  }
+
+  B1 <- SXY / SXX
+  B2 <- SYY / SXY
+  B3 <- (B1 * B2 - 1 + sqrt((1 + B1^2) * (1 + B2^2))) / (B1 + B2)
+
+  SUM1 <- sum((xc * (yc - B1 * xc))^2)
+  SUM2 <- sum((yc * (yc - B2 * xc))^2)
+  SUM3 <- sum(xc * yc * (yc - B1 * xc) * (yc - B2 * xc))
+  COV <- SUM3 / (B1 * SXX^2)
+  SIGB1 <- SUM1 / SXX^2
+  SIGB2 <- SUM2 / SXY^2
+  GAM1 <- B3 / ((B1 + B2) * sqrt((1 + B1^2) * (1 + B2^2)))
+  SIGB3 <- GAM1^2 * (
+    ((1 + B2^2)^2) * SIGB1 +
+      2 * (1 + B1^2) * (1 + B2^2) * COV +
+      ((1 + B1^2)^2) * SIGB2
+  )
+
+  se <- sqrt(max(SIGB3, 0))
+  c(slope = B3, lo = B3 - 1.96 * se, hi = B3 + 1.96 * se)
+}
+
+fit_intra <- function(data, xcol, ycol, min_n = MIN_N) {
+  sub <- data %>%
+    filter(
+      !is.na(species),
+      !is.na(.data[[xcol]]), .data[[xcol]] > 0,
+      !is.na(.data[[ycol]]), .data[[ycol]] > 0
+    )
+
+  out <- sub %>%
+    group_by(species) %>%
+    group_modify(~ {
+      if (nrow(.x) < min_n) return(tibble())
+
+      lx <- log10(.x[[xcol]])
+      ly <- log10(.x[[ycol]])
+      rng <- diff(range(lx, na.rm = TRUE))
+      if (!is.finite(rng) || rng <= 0) return(tibble())
+
+      ols_fit <- tryCatch(lm(ly ~ lx), error = function(e) NULL)
+      if (is.null(ols_fit)) return(tibble())
+
+      ols_sl <- tryCatch(as.numeric(coef(ols_fit)[2]), error = function(e) NA_real_)
+      ols_ci <- tryCatch(as.numeric(confint(ols_fit)[2, ]), error = function(e) c(NA_real_, NA_real_))
+
+      sma_res <- tryCatch({
+        s <- sma(ly ~ lx)
+        cm <- s$coef[[1]]
+        c(slope = as.numeric(cm[2, 1]), lo = as.numeric(cm[2, 2]), hi = as.numeric(cm[2, 3]))
+      }, error = function(e) c(slope = NA_real_, lo = NA_real_, hi = NA_real_))
+
+      bis_res <- tryCatch(
+        bisector_slope_ci(lx, ly),
+        error = function(e) c(slope = NA_real_, lo = NA_real_, hi = NA_real_)
+      )
+
+      tibble(
+        n = nrow(.x),
+        study = .x$study[1],
+        ols_slope = ols_sl,
+        ols_lo = ols_ci[1],
+        ols_hi = ols_ci[2],
+        sma_slope = sma_res["slope"],
+        sma_lo = sma_res["lo"],
+        sma_hi = sma_res["hi"],
+        bis_slope = bis_res["slope"],
+        bis_lo = bis_res["lo"],
+        bis_hi = bis_res["hi"],
+        r2 = suppressWarnings(cor(lx, ly)^2),
+        log_x_min = min(lx, na.rm = TRUE),
+        log_x_max = max(lx, na.rm = TRUE),
+        log_x_range = rng
+      )
+    }) %>%
+    ungroup() %>%
+    filter(is.finite(ols_slope))
+
+  out
+}
+
+results <- lapply(combos, function(co) fit_intra(nik, co$x, co$y))
+names(results) <- vapply(combos, `[[`, character(1), "id")
+
+plot_size_range <- function(res, co, max_sp = 60) {
+  if (nrow(res) == 0) {
+    return(ggplot() + theme_void() + labs(title = paste0(co$title, ": no qualifying species")))
+  }
+
+  top <- res %>%
+    arrange(desc(n)) %>%
+    slice_head(n = max_sp) %>%
+    arrange(log_x_range) %>%
+    mutate(species = factor(species, levels = species))
+
+  ggplot(top, aes(y = species)) +
+    geom_segment(aes(x = log_x_min, xend = log_x_max, yend = species), linewidth = 1, alpha = 0.8) +
+    geom_point(aes(x = log_x_min), size = 1.5) +
+    geom_point(aes(x = log_x_max), size = 1.5) +
+    labs(
+      x = co$xlab,
+      y = NULL,
+      title = paste0("Body size range per species - ", co$title),
+      subtitle = paste0(
+        "Top ", min(max_sp, nrow(res)),
+        " species by record count; bars span [min, max] of ", co$x, " in log10 space"
+      )
+    ) +
+    theme(axis.text.y = element_text(face = "italic", size = 6),
+          panel.grid.major.y = element_line(colour = "grey95"))
+}
+
+plot_slope_vs_range <- function(res, co) {
+  if (nrow(res) == 0) {
+    return(ggplot() + theme_void() + labs(title = paste0(co$title, ": no qualifying species")))
+  }
+
+  long <- res %>%
+    select(
+      species, n, log_x_range,
+      ols_slope, ols_lo, ols_hi,
+      sma_slope, sma_lo, sma_hi,
+      bis_slope, bis_lo, bis_hi
+    ) %>%
+    pivot_longer(
+      cols = c(ols_slope, sma_slope, bis_slope),
+      names_to = "method",
+      values_to = "slope"
+    ) %>%
+    mutate(
+      lo = case_when(
+        method == "ols_slope" ~ ols_lo,
+        method == "sma_slope" ~ sma_lo,
+        method == "bis_slope" ~ bis_lo,
+        TRUE ~ NA_real_
+      ),
+      hi = case_when(
+        method == "ols_slope" ~ ols_hi,
+        method == "sma_slope" ~ sma_hi,
+        method == "bis_slope" ~ bis_hi,
+        TRUE ~ NA_real_
+      ),
+      method = recode(method,
+        ols_slope = "OLS",
+        sma_slope = "SMA",
+        bis_slope = "OLS Bisector"
+      )
+    ) %>%
+    filter(is.finite(slope), is.finite(log_x_range))
+
+  if (nrow(long) == 0) {
+    return(ggplot() + theme_void() + labs(title = paste0(co$title, ": no finite slope values")))
+  }
+
+  wbe_label <- prediction_subtitle(co)
+
+  p <- ggplot(long, aes(x = log_x_range, y = slope, shape = method)) +
+    geom_hline(yintercept = 1.00, linetype = "dotted", colour = "grey70", linewidth = 0.6) +
+    geom_errorbar(aes(ymin = lo, ymax = hi), width = 0, alpha = 0.2, linewidth = 0.5) +
+    geom_point(alpha = 0.7, size = 2) +
+    geom_smooth(method = "lm", se = TRUE, colour = "black", linewidth = 0.8, alpha = 0.15) +
+    scale_shape_manual(values = c("OLS" = 16, "SMA" = 17, "OLS Bisector" = 15), name = "Method") +
+    facet_wrap(~ method) +
+    labs(
+      x = paste0("log10 size range [log10(max) - log10(min) of ", co$x, "]"),
+      y = "Intraspecific slope",
+      title = paste0("Slope vs. size range - ", co$title),
+      subtitle = wbe_label
+    )
+
+  if (is.finite(co$wbe_ref)) {
+    p <- p + geom_hline(yintercept = co$wbe_ref, linetype = "dashed", colour = "grey50", linewidth = 0.8)
+  }
+
+  p
+}
+
+table_slopes <- function(res, caption_txt) {
+  if (nrow(res) == 0) {
+    return(kable(data.frame(Note = "No species met the minimum record threshold."), caption = caption_txt))
+  }
+
+  res %>%
+    arrange(desc(n)) %>%
+    mutate(
+      across(
+        c(ols_slope, ols_lo, ols_hi,
+          sma_slope, sma_lo, sma_hi,
+          bis_slope, bis_lo, bis_hi,
+          r2, log_x_range),
+        ~ round(.x, 3)
+      ),
+      species = paste0("*", species, "*")
+    ) %>%
+    select(
+      species, study, n,
+      ols_slope, ols_lo, ols_hi,
+      sma_slope, sma_lo, sma_hi,
+      bis_slope, bis_lo, bis_hi,
+      r2, log_x_range
+    ) %>%
+    kable(
+      col.names = c(
+        "Species", "Study", "N",
+        "OLS slope", "OLS 95% lo", "OLS 95% hi",
+        "SMA slope", "SMA 95% lo", "SMA 95% hi",
+        "Bisector slope", "Bis 95% lo", "Bis 95% hi",
+        "R2", "log10 size range"
+      ),
+      caption = caption_txt,
+      escape = FALSE
+    )
+}
+
+slope_distribution_stats <- function(res, caption_txt) {
+  if (nrow(res) == 0) {
+    return(kable(data.frame(Note = "No species met the minimum record threshold."), caption = caption_txt))
+  }
+
+  method_stats <- function(x) {
+    x <- x[is.finite(x)]
+    n <- length(x)
+    if (n == 0) {
+      return(data.frame(n = 0, mean_slope = NA_real_, median_slope = NA_real_, ci_lo = NA_real_, ci_hi = NA_real_))
+    }
+
+    mn <- mean(x)
+    md <- median(x)
+    if (n < 2) {
+      lo <- NA_real_
+      hi <- NA_real_
+    } else {
+      se <- sd(x) / sqrt(n)
+      t_crit <- qt(0.975, df = n - 1)
+      lo <- mn - t_crit * se
+      hi <- mn + t_crit * se
+    }
+
+    data.frame(n = n, mean_slope = mn, median_slope = md, ci_lo = lo, ci_hi = hi)
+  }
+
+  out <- bind_rows(
+    cbind(method = "OLS", method_stats(res$ols_slope)),
+    cbind(method = "SMA", method_stats(res$sma_slope)),
+    cbind(method = "OLS Bisector", method_stats(res$bis_slope))
+  ) %>%
+    mutate(across(c(mean_slope, median_slope, ci_lo, ci_hi), ~ round(.x, 3)))
+
+  kable(
+    out,
+    col.names = c("Method", "N", "Mean slope", "Median slope", "Mean 95% CI lo", "Mean 95% CI hi"),
+    caption = caption_txt
+  )
+}
+
+plot_distribution <- function(res, co) {
+  if (nrow(res) == 0) {
+    return(ggplot() + theme_void() + labs(title = paste0(co$title, ": no qualifying species for slope distribution")))
+  }
+
+  long <- res %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope), names_to = "method", values_to = "slope") %>%
+    mutate(method = recode(method,
+      ols_slope = "OLS",
+      sma_slope = "SMA",
+      bis_slope = "OLS Bisector"
+    )) %>%
+    filter(is.finite(slope))
+
+  if (nrow(long) == 0) {
+    return(ggplot() + theme_void() + labs(title = paste0(co$title, ": no finite slope values available")))
+  }
+
+  p <- ggplot(long, aes(x = slope)) +
+    geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75) +
+    geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+    facet_wrap(~ method) +
+    labs(
+      x = "Intraspecific slope",
+      y = "N species",
+      title = paste0(co$title, ": intraspecific slope distribution"),
+      subtitle = prediction_subtitle(co)
+    )
+
+  if (is.finite(co$wbe_ref)) {
+    p <- p + geom_vline(xintercept = co$wbe_ref, linetype = "dashed", colour = "grey40")
+  }
+
+  p
+}
+```
+
+# Overview
+
+This document applies the same intraspecific workflow used in the BAAD leaf-scaling report to the Niklas-Enquist biomass dataset, using `r length(combos)` variable combinations and a minimum of `r MIN_N` records per species.
+
+The analysis includes a derived basal stem diameter predictor (`basal_diameter_m_proxy`) from stem biomass and height via a cylinder approximation, assuming wood density of `r WOOD_DENSITY_KG_M3` kg m^-3.
+
+```{r predicted-exponents-overview}
+predicted_exponents <- tibble(
+  combination = vapply(combos, function(co) paste0(co$y, " ~ ", co$x), character(1)),
+  prediction_category = vapply(combos, `[[`, character(1), "prediction_category"),
+  predicted_exponent = vapply(combos, function(co) if (is.finite(co$wbe_ref)) as.character(co$wbe_ref) else "none", character(1)),
+  assumption_if_conditional = vapply(combos, function(co) {
+    if (!is.null(co$prediction_assumption) && !is.na(co$prediction_assumption)) {
+      co$prediction_assumption
+    } else {
+      ""
+    }
+  }, character(1))
+)
+
+kable(
+  predicted_exponents,
+  col.names = c("Combination", "Prediction category", "Predicted exponent", "Assumption (if conditional)"),
+  caption = "Predicted scaling exponents by relationship. Categories: numeric prediction, assumption-conditional prediction, or no specific prediction."
+)
+```
+
+Assumption-conditional stem-mass references use Enquist and Niklas (2002, *Science* 295:1517-1520, https://doi.org/10.1126/science.1066360), but are treated as conditional because stem mass is a proxy variable in this workflow.
+
+```{r data-coverage}
+coverage <- tibble(
+  combination = vapply(combos, `[[`, character(1), "id"),
+  n_records = vapply(combos, function(co) {
+    sum(
+      !is.na(nik$species) &
+        !is.na(nik[[co$x]]) & nik[[co$x]] > 0 &
+        !is.na(nik[[co$y]]) & nik[[co$y]] > 0
+    )
+  }, numeric(1)),
+  n_species = vapply(results, nrow, integer(1))
+)
+
+kable(
+  coverage,
+  col.names = c("Combination", "Total records with positive x and y", paste0("Species (>=", MIN_N, " records)")),
+  caption = paste0("Data coverage for the ", nrow(coverage), " Niklas-Enquist intraspecific combinations")
+)
+```
+
+```{r section-loop, results='asis', fig.height=6}
+for (i in seq_along(combos)) {
+  co <- combos[[i]]
+  res <- results[[co$id]]
+
+  cat("\n---\n\n")
+  cat("# ", co$title, " (", co$y, " ~ ", co$x, ")\n\n", sep = "")
+
+  cat("## Summary stats\n\n")
+  sum_tbl <- tibble(
+    metric = c(
+      paste0("Species qualifying (>=", MIN_N, " records)"),
+      "Median OLS slope",
+      "Median SMA slope",
+      "Median OLS Bisector slope"
+    ),
+    value = c(
+      nrow(res),
+      if (nrow(res) == 0) NA_real_ else round(median(res$ols_slope, na.rm = TRUE), 3),
+      if (nrow(res) == 0) NA_real_ else round(median(res$sma_slope, na.rm = TRUE), 3),
+      if (nrow(res) == 0) NA_real_ else round(median(res$bis_slope, na.rm = TRUE), 3)
+    )
+  )
+  print(kable(sum_tbl, caption = paste0(co$title, ": summary statistics")))
+
+  cat("\n## Per-species slopes table\n\n")
+  print(table_slopes(res, paste0(co$title, ": per-species OLS, SMA, and OLS Bisector slopes")))
+
+  cat("\n## Body size range per species\n\n")
+  print(plot_size_range(res, co))
+
+  cat("\n## Scaling slope vs. size range\n\n")
+  print(plot_slope_vs_range(res, co))
+
+  cat("\n## Slope distributions\n\n")
+  print(slope_distribution_stats(res, paste0(co$title, ": slope distribution summary statistics")))
+  print(plot_distribution(res, co))
+}
+```
+
+---
+
+# Cross-combination summary
+
+## Median slopes and spread across all `r length(combos)` relationships
+
+```{r cross-summary-table}
+all_res <- bind_rows(lapply(seq_along(combos), function(i) {
+  co <- combos[[i]]
+  res <- results[[co$id]]
+  if (nrow(res) == 0) return(tibble())
+  res %>% mutate(combo = co$id, combo_title = co$title, wbe_ref = co$wbe_ref,
+                 prediction_category = co$prediction_category)
+}))
+
+if (nrow(all_res) == 0) {
+  kable(
+    data.frame(Note = "No species met thresholds for any combination."),
+    caption = "Cross-combination summary"
+  )
+} else {
+  cross_sum <- all_res %>%
+    group_by(combo, combo_title) %>%
+    summarise(
+      n_species = n(),
+      prediction_category = prediction_category[1],
+      wbe_pred = ifelse(is.finite(wbe_ref[1]), as.character(wbe_ref[1]), "none"),
+      med_ols = round(median(ols_slope[is.finite(ols_slope)], na.rm = TRUE), 3),
+      iqr_ols = round(IQR(ols_slope[is.finite(ols_slope)], na.rm = TRUE), 3),
+      med_sma = round(median(sma_slope[is.finite(sma_slope)], na.rm = TRUE), 3),
+      iqr_sma = round(IQR(sma_slope[is.finite(sma_slope)], na.rm = TRUE), 3),
+      med_bis = round(median(bis_slope[is.finite(bis_slope)], na.rm = TRUE), 3),
+      iqr_bis = round(IQR(bis_slope[is.finite(bis_slope)], na.rm = TRUE), 3),
+      med_r2 = round(median(r2[is.finite(r2)], na.rm = TRUE), 3),
+      med_range = round(median(log_x_range[is.finite(log_x_range)], na.rm = TRUE), 3),
+      .groups = "drop"
+    )
+
+  kable(
+    cross_sum %>% select(combo, prediction_category, wbe_pred, n_species, med_ols, iqr_ols, med_sma, iqr_sma, med_bis, iqr_bis, med_r2, med_range),
+    col.names = c(
+      "Combination", "Prediction category", "Predicted exponent", "N species",
+      "Median OLS slope", "IQR (OLS)",
+      "Median SMA slope", "IQR (SMA)",
+      "Median Bisector slope", "IQR (Bisector)",
+      "Median R2", "Median log10 range"
+    ),
+    caption = paste0("Cross-combination summary of intraspecific slopes (>= ", MIN_N, " records/species).")
+  )
+}
+```
+
+## Slope vs. size range - all `r length(combos)` combinations
+
+```{r all-slope-range, fig.height=10, fig.width=11}
+if (nrow(all_res) == 0) {
+  ggplot() +
+    theme_void() +
+    labs(title = "No qualifying species across combinations")
+} else {
+  long_all <- all_res %>%
+    pivot_longer(cols = c(ols_slope, sma_slope, bis_slope), names_to = "method", values_to = "slope") %>%
+    mutate(
+      method = recode(method,
+        ols_slope = "OLS",
+        sma_slope = "SMA",
+        bis_slope = "OLS Bisector"
+      )
+    ) %>%
+    filter(is.finite(slope), is.finite(log_x_range))
+
+  wbe_lines <- tibble::tibble(
+    combo = vapply(combos, `[[`, character(1), "id"),
+    wbe_ref = vapply(combos, `[[`, numeric(1), "wbe_ref")
+  ) %>% filter(is.finite(wbe_ref))
+
+  p <- ggplot(long_all, aes(x = log_x_range, y = slope, colour = method)) +
+    geom_hline(yintercept = 1.00, linetype = "dotted", colour = "grey80", linewidth = 0.6) +
+    geom_point(alpha = 0.35, size = 1.2) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1.0, alpha = 0.9) +
+    scale_colour_manual(values = c("OLS" = "#1b7837", "SMA" = "#762a83", "OLS Bisector" = "#d95f02"), name = "Method") +
+    facet_wrap(~ combo, ncol = 3) +
+    labs(
+      x = "log10 size range",
+      y = "Intraspecific slope",
+      title = paste0("Intraspecific slope vs. log10 body size range - all ", length(combos), " combinations"),
+      subtitle = "Dotted = 1.0 (isometry). Dashed lines are shown for combinations with finite WBE references across all relationship types."
+    )
+
+  if (nrow(wbe_lines) > 0) {
+    p <- p +
+      geom_hline(
+        data = wbe_lines,
+        aes(yintercept = wbe_ref),
+        inherit.aes = FALSE,
+        linetype = "dashed",
+        colour = "#5e3c99",
+        linewidth = 0.8
+      )
+  }
+
+  p
+}
+```
+
+# Methods
+
+- Data source: Niklas-Enquist biomass dataset at data/raw/niklas_enquist/niklas_enquist_biomass_20040122.csv.
+- Cleaning: all non-text columns coerced to numeric; -999 sentinel values replaced with NA.
+- Species parsing: only records that resolve to a simple binomial in taxa are retained for per-species regressions.
+- Regressions: OLS, SMA, and OLS Bisector on log10-transformed x and y values after filtering to positive x and y.
+- Thresholding: species must have at least MIN_N records and non-zero log10 size range for each combination.
+- Basal diameter proxy caveat: basal_diameter_m_proxy is derived as d = sqrt(4 * stem_biomass_kg / (pi * rho * height_m)) using rho = 600 kg m^-3; it is a geometric proxy, not a direct measured diameter.
+- WBE caveat for proxy predictor: no specific WBE exponent is asserted for dM/dt vs basal_diameter_m_proxy, so WBE reference lines are omitted for that combination.
+- Robustness: helpers return informative empty outputs for no-result scenarios; distribution summaries use only finite slopes.
