@@ -76,3 +76,4 @@
 2026-05-03 | Review-driven fixes in baad_leaf_biomass_diameter_scaling.Rmd: robust smatr parsing with lmodel2 fallback, corrected beta=2 testing, normalized pft mapping, species-label consistency checks, and re-render.
 2026-05-03 | Compliance-driven update: added explicit enhanced-theory/ecology-user consultation section to baad_leaf_biomass_diameter_scaling.Rmd (model formalism, thresholds, uncertainty/caveats, reproducible workflow structure) and re-rendered baad_leaf_biomass_diameter_scaling.html.
 2026-05-03 | Extended BAAD leaf-biomass scaling report: family exponent distributions, intraspecific distributions, PGLS
+2026-05-03 | Created baad_agb_leaf_allometry.Rmd and HTML. SMA regressions for leaf mass ~ AGB and leaf area ~ AGB broken out by clade (Angio/Gymno), family (≥30 records), and intraspecific (≥8 records/species).

@@ -1,0 +1,768 @@
+---
+title: "BAAD: Above-Ground Biomass vs. Leaf Mass and Leaf Area Allometry"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6)
+library(baad.data)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+library(scales)
+library(smatr)      # standardised major axis regression
+library(ggrepel)    # label repulsion for family plots
+
+theme_set(theme_bw(base_size = 12))
+
+# ── Load BAAD ─────────────────────────────────────────────────────────────────
+baad <- baad.data::baad_data()
+dat  <- baad$data
+
+# ── Derive clade group from PFT code ─────────────────────────────────────────
+# PFT codes: DA = Deciduous Angiosperm, DG = Deciduous Gymnosperm,
+#             EA = Evergreen Angiosperm, EG = Evergreen Gymnosperm.
+# Angiosperm/Gymnosperm is encoded in the trailing letter of the pft code.
+dat <- dat %>%
+  mutate(
+    clade = case_when(
+      grepl("A$", pft) ~ "Angiosperm",
+      grepl("G$", pft) ~ "Gymnosperm",
+      TRUE             ~ NA_character_
+    )
+  )
+
+# ── Subset: records with m.to AND (m.lf or a.lf) ─────────────────────────────
+d_lf <- dat %>% filter(m.to > 0, m.lf > 0)   # AGB + leaf mass
+d_al <- dat %>% filter(m.to > 0, a.lf > 0)   # AGB + leaf area
+
+# Helper: run sma() safely and return a tidy 1-row data.frame
+sma_tidy <- function(df, response, predictor, group_label = "all") {
+  tryCatch({
+    fit <- sma(log10(df[[response]]) ~ log10(df[[predictor]]))
+    s   <- summary(fit)$coef[[1]]
+    data.frame(
+      group    = group_label,
+      n        = nrow(df),
+      intercept = s[1, 1],
+      slope     = s[2, 1],
+      slope_lo  = s[2, 3],
+      slope_hi  = s[2, 4],
+      r2        = cor(log10(df[[response]]), log10(df[[predictor]]))^2
+    )
+  }, error = function(e) {
+    data.frame(group = group_label, n = nrow(df),
+               intercept = NA, slope = NA, slope_lo = NA, slope_hi = NA, r2 = NA)
+  })
+}
+```
+
+---
+
+# Overview
+
+This document focuses on the allometry between **total above-ground biomass**
+(`m.to`, kg) and two leaf-related traits measured on the same individual:
+
+| Response | Symbol | Units |
+|---|---|---|
+| Total leaf mass | `m.lf` | kg |
+| Total leaf area | `a.lf` | m² |
+
+Scaling relationships are estimated using **Standardised Major Axis (SMA)**
+regression on log₁₀-transformed data, which is the statistically appropriate
+method when both axes carry measurement error (Warton et al. 2006, *Biol. Rev.*).
+The null prediction under West–Brown–Enquist metabolic scaling theory is a
+3/4-power relationship between leaf mass and plant mass
+(Enquist & Niklas 2002, *Nature*). The pipe model predicts leaf area scales
+approximately linearly with sapwood area and thus sub-linearly with AGB.
+
+**BAAD citation:** Falster DS et al. (2015). BAAD: a Biomass And Allometry
+Database for woody plants. *Ecology* 96(5):1445.
+DOI: [10.1890/14-1889.1](https://doi.org/10.1890/14-1889.1)
+
+```{r data-summary}
+kable(data.frame(
+  Dataset      = c("m.lf ~ m.to", "a.lf ~ m.to"),
+  N_records    = c(nrow(d_lf), nrow(d_al)),
+  N_species    = c(n_distinct(d_lf$speciesMatched), n_distinct(d_al$speciesMatched)),
+  N_families   = c(n_distinct(d_lf$family[!is.na(d_lf$family)]),
+                   n_distinct(d_al$family[!is.na(d_al$family)])),
+  N_angiosperms = c(sum(!is.na(d_lf$clade) & d_lf$clade == "Angiosperm"),
+                    sum(!is.na(d_al$clade) & d_al$clade == "Angiosperm")),
+  N_gymnosperms = c(sum(!is.na(d_lf$clade) & d_lf$clade == "Gymnosperm"),
+                    sum(!is.na(d_al$clade) & d_al$clade == "Gymnosperm"))
+), caption = "Record counts for the two focal relationships")
+```
+
+---
+
+# Interspecific scaling — all woody plants
+
+## Leaf mass ~ AGB
+
+```{r overall-leaf-mass, fig.height=6}
+fit_lf <- sma(log10(m.lf) ~ log10(m.to), data = d_lf)
+sl_lf  <- round(coef(fit_lf)[2], 3)
+int_lf <- round(coef(fit_lf)[1], 3)
+r2_lf  <- round(cor(log10(d_lf$m.lf), log10(d_lf$m.to))^2, 3)
+
+ggplot(d_lf, aes(x = m.to, y = m.lf, colour = pft)) +
+  geom_point(alpha = 0.25, size = 0.7) +
+  geom_abline(intercept = int_lf, slope = sl_lf,
+              colour = "black", linewidth = 1.2) +
+  geom_abline(slope = 0.75, intercept = int_lf, linetype = "dashed",
+              colour = "grey40", linewidth = 0.9) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_brewer(palette = "Dark2", na.value = "grey70") +
+  annotation_logticks() +
+  labs(
+    x = "Above-ground biomass, m.to (kg)",
+    y = "Leaf mass, m.lf (kg)",
+    colour = "PFT",
+    title = paste0("Leaf mass ~ AGB  |  SMA β = ", sl_lf,
+                   "  |  R² = ", r2_lf,
+                   "  |  n = ", format(nrow(d_lf), big.mark = ",")),
+    subtitle = "Solid line: SMA fit.  Dashed line: 3/4-power reference (WBE prediction)"
+  )
+```
+
+> **SMA result:** m.lf = 10^`r int_lf` × m.to^`r sl_lf`  
+> (n = `r format(nrow(d_lf), big.mark=",")`; R² = `r r2_lf`)
+
+## Leaf area ~ AGB
+
+```{r overall-leaf-area, fig.height=6}
+fit_al <- sma(log10(a.lf) ~ log10(m.to), data = d_al)
+sl_al  <- round(coef(fit_al)[2], 3)
+int_al <- round(coef(fit_al)[1], 3)
+r2_al  <- round(cor(log10(d_al$a.lf), log10(d_al$m.to))^2, 3)
+
+ggplot(d_al, aes(x = m.to, y = a.lf, colour = pft)) +
+  geom_point(alpha = 0.25, size = 0.7) +
+  geom_abline(intercept = int_al, slope = sl_al,
+              colour = "black", linewidth = 1.2) +
+  geom_abline(slope = 0.75, intercept = int_al, linetype = "dashed",
+              colour = "grey40", linewidth = 0.9) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_brewer(palette = "Dark2", na.value = "grey70") +
+  annotation_logticks() +
+  labs(
+    x = "Above-ground biomass, m.to (kg)",
+    y = "Leaf area, a.lf (m²)",
+    colour = "PFT",
+    title = paste0("Leaf area ~ AGB  |  SMA β = ", sl_al,
+                   "  |  R² = ", r2_al,
+                   "  |  n = ", format(nrow(d_al), big.mark = ",")),
+    subtitle = "Solid line: SMA fit.  Dashed line: 3/4-power reference"
+  )
+```
+
+> **SMA result:** a.lf = 10^`r int_al` × m.to^`r sl_al`  
+> (n = `r format(nrow(d_al), big.mark=",")`; R² = `r r2_al`)
+
+---
+
+# Angiosperm vs. Gymnosperm
+
+SMA regression fitted separately for each clade. Only records with a known `pft`
+code (DA, DG, EA, or EG) are included; records with missing `pft` are excluded
+from this section.
+
+## Leaf mass ~ AGB by clade
+
+```{r clade-leaf-mass, fig.height=6}
+d_lf_c <- d_lf %>% filter(!is.na(clade))
+
+# Fit SMA per clade
+clade_lf <- d_lf_c %>%
+  group_by(clade) %>%
+  group_modify(~ {
+    tryCatch({
+      lx  <- log10(.x$m.to)
+      ly  <- log10(.x$m.lf)
+      fit <- sma(ly ~ lx)
+      cm  <- fit$coef[[1]]
+      data.frame(
+        n         = nrow(.x),
+        intercept = cm[1, 1],
+        slope     = cm[2, 1],
+        slope_lo  = cm[2, 2],
+        slope_hi  = cm[2, 3],
+        r2        = cor(lx, ly)^2
+      )
+    }, error = function(e) {
+      data.frame(n = nrow(.x), intercept = NA, slope = NA,
+                 slope_lo = NA, slope_hi = NA, r2 = NA)
+    })
+  }) %>%
+  ungroup()
+
+# Build prediction lines across AGB range
+pred_range <- seq(log10(min(d_lf_c$m.to)), log10(max(d_lf_c$m.to)), length.out = 200)
+
+clade_lines_lf <- clade_lf %>%
+  rowwise() %>%
+  mutate(log_x = list(pred_range),
+         log_y = list(intercept + slope * pred_range)) %>%
+  unnest(c(log_x, log_y)) %>%
+  mutate(x = 10^log_x, y = 10^log_y)
+
+ggplot(d_lf_c, aes(x = m.to, y = m.lf, colour = clade)) +
+  geom_point(alpha = 0.2, size = 0.7) +
+  geom_line(data = clade_lines_lf, aes(x = x, y = y, colour = clade),
+            linewidth = 1.3) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8")) +
+  annotation_logticks() +
+  labs(
+    x = "Above-ground biomass, m.to (kg)",
+    y = "Leaf mass, m.lf (kg)",
+    colour = "Clade",
+    title = "Leaf mass ~ AGB — Angiosperm vs. Gymnosperm (SMA)",
+    subtitle = "Separate SMA lines per clade"
+  )
+```
+
+```{r clade-leaf-mass-table}
+kable(clade_lf %>%
+        mutate(across(where(is.numeric), ~ round(.x, 3))) %>%
+        select(clade, n, slope, slope_lo, slope_hi, r2),
+      col.names = c("Clade", "N", "SMA slope", "95% CI lo", "95% CI hi", "R²"),
+      caption = "SMA slopes for leaf mass ~ AGB by clade")
+```
+
+## Leaf area ~ AGB by clade
+
+```{r clade-leaf-area, fig.height=6}
+d_al_c <- d_al %>% filter(!is.na(clade))
+
+clade_al <- d_al_c %>%
+  group_by(clade) %>%
+  group_modify(~ {
+    tryCatch({
+      lx  <- log10(.x$m.to)
+      ly  <- log10(.x$a.lf)
+      fit <- sma(ly ~ lx)
+      cm  <- fit$coef[[1]]
+      data.frame(
+        n         = nrow(.x),
+        intercept = cm[1, 1],
+        slope     = cm[2, 1],
+        slope_lo  = cm[2, 2],
+        slope_hi  = cm[2, 3],
+        r2        = cor(lx, ly)^2
+      )
+    }, error = function(e) {
+      data.frame(n = nrow(.x), intercept = NA, slope = NA,
+                 slope_lo = NA, slope_hi = NA, r2 = NA)
+    })
+  }) %>%
+  ungroup()
+
+pred_range_al <- seq(log10(min(d_al_c$m.to)), log10(max(d_al_c$m.to)), length.out = 200)
+
+clade_lines_al <- clade_al %>%
+  rowwise() %>%
+  mutate(log_x = list(pred_range_al),
+         log_y = list(intercept + slope * pred_range_al)) %>%
+  unnest(c(log_x, log_y)) %>%
+  mutate(x = 10^log_x, y = 10^log_y)
+
+ggplot(d_al_c, aes(x = m.to, y = a.lf, colour = clade)) +
+  geom_point(alpha = 0.2, size = 0.7) +
+  geom_line(data = clade_lines_al, aes(x = x, y = y, colour = clade),
+            linewidth = 1.3) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8")) +
+  annotation_logticks() +
+  labs(
+    x = "Above-ground biomass, m.to (kg)",
+    y = "Leaf area, a.lf (m²)",
+    colour = "Clade",
+    title = "Leaf area ~ AGB — Angiosperm vs. Gymnosperm (SMA)",
+    subtitle = "Separate SMA lines per clade"
+  )
+```
+
+```{r clade-leaf-area-table}
+kable(clade_al %>%
+        mutate(across(where(is.numeric), ~ round(.x, 3))) %>%
+        select(clade, n, slope, slope_lo, slope_hi, r2),
+      col.names = c("Clade", "N", "SMA slope", "95% CI lo", "95% CI hi", "R²"),
+      caption = "SMA slopes for leaf area ~ AGB by clade")
+```
+
+---
+
+# Family-level scaling
+
+SMA regression fitted for each plant family with ≥ 30 individual records
+having both `m.to` and the relevant leaf trait measured. Families are sorted
+by slope. The **3/4-power reference line** is shown in grey.
+
+## Leaf mass ~ AGB by family
+
+```{r family-leaf-mass, fig.height=8, fig.width=11}
+# ── Minimum records per family to estimate a regression ──────────────────────
+MIN_N_FAM <- 30
+
+fam_lf_counts <- d_lf %>%
+  filter(!is.na(family)) %>%
+  count(family) %>%
+  filter(n >= MIN_N_FAM) %>%
+  pull(family)
+
+fam_lf_slopes <- d_lf %>%
+  filter(!is.na(family), family %in% fam_lf_counts) %>%
+  group_by(family) %>%
+  group_modify(~ {
+    tryCatch({
+      lx  <- log10(.x$m.to)
+      ly  <- log10(.x$m.lf)
+      fit <- sma(ly ~ lx)
+      cm  <- fit$coef[[1]]
+      data.frame(
+        n         = nrow(.x),
+        n_sp      = n_distinct(.x$speciesMatched),
+        intercept = cm[1, 1],
+        slope     = cm[2, 1],
+        slope_lo  = cm[2, 2],
+        slope_hi  = cm[2, 3],
+        r2        = cor(lx, ly)^2
+      )
+    }, error = function(e) {
+      data.frame(n = nrow(.x), n_sp = n_distinct(.x$speciesMatched),
+                 intercept = NA, slope = NA, slope_lo = NA, slope_hi = NA, r2 = NA)
+    })
+  }) %>%
+  ungroup() %>%
+  filter(!is.na(slope)) %>%
+  arrange(slope)
+
+# Forest-style dot-range plot ─────────────────────────────────────────────────
+ggplot(fam_lf_slopes, aes(x = slope, y = reorder(family, slope))) +
+  geom_vline(xintercept = 0.75, colour = "grey50", linetype = "dashed", linewidth = 0.8) +
+  geom_vline(xintercept = 1.00, colour = "grey70", linetype = "dotted", linewidth = 0.6) +
+  geom_errorbarh(aes(xmin = slope_lo, xmax = slope_hi),
+                 height = 0.3, colour = "steelblue", linewidth = 0.7) +
+  geom_point(aes(size = log10(n)), colour = "steelblue", fill = "white", shape = 21,
+             stroke = 1.1) +
+  scale_size_continuous(range = c(2, 6), name = "log₁₀(N records)") +
+  labs(
+    x = "SMA slope (log leaf mass ~ log AGB)",
+    y = NULL,
+    title = paste0("Leaf mass ~ AGB: family-level SMA slopes (families with ≥ ", MIN_N_FAM, " records)"),
+    subtitle = "Dashed = 3/4-power (WBE); dotted = isometry (slope = 1). Points sized by log₁₀(N records)."
+  ) +
+  theme(panel.grid.major.y = element_line(colour = "grey92"),
+        panel.grid.minor   = element_blank())
+```
+
+```{r family-leaf-mass-table}
+kable(
+  fam_lf_slopes %>%
+    arrange(desc(n)) %>%
+    mutate(across(c(slope, slope_lo, slope_hi, r2, intercept), ~ round(.x, 3))) %>%
+    select(family, n, n_sp, slope, slope_lo, slope_hi, r2),
+  col.names = c("Family", "N records", "N species", "SMA slope",
+                "95% CI lo", "95% CI hi", "R²"),
+  caption = paste0("Family-level SMA slopes — leaf mass ~ AGB (≥ ", MIN_N_FAM, " records)")
+)
+```
+
+## Leaf area ~ AGB by family
+
+```{r family-leaf-area, fig.height=8, fig.width=11}
+fam_al_counts <- d_al %>%
+  filter(!is.na(family)) %>%
+  count(family) %>%
+  filter(n >= MIN_N_FAM) %>%
+  pull(family)
+
+fam_al_slopes <- d_al %>%
+  filter(!is.na(family), family %in% fam_al_counts) %>%
+  group_by(family) %>%
+  group_modify(~ {
+    tryCatch({
+      lx  <- log10(.x$m.to)
+      ly  <- log10(.x$a.lf)
+      fit <- sma(ly ~ lx)
+      cm  <- fit$coef[[1]]
+      data.frame(
+        n         = nrow(.x),
+        n_sp      = n_distinct(.x$speciesMatched),
+        intercept = cm[1, 1],
+        slope     = cm[2, 1],
+        slope_lo  = cm[2, 2],
+        slope_hi  = cm[2, 3],
+        r2        = cor(lx, ly)^2
+      )
+    }, error = function(e) {
+      data.frame(n = nrow(.x), n_sp = n_distinct(.x$speciesMatched),
+                 intercept = NA, slope = NA, slope_lo = NA, slope_hi = NA, r2 = NA)
+    })
+  }) %>%
+  ungroup() %>%
+  filter(!is.na(slope)) %>%
+  arrange(slope)
+
+ggplot(fam_al_slopes, aes(x = slope, y = reorder(family, slope))) +
+  geom_vline(xintercept = 0.75, colour = "grey50", linetype = "dashed", linewidth = 0.8) +
+  geom_vline(xintercept = 1.00, colour = "grey70", linetype = "dotted", linewidth = 0.6) +
+  geom_errorbarh(aes(xmin = slope_lo, xmax = slope_hi),
+                 height = 0.3, colour = "#e5691f", linewidth = 0.7) +
+  geom_point(aes(size = log10(n)), colour = "#e5691f", fill = "white", shape = 21,
+             stroke = 1.1) +
+  scale_size_continuous(range = c(2, 6), name = "log₁₀(N records)") +
+  labs(
+    x = "SMA slope (log leaf area ~ log AGB)",
+    y = NULL,
+    title = paste0("Leaf area ~ AGB: family-level SMA slopes (families with ≥ ", MIN_N_FAM, " records)"),
+    subtitle = "Dashed = 3/4-power (WBE); dotted = isometry (slope = 1). Points sized by log₁₀(N records)."
+  ) +
+  theme(panel.grid.major.y = element_line(colour = "grey92"),
+        panel.grid.minor   = element_blank())
+```
+
+```{r family-leaf-area-table}
+kable(
+  fam_al_slopes %>%
+    arrange(desc(n)) %>%
+    mutate(across(c(slope, slope_lo, slope_hi, r2, intercept), ~ round(.x, 3))) %>%
+    select(family, n, n_sp, slope, slope_lo, slope_hi, r2),
+  col.names = c("Family", "N records", "N species", "SMA slope",
+                "95% CI lo", "95% CI hi", "R²"),
+  caption = paste0("Family-level SMA slopes — leaf area ~ AGB (≥ ", MIN_N_FAM, " records)")
+)
+```
+
+---
+
+# Intraspecific scaling
+
+Within-species (intraspecific) scaling slopes are estimated for species with
+**≥ 8 individual records** having both AGB and the leaf trait measured.
+Intraspecific slopes are compared to the interspecific SMA slope (shown as a
+vertical dashed line).
+
+**Interpretation caveat:** BAAD individuals within a species often come from a
+single study or a narrow size range. Intraspecific slopes should be treated as
+within-study estimates and may reflect ontogenetic or site-level effects rather
+than true species-level allometries.
+
+## Leaf mass ~ AGB: intraspecific slope distribution
+
+```{r intra-leaf-mass-hist, fig.height=5}
+MIN_N_INTRA <- 8
+
+intra_lf <- d_lf %>%
+  filter(!is.na(speciesMatched)) %>%
+  group_by(speciesMatched) %>%
+  group_modify(~ {
+    if (nrow(.x) < MIN_N_INTRA) return(data.frame())
+    tryCatch({
+      lx   <- log10(.x$m.to)
+      ly   <- log10(.x$m.lf)
+      fit  <- sma(ly ~ lx)
+      cm   <- fit$coef[[1]]
+      data.frame(
+        n         = nrow(.x),
+        family    = .x$family[1],
+        clade     = .x$clade[1],
+        slope     = cm[2, 1],
+        slope_lo  = cm[2, 2],
+        slope_hi  = cm[2, 3],
+        r2        = cor(lx, ly)^2,
+        agb_range = diff(range(lx))
+      )
+    }, error = function(e) data.frame())
+  }) %>%
+  ungroup()
+
+cat("Species with ≥", MIN_N_INTRA, "records (m.lf + m.to):", nrow(intra_lf), "\n")
+
+ggplot(intra_lf, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.05, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = sl_lf,  linetype = "solid",  colour = "black", linewidth = 1) +
+  geom_vline(xintercept = 0.75,   linetype = "dashed", colour = "grey40", linewidth = 0.9) +
+  geom_vline(xintercept = 1.00,   linetype = "dotted", colour = "grey60", linewidth = 0.7) +
+  scale_fill_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                    na.value = "grey60", name = "Clade") +
+  labs(
+    x = "Intraspecific SMA slope",
+    y = "Number of species",
+    title = paste0("Distribution of intraspecific slopes — leaf mass ~ AGB  (≥ ", MIN_N_INTRA, " records/species)"),
+    subtitle = paste0("Solid = interspecific SMA slope (", sl_lf, "); dashed = 3/4; dotted = 1.0")
+  )
+```
+
+```{r intra-leaf-mass-summary}
+kable(
+  intra_lf %>%
+    group_by(clade) %>%
+    summarise(
+      n_species   = n(),
+      median_slope = round(median(slope, na.rm = TRUE), 3),
+      mean_slope   = round(mean(slope, na.rm = TRUE), 3),
+      sd_slope     = round(sd(slope, na.rm = TRUE), 3),
+      pct_lt_075   = round(mean(slope < 0.75, na.rm = TRUE) * 100, 1),
+      pct_gt_1     = round(mean(slope > 1.00, na.rm = TRUE) * 100, 1)
+    ),
+  col.names = c("Clade", "N species", "Median slope", "Mean slope", "SD slope",
+                "% slopes < 0.75", "% slopes > 1.0"),
+  caption = "Summary of intraspecific leaf mass ~ AGB slopes by clade"
+)
+```
+
+## Top species by record count — leaf mass ~ AGB
+
+Scatter plots for the 16 most data-rich species, each with its own SMA line.
+
+```{r intra-leaf-mass-topsp, fig.height=10, fig.width=12}
+top_sp_lf <- intra_lf %>%
+  arrange(desc(n)) %>%
+  slice_head(n = 16) %>%
+  pull(speciesMatched)
+
+d_lf %>%
+  filter(speciesMatched %in% top_sp_lf) %>%
+  ggplot(aes(x = m.to, y = m.lf)) +
+  geom_point(aes(colour = clade), alpha = 0.5, size = 1) +
+  geom_smooth(method = "lm", formula = y ~ x,   # lm on log scale = SMA direction visual
+              colour = "black", se = TRUE, linewidth = 0.9) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                      na.value = "grey60") +
+  facet_wrap(~ speciesMatched, scales = "free", ncol = 4) +
+  annotation_logticks() +
+  labs(
+    x = "AGB m.to (kg)", y = "Leaf mass m.lf (kg)", colour = "Clade",
+    title = "Intraspecific leaf mass ~ AGB: top 16 species by record count"
+  ) +
+  theme(strip.text = element_text(size = 7, face = "italic"),
+        legend.position = "bottom")
+```
+
+## Leaf area ~ AGB: intraspecific slope distribution
+
+```{r intra-leaf-area-hist, fig.height=5}
+intra_al <- d_al %>%
+  filter(!is.na(speciesMatched)) %>%
+  group_by(speciesMatched) %>%
+  group_modify(~ {
+    if (nrow(.x) < MIN_N_INTRA) return(data.frame())
+    tryCatch({
+      lx   <- log10(.x$m.to)
+      ly   <- log10(.x$a.lf)
+      fit  <- sma(ly ~ lx)
+      cm   <- fit$coef[[1]]
+      data.frame(
+        n         = nrow(.x),
+        family    = .x$family[1],
+        clade     = .x$clade[1],
+        slope     = cm[2, 1],
+        slope_lo  = cm[2, 2],
+        slope_hi  = cm[2, 3],
+        r2        = cor(lx, ly)^2,
+        agb_range = diff(range(lx))
+      )
+    }, error = function(e) data.frame())
+  }) %>%
+  ungroup()
+
+cat("Species with ≥", MIN_N_INTRA, "records (a.lf + m.to):", nrow(intra_al), "\n")
+
+ggplot(intra_al, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.05, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = sl_al,  linetype = "solid",  colour = "black", linewidth = 1) +
+  geom_vline(xintercept = 0.75,   linetype = "dashed", colour = "grey40", linewidth = 0.9) +
+  geom_vline(xintercept = 1.00,   linetype = "dotted", colour = "grey60", linewidth = 0.7) +
+  scale_fill_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                    na.value = "grey60", name = "Clade") +
+  labs(
+    x = "Intraspecific SMA slope",
+    y = "Number of species",
+    title = paste0("Distribution of intraspecific slopes — leaf area ~ AGB  (≥ ", MIN_N_INTRA, " records/species)"),
+    subtitle = paste0("Solid = interspecific SMA slope (", sl_al, "); dashed = 3/4; dotted = 1.0")
+  )
+```
+
+```{r intra-leaf-area-summary}
+kable(
+  intra_al %>%
+    group_by(clade) %>%
+    summarise(
+      n_species   = n(),
+      median_slope = round(median(slope, na.rm = TRUE), 3),
+      mean_slope   = round(mean(slope, na.rm = TRUE), 3),
+      sd_slope     = round(sd(slope, na.rm = TRUE), 3),
+      pct_lt_075   = round(mean(slope < 0.75, na.rm = TRUE) * 100, 1),
+      pct_gt_1     = round(mean(slope > 1.00, na.rm = TRUE) * 100, 1)
+    ),
+  col.names = c("Clade", "N species", "Median slope", "Mean slope", "SD slope",
+                "% slopes < 0.75", "% slopes > 1.0"),
+  caption = "Summary of intraspecific leaf area ~ AGB slopes by clade"
+)
+```
+
+## Top species by record count — leaf area ~ AGB
+
+```{r intra-leaf-area-topsp, fig.height=10, fig.width=12}
+top_sp_al <- intra_al %>%
+  arrange(desc(n)) %>%
+  slice_head(n = 16) %>%
+  pull(speciesMatched)
+
+d_al %>%
+  filter(speciesMatched %in% top_sp_al) %>%
+  ggplot(aes(x = m.to, y = a.lf)) +
+  geom_point(aes(colour = clade), alpha = 0.5, size = 1) +
+  geom_smooth(method = "lm", formula = y ~ x,
+              colour = "black", se = TRUE, linewidth = 0.9) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                      na.value = "grey60") +
+  facet_wrap(~ speciesMatched, scales = "free", ncol = 4) +
+  annotation_logticks() +
+  labs(
+    x = "AGB m.to (kg)", y = "Leaf area a.lf (m²)", colour = "Clade",
+    title = "Intraspecific leaf area ~ AGB: top 16 species by record count"
+  ) +
+  theme(strip.text = element_text(size = 7, face = "italic"),
+        legend.position = "bottom")
+```
+
+---
+
+# Intraspecific vs. interspecific slopes
+
+A key question in allometry is whether slopes measured within species (ontogenetic
+or population-level variation) match those estimated across species (evolutionary
+divergence). The scatter below plots intraspecific SMA slope against the log₁₀
+of sample size within each species.
+
+## Leaf mass ~ AGB
+
+```{r slope-vs-n-lf, fig.height=5}
+ggplot(intra_lf, aes(x = n, y = slope, colour = clade)) +
+  geom_hline(yintercept = sl_lf,  linetype = "solid",  colour = "grey30", linewidth = 0.8) +
+  geom_hline(yintercept = 0.75,   linetype = "dashed", colour = "grey50", linewidth = 0.7) +
+  geom_point(alpha = 0.6, size = 2) +
+  geom_errorbar(aes(ymin = slope_lo, ymax = slope_hi), width = 0, alpha = 0.25) +
+  scale_x_log10() +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                      na.value = "grey60") +
+  labs(
+    x = "N records per species (log scale)",
+    y = "Intraspecific SMA slope",
+    colour = "Clade",
+    title = "Intraspecific slope vs. sample size — leaf mass ~ AGB",
+    subtitle = paste0("Solid = interspecific slope (", sl_lf, "); dashed = 3/4")
+  )
+```
+
+## Leaf area ~ AGB
+
+```{r slope-vs-n-al, fig.height=5}
+ggplot(intra_al, aes(x = n, y = slope, colour = clade)) +
+  geom_hline(yintercept = sl_al,  linetype = "solid",  colour = "grey30", linewidth = 0.8) +
+  geom_hline(yintercept = 0.75,   linetype = "dashed", colour = "grey50", linewidth = 0.7) +
+  geom_point(alpha = 0.6, size = 2) +
+  geom_errorbar(aes(ymin = slope_lo, ymax = slope_hi), width = 0, alpha = 0.25) +
+  scale_x_log10() +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                      na.value = "grey60") +
+  labs(
+    x = "N records per species (log scale)",
+    y = "Intraspecific SMA slope",
+    colour = "Clade",
+    title = "Intraspecific slope vs. sample size — leaf area ~ AGB",
+    subtitle = paste0("Solid = interspecific slope (", sl_al, "); dashed = 3/4")
+  )
+```
+
+---
+
+# Summary table
+
+```{r final-summary-table}
+kable(data.frame(
+  Relationship        = c("Leaf mass ~ AGB (all)",
+                           "Leaf mass ~ AGB (Angiosperm)",
+                           "Leaf mass ~ AGB (Gymnosperm)",
+                           "Leaf area ~ AGB (all)",
+                           "Leaf area ~ AGB (Angiosperm)",
+                           "Leaf area ~ AGB (Gymnosperm)"),
+  N                   = c(nrow(d_lf),
+                           clade_lf$n[clade_lf$clade == "Angiosperm"],
+                           clade_lf$n[clade_lf$clade == "Gymnosperm"],
+                           nrow(d_al),
+                           clade_al$n[clade_al$clade == "Angiosperm"],
+                           clade_al$n[clade_al$clade == "Gymnosperm"]),
+  SMA_slope           = round(c(sl_lf,
+                                 clade_lf$slope[clade_lf$clade == "Angiosperm"],
+                                 clade_lf$slope[clade_lf$clade == "Gymnosperm"],
+                                 sl_al,
+                                 clade_al$slope[clade_al$clade == "Angiosperm"],
+                                 clade_al$slope[clade_al$clade == "Gymnosperm"]), 3),
+  CI_lo               = round(c(fit_lf$coef[[1]][2, 2],
+                                 clade_lf$slope_lo[clade_lf$clade == "Angiosperm"],
+                                 clade_lf$slope_lo[clade_lf$clade == "Gymnosperm"],
+                                 fit_al$coef[[1]][2, 2],
+                                 clade_al$slope_lo[clade_al$clade == "Angiosperm"],
+                                 clade_al$slope_lo[clade_al$clade == "Gymnosperm"]), 3),
+  CI_hi               = round(c(fit_lf$coef[[1]][2, 3],
+                                 clade_lf$slope_hi[clade_lf$clade == "Angiosperm"],
+                                 clade_lf$slope_hi[clade_lf$clade == "Gymnosperm"],
+                                 fit_al$coef[[1]][2, 3],
+                                 clade_al$slope_hi[clade_al$clade == "Angiosperm"],
+                                 clade_al$slope_hi[clade_al$clade == "Gymnosperm"]), 3),
+  R2                  = round(c(r2_lf,
+                                 clade_lf$r2[clade_lf$clade == "Angiosperm"],
+                                 clade_lf$r2[clade_lf$clade == "Gymnosperm"],
+                                 r2_al,
+                                 clade_al$r2[clade_al$clade == "Angiosperm"],
+                                 clade_al$r2[clade_al$clade == "Gymnosperm"]), 3)
+),
+col.names = c("Relationship", "N records", "SMA slope", "95% CI lo", "95% CI hi", "R²"),
+caption = "Summary of interspecific SMA slopes (all and by clade)")
+```
+
+---
+
+# Methods note
+
+- **Data source:** BAAD v1 (Falster et al. 2015), accessed via the `baad.data` R
+  package. All measurements are individual-level.
+- **Regression method:** Standardised Major Axis (SMA) using the `smatr` package
+  (Warton et al. 2012, *Methods Ecol. Evol.* 3:257–259). SMA is appropriate
+  when both variables carry error and the goal is to characterise the
+  bivariate relationship rather than predict one from the other.
+- **Angio/Gymno classification:** derived from the BAAD `pft` field (trailing
+  letter A = Angiosperm, G = Gymnosperm). Records with missing `pft` are excluded
+  from the clade-level comparisons.
+- **Family-level analysis:** families with ≥ 30 individual records.
+- **Intraspecific analysis:** species with ≥ 8 individual records having both
+  AGB and the focal leaf trait. Slopes reflect ontogenetic or population-level
+  size variation within each dataset contributing records for that species.
+- **Theoretical benchmarks:** WBE/MST theory (Enquist & Niklas 2002) predicts
+  leaf mass ∝ AGB^(3/4); isometry (slope = 1.0) would indicate constant leaf
+  mass fraction regardless of plant size.

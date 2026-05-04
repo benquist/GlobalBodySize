@@ -1204,3 +1204,4 @@ Actions: Replaced single SDM worked example with four parallel worked examples (
 2026-05-02 | Created plant_scaling_data/niklas_enquist_organ_scaling.Rmd — full organ-mass scaling analysis.
 2026-05-02 | Created niklas_enquist_organ_scaling.Rmd in plant_scaling_data/; 68 chunks; renders clean.
 2026-05-02 | Committed unstaged session changes: tallo_summary.Rmd + HTML, tallo_bien_preexport.R path fix, agent definition updates.
+2026-05-03 | Created plant_scaling_data/baad_agb_leaf_allometry.Rmd and .html: AGB ~ leaf mass/area allometry, Angio/Gymno, family-level SMA, intraspecific scaling.
