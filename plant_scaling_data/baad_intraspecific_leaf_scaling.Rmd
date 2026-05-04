@@ -81,8 +81,38 @@ combos <- list(
        title_short = "Leaf area ~ stem mass")
 )
 
+# ─── OLS Bisector slope helper (Isobe et al. 1990) ───────────────────────────
+# Returns c(slope, lo, hi) for the OLS bisector of log-transformed vectors.
+# The bisector is the line that bisects the angle between the OLS(Y|X) and
+# OLS(X|Y) regression lines. It is symmetric (invariant to axis swap) and
+# appropriate for allometric inference when neither axis is error-free.
+bisector_slope_ci <- function(lx, ly) {
+  n    <- length(lx)
+  xc   <- lx - mean(lx); yc <- ly - mean(ly)
+  SXX  <- sum(xc^2); SYY <- sum(yc^2); SXY <- sum(xc * yc)
+  if (SXX == 0 || SXY == 0) return(c(slope = NA, lo = NA, hi = NA))
+
+  B1 <- SXY / SXX          # OLS(Y|X) slope
+  B2 <- SYY / SXY          # OLS(X|Y) slope
+  B3 <- (B1*B2 - 1 + sqrt((1 + B1^2)*(1 + B2^2))) / (B1 + B2)  # bisector
+
+  # Asymptotic variance of bisector slope (Isobe et al. 1990, eq. 8)
+  SUM1 <- sum((xc * (yc - B1*xc))^2)
+  SUM2 <- sum((yc * (yc - B2*xc))^2)
+  SUM3 <- sum(xc * yc * (yc - B1*xc) * (yc - B2*xc))
+  COV  <- SUM3 / (B1 * SXX^2)
+  SIGB1 <- SUM1 / SXX^2
+  SIGB2 <- SUM2 / SXY^2
+  GAM1  <- B3 / ((B1 + B2) * sqrt((1 + B1^2) * (1 + B2^2)))
+  SIGB3 <- GAM1^2 * (((1 + B2^2)^2) * SIGB1 +
+                      2*(1 + B1^2)*(1 + B2^2)*COV +
+                      ((1 + B1^2)^2) * SIGB2)
+  se <- sqrt(max(SIGB3, 0))
+  c(slope = B3, lo = B3 - 1.96*se, hi = B3 + 1.96*se)
+}
+
 # ─── Per-species regression helper ───────────────────────────────────────────
-# Returns per-species OLS + SMA slopes for one (x, y) combo.
+# Returns per-species OLS + SMA + OLS Bisector slopes for one (x, y) combo.
 # Minimum MIN_N records per species required.
 fit_intra <- function(data, xcol, ycol, min_n = MIN_N) {
   sub <- data %>%
@@ -111,6 +141,12 @@ fit_intra <- function(data, xcol, ycol, min_n = MIN_N) {
         c(slope = cm[2, 1], lo = cm[2, 2], hi = cm[2, 3])
       }, error = function(e) c(slope = NA, lo = NA, hi = NA))
 
+      # OLS Bisector (Isobe et al. 1990)
+      bis_res <- tryCatch(
+        bisector_slope_ci(lx, ly),
+        error = function(e) c(slope = NA, lo = NA, hi = NA)
+      )
+
       data.frame(
         n          = nrow(.x),
         family     = .x$family[1],
@@ -122,6 +158,9 @@ fit_intra <- function(data, xcol, ycol, min_n = MIN_N) {
         sma_slope  = sma_res["slope"],
         sma_lo     = sma_res["lo"],
         sma_hi     = sma_res["hi"],
+        bis_slope  = bis_res["slope"],
+        bis_lo     = bis_res["lo"],
+        bis_hi     = bis_res["hi"],
         r2         = cor(lx, ly)^2,
         log_x_min  = min(lx),
         log_x_max  = max(lx),
@@ -226,20 +265,26 @@ plot_size_range <- function(res, co, max_sp = 60) {
 # ── Shared helper: exponent vs. size range ────────────────────────────────────
 plot_slope_vs_range <- function(res, co) {
   if (nrow(res) == 0) { plot.new(); return(invisible(NULL)) }
-  # pivot OLS and SMA long
+  # pivot OLS, SMA, and OLS Bisector long
   long <- res %>%
     select(speciesMatched, clade, n, log_x_range,
            ols_slope, ols_lo, ols_hi,
-           sma_slope, sma_lo, sma_hi) %>%
+           sma_slope, sma_lo, sma_hi,
+           bis_slope, bis_lo, bis_hi) %>%
     pivot_longer(
-      cols      = c(ols_slope, sma_slope),
+      cols      = c(ols_slope, sma_slope, bis_slope),
       names_to  = "method",
       values_to = "slope"
     ) %>%
     mutate(
-      lo     = ifelse(method == "ols_slope", ols_lo, sma_lo),
-      hi     = ifelse(method == "ols_slope", ols_hi, sma_hi),
-      method = recode(method, ols_slope = "OLS", sma_slope = "SMA")
+      lo     = case_when(method == "ols_slope" ~ ols_lo,
+                         method == "sma_slope" ~ sma_lo,
+                         method == "bis_slope" ~ bis_lo),
+      hi     = case_when(method == "ols_slope" ~ ols_hi,
+                         method == "sma_slope" ~ sma_hi,
+                         method == "bis_slope" ~ bis_hi),
+      method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                      bis_slope = "OLS Bisector")
     )
 
   wbe_label <- if (!is.na(co$wbe_ref))
@@ -260,7 +305,7 @@ plot_slope_vs_range <- function(res, co) {
     scale_colour_manual(values = c(Angiosperm = "#e41a1c",
                                    Gymnosperm = "#377eb8"),
                         na.value = "grey60", name = "Clade") +
-    scale_shape_manual(values = c(OLS = 16, SMA = 17), name = "Method") +
+    scale_shape_manual(values = c(OLS = 16, SMA = 17, "OLS Bisector" = 15), name = "Method") +
     facet_wrap(~ method) +
     labs(
       x = paste0("log₁₀ size range  [log₁₀(max) − log₁₀(min) of ", co$x, "]"),
@@ -283,16 +328,19 @@ table_slopes <- function(res, caption_txt) {
     arrange(desc(n)) %>%
     mutate(across(c(ols_slope, ols_lo, ols_hi,
                     sma_slope, sma_lo, sma_hi,
+                    bis_slope, bis_lo, bis_hi,
                     r2, log_x_range), ~ round(.x, 3)),
            speciesMatched = paste0("*", speciesMatched, "*")) %>%
     select(speciesMatched, family, clade, n,
            ols_slope, ols_lo, ols_hi,
            sma_slope, sma_lo, sma_hi,
+           bis_slope, bis_lo, bis_hi,
            r2, log_x_range) %>%
     kable(
       col.names = c("Species", "Family", "Clade", "N",
                     "OLS slope", "OLS 95% lo", "OLS 95% hi",
                     "SMA slope", "SMA 95% lo", "SMA 95% hi",
+                    "Bisector slope", "Bis 95% lo", "Bis 95% hi",
                     "R²", "log₁₀ size range"),
       caption   = caption_txt,
       escape    = FALSE
@@ -310,6 +358,7 @@ co1 <- combos[[1]]
 cat("Species qualifying (≥", MIN_N, "records):", nrow(r1), "\n")
 cat("Median OLS slope:", round(median(r1$ols_slope, na.rm=TRUE), 3), "\n")
 cat("Median SMA slope:", round(median(r1$sma_slope, na.rm=TRUE), 3), "\n")
+cat("Median Bisector slope:", round(median(r1$bis_slope, na.rm=TRUE), 3), "\n")
 ```
 
 ## Per-species slopes table {.tabset}
@@ -337,9 +386,10 @@ plot_slope_vs_range(r1, co1)
 
 ```{r sec1-dist, fig.height=5}
 r1_long <- r1 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope),
+  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
                names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                         bis_slope = "OLS Bisector"))
 
 ggplot(r1_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
@@ -363,6 +413,7 @@ co2 <- combos[[2]]
 cat("Species qualifying (≥", MIN_N, "records):", nrow(r2), "\n")
 cat("Median OLS slope:", round(median(r2$ols_slope, na.rm=TRUE), 3), "\n")
 cat("Median SMA slope:", round(median(r2$sma_slope, na.rm=TRUE), 3), "\n")
+cat("Median Bisector slope:", round(median(r2$bis_slope, na.rm=TRUE), 3), "\n")
 ```
 
 ## Per-species slopes table
@@ -388,9 +439,10 @@ plot_slope_vs_range(r2, co2)
 
 ```{r sec2-dist, fig.height=5}
 r2_long <- r2 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope),
+  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
                names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                         bis_slope = "OLS Bisector"))
 
 ggplot(r2_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
@@ -414,6 +466,7 @@ co3 <- combos[[3]]
 cat("Species qualifying (≥", MIN_N, "records):", nrow(r3), "\n")
 cat("Median OLS slope:", round(median(r3$ols_slope, na.rm=TRUE), 3), "\n")
 cat("Median SMA slope:", round(median(r3$sma_slope, na.rm=TRUE), 3), "\n")
+cat("Median Bisector slope:", round(median(r3$bis_slope, na.rm=TRUE), 3), "\n")
 ```
 
 ## Per-species slopes table
@@ -439,9 +492,10 @@ plot_slope_vs_range(r3, co3)
 
 ```{r sec3-dist, fig.height=5}
 r3_long <- r3 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope),
+  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
                names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                         bis_slope = "OLS Bisector"))
 
 ggplot(r3_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
@@ -465,6 +519,7 @@ co4 <- combos[[4]]
 cat("Species qualifying (≥", MIN_N, "records):", nrow(r4), "\n")
 cat("Median OLS slope:", round(median(r4$ols_slope, na.rm=TRUE), 3), "\n")
 cat("Median SMA slope:", round(median(r4$sma_slope, na.rm=TRUE), 3), "\n")
+cat("Median Bisector slope:", round(median(r4$bis_slope, na.rm=TRUE), 3), "\n")
 ```
 
 ## Per-species slopes table
@@ -490,9 +545,10 @@ plot_slope_vs_range(r4, co4)
 
 ```{r sec4-dist, fig.height=5}
 r4_long <- r4 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope),
+  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
                names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                         bis_slope = "OLS Bisector"))
 
 ggplot(r4_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
@@ -516,6 +572,7 @@ co5 <- combos[[5]]
 cat("Species qualifying (≥", MIN_N, "records):", nrow(r5), "\n")
 cat("Median OLS slope:", round(median(r5$ols_slope, na.rm=TRUE), 3), "\n")
 cat("Median SMA slope:", round(median(r5$sma_slope, na.rm=TRUE), 3), "\n")
+cat("Median Bisector slope:", round(median(r5$bis_slope, na.rm=TRUE), 3), "\n")
 ```
 
 ## Per-species slopes table
@@ -541,9 +598,10 @@ plot_slope_vs_range(r5, co5)
 
 ```{r sec5-dist, fig.height=5}
 r5_long <- r5 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope),
+  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
                names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                         bis_slope = "OLS Bisector"))
 
 ggplot(r5_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
@@ -567,6 +625,7 @@ co6 <- combos[[6]]
 cat("Species qualifying (≥", MIN_N, "records):", nrow(r6), "\n")
 cat("Median OLS slope:", round(median(r6$ols_slope, na.rm=TRUE), 3), "\n")
 cat("Median SMA slope:", round(median(r6$sma_slope, na.rm=TRUE), 3), "\n")
+cat("Median Bisector slope:", round(median(r6$bis_slope, na.rm=TRUE), 3), "\n")
 ```
 
 ## Per-species slopes table
@@ -592,9 +651,10 @@ plot_slope_vs_range(r6, co6)
 
 ```{r sec6-dist, fig.height=5}
 r6_long <- r6 %>%
-  pivot_longer(cols = c(ols_slope, sma_slope),
+  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
                names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                         bis_slope = "OLS Bisector"))
 
 ggplot(r6_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
@@ -637,6 +697,8 @@ cross_sum <- all_res %>%
     pct_ols_gt_iso   = round(mean(ols_slope > 1.00, na.rm = TRUE) * 100, 1),
     med_sma          = round(median(sma_slope, na.rm = TRUE), 3),
     iqr_sma          = round(IQR(sma_slope, na.rm = TRUE), 3),
+    med_bis          = round(median(bis_slope, na.rm = TRUE), 3),
+    iqr_bis          = round(IQR(bis_slope, na.rm = TRUE), 3),
     med_r2           = round(median(r2, na.rm = TRUE), 3),
     med_range        = round(median(log_x_range, na.rm = TRUE), 3),
     .groups = "drop"
@@ -647,6 +709,7 @@ kable(cross_sum,
                     "Median OLS slope", "IQR (OLS)",
                     "% OLS < WBE", "% OLS > 1.0",
                     "Median SMA slope", "IQR (SMA)",
+                    "Median Bisector slope", "IQR (Bis)",
                     "Median R²", "Median log₁₀ range"),
       caption = paste0("Cross-combination summary of intraspecific slopes (≥ ", MIN_N,
                        " records/species). WBE exponent: 2.0 for diameter predictors,",
@@ -697,9 +760,10 @@ all_res %>%
 
 ```{r all-slope-range, fig.height=10, fig.width=11}
 all_res %>%
-  pivot_longer(cols = c(ols_slope, sma_slope),
+  pivot_longer(cols = c(ols_slope, sma_slope, bis_slope),
                names_to = "method", values_to = "slope") %>%
-  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA")) %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA",
+                         bis_slope = "OLS Bisector")) %>%
   filter(!is.na(slope)) %>%
   ggplot(aes(x = log_x_range, y = slope, colour = method)) +
   geom_hline(yintercept = 1.00, linetype = "dotted",
@@ -717,7 +781,8 @@ all_res %>%
              linetype = "dashed", colour = "#5e3c99", linewidth = 0.7) +
   geom_point(alpha = 0.35, size = 1.2) +
   geom_smooth(method = "lm", se = FALSE, linewidth = 1.2, alpha = 0.9) +
-  scale_colour_manual(values = c(OLS = "#1b7837", SMA = "#762a83"),
+  scale_colour_manual(values = c(OLS = "#1b7837", SMA = "#762a83",
+                                 "OLS Bisector" = "#d95f02"),
                       name = "Method") +
   facet_wrap(~ combo, ncol = 3) +
   labs(
@@ -746,6 +811,11 @@ all_res %>%
   residuals in both X and Y directions and gives unbiased slope estimates for allometric
   inference regardless of R². SMA slope = OLS slope / r (Pearson correlation), so
   SMA ≥ OLS always.
+- **OLS Bisector regression:** The bisector of the OLS(Y|X) and OLS(X|Y) regression
+  lines, following Isobe et al. (1990, *Astrophysical Journal* 364:104). The bisector
+  slope is symmetric (invariant to axis swap), lies between OLS and SMA, and is
+  recommended when neither axis can be treated as error-free. 95% CIs use the
+  asymptotic variance formula of Isobe et al. (1990, eq. 8).
 - **Size range:** log₁₀(max predictor) − log₁₀(min predictor) within each species.
   A key diagnostic: OLS slopes estimated from narrow size ranges are strongly biased
   downward; SMA slopes are less affected but CIs widen with small range.
