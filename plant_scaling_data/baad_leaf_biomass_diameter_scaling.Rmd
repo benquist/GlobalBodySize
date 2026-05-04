@@ -46,6 +46,29 @@ theme_set(theme_bw(base_size = 12))
 HAS_SMATR <- requireNamespace("smatr", quietly = TRUE)
 HAS_LMODEL2 <- requireNamespace("lmodel2", quietly = TRUE)
 
+HAS_VPHYLO <- requireNamespace("V.PhyloMaker2", quietly = TRUE)
+HAS_APE    <- requireNamespace("ape",           quietly = TRUE)
+HAS_CAPER  <- requireNamespace("caper",         quietly = TRUE)
+PGLS_AVAIL <- HAS_VPHYLO && HAS_APE && HAS_CAPER
+
+# Initialized here so eval= conditions in PGLS chunks can reference them safely
+# regardless of which chunks have executed; updated inside PGLS chunks.
+TREE_OK <- FALSE
+COMP_OK <- FALSE
+
+if (PGLS_AVAIL) {
+  suppressPackageStartupMessages({
+    library(V.PhyloMaker2)
+    library(ape)
+    library(caper)
+  })
+  # Restore dplyr verbs that may be masked by ape/caper/MASS dependencies
+  select <- dplyr::select
+  filter <- dplyr::filter
+  rename <- dplyr::rename
+  mutate <- dplyr::mutate
+}
+
 if (!HAS_SMATR && !HAS_LMODEL2) {
   stop("Need either 'smatr' or 'lmodel2' for RMA/SMA fits. Install one of them.", call. = FALSE)
 }
@@ -621,6 +644,355 @@ ggplot(family_fits, aes(x = slope, y = reorder(family, n_records), color = model
     subtitle = "Families with n >= 30 and >= 5 species"
   )
 ```
+
+# Family-Level Exponent Distributions (Angiosperm vs Gymnosperm)
+
+Distributions of OLS scaling exponents (slopes) across eligible families, split by major functional group. The gymnosperm family list is hardcoded from the standard classification; families not on the list are treated as angiosperms.
+
+```{r family-gymno-list}
+gymno_families <- c(
+  "Pinaceae","Cupressaceae","Podocarpaceae","Araucariaceae",
+  "Taxaceae","Cephalotaxaceae","Sciadopityaceae","Gnetaceae",
+  "Welwitschiaceae","Ephedraceae","Cycadaceae","Zamiaceae","Ginkgoaceae"
+)
+
+family_fits_ag <- family_fits %>%
+  filter(model == "OLS", is.finite(slope)) %>%
+  mutate(
+    ag_group = if_else(family %in% gymno_families, "Gymnosperm", "Angiosperm")
+  )
+
+family_ag_counts <- family_fits_ag %>%
+  count(ag_group, name = "n_families")
+kable(family_ag_counts, caption = "Eligible families per major group (family exponent distribution)")
+```
+
+```{r family-exponent-dist, fig.height=6}
+n_gymno_fam <- sum(family_fits_ag$ag_group == "Gymnosperm", na.rm = TRUE)
+
+if (n_gymno_fam >= 3) {
+  ggplot(family_fits_ag, aes(x = slope, fill = ag_group)) +
+    geom_histogram(bins = 12, color = "white", alpha = 0.85, position = "identity") +
+    geom_vline(xintercept = 2, linetype = "dashed", color = "gray30") +
+    facet_wrap(~ ag_group, ncol = 1, scales = "free_y") +
+    scale_fill_manual(values = c("Angiosperm" = "#2171b5", "Gymnosperm" = "#238b45")) +
+    labs(
+      x = expression("Family-level OLS slope " * (beta)),
+      y = "Number of families",
+      title = "Family-level OLS exponent distributions: Angiosperm vs Gymnosperm",
+      subtitle = "Families with n >= 30 records and >= 5 species. Dashed line: beta = 2."
+    ) +
+    theme(legend.position = "none")
+} else {
+  ggplot(family_fits_ag, aes(x = slope, y = family, color = ag_group)) +
+    geom_vline(xintercept = 2, linetype = "dashed", color = "gray30") +
+    geom_errorbarh(aes(xmin = slope_lwr, xmax = slope_upr), height = 0.3,
+                   position = position_dodge(width = 0.5), na.rm = TRUE) +
+    geom_point(size = 2.5, position = position_dodge(width = 0.5)) +
+    scale_color_manual(values = c("Angiosperm" = "#2171b5", "Gymnosperm" = "#238b45")) +
+    labs(
+      x = expression("OLS slope " * (beta)),
+      y = NULL,
+      color = "Group",
+      title = "Family-level OLS slopes (dot plot; too few gymno families for histogram)",
+      subtitle = "Dashed line: beta = 2"
+    )
+}
+```
+
+```{r family-exponent-summary}
+fam_exp_summary <- family_fits_ag %>%
+  group_by(ag_group) %>%
+  summarise(
+    n_families    = n(),
+    median_slope  = median(slope, na.rm = TRUE),
+    mean_slope    = mean(slope, na.rm = TRUE),
+    sd_slope      = sd(slope, na.rm = TRUE),
+    q25           = quantile(slope, 0.25, na.rm = TRUE),
+    q75           = quantile(slope, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+kable(fam_exp_summary, digits = 3,
+      caption = "Family-level OLS exponent distribution summary by major group")
+```
+
+# Intraspecific Slope Distributions (Angiosperm vs Gymnosperm)
+
+Distribution of OLS scaling slopes across eligible intraspecific species (n >= 11, log10 diameter range >= 0.7), split by major functional group.
+
+```{r intraspecific-slope-dist-prep}
+intra_fits_ag <- intra_fits %>%
+  filter(model == "OLS", is.finite(slope)) %>%
+  mutate(
+    ag_group = case_when(
+      !is.na(pft_group) & pft_group == "Gymnosperm" ~ "Gymnosperm",
+      family %in% gymno_families ~ "Gymnosperm",
+      TRUE ~ "Angiosperm"
+    )
+  )
+
+intra_ag_counts <- intra_fits_ag %>%
+  count(ag_group, name = "n_species")
+kable(intra_ag_counts, caption = "Eligible intraspecific species per major group")
+```
+
+```{r intraspecific-slope-dist, fig.height=6}
+n_gymno_intra <- sum(intra_fits_ag$ag_group == "Gymnosperm", na.rm = TRUE)
+
+if (n_gymno_intra >= 3) {
+  ggplot(intra_fits_ag, aes(x = slope, fill = ag_group)) +
+    geom_histogram(bins = 20, color = "white", alpha = 0.85, position = "identity") +
+    geom_vline(xintercept = 2, linetype = "dashed", color = "gray30") +
+    facet_wrap(~ ag_group, ncol = 1, scales = "free_y") +
+    scale_fill_manual(values = c("Angiosperm" = "#2171b5", "Gymnosperm" = "#238b45")) +
+    labs(
+      x = expression("Intraspecific OLS slope " * (beta)),
+      y = "Number of species",
+      title = "Intraspecific OLS slope distributions: Angiosperm vs Gymnosperm",
+      subtitle = "Species with n >= 11 and log10(d.bh) range >= 0.7. Dashed line: beta = 2."
+    ) +
+    theme(legend.position = "none")
+} else {
+  ggplot(intra_fits_ag, aes(x = slope, fill = ag_group)) +
+    geom_histogram(bins = 20, color = "white", alpha = 0.85) +
+    geom_vline(xintercept = 2, linetype = "dashed", color = "gray30") +
+    scale_fill_manual(values = c("Angiosperm" = "#2171b5", "Gymnosperm" = "#238b45")) +
+    labs(
+      x = expression("Intraspecific OLS slope " * (beta)),
+      y = "Number of species",
+      title = "Intraspecific OLS slope distribution (all groups pooled; too few gymno species)",
+      subtitle = "Dashed line: beta = 2"
+    )
+}
+```
+
+```{r intraspecific-slope-summary}
+intra_slope_summary <- intra_fits_ag %>%
+  group_by(ag_group) %>%
+  summarise(
+    n_species     = n(),
+    median_slope  = median(slope, na.rm = TRUE),
+    mean_slope    = mean(slope, na.rm = TRUE),
+    sd_slope      = sd(slope, na.rm = TRUE),
+    q25           = quantile(slope, 0.25, na.rm = TRUE),
+    q75           = quantile(slope, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+kable(intra_slope_summary, digits = 3,
+      caption = "Intraspecific OLS slope distribution summary by major group")
+```
+
+# Phylogenetic Generalized Least Squares (PGLS)
+
+PGLS is applied to the interspecific species-means data to account for phylogenetic non-independence across species. The phylogeny is built using V.PhyloMaker2 (Jin & Qian 2022) with the GBOTB megatree backbone (Smith & Brown 2018), Scenario 3 (graft missing taxa at genus/family node). Pagel's lambda is estimated by maximum likelihood. Likelihood ratio tests compare the ML model to boundary cases (lambda = 0, equivalent to OLS; lambda = 1, full Brownian motion).
+
+**PGLS requires: V.PhyloMaker2, ape, caper.** If not installed, this section is skipped gracefully.
+
+```{r pgls-availability-check}
+if (!PGLS_AVAIL) {
+  cat("PGLS section skipped: V.PhyloMaker2, ape, and/or caper not installed.\n")
+  cat("Install with: install.packages(c('V.PhyloMaker2', 'ape', 'caper'))\n")
+}
+```
+
+```{r pgls-tree-build, eval=PGLS_AVAIL}
+# Build V.PhyloMaker2 species input table
+# Column names must be exactly: species (Genus_species), genus, family
+pgls_sp_input <- species_means %>%
+  filter(!is.na(family), family != "", is.finite(log_d_mean), is.finite(log_mlf_mean)) %>%
+  mutate(
+    species_vp = gsub(" ", "_", trimws(species)),
+    # strip infraspecific epithets
+    species_vp = sub("_var\\._.*|_subsp\\._.*|_f\\._.*", "", species_vp),
+    genus      = sub("_.*", "", species_vp)
+  ) %>%
+  filter(nchar(species_vp) > 0, !duplicated(species_vp)) %>%
+  select(species = species_vp, genus, family)
+
+pgls_sp_input_df <- as.data.frame(pgls_sp_input)
+
+cat(sprintf("Species entering phylogeny build: %d\n", nrow(pgls_sp_input_df)))
+```
+
+```{r pgls-run-phylomaker, eval=PGLS_AVAIL}
+set.seed(42)
+tree_result <- tryCatch(
+  V.PhyloMaker2::phylo.maker(
+    sp.list  = pgls_sp_input_df,
+    tree     = GBOTB.extended,
+    nodes    = nodes.info.1,
+    scenarios = "S3"
+  ),
+  error = function(e) {
+    message("V.PhyloMaker2::phylo.maker failed: ", conditionMessage(e))
+    NULL
+  }
+)
+
+phy_raw <- if (!is.null(tree_result)) tree_result$scenario.3 else NULL
+
+TREE_OK <- !is.null(phy_raw) && inherits(phy_raw, "phylo")
+cat(sprintf("Tree build: %s\n", if (TREE_OK) "SUCCESS" else "FAILED"))
+if (TREE_OK) cat(sprintf("Tips in built tree: %d\n", length(phy_raw$tip.label)))
+```
+
+```{r pgls-reconciliation, eval=PGLS_AVAIL && TREE_OK}
+species_vp_vec <- gsub(" ", "_", trimws(species_means$species))
+species_vp_vec <- sub("_var\\._.*|_subsp\\._.*|_f\\._.*", "", species_vp_vec)
+
+in_tree   <- species_vp_vec %in% phy_raw$tip.label
+not_in    <- !in_tree
+
+recon_summary <- tibble(
+  Category = c(
+    "Species in species_means",
+    "Species with family (eligible for tree build)",
+    "Species placed in tree",
+    "Species not in tree (dropped from PGLS)"
+  ),
+  N = c(
+    length(species_vp_vec),
+    nrow(pgls_sp_input_df),
+    sum(in_tree),
+    sum(not_in)
+  )
+)
+kable(recon_summary, caption = "Taxonomic reconciliation audit: V.PhyloMaker2 / GBOTB (Scenario 3)")
+
+if (sum(not_in) > 0) {
+  dropped_sp <- species_means$species[!in_tree]
+  cat(sprintf("\nSpecies dropped from PGLS (n = %d):\n", sum(not_in)))
+  cat(paste(head(dropped_sp, 30), collapse = "\n"))
+  if (sum(not_in) > 30) cat(sprintf("\n... and %d more.\n", sum(not_in) - 30))
+}
+
+pct_in <- 100 * sum(in_tree) / length(species_vp_vec)
+if (pct_in < 70) {
+  warning(sprintf("Only %.1f%% of species placed in tree. PGLS slopes should be interpreted with caution.", pct_in))
+}
+```
+
+```{r pgls-prune-and-data, eval=PGLS_AVAIL && TREE_OK}
+tips_to_keep <- intersect(phy_raw$tip.label, species_vp_vec)
+phy_pruned <- ape::keep.tip(phy_raw, tips_to_keep)
+
+pgls_dat <- species_means %>%
+  mutate(
+    species_vp = gsub(" ", "_", trimws(species)),
+    species_vp = sub("_var\\._.*|_subsp\\._.*|_f\\._.*", "", species_vp)
+  ) %>%
+  filter(species_vp %in% phy_pruned$tip.label,
+         is.finite(log_d_mean), is.finite(log_mlf_mean)) %>%
+  filter(!duplicated(species_vp))
+
+comp_dat <- tryCatch(
+  caper::comparative.data(
+    phy       = phy_pruned,
+    data      = as.data.frame(pgls_dat),
+    names.col = "species_vp",
+    vcv       = TRUE,
+    warn.dropped = TRUE
+  ),
+  error = function(e) {
+    message("comparative.data() failed: ", conditionMessage(e))
+    NULL
+  }
+)
+
+COMP_OK <- !is.null(comp_dat)
+cat(sprintf("comparative.data: %s; n = %d\n",
+            if (COMP_OK) "OK" else "FAILED",
+            if (COMP_OK) nrow(comp_dat$data) else 0))
+```
+
+```{r pgls-fit, eval=PGLS_AVAIL && TREE_OK && COMP_OK}
+# ML model
+pgls_ml <- tryCatch(
+  caper::pgls(log_mlf_mean ~ log_d_mean, data = comp_dat, lambda = "ML"),
+  error = function(e) { message("pgls ML failed: ", conditionMessage(e)); NULL }
+)
+
+# Boundary models for LRT
+pgls_l0 <- tryCatch(
+  caper::pgls(log_mlf_mean ~ log_d_mean, data = comp_dat, lambda = 0),
+  error = function(e) NULL
+)
+pgls_l1 <- tryCatch(
+  caper::pgls(log_mlf_mean ~ log_d_mean, data = comp_dat, lambda = 1),
+  error = function(e) NULL
+)
+
+PGLS_FIT_OK <- !is.null(pgls_ml)
+```
+
+```{r pgls-results-table, eval=PGLS_AVAIL && TREE_OK && COMP_OK && PGLS_FIT_OK}
+pgls_sum <- summary(pgls_ml)
+ols_sp   <- lm(log_mlf_mean ~ log_d_mean, data = pgls_dat)
+ols_sum  <- summary(ols_sp)
+
+pgls_output <- tibble(
+  Model     = c("OLS (species means, PGLS subset)", "PGLS (Pagel lambda ML)"),
+  n_species = c(nrow(pgls_dat), nrow(comp_dat$data)),
+  Slope     = c(coef(ols_sp)[["log_d_mean"]], coef(pgls_ml)[["log_d_mean"]]),
+  SE_slope  = c(ols_sum$coefficients["log_d_mean","Std. Error"],
+                pgls_sum$coefficients["log_d_mean","Std. Error"]),
+  P_slope   = c(ols_sum$coefficients["log_d_mean","Pr(>|t|)"],
+                pgls_sum$coefficients["log_d_mean","Pr(>|t|)"]),
+  Intercept = c(coef(ols_sp)[["(Intercept)"]], coef(pgls_ml)[["(Intercept)"]]),
+  R2        = c(ols_sum$r.squared, pgls_sum$r.squared),
+  Pagel_lambda = c(NA_real_, pgls_ml$param[["lambda"]])
+)
+kable(pgls_output, digits = 4, caption = "OLS vs PGLS: interspecific slope comparison")
+```
+
+```{r pgls-lrt, eval=PGLS_AVAIL && TREE_OK && COMP_OK && PGLS_FIT_OK}
+safe_lrt <- function(model_h0, model_ml, label) {
+  tryCatch({
+    lr <- 2 * (logLik(model_ml) - logLik(model_h0))
+    p  <- pchisq(as.numeric(lr), df = 1, lower.tail = FALSE)
+    tibble(Test = label, LogLik_ML = as.numeric(logLik(model_ml)),
+           LogLik_H0 = as.numeric(logLik(model_h0)),
+           Chi_sq = as.numeric(lr), df = 1, P_value = p)
+  }, error = function(e) {
+    tibble(Test = label, LogLik_ML = NA, LogLik_H0 = NA,
+           Chi_sq = NA, df = 1, P_value = NA)
+  })
+}
+
+lrt_table <- bind_rows(
+  if (!is.null(pgls_l0)) safe_lrt(pgls_l0, pgls_ml, "lambda = 0 vs ML (OLS vs PGLS)") else NULL,
+  if (!is.null(pgls_l1)) safe_lrt(pgls_l1, pgls_ml, "lambda = 1 vs ML (BM vs PGLS)") else NULL
+)
+kable(lrt_table, digits = 4,
+      caption = "Likelihood ratio tests: lambda = 0 (OLS) and lambda = 1 (BM) vs ML lambda")
+```
+
+```{r pgls-lambda-profile, eval=PGLS_AVAIL && TREE_OK && COMP_OK && PGLS_FIT_OK, fig.height=4}
+tryCatch({
+  lam_prof <- caper::pgls.profile(pgls_ml, which = "lambda")
+  plot(lam_prof, main = "Lambda profile likelihood")
+  abline(v = pgls_ml$param[["lambda"]], col = "red", lty = 2)
+}, error = function(e) {
+  message("Lambda profile plot failed: ", conditionMessage(e))
+})
+```
+
+```{r pgls-caveats-block, eval=PGLS_AVAIL && TREE_OK && COMP_OK && PGLS_FIT_OK}
+pct_pgls <- 100 * nrow(comp_dat$data) / nrow(species_means)
+cat(sprintf(
+  "PGLS tree coverage: %.1f%% of species means (%d of %d species).\n",
+  pct_pgls, nrow(comp_dat$data), nrow(species_means)
+))
+if (pct_pgls < 70) cat("WARNING: Coverage < 70%. PGLS inference should be treated as exploratory.\n")
+```
+
+## PGLS caveats
+
+1. **Tree source**: V.PhyloMaker2 with GBOTB backbone (Smith & Brown 2018); branch lengths are time-calibrated in Ma. Grafted taxa (Scenario 3) have approximated branch lengths.
+2. **Pagel lambda**: ML-estimated lambda relaxes the strict Brownian motion assumption; it is a model-fit parameter, not a direct measure of phylogenetic signal strength.
+3. **PGLS does not eliminate confounding**: Adjusts for phylogenetic covariance under BM-like evolution; does not control for unmeasured site, methodological, or ecological variation.
+4. **Coverage caveat**: If substantially fewer than 100% of species_means are in the PGLS tree, slope estimates may reflect a non-representative subsample.
+5. **Citations**: Jin & Qian (2022) V.PhyloMaker2 (*Plant Diversity*, 44(4), 335–339); Smith & Brown (2018) GBOTB (*New Phytologist*, 217(4), 1401–1408); Pagel (1999) lambda (*Nature*, 401, 877–884); Orme et al. caper (CRAN); Paradis & Schliep (2019) ape (*Bioinformatics*, 35, 526–528). **Verify all DOIs/details against primary sources before citing.**
 
 # Diagnostics and Caveats
 
