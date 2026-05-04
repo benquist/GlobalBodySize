@@ -71,11 +71,11 @@ combos <- list(
        xlab = "Total plant biomass m.to (kg)",  ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ total biomass (kg)",   ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ total plant biomass"),
-  list(x = "m.st",  y = "m.lf", wbe_ref = NA_real_,
+  list(x = "m.st",  y = "m.lf", wbe_ref = 0.75,
        xlab = "Stem mass m.st (kg)",            ylab = "Leaf mass m.lf (kg)",
        xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf mass (kg)",
        title_short = "Leaf mass ~ stem mass"),
-  list(x = "m.st",  y = "a.lf", wbe_ref = NA_real_,
+  list(x = "m.st",  y = "a.lf", wbe_ref = 0.75,
        xlab = "Stem mass m.st (kg)",            ylab = "Leaf area a.lf (m²)",
        xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf area (m²)",
        title_short = "Leaf area ~ stem mass")
@@ -163,7 +163,7 @@ database with ≥ `r MIN_N` individual records per species.
 > **WBE predictions tested:**
 > - Leaf area and leaf mass vs. **basal diameter**: exponent = **2** (area-preserving branching: conduit cross-sectional area is conserved across branching levels, so total leaf area ∝ d²; Enquist et al. 1998; West et al. 1999).
 > - Leaf area and leaf mass vs. **total plant biomass**: exponent = **3/4** (metabolic scaling: whole-plant resource flux ∝ M^(3/4), so leaf area, which sets gas exchange capacity, also scales as M^(3/4); Enquist & Niklas 2001).
-> - Leaf area and leaf mass vs. **stem mass**: no explicit WBE exponent stated here; isometry (1.0) shown as a reference.
+> - Leaf area and leaf mass vs. **stem mass**: exponent = **3/4** (Enquist & Niklas 2002 predict that leaf biomass and leaf area both scale as stem mass^(3/4), consistent with the general 3/4-power metabolic scaling framework).
 >
 > **Variable notes:**  
 > `d.ba` = stem diameter at base [m] (more commonly measured in BAAD than DBH).  
@@ -547,13 +547,14 @@ r5_long <- r5 %>%
 
 ggplot(r5_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf mass ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dotted = 1.0 (isometry); no explicit WBE prediction for leaf ~ stem mass")
+       subtitle = "Dashed = 3/4 (Enquist & Niklas 2002 prediction); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -597,13 +598,14 @@ r6_long <- r6 %>%
 
 ggplot(r6_long, aes(x = slope, fill = clade)) +
   geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
   facet_wrap(~ method) +
   scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
                     na.value="grey60", name="Clade") +
   labs(x = "Intraspecific slope", y = "N species",
        title = "Leaf area ~ stem mass: intraspecific slope distribution",
-       subtitle = "Dotted = 1.0 (isometry); no explicit WBE prediction for leaf ~ stem mass")
+       subtitle = "Dashed = 3/4 (Enquist & Niklas 2002 prediction); dotted = 1.0 (isometry)")
 ```
 
 ---
@@ -709,7 +711,7 @@ all_res %>%
              aes(yintercept = wbe_ref), inherit.aes = FALSE,
              linetype = "dashed", colour = "#e66101", linewidth = 0.7) +
   geom_hline(data = data.frame(
-               combo   = c("m.lf~m.to", "a.lf~m.to"),
+               combo   = c("m.lf~m.to", "a.lf~m.to", "m.lf~m.st", "a.lf~m.st"),
                wbe_ref = 0.75),
              aes(yintercept = wbe_ref), inherit.aes = FALSE,
              linetype = "dashed", colour = "#5e3c99", linewidth = 0.7) +
@@ -722,7 +724,7 @@ all_res %>%
     x = "log₁₀ size range",
     y = "Intraspecific slope",
     title = "Intraspecific slope vs. log₁₀ body size range — all six combinations",
-    subtitle = "OLS slopes are typically compressed toward zero at small size ranges (regression dilution).\nSMA slopes are more consistent across size range.\nOrange dashed = 2.0 (WBE, d.ba); purple dashed = 3/4 (WBE, m.to); dotted = 1.0 (isometry)."
+    subtitle = "OLS slopes are typically compressed toward zero at small size ranges (regression dilution).\nSMA slopes are more consistent across size range.\nOrange dashed = 2.0 (WBE, d.ba); purple dashed = 3/4 (WBE/Enquist-Niklas, m.to and m.st); dotted = 1.0 (isometry)."
   ) +
   theme(strip.text = element_text(size = 9))
 ```
@@ -754,8 +756,10 @@ all_res %>%
   2. **Leaf area/mass vs. total plant biomass (`m.to`):** WBE exponent = **3/4** (dashed
      purple). Whole-plant metabolic rate ∝ M^(3/4), and leaf area sets gas exchange
      capacity, so leaf area ∝ M^(3/4) (Enquist & Niklas 2001; Enquist et al. 2009).
-  3. **Leaf area/mass vs. stem mass (`m.st`):** No explicit WBE exponent; dotted line
-     at 1.0 (isometry) shown for reference only.
+  3. **Leaf area/mass vs. stem mass (`m.st`):** WBE/Enquist-Niklas exponent = **3/4**
+     (dashed purple). Enquist & Niklas (2002) predict that leaf biomass and leaf area
+     scale with above-ground stem mass as M^(3/4), consistent with the general
+     metabolic scaling framework.
   - 1.0 (dotted, all panels) = isometric (geometric) scaling.
 - **BAAD variable notes:**
   - `d.ba` = diameter at base of stem [m]; more commonly measured than DBH in BAAD.
