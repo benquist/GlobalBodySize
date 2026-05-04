@@ -1,0 +1,727 @@
+---
+title: "BAAD: Intraspecific Leaf Scaling — OLS and SMA Slopes per Species"
+author: "plant_scaling_data project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6)
+library(baad.data)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(knitr)
+library(scales)
+library(smatr)
+
+theme_set(theme_bw(base_size = 12))
+
+# ─── Load BAAD ────────────────────────────────────────────────────────────────
+baad <- baad.data::baad_data()
+dat  <- baad$data
+
+dat <- dat %>%
+  mutate(
+    clade = case_when(
+      grepl("A$", pft) ~ "Angiosperm",
+      grepl("G$", pft) ~ "Gymnosperm",
+      TRUE             ~ NA_character_
+    )
+  )
+
+# ─── Analysis constants ───────────────────────────────────────────────────────
+MIN_N <- 10   # minimum records per species for regression
+
+# ─── Six focal allometric combinations ───────────────────────────────────────
+# Predictor: basal diameter (d.ba, m), total plant biomass (m.to, kg),
+#            stem mass (m.st, kg — AGB excluding leaves)
+# Response:  leaf mass (m.lf, kg), leaf area (a.lf, m²)
+#
+# Note: BAAD m.to = m.rt + m.so (includes root mass); it is the best available
+# whole-plant size measure in BAAD but is NOT purely above-ground. m.st = all
+# stem tissue (branches, bark) and approximates AGB without leaves.
+
+combos <- list(
+  list(x = "d.ba",  y = "m.lf",
+       xlab = "Basal diameter d.ba (m)",        ylab = "Leaf mass m.lf (kg)",
+       xlab_log = "log₁₀ basal diameter (m)",   ylab_log = "log₁₀ leaf mass (kg)",
+       title_short = "Leaf mass ~ basal diameter"),
+  list(x = "d.ba",  y = "a.lf",
+       xlab = "Basal diameter d.ba (m)",        ylab = "Leaf area a.lf (m²)",
+       xlab_log = "log₁₀ basal diameter (m)",   ylab_log = "log₁₀ leaf area (m²)",
+       title_short = "Leaf area ~ basal diameter"),
+  list(x = "m.to",  y = "m.lf",
+       xlab = "Total plant biomass m.to (kg)",  ylab = "Leaf mass m.lf (kg)",
+       xlab_log = "log₁₀ total biomass (kg)",   ylab_log = "log₁₀ leaf mass (kg)",
+       title_short = "Leaf mass ~ total plant biomass"),
+  list(x = "m.to",  y = "a.lf",
+       xlab = "Total plant biomass m.to (kg)",  ylab = "Leaf area a.lf (m²)",
+       xlab_log = "log₁₀ total biomass (kg)",   ylab_log = "log₁₀ leaf area (m²)",
+       title_short = "Leaf area ~ total plant biomass"),
+  list(x = "m.st",  y = "m.lf",
+       xlab = "Stem mass m.st (kg)",            ylab = "Leaf mass m.lf (kg)",
+       xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf mass (kg)",
+       title_short = "Leaf mass ~ stem mass"),
+  list(x = "m.st",  y = "a.lf",
+       xlab = "Stem mass m.st (kg)",            ylab = "Leaf area a.lf (m²)",
+       xlab_log = "log₁₀ stem mass (kg)",       ylab_log = "log₁₀ leaf area (m²)",
+       title_short = "Leaf area ~ stem mass")
+)
+
+# ─── Per-species regression helper ───────────────────────────────────────────
+# Returns per-species OLS + SMA slopes for one (x, y) combo.
+# Minimum MIN_N records per species required.
+fit_intra <- function(data, xcol, ycol, min_n = MIN_N) {
+  sub <- data %>%
+    filter(!is.na(speciesMatched),
+           !is.na(.data[[xcol]]), .data[[xcol]] > 0,
+           !is.na(.data[[ycol]]), .data[[ycol]] > 0)
+
+  sub %>%
+    group_by(speciesMatched) %>%
+    group_modify(~ {
+      if (nrow(.x) < min_n) return(data.frame())
+      lx <- log10(.x[[xcol]])
+      ly <- log10(.x[[ycol]])
+      rng <- diff(range(lx))
+      if (rng == 0) return(data.frame())  # zero size range → no slope
+
+      # OLS
+      ols_fit <- lm(ly ~ lx)
+      ols_sl  <- coef(ols_fit)[2]
+      ols_ci  <- tryCatch(confint(ols_fit)[2, ], error = function(e) c(NA, NA))
+
+      # SMA
+      sma_res <- tryCatch({
+        s  <- sma(ly ~ lx)
+        cm <- s$coef[[1]]
+        c(slope = cm[2, 1], lo = cm[2, 2], hi = cm[2, 3])
+      }, error = function(e) c(slope = NA, lo = NA, hi = NA))
+
+      data.frame(
+        n          = nrow(.x),
+        family     = .x$family[1],
+        clade      = .x$clade[1],
+        study      = .x$studyName[1],
+        ols_slope  = ols_sl,
+        ols_lo     = ols_ci[1],
+        ols_hi     = ols_ci[2],
+        sma_slope  = sma_res["slope"],
+        sma_lo     = sma_res["lo"],
+        sma_hi     = sma_res["hi"],
+        r2         = cor(lx, ly)^2,
+        log_x_min  = min(lx),
+        log_x_max  = max(lx),
+        log_x_range = rng
+      )
+    }) %>%
+    ungroup() %>%
+    filter(!is.na(ols_slope))
+}
+
+# ─── Compute all six datasets ─────────────────────────────────────────────────
+cat("Computing intraspecific regressions for 6 combinations...\n")
+results <- lapply(combos, function(co) {
+  fit_intra(dat, co$x, co$y)
+})
+names(results) <- sapply(combos, function(co) paste0(co$y, "~", co$x))
+cat("Done.\n")
+```
+
+---
+
+# Overview
+
+This document reports **intraspecific** (within-species) scaling relationships between
+leaf traits and three plant size proxies across all woody plant species in the BAAD
+database with ≥ `r MIN_N` individual records per species.
+
+**Six allometric combinations analysed:**
+
+| Response | Predictor | Symbol | Units |
+|---|---|---|---|
+| Leaf mass | Basal stem diameter | `m.lf ~ d.ba` | kg ~ m |
+| Leaf area | Basal stem diameter | `a.lf ~ d.ba` | m² ~ m |
+| Leaf mass | Total plant biomass | `m.lf ~ m.to` | kg ~ kg |
+| Leaf area | Total plant biomass | `a.lf ~ m.to` | m² ~ kg |
+| Leaf mass | Stem mass | `m.lf ~ m.st` | kg ~ kg |
+| Leaf area | Stem mass | `a.lf ~ m.st` | m² ~ kg |
+
+> **Variable notes:**  
+> `d.ba` = stem diameter at base [m] (more commonly measured in BAAD than DBH).  
+> `m.to` = total plant biomass including roots (= `m.rt + m.so`); used as the best available whole-plant size indicator.  
+> `m.st` = all stem tissue including branches; approximates above-ground structural biomass (AGB excluding leaves and roots).  
+> Both **OLS** and **SMA** regression slopes are reported. OLS minimises residuals in Y and is appropriate for prediction; SMA minimises residuals in both directions and is the standard for allometric inference (Warton et al. 2006).
+
+```{r data-coverage}
+cov <- data.frame(
+  Combo     = names(results),
+  N_records = sapply(seq_along(combos), function(i) {
+    co <- combos[[i]]
+    sum(!is.na(dat[[co$x]]) & dat[[co$x]] > 0 &
+        !is.na(dat[[co$y]]) & dat[[co$y]] > 0, na.rm = TRUE)
+  }),
+  N_species = sapply(results, nrow),
+  N_angio   = sapply(results, function(r) sum(r$clade == "Angiosperm", na.rm = TRUE)),
+  N_gymno   = sapply(results, function(r) sum(r$clade == "Gymnosperm", na.rm = TRUE))
+)
+
+kable(cov,
+      col.names = c("Combination", "Total records in BAAD",
+                    paste0("Species (≥", MIN_N, " records)"),
+                    "Angiosperms", "Gymnosperms"),
+      caption = "Data coverage for the six focal allometric combinations")
+```
+
+---
+
+```{r shared-plot-fns, include=FALSE}
+# ── Shared helper: size-range plot ────────────────────────────────────────────
+# Horizontal range bars per species, sorted by log_x_range (descending).
+# Top max_sp species by record count shown if too many.
+plot_size_range <- function(res, co, max_sp = 60) {
+  if (nrow(res) == 0) { plot.new(); return(invisible(NULL)) }
+  top <- res %>% arrange(desc(n)) %>% slice_head(n = max_sp)
+  top <- top %>% arrange(log_x_range)
+  top$speciesMatched <- factor(top$speciesMatched,
+                               levels = top$speciesMatched)
+  ggplot(top, aes(y = speciesMatched, colour = clade)) +
+    geom_segment(aes(x = log_x_min, xend = log_x_max,
+                     yend = speciesMatched), linewidth = 1, alpha = 0.8) +
+    geom_point(aes(x = log_x_min), size = 1.5, shape = 16) +
+    geom_point(aes(x = log_x_max), size = 1.5, shape = 16) +
+    scale_colour_manual(values = c(Angiosperm = "#e41a1c",
+                                   Gymnosperm = "#377eb8"),
+                        na.value = "grey60", name = "Clade") +
+    labs(
+      x = paste0("log₁₀ ", co$xlab),
+      y = NULL,
+      title = paste0("Body size range per species — ", co$title_short),
+      subtitle = paste0("Top ", min(max_sp, nrow(res)),
+                        " species by record count; bars span [min, max] of ",
+                        co$x, " in log₁₀ space")
+    ) +
+    theme(axis.text.y  = element_text(face = "italic", size = 6),
+          panel.grid.major.y = element_line(colour = "grey95"))
+}
+
+# ── Shared helper: exponent vs. size range ────────────────────────────────────
+plot_slope_vs_range <- function(res, co) {
+  if (nrow(res) == 0) { plot.new(); return(invisible(NULL)) }
+  # pivot OLS and SMA long
+  long <- res %>%
+    select(speciesMatched, clade, n, log_x_range,
+           ols_slope, ols_lo, ols_hi,
+           sma_slope, sma_lo, sma_hi) %>%
+    pivot_longer(
+      cols      = c(ols_slope, sma_slope),
+      names_to  = "method",
+      values_to = "slope"
+    ) %>%
+    mutate(
+      lo     = ifelse(method == "ols_slope", ols_lo, sma_lo),
+      hi     = ifelse(method == "ols_slope", ols_hi, sma_hi),
+      method = recode(method, ols_slope = "OLS", sma_slope = "SMA")
+    )
+
+  ggplot(long, aes(x = log_x_range, y = slope,
+                   colour = clade, shape = method)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed",
+               colour = "grey50", linewidth = 0.8) +
+    geom_hline(yintercept = 1.00, linetype = "dotted",
+               colour = "grey70", linewidth = 0.6) +
+    geom_errorbar(aes(ymin = lo, ymax = hi),
+                  width = 0, alpha = 0.2, linewidth = 0.5) +
+    geom_point(alpha = 0.7, size = 2) +
+    geom_smooth(aes(group = method), method = "lm",
+                se = TRUE, colour = "black",
+                linewidth = 0.8, alpha = 0.15) +
+    scale_colour_manual(values = c(Angiosperm = "#e41a1c",
+                                   Gymnosperm = "#377eb8"),
+                        na.value = "grey60", name = "Clade") +
+    scale_shape_manual(values = c(OLS = 16, SMA = 17), name = "Method") +
+    facet_wrap(~ method) +
+    labs(
+      x = paste0("log₁₀ size range  [log₁₀(max) − log₁₀(min) of ", co$x, "]"),
+      y = "Intraspecific slope",
+      title = paste0("Slope vs. size range — ", co$title_short),
+      subtitle = "Dashed = 3/4 reference; dotted = isometry. Black line: OLS trend across species."
+    )
+}
+
+# ── Shared helper: slopes table ───────────────────────────────────────────────
+table_slopes <- function(res, caption_txt) {
+  if (nrow(res) == 0) {
+    return(kable(data.frame(Note = "No species met the minimum record threshold.")))
+  }
+  res %>%
+    arrange(desc(n)) %>%
+    mutate(across(c(ols_slope, ols_lo, ols_hi,
+                    sma_slope, sma_lo, sma_hi,
+                    r2, log_x_range), ~ round(.x, 3)),
+           speciesMatched = paste0("*", speciesMatched, "*")) %>%
+    select(speciesMatched, family, clade, n,
+           ols_slope, ols_lo, ols_hi,
+           sma_slope, sma_lo, sma_hi,
+           r2, log_x_range) %>%
+    kable(
+      col.names = c("Species", "Family", "Clade", "N",
+                    "OLS slope", "OLS 95% lo", "OLS 95% hi",
+                    "SMA slope", "SMA 95% lo", "SMA 95% hi",
+                    "R²", "log₁₀ size range"),
+      caption   = caption_txt,
+      escape    = FALSE
+    )
+}
+```
+
+---
+
+# Leaf mass ~ Basal stem diameter (`m.lf ~ d.ba`)
+
+```{r sec1-summary}
+r1  <- results[["m.lf~d.ba"]]
+co1 <- combos[[1]]
+cat("Species qualifying (≥", MIN_N, "records):", nrow(r1), "\n")
+cat("Median OLS slope:", round(median(r1$ols_slope, na.rm=TRUE), 3), "\n")
+cat("Median SMA slope:", round(median(r1$sma_slope, na.rm=TRUE), 3), "\n")
+```
+
+## Per-species slopes table {.tabset}
+
+### All species (sorted by N)
+
+```{r sec1-table, results='asis'}
+table_slopes(r1, paste0("Leaf mass ~ basal diameter: per-species OLS and SMA slopes (≥ ",
+                         MIN_N, " records per species, sorted by N)"))
+```
+
+## Body size range per species
+
+```{r sec1-range, fig.height=14}
+plot_size_range(r1, co1)
+```
+
+## Scaling slope vs. size range
+
+```{r sec1-slope-range, fig.height=6}
+plot_slope_vs_range(r1, co1)
+```
+
+## Slope distributions
+
+```{r sec1-dist, fig.height=5}
+r1_long <- r1 %>%
+  pivot_longer(cols = c(ols_slope, sma_slope),
+               names_to = "method", values_to = "slope") %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+
+ggplot(r1_long, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+  facet_wrap(~ method) +
+  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                    na.value="grey60", name="Clade") +
+  labs(x = "Intraspecific slope", y = "N species",
+       title = "Leaf mass ~ basal diameter: intraspecific slope distribution",
+       subtitle = "Dashed = 3/4; dotted = 1.0")
+```
+
+---
+
+# Leaf area ~ Basal stem diameter (`a.lf ~ d.ba`)
+
+```{r sec2-summary}
+r2  <- results[["a.lf~d.ba"]]
+co2 <- combos[[2]]
+cat("Species qualifying (≥", MIN_N, "records):", nrow(r2), "\n")
+cat("Median OLS slope:", round(median(r2$ols_slope, na.rm=TRUE), 3), "\n")
+cat("Median SMA slope:", round(median(r2$sma_slope, na.rm=TRUE), 3), "\n")
+```
+
+## Per-species slopes table
+
+```{r sec2-table, results='asis'}
+table_slopes(r2, paste0("Leaf area ~ basal diameter: per-species OLS and SMA slopes (≥ ",
+                         MIN_N, " records per species, sorted by N)"))
+```
+
+## Body size range per species
+
+```{r sec2-range, fig.height=14}
+plot_size_range(r2, co2)
+```
+
+## Scaling slope vs. size range
+
+```{r sec2-slope-range, fig.height=6}
+plot_slope_vs_range(r2, co2)
+```
+
+## Slope distributions
+
+```{r sec2-dist, fig.height=5}
+r2_long <- r2 %>%
+  pivot_longer(cols = c(ols_slope, sma_slope),
+               names_to = "method", values_to = "slope") %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+
+ggplot(r2_long, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+  facet_wrap(~ method) +
+  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                    na.value="grey60", name="Clade") +
+  labs(x = "Intraspecific slope", y = "N species",
+       title = "Leaf area ~ basal diameter: intraspecific slope distribution",
+       subtitle = "Dashed = 3/4; dotted = 1.0")
+```
+
+---
+
+# Leaf mass ~ Total plant biomass (`m.lf ~ m.to`)
+
+```{r sec3-summary}
+r3  <- results[["m.lf~m.to"]]
+co3 <- combos[[3]]
+cat("Species qualifying (≥", MIN_N, "records):", nrow(r3), "\n")
+cat("Median OLS slope:", round(median(r3$ols_slope, na.rm=TRUE), 3), "\n")
+cat("Median SMA slope:", round(median(r3$sma_slope, na.rm=TRUE), 3), "\n")
+```
+
+## Per-species slopes table
+
+```{r sec3-table, results='asis'}
+table_slopes(r3, paste0("Leaf mass ~ total biomass: per-species OLS and SMA slopes (≥ ",
+                         MIN_N, " records per species, sorted by N)"))
+```
+
+## Body size range per species
+
+```{r sec3-range, fig.height=14}
+plot_size_range(r3, co3)
+```
+
+## Scaling slope vs. size range
+
+```{r sec3-slope-range, fig.height=6}
+plot_slope_vs_range(r3, co3)
+```
+
+## Slope distributions
+
+```{r sec3-dist, fig.height=5}
+r3_long <- r3 %>%
+  pivot_longer(cols = c(ols_slope, sma_slope),
+               names_to = "method", values_to = "slope") %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+
+ggplot(r3_long, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+  facet_wrap(~ method) +
+  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                    na.value="grey60", name="Clade") +
+  labs(x = "Intraspecific slope", y = "N species",
+       title = "Leaf mass ~ total plant biomass: intraspecific slope distribution",
+       subtitle = "Dashed = 3/4; dotted = 1.0")
+```
+
+---
+
+# Leaf area ~ Total plant biomass (`a.lf ~ m.to`)
+
+```{r sec4-summary}
+r4  <- results[["a.lf~m.to"]]
+co4 <- combos[[4]]
+cat("Species qualifying (≥", MIN_N, "records):", nrow(r4), "\n")
+cat("Median OLS slope:", round(median(r4$ols_slope, na.rm=TRUE), 3), "\n")
+cat("Median SMA slope:", round(median(r4$sma_slope, na.rm=TRUE), 3), "\n")
+```
+
+## Per-species slopes table
+
+```{r sec4-table, results='asis'}
+table_slopes(r4, paste0("Leaf area ~ total biomass: per-species OLS and SMA slopes (≥ ",
+                         MIN_N, " records per species, sorted by N)"))
+```
+
+## Body size range per species
+
+```{r sec4-range, fig.height=14}
+plot_size_range(r4, co4)
+```
+
+## Scaling slope vs. size range
+
+```{r sec4-slope-range, fig.height=6}
+plot_slope_vs_range(r4, co4)
+```
+
+## Slope distributions
+
+```{r sec4-dist, fig.height=5}
+r4_long <- r4 %>%
+  pivot_longer(cols = c(ols_slope, sma_slope),
+               names_to = "method", values_to = "slope") %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+
+ggplot(r4_long, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+  facet_wrap(~ method) +
+  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                    na.value="grey60", name="Clade") +
+  labs(x = "Intraspecific slope", y = "N species",
+       title = "Leaf area ~ total plant biomass: intraspecific slope distribution",
+       subtitle = "Dashed = 3/4; dotted = 1.0")
+```
+
+---
+
+# Leaf mass ~ Stem mass (`m.lf ~ m.st`)
+
+```{r sec5-summary}
+r5  <- results[["m.lf~m.st"]]
+co5 <- combos[[5]]
+cat("Species qualifying (≥", MIN_N, "records):", nrow(r5), "\n")
+cat("Median OLS slope:", round(median(r5$ols_slope, na.rm=TRUE), 3), "\n")
+cat("Median SMA slope:", round(median(r5$sma_slope, na.rm=TRUE), 3), "\n")
+```
+
+## Per-species slopes table
+
+```{r sec5-table, results='asis'}
+table_slopes(r5, paste0("Leaf mass ~ stem mass: per-species OLS and SMA slopes (≥ ",
+                         MIN_N, " records per species, sorted by N)"))
+```
+
+## Body size range per species
+
+```{r sec5-range, fig.height=14}
+plot_size_range(r5, co5)
+```
+
+## Scaling slope vs. size range
+
+```{r sec5-slope-range, fig.height=6}
+plot_slope_vs_range(r5, co5)
+```
+
+## Slope distributions
+
+```{r sec5-dist, fig.height=5}
+r5_long <- r5 %>%
+  pivot_longer(cols = c(ols_slope, sma_slope),
+               names_to = "method", values_to = "slope") %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+
+ggplot(r5_long, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+  facet_wrap(~ method) +
+  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                    na.value="grey60", name="Clade") +
+  labs(x = "Intraspecific slope", y = "N species",
+       title = "Leaf mass ~ stem mass: intraspecific slope distribution",
+       subtitle = "Dashed = 3/4; dotted = 1.0")
+```
+
+---
+
+# Leaf area ~ Stem mass (`a.lf ~ m.st`)
+
+```{r sec6-summary}
+r6  <- results[["a.lf~m.st"]]
+co6 <- combos[[6]]
+cat("Species qualifying (≥", MIN_N, "records):", nrow(r6), "\n")
+cat("Median OLS slope:", round(median(r6$ols_slope, na.rm=TRUE), 3), "\n")
+cat("Median SMA slope:", round(median(r6$sma_slope, na.rm=TRUE), 3), "\n")
+```
+
+## Per-species slopes table
+
+```{r sec6-table, results='asis'}
+table_slopes(r6, paste0("Leaf area ~ stem mass: per-species OLS and SMA slopes (≥ ",
+                         MIN_N, " records per species, sorted by N)"))
+```
+
+## Body size range per species
+
+```{r sec6-range, fig.height=14}
+plot_size_range(r6, co6)
+```
+
+## Scaling slope vs. size range
+
+```{r sec6-slope-range, fig.height=6}
+plot_slope_vs_range(r6, co6)
+```
+
+## Slope distributions
+
+```{r sec6-dist, fig.height=5}
+r6_long <- r6 %>%
+  pivot_longer(cols = c(ols_slope, sma_slope),
+               names_to = "method", values_to = "slope") %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA"))
+
+ggplot(r6_long, aes(x = slope, fill = clade)) +
+  geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.75, position = "stack") +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40") +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60") +
+  facet_wrap(~ method) +
+  scale_fill_manual(values = c(Angiosperm="#e41a1c", Gymnosperm="#377eb8"),
+                    na.value="grey60", name="Clade") +
+  labs(x = "Intraspecific slope", y = "N species",
+       title = "Leaf area ~ stem mass: intraspecific slope distribution",
+       subtitle = "Dashed = 3/4; dotted = 1.0")
+```
+
+---
+
+# Cross-combination summary
+
+## Median slopes and spread across all six relationships
+
+```{r cross-summary-table}
+all_res <- bind_rows(
+  lapply(seq_along(combos), function(i) {
+    results[[i]] %>%
+      mutate(combo = names(results)[i],
+             response = combos[[i]]$y,
+             predictor = combos[[i]]$x)
+  })
+)
+
+cross_sum <- all_res %>%
+  group_by(combo) %>%
+  summarise(
+    n_species     = n(),
+    med_ols       = round(median(ols_slope, na.rm = TRUE), 3),
+    iqr_ols       = round(IQR(ols_slope, na.rm = TRUE), 3),
+    pct_ols_lt075 = round(mean(ols_slope < 0.75, na.rm = TRUE) * 100, 1),
+    pct_ols_gt100 = round(mean(ols_slope > 1.00, na.rm = TRUE) * 100, 1),
+    med_sma       = round(median(sma_slope, na.rm = TRUE), 3),
+    iqr_sma       = round(IQR(sma_slope, na.rm = TRUE), 3),
+    med_r2        = round(median(r2, na.rm = TRUE), 3),
+    med_range     = round(median(log_x_range, na.rm = TRUE), 3),
+    .groups = "drop"
+  )
+
+kable(cross_sum,
+      col.names = c("Combination", "N species",
+                    "Median OLS slope", "IQR (OLS)",
+                    "% OLS < 0.75", "% OLS > 1.0",
+                    "Median SMA slope", "IQR (SMA)",
+                    "Median R²", "Median log₁₀ range"),
+      caption = paste0("Cross-combination summary of intraspecific slopes (≥ ", MIN_N, " records/species)"))
+```
+
+## OLS vs. SMA slope comparison — all combinations
+
+```{r ols-vs-sma, fig.height=7, fig.width=10}
+all_res %>%
+  filter(!is.na(ols_slope), !is.na(sma_slope)) %>%
+  ggplot(aes(x = ols_slope, y = sma_slope, colour = clade)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed",
+              colour = "grey50", linewidth = 0.8) +
+  geom_point(aes(size = log10(n)), alpha = 0.5) +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                      na.value = "grey60", name = "Clade") +
+  scale_size_continuous(range = c(1, 4), name = "log₁₀(N records)") +
+  facet_wrap(~ combo, scales = "free", ncol = 3) +
+  labs(
+    x = "OLS slope", y = "SMA slope",
+    title = "OLS vs. SMA intraspecific slopes — all six combinations",
+    subtitle = "Dashed line = 1:1. SMA slopes are systematically steeper when R² < 1."
+  )
+```
+
+## Size range vs. R² — all combinations
+
+```{r range-r2, fig.height=7, fig.width=10}
+all_res %>%
+  filter(!is.na(r2)) %>%
+  ggplot(aes(x = log_x_range, y = r2, colour = clade)) +
+  geom_point(alpha = 0.5, size = 1.5) +
+  geom_smooth(aes(group = 1), method = "lm", colour = "black",
+              se = TRUE, linewidth = 0.7, alpha = 0.15) +
+  scale_colour_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                      na.value = "grey60", name = "Clade") +
+  facet_wrap(~ combo, ncol = 3) +
+  labs(
+    x = "log₁₀ size range [log₁₀(max) − log₁₀(min)]",
+    y = "R² (OLS)",
+    title = "R² vs. body size range — all six combinations",
+    subtitle = "Wider size range generally yields higher R²; slope estimates more reliable when R² > 0.7."
+  )
+```
+
+## Slope vs. size range — all six combinations
+
+```{r all-slope-range, fig.height=10, fig.width=11}
+all_res %>%
+  pivot_longer(cols = c(ols_slope, sma_slope),
+               names_to = "method", values_to = "slope") %>%
+  mutate(method = recode(method, ols_slope = "OLS", sma_slope = "SMA")) %>%
+  filter(!is.na(slope)) %>%
+  ggplot(aes(x = log_x_range, y = slope, colour = method)) +
+  geom_hline(yintercept = 0.75, linetype = "dashed",
+             colour = "grey60", linewidth = 0.6) +
+  geom_hline(yintercept = 1.00, linetype = "dotted",
+             colour = "grey80", linewidth = 0.5) +
+  geom_point(alpha = 0.35, size = 1.2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2, alpha = 0.9) +
+  scale_colour_manual(values = c(OLS = "#1b7837", SMA = "#762a83"),
+                      name = "Method") +
+  facet_wrap(~ combo, ncol = 3) +
+  labs(
+    x = "log₁₀ size range",
+    y = "Intraspecific slope",
+    title = "Intraspecific slope vs. log₁₀ body size range — all six combinations",
+    subtitle = "OLS slopes are typically compressed toward zero at small size ranges (regression dilution).\nSMA slopes are more consistent across size range. Dashed = 3/4; dotted = 1.0."
+  ) +
+  theme(strip.text = element_text(size = 9))
+```
+
+---
+
+# Methods
+
+- **Data:** BAAD v1 (Falster et al. 2015, *Ecology* 96:1445). Individual-level
+  plant measurements from >170 primary studies.
+- **Minimum threshold:** ≥ `r MIN_N` individual records per species per combination.
+  Species with zero size range (all individuals same size) excluded.
+- **OLS regression:** `lm(log10 Y ~ log10 X)`. Slope = predicted change in
+  log₁₀ Y per unit log₁₀ X. 95% CIs via `confint()`. Appropriate when predicting Y
+  from X; known to underestimate the true allometric slope when R² < 1 (regression
+  dilution / attenuation bias).
+- **SMA regression:** Standardised Major Axis via `smatr::sma(Y ~ X)` on
+  log₁₀-transformed variables. 95% CIs from the coefficient matrix. SMA minimises
+  residuals in both X and Y directions and gives unbiased slope estimates for allometric
+  inference regardless of R². SMA slope = OLS slope / r (Pearson correlation), so
+  SMA ≥ OLS always.
+- **Size range:** log₁₀(max predictor) − log₁₀(min predictor) within each species.
+  A key diagnostic: OLS slopes estimated from narrow size ranges are strongly biased
+  downward; SMA slopes are less affected but CIs widen with small range.
+- **Reference slopes:** 3/4-power (dashed) = WBE/MST prediction for metabolic
+  scaling; 1.0 (dotted) = geometric (isometric) scaling of leaf mass with body size.
+- **BAAD variable notes:**
+  - `d.ba` = diameter at base of stem [m]; more commonly measured than DBH in BAAD.
+  - `m.to` = total plant biomass [kg] (= `m.rt + m.so`; includes root mass).
+  - `m.st` = all stem tissue [kg] (branches, bark; excludes leaves and roots).

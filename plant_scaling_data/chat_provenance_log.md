@@ -1,3 +1,5 @@
+2026-05-04 | Created baad_intraspecific_leaf_scaling.Rmd/html. Intraspecific scaling analysis: 6 allometric combinations (leaf mass and leaf area as responses, basal diameter / total plant biomass / stem mass as predictors). Per-species OLS + SMA slopes with 95% CIs, size-range plots, slope-vs-range scatter, distribution histograms, cross-combo summary. MIN_N=10 per species. 75 chunks, rendered 9 MB HTML. BAAD source: Falster et al. 2015 Ecology 96:1445. smatr::sma() explicit-vector pattern used throughout.
+
 2026-05-01 | Initialized plant_scaling_data project scaffold with reproducible workflow files and starting provenance entry.
 2026-05-01 | Created baad_summary.Rmd and baad_summary.html with full BAAD dataset breakdown: species, geography, vegetation, growing conditions, PFTs, scaling exponents, and source study table.
 2026-05-01 | Created baad_summary.Rmd and baad_summary.html with full BAAD dataset breakdown: species, geography, vegetation, growing conditions, PFTs, scaling exponents, and source study table.
