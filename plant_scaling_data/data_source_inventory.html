@@ -11,7 +11,7 @@
 
 <meta name="author" content="plant_scaling_data project" />
 
-<meta name="date" content="2026-05-01" />
+<meta name="date" content="2026-05-06" />
 
 <title>Plant Allometry Data Source Inventory</title>
 
@@ -1587,7 +1587,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Plant Allometry Data Source Inventory</h1>
 <h4 class="author">plant_scaling_data project</h4>
-<h4 class="date">2026-05-01</h4>
+<h4 class="date">2026-05-06</h4>
 
 </div>
 
@@ -1607,6 +1607,7 @@ variables, access method, and ingestion status.</p>
 <pre class="r"><code>inv &lt;- data.frame(
   Source = c(&quot;BAAD&quot;, &quot;Niklas-Enquist&quot;, &quot;Tallo&quot;,
              &quot;ForestGEO Panama&quot;, &quot;NEON ForestAGB&quot;,
+             &quot;Shenkin et al. 2020&quot;,
              &quot;allodb&quot;, &quot;BIOMASS::wdData&quot;,
              &quot;BIOMASS::NouraguesHD&quot;, &quot;rFIA (US)&quot;,
              &quot;Zanne et al. 2009 (Dryad)&quot;, &quot;Chave et al. 2014&quot;,
@@ -1614,6 +1615,7 @@ variables, access method, and ingestion status.</p>
   Type = c(&quot;Individual measurements&quot;,&quot;Individual measurements&quot;,
            &quot;Individual measurements&quot;,
            &quot;Individual measurements&quot;,&quot;Individual measurements + AGB (modeled)&quot;,
+           &quot;Individual measurements&quot;,
            &quot;Allometric equations&quot;,&quot;Wood density lookup&quot;,
            &quot;H-D paired measurements&quot;,&quot;Individual measurements (FIA plots)&quot;,
            &quot;Wood density lookup&quot;,&quot;Allometric equations&quot;,
@@ -1621,6 +1623,7 @@ variables, access method, and ingestion status.</p>
   N_records = c(&quot;21,084 individuals&quot;,&quot;2,626 individuals&quot;,
                 &quot;498,838 individuals&quot;,
                 &quot;5,109 individuals&quot;,&quot;194,704 rows (~93,971 unique trees)&quot;,
+                &quot;1,153 individuals&quot;,
                 &quot;570 equations&quot;,&quot;16,467 species×region&quot;,
                 &quot;1,051 H-D pairs&quot;,&quot;millions (US national)&quot;,
                 &quot;~16,000 spp&quot;,&quot;pantropical equations&quot;,
@@ -1630,6 +1633,7 @@ variables, access method, and ingestion status.</p>
                     &quot;DBH (cm), height (m), crown radius (m), lat/lon — all georeferenced&quot;,
                     &quot;DBH (mm), height (m), HOM (m), crown/light/lianas flags, 2011–2020&quot;,
                     &quot;DBH (cm), height (m), AGB Chojnacky &amp; Jenkins (kg), 35 sites 2014–2023&quot;,
+                    &quot;DBH (cm), tree height (m), crown radius (m), crown depth (m), crown surface area (m²), crown volume (m³), lat/lon, elevation (m asl)&quot;,
                     &quot;DBH→AGB equations, r², bias correction&quot;,
                     &quot;wood density (g/cm³) by species × region&quot;,
                     &quot;DBH (cm), height (m), lat/lon&quot;,
@@ -1644,6 +1648,7 @@ variables, access method, and ingestion status.</p>
              &quot;Zenodo doi:10.5281/zenodo.6637599 — VERIFIED; CSV on disk (ingested)&quot;,
              &quot;Smithsonian Figshare doi:10.25573/data.24954204.v1 — ingested ✓&quot;,
              &quot;GitHub atkinsjeff/NEONForestAGB; Zenodo doi:10.5281/zenodo.11193519 — ingested ✓&quot;,
+             &quot;doi:10.1111/nph.16523 [UNVERIFIED]; CSV on disk (ingested)&quot;,
              &quot;R: allodb (ropensci/allodb)&quot;,&quot;R: BIOMASS::wdData&quot;,
              &quot;R: BIOMASS::NouraguesHD&quot;,
              &quot;R: rFIA::getFIA(states=&#39;RI&#39;) — per state download&quot;,
@@ -1656,6 +1661,7 @@ variables, access method, and ingestion status.</p>
   Status = c(&quot;Ingested ✓&quot;,&quot;Ingested ✓&quot;,
              &quot;Ingested ✓&quot;,
              &quot;Ingested ✓&quot;,&quot;Ingested ✓&quot;,
+             &quot;Ingested ✓&quot;,
              &quot;Installed ✓ — not yet merged&quot;,
              &quot;Installed ✓ — not yet merged&quot;,
              &quot;Installed ✓ — not yet merged&quot;,
@@ -1673,12 +1679,12 @@ kable(inv, caption = &quot;Plant allometry data source inventory&quot;)</code></
 <table>
 <caption>Plant allometry data source inventory</caption>
 <colgroup>
-<col width="8%" />
-<col width="13%" />
-<col width="12%" />
-<col width="24%" />
-<col width="27%" />
-<col width="13%" />
+<col width="7%" />
+<col width="11%" />
+<col width="10%" />
+<col width="37%" />
+<col width="22%" />
+<col width="11%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -1737,6 +1743,17 @@ flags, 2011–2020</td>
 <td align="left">Ingested ✓</td>
 </tr>
 <tr class="even">
+<td align="left">Shenkin et al. 2020</td>
+<td align="left">Individual measurements</td>
+<td align="left">1,153 individuals</td>
+<td align="left">DBH (cm), tree height (m), crown radius (m), crown
+depth (m), crown surface area (m²), crown volume (m³), lat/lon,
+elevation (m asl)</td>
+<td align="left"><a href="doi:10.1111/nph.16523" class="uri">doi:10.1111/nph.16523</a> [UNVERIFIED]; CSV on disk
+(ingested)</td>
+<td align="left">Ingested ✓</td>
+</tr>
+<tr class="odd">
 <td align="left">allodb</td>
 <td align="left">Allometric equations</td>
 <td align="left">570 equations</td>
@@ -1744,7 +1761,7 @@ flags, 2011–2020</td>
 <td align="left">R: allodb (ropensci/allodb)</td>
 <td align="left">Installed ✓ — not yet merged</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">BIOMASS::wdData</td>
 <td align="left">Wood density lookup</td>
 <td align="left">16,467 species×region</td>
@@ -1752,7 +1769,7 @@ flags, 2011–2020</td>
 <td align="left">R: BIOMASS::wdData</td>
 <td align="left">Installed ✓ — not yet merged</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">BIOMASS::NouraguesHD</td>
 <td align="left">H-D paired measurements</td>
 <td align="left">1,051 H-D pairs</td>
@@ -1760,7 +1777,7 @@ flags, 2011–2020</td>
 <td align="left">R: BIOMASS::NouraguesHD</td>
 <td align="left">Installed ✓ — not yet merged</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">rFIA (US)</td>
 <td align="left">Individual measurements (FIA plots)</td>
 <td align="left">millions (US national)</td>
@@ -1768,7 +1785,7 @@ flags, 2011–2020</td>
 <td align="left">R: rFIA::getFIA(states=‘RI’) — per state download</td>
 <td align="left">Installed ✓ — download per state needed</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">Zanne et al. 2009 (Dryad)</td>
 <td align="left">Wood density lookup</td>
 <td align="left">~16,000 spp</td>
@@ -1776,7 +1793,7 @@ flags, 2011–2020</td>
 <td align="left">Dryad <a href="doi:10.5061/dryad.234" class="uri">doi:10.5061/dryad.234</a> — VERIFIED</td>
 <td align="left">DOI verified — data not yet downloaded</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">Chave et al. 2014</td>
 <td align="left">Allometric equations</td>
 <td align="left">pantropical equations</td>
@@ -1784,7 +1801,7 @@ flags, 2011–2020</td>
 <td align="left">New Phytologist supplement + BIOMASS param tables</td>
 <td align="left">BIOMASS package implements — cite needed</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">Poorter et al. 2012</td>
 <td align="left">Biomass allocation fractions</td>
 <td align="left">meta-analysis</td>
@@ -1792,7 +1809,7 @@ flags, 2011–2020</td>
 <td align="left">New Phytologist supplement — manual download</td>
 <td align="left">Not yet acquired</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">TRY</td>
 <td align="left">Trait database</td>
 <td align="left">~280,000 spp</td>
@@ -1800,7 +1817,7 @@ flags, 2011–2020</td>
 <td align="left">try-db.org — registration required</td>
 <td align="left">Not yet acquired</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">FRED</td>
 <td align="left">Root traits</td>
 <td align="left">~70,000 obs</td>
@@ -1808,7 +1825,7 @@ flags, 2011–2020</td>
 <td align="left">UTK FRED website — free download</td>
 <td align="left">Not yet acquired</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">GlobAllomeTree</td>
 <td align="left">Equation library</td>
 <td align="left">~5,000 equations</td>
@@ -2919,7 +2936,7 @@ convert to per-tree lbs, then × 0.4536 to kg.</p></li>
 ## locale:
 ## [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
 ## 
-## time zone: America/Phoenix
+## time zone: Europe/London
 ## tzcode source: internal
 ## 
 ## attached base packages:
@@ -2946,7 +2963,7 @@ convert to per-tree lbs, then × 0.4536 to kg.</p></li>
 ## [49] withr_3.0.2        backports_1.5.0    rappdirs_0.3.3     bit64_4.6.0-1     
 ## [53] rmarkdown_2.29     bit_4.6.0          cellranger_1.1.0   hms_1.1.3         
 ## [57] evaluate_1.0.3     viridisLite_0.4.2  dtplyr_1.3.1       mgcv_1.9-1        
-## [61] rlang_1.1.6        Rcpp_1.0.14        glue_1.8.0         DBI_1.2.3         
+## [61] rlang_1.1.6        Rcpp_1.1.0         glue_1.8.0         DBI_1.2.3         
 ## [65] vroom_1.6.5        jsonlite_2.0.0     R6_2.6.1           units_0.8-7</code></pre>
 </div>
 
