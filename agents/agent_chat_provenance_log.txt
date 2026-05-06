@@ -1211,3 +1211,6 @@ Actions: Replaced single SDM worked example with four parallel worked examples (
 2026-05-02 | Created niklas_enquist_organ_scaling.Rmd in plant_scaling_data/; 68 chunks; renders clean.
 2026-05-02 | Committed unstaged session changes: tallo_summary.Rmd + HTML, tallo_bien_preexport.R path fix, agent definition updates.
 2026-05-03 | Created plant_scaling_data/baad_agb_leaf_allometry.Rmd and .html: AGB ~ leaf mass/area allometry, Angio/Gymno, family-level SMA, intraspecific scaling.
+2026-05-04 | Literature overlap redesign consultation: biodiversity-informatics-checker + taxonomy-reconciliation + scholarly-rigor-reviewer. Outcome: adopt two-tier overlap (project-level screen first, targeted species confirmatory second) with explicit caveats and reconciliation metadata requirements.
+2026-05-06 | Added Theory section to enquistlab-site-migration/_pages/research.md: MST (WBE fractal network → 3/4 scaling, MTE) and TDT (trait distributions, multi-scale filtering) subsections with key paper links. Applied enhanced-theory (Scaling/Network modes) and ecology-user (Trait-Environment Mapping, Scaling Logic conditions) agent frameworks.
+2026-05-06 | Research page Theory section drafted, citation-audited, and cleaned. Redundant stubs removed. All changes pushed to enquistlab.github.io.
