@@ -1,3 +1,9 @@
+[22] Date: 2026-05-05
+Source: active chat request (@m supervisor agent mode)
+Request summary: Update project-associated .html and .rmd files including a map of new coordinates for shenkin_etal_2020_crown_dimensions.csv (Andean crown dimensions dataset, 1,153 records, Peru, multi-elevation plots).
+Files affected: plant_scaling_data/grand_cross_study_allometry.Rmd, plant_scaling_data/grand_cross_study_allometry.html, plant_scaling_data/data/raw/shenkin/shenkin_etal_2020_crown_dimensions.csv (gitignored), agents/prompt_log.md, agents/agent_chat_provenance_log.txt
+Action taken: Copied CSV to data/raw/shenkin/ (path is gitignored per plant_scaling_data/.gitignore:data/raw/). Added load-shenkin chunk reading and harmonising 1,153 Andean tree records (DBH_cm, Height_m, CrownRadius_m, lat, lon, family, species, source="Shenkin_2020"). Integrated shenkin_clean into harmonise-allom bind_rows. Updated interactive leaflet map: shenkin_ll derived from per-plot distinct() lat/lon from shenkin_raw, pink markers (#E91E63) with popup showing plot ID, region, elevation. Added "Shenkin 2020 (Andes)" layer in addLayersControl. Extended colorFactor to 5 sources. Updated Rmd subtitle, Methods data-sources block (citation with UNVERIFIED DOI flag), and unit harmonisation note. Re-rendered grand_cross_study_allometry.html successfully (124/124 chunks, exit code 0). Committed and pushed to master (7df04f3).
+
 [21] Date: 2026-05-04
 Source: active chat request (@m supervisor agent mode)
 Request summary: BAAD intraspecific scaling of leaf area and leaf mass vs. basal stem diameter, total plant biomass, and stem mass. Report per-species slopes, size range plots, and exponent vs. size range plots. Always report OLS and SMA.
