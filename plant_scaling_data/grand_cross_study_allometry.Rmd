@@ -1,6 +1,6 @@
 ---
 title: "Grand Cross-Study Plant Allometry: Theory Testing, Inter- and Intraspecific Scaling"
-subtitle: "OLS, SMA/RMA, PGLS across Tallo, BAAD, NEON, ForestGEO Panama, Niklas-Enquist"
+subtitle: "OLS, SMA/RMA, PGLS across Tallo, BAAD, NEON, ForestGEO Panama, Shenkin 2020 Andean Crown Dimensions, Niklas-Enquist"
 author: "plant_scaling_data project"
 date: "`r Sys.Date()`"
 output:
@@ -222,8 +222,34 @@ nik_enq <- read_csv(
     "with a few|community|stand|plot|mixed", taxa, ignore.case = TRUE))
 ```
 
+```{r load-shenkin}
+shenkin_raw <- read_csv(
+  file.path(proj_dir, "data/raw/shenkin/shenkin_etal_2020_crown_dimensions.csv"),
+  show_col_types = FALSE)
+
+shenkin_clean <- shenkin_raw |>
+  filter(!is.na(DBH), DBH > 0) |>
+  mutate(
+    source        = "Shenkin_2020",
+    DBH_cm        = DBH,                             # column already in cm
+    Height_m      = `tree_height (m)`,
+    AGB_kg        = NA_real_,
+    AGB_method    = NA_character_,
+    CrownRadius_m = `crown_radius  (m)`,
+    species       = species,
+    genus         = word(species, 1),
+    family        = family,
+    division      = NA_character_,
+    lat           = lat,
+    lon           = lon,
+    agb_eligible  = FALSE
+  ) |>
+  select(source, DBH_cm, Height_m, AGB_kg, AGB_method, CrownRadius_m,
+         species, genus, family, division, lat, lon, agb_eligible)
+```
+
 ```{r harmonise-allom}
-allom <- bind_rows(tallo_clean, baad_clean, neon_clean, fgeo_clean) |>
+allom <- bind_rows(tallo_clean, baad_clean, neon_clean, fgeo_clean, shenkin_clean) |>
   filter(!is.na(species), species != "",
          !grepl("^sp\\.?$|^[A-Z][a-z]+ sp\\.$", species, ignore.case = FALSE))
 ```
@@ -266,9 +292,17 @@ neon_ll <- site_coords |>
 fgeo_ll <- data.frame(lat = FGEO_LAT, lon = FGEO_LON,
                       source = "ForestGEO_Panama", col = "#4CAF50")
 
+# Shenkin 2020 Andean plots — one point per unique plot centroid
+shenkin_ll <- shenkin_raw |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  distinct(plot, .keep_all = TRUE) |>
+  mutate(source = "Shenkin_2020", col = "#E91E63",
+         popup_txt = paste0(plot, "<br>Region: ", region,
+                            "<br>Elevation: ", `ele_asl (m)`, " m"))
+
 pal_src <- colorFactor(
-  palette = c("#2196F3","#9C27B0","#FF5722","#4CAF50"),
-  levels  = c("Tallo","BAAD","NEON","ForestGEO_Panama"))
+  palette = c("#2196F3","#9C27B0","#FF5722","#4CAF50","#E91E63"),
+  levels  = c("Tallo","BAAD","NEON","ForestGEO_Panama","Shenkin_2020"))
 
 m <- leaflet() |>
   addTiles() |>
@@ -281,7 +315,11 @@ m <- leaflet() |>
   addCircleMarkers(data = fgeo_ll, ~lon, ~lat, radius = 8,
     color = "#4CAF50", opacity = 0.9, fillOpacity = 0.9,
     popup = "ForestGEO Panama", group = "ForestGEO Panama") |>
-  addLayersControl(overlayGroups = c("Tallo","NEON sites","ForestGEO Panama"),
+  addCircleMarkers(data = shenkin_ll, ~lon, ~lat, radius = 8,
+    color = "#E91E63", opacity = 0.9, fillOpacity = 0.9,
+    popup = ~popup_txt, group = "Shenkin 2020 (Andes)") |>
+  addLayersControl(overlayGroups = c("Tallo","NEON sites","ForestGEO Panama",
+                                     "Shenkin 2020 (Andes)"),
                    options = layersControlOptions(collapsed = FALSE))
 m
 ```
@@ -2464,9 +2502,10 @@ Tallo v1.0 (Jucker et al. 2022, *Glob. Change Biol.* 28:5254, DOI: 10.1111/gcb.1
 BAAD (Falster et al. 2015, *Ecology* 96:1445, DOI: 10.1890/14-1889.1);
 NEONForestAGBv2 (Atkins et al. 2024, DOI: 10.6084/m9.figshare.25625352.v1 [UNVERIFIED — verify before publication]);
 ForestGEO Panama small-plots 2024;
+Shenkin et al. 2020 Andean crown dimensions (Shenkin et al. 2020, *New Phytologist* 226:1579–1592, DOI: 10.1111/nph.16523 [UNVERIFIED — verify before publication]);
 Niklas-Enquist biomass compilation (Niklas & Enquist 2001, *PNAS* 98:2922, DOI: 10.1073/pnas.041590298).
 
-**Unit harmonisation:** BAAD `d.bh` converted from metres to centimetres (× 100); NEON `stemDiameter` already in cm; ForestGEO `DBH_mm` divided by 10. All AGB in kg; all height in m.
+**Unit harmonisation:** BAAD `d.bh` converted from metres to centimetres (× 100); NEON `stemDiameter` already in cm; ForestGEO `DBH_mm` divided by 10; Shenkin `DBH` already in cm; Shenkin `crown_radius (m)` already in metres. All AGB in kg; all height in m.
 
 **Regression methods:** OLS = `lm()`; SMA = `smatr::sma()`; PGLS = `caper::pgls()` with Pagel's λ estimated by ML. OLS is used for pooled and study-level regressions (prediction from DBH to height); SMA is used for theory-testing comparisons where both axes carry measurement error. Intraspecific slopes use OLS; note that SMA would give steeper slopes if DBH measurement error is non-negligible.
 
