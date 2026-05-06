@@ -22,6 +22,7 @@ library(scales)
 library(tidyr)
 library(readr)
 library(maps)
+library(leaflet)
 
 theme_set(theme_bw(base_size = 12))
 ```
@@ -601,6 +602,117 @@ neon_all |>
   labs(x = "DBH (cm)", y = "Height (m)",
        title = paste0("NEON ForestAGB: Height ~ DBH (20,000 subsample; ",
                       length(neon_sites_all), " sites)"))
+```
+
+---
+
+## Shenkin et al. 2020 — Andean Crown Dimensions
+
+```{r shenkin-profile}
+shenkin_path <- file.path(dirname(knitr::current_input(dir = TRUE)),
+                          "data/raw/shenkin/shenkin_etal_2020_crown_dimensions.csv")
+shenkin <- read_csv(shenkin_path, show_col_types = FALSE)
+
+kable(data.frame(
+  Metric = c("Total trees", "Unique plots", "Unique species", "Unique families",
+             "Region", "Elevation range (m asl)",
+             "Lat range (°)", "Lon range (°)",
+             "DBH range (cm)", "Tree height range (m)",
+             "Crown radius range (m)", "Crown depth range (m)",
+             "Crown surface area range (m²)", "Crown volume range (m³)",
+             "Citation (DOI UNVERIFIED)"),
+  Value = c(
+    format(nrow(shenkin), big.mark = ","),
+    length(unique(shenkin$plot)),
+    length(unique(shenkin$species)),
+    length(unique(shenkin$family)),
+    paste(unique(shenkin$region), collapse = ", "),
+    paste0(round(min(shenkin$`ele_asl (m)`, na.rm = TRUE), 0), "–",
+           round(max(shenkin$`ele_asl (m)`, na.rm = TRUE), 0)),
+    paste0(round(min(shenkin$lat, na.rm = TRUE), 3), " to ",
+           round(max(shenkin$lat, na.rm = TRUE), 3)),
+    paste0(round(min(shenkin$lon, na.rm = TRUE), 3), " to ",
+           round(max(shenkin$lon, na.rm = TRUE), 3)),
+    paste0(round(min(shenkin$DBH, na.rm = TRUE), 1), "–",
+           round(max(shenkin$DBH, na.rm = TRUE), 1)),
+    paste0(round(min(shenkin$`tree_height (m)`, na.rm = TRUE), 1), "–",
+           round(max(shenkin$`tree_height (m)`, na.rm = TRUE), 1)),
+    paste0(round(min(shenkin$`crown_radius  (m)`, na.rm = TRUE), 2), "–",
+           round(max(shenkin$`crown_radius  (m)`, na.rm = TRUE), 2)),
+    paste0(round(min(shenkin$`crown_depth (m)`, na.rm = TRUE), 2), "–",
+           round(max(shenkin$`crown_depth (m)`, na.rm = TRUE), 2)),
+    paste0(round(min(shenkin$`crown_surface_area  (m^2)`, na.rm = TRUE), 1), "–",
+           round(max(shenkin$`crown_surface_area  (m^2)`, na.rm = TRUE), 0)),
+    paste0(round(min(shenkin$`crown_volume  (m^3)`, na.rm = TRUE), 1), "–",
+           round(max(shenkin$`crown_volume  (m^3)`, na.rm = TRUE), 0)),
+    "Shenkin A et al. (2020) New Phytologist 226:1579–1592; doi:10.1111/nph.16523"
+  ),
+  stringsAsFactors = FALSE
+), caption = "Shenkin et al. 2020 — Andean crown dimensions profile")
+```
+
+### Geographic distribution of sampling points
+
+All 1,153 individual tree records have exact lat/lon coordinates.
+The plots span a montane elevational gradient in the Peruvian Andes.
+
+```{r shenkin-map, fig.width=11, fig.height=5.5}
+library(leaflet)
+
+shenkin_pts <- shenkin |>
+  filter(!is.na(lat), !is.na(lon)) |>
+  mutate(
+    ele   = `ele_asl (m)`,
+    label = paste0(plot, "<br>", species, "<br>Elevation: ", ele, " m asl",
+                   "<br>DBH: ", round(DBH, 1), " cm",
+                   "<br>Height: ", round(`tree_height (m)`, 1), " m",
+                   "<br>Crown radius: ", round(`crown_radius  (m)`, 2), " m")
+  )
+
+# colour by elevation band
+pal_ele <- colorNumeric(palette = "RdYlBu", domain = shenkin_pts$ele, reverse = TRUE)
+
+leaflet(shenkin_pts) |>
+  addProviderTiles(providers$Esri.WorldTopoMap) |>
+  addCircleMarkers(
+    ~lon, ~lat,
+    radius      = 4,
+    color       = ~pal_ele(ele),
+    fillColor   = ~pal_ele(ele),
+    fillOpacity = 0.85,
+    opacity     = 0.9,
+    popup       = ~label,
+    group       = "Individual trees"
+  ) |>
+  addLegend(
+    pal      = pal_ele,
+    values   = ~ele,
+    title    = "Elevation (m asl)",
+    position = "bottomright"
+  ) |>
+  addLayersControl(
+    overlayGroups = "Individual trees",
+    options       = layersControlOptions(collapsed = FALSE)
+  )
+```
+
+```{r shenkin-hdbh, fig.height=4.5}
+shenkin |>
+  filter(!is.na(DBH), !is.na(`tree_height (m)`), DBH > 0, `tree_height (m)` > 0) |>
+  mutate(ele_band = cut(`ele_asl (m)`,
+                        breaks = quantile(`ele_asl (m)`, probs = c(0, 0.25, 0.5, 0.75, 1),
+                                          na.rm = TRUE),
+                        labels = c("Low","Mid-low","Mid-high","High"),
+                        include.lowest = TRUE)) |>
+  ggplot(aes(x = DBH, y = `tree_height (m)`, color = ele_band)) +
+  geom_point(alpha = 0.35, size = 1.2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  scale_x_log10(labels = comma) + scale_y_log10(labels = comma) +
+  annotation_logticks() +
+  scale_color_brewer(palette = "RdYlBu", direction = -1, na.value = "grey60") +
+  labs(x = "DBH (cm)", y = "Tree height (m)", color = "Elevation quartile",
+       title = paste0("Shenkin 2020: Height ~ DBH by elevation band  (n = ",
+                      nrow(shenkin), ")"))
 ```
 
 ---
