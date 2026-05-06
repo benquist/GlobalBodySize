@@ -1,0 +1,712 @@
+---
+title: "Tree Longevity Data Curation Catalog"
+subtitle: "Running summary of datasets, download status, and QA"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: flatly
+    highlight: tango
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(here)
+library(knitr)
+library(kableExtra)
+source(here("R", "catalog_utils.R"))
+
+# Load download log if present
+dl_log <- tryCatch(
+  read.csv(here("logs", "download_log.csv"), stringsAsFactors = FALSE),
+  error = function(e) data.frame()
+)
+
+# Helper: look up most recent log entry for a dataset_id
+last_status <- function(id) {
+  if (nrow(dl_log) == 0) return(list(status = "NOT RUN", date = NA, size = NA, hash = NA, notes = ""))
+  rows <- dl_log[dl_log$dataset_id == id, , drop = FALSE]
+  if (nrow(rows) == 0) return(list(status = "NOT RUN", date = NA, size = NA, hash = NA, notes = ""))
+  r <- rows[nrow(rows), ]
+  list(status  = as.character(r$http_status),
+       date    = as.character(r$download_timestamp),
+       size    = r$file_size_bytes,
+       hash    = as.character(r$sha256),
+       notes   = as.character(r$notes))
+}
+```
+
+---
+
+## Overview
+
+This catalog documents 20 published datasets related to tree longevity, traits, and climate. 
+For each dataset it records: source citation, access type, download status, file provenance (SHA-256, size), 
+key variables, units, and any blockers that prevent automated download.
+
+**Framework designed by:** scholarly-rigor-reviewer, biodiversity-science-guard, biodiversity-informatics-checker  
+**Project root:** `tree-longevity-data-curation/`  
+**Download log:** `logs/download_log.csv` (committed; tracks every attempt)  
+**Data files:** `data/raw/` (gitignored; large files not committed)
+
+---
+
+## Download Status Summary
+
+```{r summary-table}
+datasets <- data.frame(
+  ID      = sprintf("D%02d", 1:20),
+  Dataset = c(
+    "Main study longevity/traits/climate (Figshare 29876984)",
+    "ITRDB tree ring data (NOAA)",
+    "Tropical tree rings — Locoselli et al. 2020 (Figshare 13119842)",
+    "OldList West (RMTRR)",
+    "OldList East (LDEO Columbia)",
+    "Native Tree Society dendro ages",
+    "Old Growth Canada",
+    "Tree height (Zenodo 6637599)",
+    "Conifer max height (conifers.org)",
+    "MonumentalTrees max height",
+    "Wood density (Zenodo 13322441)",
+    "Wood density (CIRAD DataVerse DVN1/KRVF0E)",
+    "Conduit density + P50 + HSM (Dryad 10.5061/dryad.1138)",
+    "P50 + HSM (Science Advances aav1332 supp.)",
+    "GLOPNET leaf traits (Wright et al. 2004 Nature)",
+    "Seed mass (TRY request 30569)",
+    "TreeGOER climate/soil (Zenodo 10008994)",
+    "WorldClim 2.1 gridded climate/elevation",
+    "CHELSA growing season + NPP",
+    "GBIF species occurrence (dl.77gcvq)"
+  ),
+  Downloadable = c(
+    "YES", "PARTIAL", "YES",
+    "PARTIAL", "PARTIAL", "PARTIAL", "NO",
+    "YES", "NO", "NO",
+    "YES", "YES",
+    "YES", "PARTIAL", "PARTIAL",
+    "NO", "YES", "YES", "YES", "PARTIAL"
+  ),
+  Method = c(
+    "Figshare API v2", "FTP/dplR subset", "Figshare API v2",
+    "rvest scrape", "rvest scrape", "rvest scrape", "Manual — maintainer contact",
+    "Zenodo API", "Manual — ToS review req.", "Manual — ToS review req.",
+    "Zenodo API", "DataVerse API",
+    "Dryad API v2", "Manual — CDN URL", "Manual — Nature supp / TRY",
+    "Manual — TRY registration", "Zenodo API", "geodata R pkg",
+    "direct curl CHELSA CDN", "rgbif::occ_download_get"
+  ),
+  stringsAsFactors = FALSE
+)
+
+# Pull actual statuses from log
+datasets$Last_Status <- sapply(datasets$ID, function(id) {
+  s <- last_status(id)$status
+  if (is.na(s) || s == "NOT RUN") "Not attempted" else as.character(s)
+})
+
+datasets$Download_Date <- sapply(datasets$ID, function(id) {
+  d <- last_status(id)$date
+  if (is.na(d)) "—" else substr(d, 1, 10)
+})
+
+kable(datasets,
+      col.names = c("ID", "Dataset", "Downloadable", "Method",
+                    "Last Status", "Date"),
+      align = "llllll",
+      escape = FALSE) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE, font_size = 12) |>
+  row_spec(which(datasets$Downloadable == "YES"),
+           background = "#f0fff0") |>
+  row_spec(which(datasets$Downloadable == "PARTIAL"),
+           background = "#fffbea") |>
+  row_spec(which(datasets$Downloadable == "NO"),
+           background = "#fff0f0")
+```
+
+---
+
+## D01 — Main Study Longevity/Traits/Climate
+
+```{r d01}
+s <- last_status("D01")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Study authors (in review). Tree longevity dataset. Figshare. DOI: 10.6084/m9.figshare.29876984 |
+| **DOI / URL** | https://doi.org/10.6084/m9.figshare.29876984 |
+| **Folder** | `data/raw/01_main_study/` |
+| **License** | To be confirmed — verify at Figshare record |
+| **Access type** | Open (if not embargoed) |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | Figshare REST API v2 |
+| **Script** | `R/download_01_main_study.R` |
+| **Download date** | `r s$date` |
+| **File size (bytes)** | `r s$size` |
+| **SHA-256** | `r s$hash` |
+| **Key variables** | Species max longevity, functional traits, mean climate per species |
+| **Biological unit** | Species |
+| **Known issues** | **VERIFY:** DOI not independently confirmed; record may be embargoed if paper is in review |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D02 — ITRDB Tree Ring Data (NOAA)
+
+```{r d02}
+s <- last_status("D02")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | International Tree-Ring Data Bank. NOAA National Centers for Environmental Information. https://www.ncei.noaa.gov/products/paleoclimatology/tree-ring |
+| **DOI / URL** | https://www.ncei.noaa.gov/products/paleoclimatology/tree-ring |
+| **Folder** | `data/raw/02_itrdb/` |
+| **License** | Open — NOAA public domain |
+| **Access type** | Open (FTP) |
+| **Download status** | `r status_badge("PARTIAL")` |
+| **Method** | NOAA FTP; `dplR` package for `.rwl` parsing |
+| **Script** | `R/download_02_itrdb.R` |
+| **Download date** | `r s$date` |
+| **Key variables** | Ring-width chronologies, site metadata, species codes |
+| **Biological unit** | Chronology (site × species) |
+| **Known issues** | No single bulk download. Species/site selection criteria must be defined before downloading. File format: Tucson `.rwl`. |
+| **Action required** | Define chronology selection criteria (species list, geographic bounding box, minimum length). Update `download_02_itrdb.R` with selection logic. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D03 — Tropical Tree Rings (Locoselli et al. 2020)
+
+```{r d03}
+s <- last_status("D03")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Locoselli GM et al. (2020) Global tree-ring analysis reveals rapid decrease in tropical tree longevity with temperature. PNAS 117(52):33358–33364. https://doi.org/10.1073/pnas.2003873117 |
+| **DOI / URL** | https://figshare.com/articles/dataset/Locoselli_et_al_2020.../13119842 |
+| **Folder** | `data/raw/03_tropical_rings/` |
+| **License** | CC BY 4.0 (verify at Figshare) |
+| **Access type** | Open |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | Figshare REST API v2 |
+| **Script** | `R/download_03_tropical_rings.R` |
+| **Download date** | `r s$date` |
+| **File size (bytes)** | `r s$size` |
+| **SHA-256** | `r s$hash` |
+| **Key variables** | Tropical tree ring widths, species, site metadata, longevity estimates |
+| **Biological unit** | Individual tree / chronology |
+| **Known issues** | None identified at design stage |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D04 — OldList West (RMTRR)
+
+```{r d04}
+s <- last_status("D04")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Rocky Mountain Tree Ring Research. OldList — a database of maximum tree ages. http://www.rmtrr.org/oldlist.htm. Accessed: `r Sys.Date()` |
+| **URL** | http://www.rmtrr.org/oldlist.htm |
+| **Folder** | `data/raw/04_oldlist_west/` |
+| **License** | Not stated — cite as accessed with date |
+| **Access type** | Open (HTML table) |
+| **Download status** | `r status_badge("PARTIAL")` |
+| **Method** | `rvest` HTML table scrape; raw HTML archived |
+| **Script** | `R/download_04_oldlist_west.R` |
+| **Download date** | `r s$date` |
+| **Key variables** | Species name, maximum age (years), location, reference |
+| **Biological unit** | Species maximum longevity record |
+| **Known issues** | No DOI or persistent identifier. HTTP (not HTTPS). Page structure may change. Scrape is fragile — verify column names after each run. |
+| **Provenance note** | Raw HTML archived alongside CSV. Record scrape date as version. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D05 — OldList East (LDEO Columbia)
+
+```{r d05}
+s <- last_status("D05")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Larson D (LDEO Columbia). OldList East. https://www.ldeo.columbia.edu/~adk/oldlisteast/. Accessed: `r Sys.Date()` |
+| **URL** | https://www.ldeo.columbia.edu/~adk/oldlisteast/ |
+| **Folder** | `data/raw/05_oldlist_east/` |
+| **License** | Not stated |
+| **Access type** | Open (HTML) |
+| **Download status** | `r status_badge("PARTIAL")` |
+| **Method** | `rvest` HTML scrape |
+| **Script** | `R/download_05_oldlist_east.R` |
+| **Download date** | `r s$date` |
+| **Key variables** | Species, maximum age (years), location, reference |
+| **Biological unit** | Species maximum longevity record |
+| **Known issues** | Personal-directory URL (`~adk`) — inherently unstable. Columbia LDEO may reorganize at any time. Screenshot + HTML archive mandatory. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D06 — Native Tree Society Dendro Ages
+
+```{r d06}
+s <- last_status("D06")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Native Tree Society. Maximum tree ages — dendrochronological data. http://www.nativetreesociety.org/dendro/ents_maximum_ages.htm. Accessed: `r Sys.Date()` |
+| **URL** | http://www.nativetreesociety.org/dendro/ents_maximum_ages.htm |
+| **Folder** | `data/raw/06_nts_dendro/` |
+| **License** | Not stated |
+| **Access type** | Open (HTML) — HTTP only |
+| **Download status** | `r status_badge("PARTIAL")` |
+| **Method** | `rvest` HTML scrape; may require manual extraction if no table found |
+| **Script** | `R/download_06_nts_dendro.R` |
+| **Download date** | `r s$date` |
+| **Key variables** | Species, maximum age, location, reference |
+| **Biological unit** | Species maximum longevity record |
+| **Known issues** | Community-maintained page; irregular table structure. Manual review required after scrape. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D07 — Old Growth Canada
+
+```{r d07}
+s <- last_status("D07")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | OldGrowth.ca. Old trees database. https://www.oldgrowth.ca/oldtrees/. Accessed: `r Sys.Date()` |
+| **URL** | https://www.oldgrowth.ca/oldtrees/ |
+| **Folder** | `data/raw/07_oldgrowth_canada/` |
+| **License** | Not stated |
+| **Access type** | Open (HTML only — no structured download) |
+| **Download status** | `r status_badge("NO")` |
+| **Method** | Manual — maintainer contact required |
+| **Script** | `R/download_07_oldgrowth_canada.R` (writes README only) |
+| **Known issues** | Records presented as HTML text/galleries; no structured table or API. No DOI or persistent identifier. |
+| **Action required** | Contact OldGrowth.ca maintainers to request a data export. Document: contact date, response, fields received, attribution terms. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D08 — Tree Height (Zenodo 6637599)
+
+```{r d08}
+s <- last_status("D08")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Verify citation from Zenodo record metadata at https://zenodo.org/record/6637599 |
+| **DOI** | https://doi.org/10.5281/zenodo.6637599 |
+| **Folder** | `data/raw/08_tree_height_zenodo/` |
+| **License** | Verify at Zenodo (likely CC BY 4.0) |
+| **Access type** | Open |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | Zenodo REST API v1 |
+| **Script** | `R/download_08_tree_height_zenodo.R` |
+| **Download date** | `r s$date` |
+| **File size (bytes)** | `r s$size` |
+| **SHA-256** | `r s$hash` |
+| **Key variables** | Species, maximum height (m), source |
+| **Biological unit** | Species |
+| **Unit note** | Verify unit (meters assumed); check README in Zenodo record |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D09 — Conifer Maximum Height (conifers.org)
+
+```{r d09}
+s <- last_status("D09")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Earle CJ. The Gymnosperm Database. https://www.conifers.org. Accessed: `r Sys.Date()` |
+| **URL** | https://www.conifers.org |
+| **Folder** | `data/raw/09_conifers_height/` |
+| **License** | Not stated — ToS review required |
+| **Access type** | Open website; no bulk download |
+| **Download status** | `r status_badge("NO")` |
+| **Method** | Per-species page scraping feasible (~900 pages) but requires ToS clearance |
+| **Script** | `R/download_09_conifers_height.R` (writes README only) |
+| **Known issues** | No bulk download or API. Per-species scraping requires `polite` package for robots.txt compliance + 5 s rate limit. ToS must be reviewed before any scraping. |
+| **Action required** | 1. Review robots.txt at https://www.conifers.org/robots.txt. 2. If permitted, implement per-species scrape with `polite`. 3. Alternatively, contact C.J. Earle for bulk export. |
+| **Unit note** | Heights reported in meters. Verify per record. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D10 — MonumentalTrees Maximum Height
+
+```{r d10}
+s <- last_status("D10")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | MonumentalTrees.com. Community tree measurement database. https://www.monumentaltrees.com. Accessed: `r Sys.Date()` |
+| **URL** | https://www.monumentaltrees.com |
+| **Folder** | `data/raw/10_monumental_height/` |
+| **License** | Not stated — ToS review required |
+| **Access type** | Open website; no bulk download |
+| **Download status** | `r status_badge("NO")` |
+| **Method** | Manual — ToS review + maintainer contact recommended |
+| **Script** | `R/download_10_monumental_height.R` (writes README only) |
+| **Known issues** | Community-contributed; per-record provenance unclear. Do not use as primary source without independent verification. No DOI. |
+| **Action required** | 1. Review ToS and robots.txt. 2. Contact administrator for bulk export. 3. Flag all records as 'unverified community observation' in analyses. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D11 — Wood Density (Zenodo 13322441)
+
+```{r d11}
+s <- last_status("D11")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Verify citation from Zenodo record at https://zenodo.org/records/13322441 |
+| **DOI** | https://doi.org/10.5281/zenodo.13322441 |
+| **Folder** | `data/raw/11_wood_density_zenodo/` |
+| **License** | Verify at Zenodo |
+| **Access type** | Open |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | Zenodo REST API v1 |
+| **Script** | `R/download_11_wood_density_zenodo.R` |
+| **Download date** | `r s$date` |
+| **File size (bytes)** | `r s$size` |
+| **SHA-256** | `r s$hash` |
+| **Key variables** | Species, wood density |
+| **Biological unit** | Species (mean) |
+| **Unit note** | **CRITICAL:** Verify unit — g/cm³ vs kg/m³ before merging with D12. 1 g/cm³ = 1000 kg/m³. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D12 — Wood Density (CIRAD DataVerse)
+
+```{r d12}
+s <- last_status("D12")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Verify citation at https://doi.org/10.18167/DVN1/KRVF0E |
+| **DOI** | https://doi.org/10.18167/DVN1/KRVF0E |
+| **Folder** | `data/raw/12_wood_density_dv/` |
+| **License** | Verify at CIRAD DataVerse |
+| **Access type** | Open (CIRAD DataVerse, France) |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | DataVerse native API |
+| **Script** | `R/download_12_wood_density_dv.R` |
+| **Download date** | `r s$date` |
+| **File size (bytes)** | `r s$size` |
+| **SHA-256** | `r s$hash` |
+| **Known issues** | DOI prefix 10.18167 is CIRAD DataVerse (France); may require API token even for open data. Script falls back with clear error message. |
+| **Unit note** | **CRITICAL:** Audit wood density units before merging with D11. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D13 — Conduit Density + P50 + HSM (Dryad)
+
+```{r d13}
+s <- last_status("D13")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Verify citation at https://doi.org/10.5061/dryad.1138 |
+| **DOI** | https://doi.org/10.5061/dryad.1138 |
+| **Folder** | `data/raw/13_conduit_p50_dryad/` |
+| **License** | CC0 (Dryad default) |
+| **Access type** | Open |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | Dryad API v2 |
+| **Script** | `R/download_13_conduit_p50_dryad.R` |
+| **Download date** | `r s$date` |
+| **File size (bytes)** | `r s$size` |
+| **SHA-256** | `r s$hash` |
+| **Key variables** | Conduit density (n/mm²), P50 (MPa), HSM (MPa), species |
+| **Biological unit** | Species |
+| **Unit note** | **CRITICAL — P50 sign convention:** Negative MPa expected. Run `check_p50_sign()` and compare with D14 before merging. |
+| **Known issues** | Short-form Dryad DOI (`dryad.1138`) — verify resolution. Dryad API v2 endpoint used. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D14 — P50 + HSM (Science Advances aav1332)
+
+```{r d14}
+s <- last_status("D14")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Choat B et al. (2018) Triggers of tree mortality under drought. Science Advances 4(1):eaav1332. https://doi.org/10.1126/sciadv.aav1332 |
+| **DOI** | https://doi.org/10.1126/sciadv.aav1332 (paper DOI — not data DOI) |
+| **Folder** | `data/raw/14_p50_sci_advances/` |
+| **License** | Open access (CC BY-NC) |
+| **Access type** | Supplementary file — may require institutional access |
+| **Download status** | `r status_badge("PARTIAL")` |
+| **Method** | Manual — locate and download supplementary file from paper landing page |
+| **Script** | `R/download_14_p50_sci_advances.R` (writes README only) |
+| **Action required** | Navigate to https://doi.org/10.1126/sciadv.aav1332, download supplementary data file, save to `data/raw/14_p50_sci_advances/`. Update catalog with filename, download date, and institutional access requirement. |
+| **Unit note** | P50 in MPa. **Audit sign convention** vs D13 before merging. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D15 — GLOPNET Leaf Traits (Wright et al. 2004)
+
+```{r d15}
+s <- last_status("D15")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Wright IJ et al. (2004) The worldwide leaf economics spectrum. Nature 428:821–827. https://doi.org/10.1038/nature02403 |
+| **DOI** | https://doi.org/10.1038/nature02403 (paper); data via Nature supplementary or TRY |
+| **Folder** | `data/raw/15_glopnet_leaf/` |
+| **License** | Nature supplementary — verify. TRY data: see TRY terms. |
+| **Access type** | Supplementary file (Nature) or TRY database request |
+| **Download status** | `r status_badge("PARTIAL")` |
+| **Method** | Manual (Nature supp) or TRY database request (recommended) |
+| **Script** | `R/download_15_glopnet_leaf.R` (writes README only) |
+| **Key variables** | LL, LMA, Nmass, Narea, Pmass, Amass, Aarea, Rd mass |
+| **Biological unit** | Species mean (leaf trait per species) |
+| **Action required** | Option A: Download Nature supplementary file from https://www.nature.com/articles/nature02403. Option B (recommended): Request GLOPNET traits via TRY database (see D16 for TRY process). |
+| **Unit note** | Verify units from paper Table S1: mass-based (mg/g, nmol/g/s) vs area-based (g/m², μmol/m²/s). |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D16 — Seed Mass (TRY Database Request 30569)
+
+```{r d16}
+s <- last_status("D16")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Kattge J et al. (2020) TRY plant trait database — enhanced coverage and open access. Global Change Biology 26:119–188. https://doi.org/10.1111/gcb.14904 |
+| **DOI / URL** | https://www.try-db.org |
+| **Folder** | `data/raw/16_try_seed_mass/` |
+| **License** | TRY-specific — **data cannot be redistributed** |
+| **Access type** | Registration + formal data request required |
+| **Download status** | `r status_badge("NO")` |
+| **Method** | Manual — TRY account + new data request submission |
+| **Script** | `R/download_16_try_seed_mass.R` (writes README only) |
+| **Key variables** | Seed/diaspore mass (mg dry mass), species, reference |
+| **TRY Trait IDs** | TraitID 26 (seed mass) or TraitID 4 (diaspore mass) |
+| **Original request** | Request No. 30569 (study-specific; not reproducible by others without new request) |
+| **Action required** | 1. Register at https://www.try-db.org/TryWeb/Account/Register. 2. Submit new request for TraitID 26 (seed mass). 3. Document: request ID, TRY version, submission date, approval date. |
+| **DATA RESTRICTION** | TRY data MUST NOT be committed to git or redistributed. |
+| **Unit note** | Standard: mg dry mass. Verify `UnitName` column — some records may be in g. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D17 — TreeGOER Climate/Soil (Zenodo 10008994)
+
+```{r d17}
+s <- last_status("D17")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Verify citation from Zenodo record at https://zenodo.org/records/10008994 |
+| **DOI** | https://doi.org/10.5281/zenodo.10008994 |
+| **Folder** | `data/raw/17_treegOER_climate/` |
+| **License** | Verify at Zenodo |
+| **Access type** | Open |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | Zenodo REST API v1 |
+| **Script** | `R/download_17_treegOER_climate.R` |
+| **Download date** | `r s$date` |
+| **File size (bytes)** | `r s$size` |
+| **SHA-256** | `r s$hash` |
+| **Key variables** | Species-level mean climate (MAT, MAP, etc.) and soil variables |
+| **Biological unit** | Species |
+| **Known issues** | Verify that TreeGOER provides species-level MEAN climate values (not raw occurrence grid values). Unit audit required for all soil variables. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D18 — WorldClim 2.1 Gridded Climate/Elevation
+
+```{r d18}
+s <- last_status("D18")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Fick SE, Hijmans RJ (2017) WorldClim 2: new 1-km spatial resolution climate surfaces for global land areas. International Journal of Climatology 37:4302–4315. https://doi.org/10.1002/joc.5086 |
+| **DOI / URL** | https://www.worldclim.org/data/worldclim21.html |
+| **Folder** | `data/raw/18_worldclim/` |
+| **License** | CC BY 4.0 |
+| **Access type** | Open |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | `geodata::worldclim_global()` R package |
+| **Script** | `R/download_18_worldclim.R` |
+| **Download date** | `r s$date` |
+| **Resolution used** | 10 arc-min (development default; change `RES` in script for production) |
+| **Variables** | tmin, tmax, prec, bio (bioclim 1–19), elev |
+| **Unit note** | Temperature: °C × 10 (BIO1–BIO11); precipitation: mm; elevation: m |
+| **Known issues** | Full resolution (30 arc-sec) is ~8 GB. Use 10 arc-min for development. Document final resolution in methods. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D19 — CHELSA Growing Season + NPP
+
+```{r d19}
+s <- last_status("D19")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | Karger DN et al. (2017) Climatologies at high resolution for the earth's land surface areas (CHELSA). Scientific Data 4:170122. https://doi.org/10.1038/sdata.2017.122 |
+| **DOI / URL** | https://chelsa-climate.org/ |
+| **Folder** | `data/raw/19_chelsa/` |
+| **License** | CC BY 4.0 |
+| **Access type** | Open |
+| **Download status** | `r status_badge("YES")` |
+| **Method** | Direct `curl` — CHELSA SwitchDrive CDN |
+| **Script** | `R/download_19_chelsa.R` |
+| **Download date** | `r s$date` |
+| **Variables** | kg_gsl (growing season length, days), npp (net primary productivity, kg C/m²/yr) |
+| **Known issues** | Individual files are 200–600 MB each. CHELSA URL conventions must match v2.1 exactly — verify at https://chelsa-climate.org/downloads/. |
+| **Unit note** | GSL: days; NPP: kg C/m²/yr; Verify units in CHELSA v2.1 technical specification. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## D20 — GBIF Species Occurrence (dl.77gcvq)
+
+```{r d20}
+s <- last_status("D20")
+```
+
+| Field | Value |
+|---|---|
+| **Citation** | GBIF.org. GBIF Occurrence Download. https://doi.org/10.15468/dl.77gcvq. Accessed: see download date |
+| **DOI** | https://doi.org/10.15468/dl.77gcvq |
+| **Folder** | `data/raw/20_gbif_occurrence/` |
+| **License** | CC BY 4.0 (GBIF standard) |
+| **Access type** | Open — GBIF prepared download (expires after ~6 months) |
+| **Download status** | `r status_badge("PARTIAL")` |
+| **Method** | `rgbif::occ_download_get()` |
+| **Script** | `R/download_20_gbif_occurrence.R` |
+| **Download date** | `r s$date` |
+| **File format** | Darwin Core Archive ZIP (occurrence.txt + meta.xml + eml.xml) |
+| **Key DwC fields** | species, decimalLatitude, decimalLongitude, eventDate, basisOfRecord, occurrenceID, countryCode |
+| **Biological unit** | Occurrence record |
+| **Known issues** | **GBIF downloads expire after ~6 months.** Verify key `dl.77gcvq` is still active. If expired, re-download requires documenting original filter criteria (taxon key, date range, basisOfRecord, spatial filters). |
+| **Action required if expired** | Submit new `rgbif::occ_download()` request. Document original filter set in this catalog. |
+| **QA status** | `r qa_badge("NOT RUN")` |
+
+---
+
+## Critical Issues Tracker
+
+```{r critical-issues}
+issues <- data.frame(
+  ID      = c("D01", "D13", "D14", "D16", "D20"),
+  Issue   = c(
+    "Figshare record 29876984 not independently verified — may be embargoed",
+    "P50 sign convention must be audited before merging with D14",
+    "P50 sign convention must be audited before merging with D13; supplementary file may require institutional access",
+    "TRY data cannot be redistributed; original request 30569 not reproducible by others",
+    "GBIF download dl.77gcvq may have expired; original filter criteria must be documented"
+  ),
+  Priority = c("HIGH", "CRITICAL", "CRITICAL", "HIGH", "HIGH"),
+  stringsAsFactors = FALSE
+)
+
+kable(issues, col.names = c("Dataset", "Issue", "Priority"),
+      align = "lll") |>
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = TRUE) |>
+  row_spec(which(issues$Priority == "CRITICAL"), background = "#fff0f0", bold = TRUE) |>
+  row_spec(which(issues$Priority == "HIGH"), background = "#fffbea")
+```
+
+---
+
+## QA Log
+
+```{r qa-log}
+qa_log <- tryCatch(
+  read.csv(here("logs", "qa_log.csv"), stringsAsFactors = FALSE),
+  error = function(e) data.frame()
+)
+if (nrow(qa_log) == 0) {
+  cat("*No QA checks run yet. Run per-dataset QA functions from `R/qa_utils.R` after download.*")
+} else {
+  kable(qa_log) |>
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = TRUE, font_size = 11)
+}
+```
+
+---
+
+## Download Log
+
+```{r download-log}
+if (nrow(dl_log) == 0) {
+  cat("*No downloads recorded yet. Run `source('download_all.R')` to start.*")
+} else {
+  dl_show <- dl_log[, c("dataset_id", "dataset_name", "download_timestamp",
+                         "http_status", "file_size_bytes", "download_method", "notes")]
+  kable(dl_show,
+        col.names = c("ID", "Dataset", "Timestamp", "Status",
+                      "Size (bytes)", "Method", "Notes")) |>
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = TRUE, font_size = 11)
+}
+```
+
+---
+
+## R Package Requirements
+
+```{r packages, echo=TRUE, eval=FALSE}
+# Install required packages for all download scripts and catalog
+install.packages(c(
+  "httr2",      # REST API calls (Zenodo, Figshare, Dryad, DataVerse)
+  "digest",     # SHA-256 file hashing
+  "cli",        # Formatted console messages
+  "here",       # Portable file paths
+  "rvest",      # HTML scraping (OldList sources)
+  "polite",     # Rate-limited, robots.txt-compliant scraping
+  "rgbif",      # GBIF occurrence downloads
+  "geodata",    # WorldClim download wrapper
+  "terra",      # Geospatial raster (CHELSA, WorldClim)
+  "dplR",       # ITRDB .rwl tree ring file parsing
+  "rmarkdown",
+  "knitr",
+  "kableExtra"
+))
+```
+
+---
+
+*Catalog rendered: `r format(Sys.time(), "%Y-%m-%d %H:%M")`*  
+*Framework designed by scholarly-rigor-reviewer × biodiversity-science-guard × biodiversity-informatics-checker*
