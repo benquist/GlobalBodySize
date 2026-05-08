@@ -1889,3 +1889,8 @@ Record each user prompt that led to creation, direction, or alteration of agent 
 ## 2026-05-08 — Add WEF UNESCO biodiversity news item
 
 Added `_news/announcement_5.md` linking to https://www.weforum.org/stories/2023/09/unesco-world-heritage-sites-biodiversity/ on the enquistlab site news page. Committed and pushed (96b68b6).
+
+## 2026-05-08 — conservation-impacts: restore Selected Examples + fix Partner With Us contrast
+Prompt: Restore the removed "Selected Examples" section (SPARC, Krieger 2022, Hannah 2020, Duncanson 2023, Pillet 2022) to conservation-impacts.md with scientific caveats intact. Fix the "Partner With Us" section where black text was rendering on a dark green background (unreadable) — redesigned to a lightly tinted green card with a left border accent and dark text.
+Files changed: _pages/conservation-impacts.md
+Commit: 1345422
