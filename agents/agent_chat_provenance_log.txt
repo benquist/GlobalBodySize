@@ -1,3 +1,17 @@
+[23] Date: 2026-05-09
+Source: overnight autonomous execution (@m supervisor agent mode; user asleep)
+Request summary: Complete overnight pipeline for BIEN Species Shiny app multi-agent design sprint: run code-checker → fix all issues → run optimizer → implement optimization → run code-verifier → commit + push.
+Files affected: BIEN-SpeciesShinyApp/app.R, BIEN-SpeciesShinyApp/chat_provenance_log.md, agents/prompt_log.md, agents/agent_chat_provenance_log.txt
+Agents invoked: code-checker, optimizer, code-verifier
+Action taken:
+  code-checker: found 5 issues — C1 CRITICAL (as.character(NA) coerced to "na" via tolower; intro NA records miscounted as known native status), W1 (cap-active guard `mapped_n < orig_kept` silently suppressed because orig_kept was NULL), W2 (R list passed directly to tags$div() instead of via do.call — not portable across htmltools versions), W3 (CSS nth-child border-left colors and active-state green selectors used visual/flex-reorder positions instead of true DOM positions), W4 (as.character(NULL) → character(0) triggering taxon match banner incorrectly). All 5 fixed in app.R.
+  optimizer: recommended shared `matched_taxon_name_rv <- reactive({...})` to deduplicate find_first_col() + na.omit(unique()) calls made independently by taxon_match_banner_ui and recon_callout_ui. Already implemented in file from prior session. Confirmed in place.
+  code-verifier: independent second-pass confirmed all 4 verifiable prior issues resolved; caught one additional WARNING — `occ_returned` not guarded against NA when res$occurrences_returned is SQL NULL. Fixed with `!is.na(res$occurrences_returned)` guard. Verdict: APPROVED WITH NOTES.
+  Parse verified clean (exit 0) after all fixes.
+  git commit 6a359a6 ("Multi-agent design: tab reorder, taxon banner, QA chips, disclosure strips; fix C1/W1-W4 + NA guard; optimizer shared reactive") pushed to https://github.com/benquist/BIEN-SpeciesShinyApp.git (origin/main).
+  Parent workspace agents/prompt_log.md committed as 4fce95c.
+Outcome: All code-checker and code-verifier issues resolved. Optimizer shared reactive in place. Committed and pushed. app.R parse-clean.
+
 [22] Date: 2026-05-05
 Source: active chat request (@m supervisor agent mode)
 Request summary: Update project-associated .html and .rmd files including a map of new coordinates for shenkin_etal_2020_crown_dimensions.csv (Andean crown dimensions dataset, 1,153 records, Peru, multi-elevation plots).
@@ -1220,3 +1234,4 @@ Actions: Replaced single SDM worked example with four parallel worked examples (
 2026-05-04 | Literature overlap redesign consultation: biodiversity-informatics-checker + taxonomy-reconciliation + scholarly-rigor-reviewer. Outcome: adopt two-tier overlap (project-level screen first, targeted species confirmatory second) with explicit caveats and reconciliation metadata requirements.
 2026-05-06 | Added Theory section to enquistlab-site-migration/_pages/research.md: MST (WBE fractal network → 3/4 scaling, MTE) and TDT (trait distributions, multi-scale filtering) subsections with key paper links. Applied enhanced-theory (Scaling/Network modes) and ecology-user (Trait-Environment Mapping, Scaling Logic conditions) agent frameworks.
 2026-05-06 | Research page Theory section drafted, citation-audited, and cleaned. Redundant stubs removed. All changes pushed to enquistlab.github.io.
+2026-05-08 | BIEN-SpeciesShinyApp reactive species photo panel added to app header. Agents involved: design-atelier (UI layout), coder (fetch_species_photo helper, iNat/Wikipedia APIs, session cache), optimizer (timeout and null-guard tuning), code-checker (4 CRITICAL + 2 WARNING issues resolved), biodiversity-science-guard (license filter: cc-by/cc-by-sa/cc0; taxonomic name validation; ARR/NC/ND rejection), code-verifier (parse-OK confirmed). Commit 49c648a pushed to origin/main; deployed to benquist.shinyapps.io/bien-species-shinyapp/.
