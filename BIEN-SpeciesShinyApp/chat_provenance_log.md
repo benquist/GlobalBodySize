@@ -2,6 +2,27 @@
 
 Tracks prompts that created or changed work under this project folder.
 
+## 2026-05-09 — Multi-agent UX/design redesign
+
+**Prompt:** "@M orchestrate design proposal from @scandinavian-design, @design-atelier, @biodiversity-informatics-checker, @ecology-user for the BIEN Species Shiny app"
+
+**Agents invoked:** ecology-user (use case analysis), biodiversity-informatics-checker (data quality audit), design-atelier + scandinavian-design (Nordic UI/UX spec)
+
+**Changes implemented in `app.R`:**
+- CSS flexbox `order` properties on `.nav-tabs > li:nth-child(N)` to visually reorder tabs: Occurrence 1st, Observations 2nd, Traits 3rd, Range 4th, Community 5th, Temporal 6th, Download 7th, External Links 8th, About & Help last — without changing server-side tab IDs.
+- Renamed "Overview & About" tab to "About & Help".
+- `uiOutput("taxon_match_banner_ui")` added above tabsetPanel — amber banner when BIEN-resolved name ≠ user input; shown on all tabs.
+- `uiOutput("recon_callout_ui")` — compact above-map callout showing queried vs. BIEN-matched name and geographic scope.
+- `uiOutput("qa_chips_bar_ui")` — pill-style QA chips bar: native/introduced/unknown record counts with amber warnings at >20% unknown or sampling cap active.
+- `uiOutput("map_caption_ui")` — amber sampling-cap disclosure below occurrence map.
+- Observations tab: added `disclosure-strip` explaining deduplication key (species+lat+lon+observation_type) and heuristic classification.
+- Traits tab: added `disclosure-strip` for parsing exclusions (range notation → NA) and no-unit-harmonization warning.
+- Range tab: upgraded SDM caveat to prominent left-bordered amber callout placed above the map.
+- Community tab: replaced plain `tags$p` with `disclosure-strip` clarifying plot-only scope.
+- New CSS classes: `.taxon-match-banner`, `.qa-chip`, `.qa-warn`, `.map-caption-row`, `.recon-callout`, `.disclosure-strip`, `.null-status-note`.
+- Syntax verified: `parse('app.R')` passes cleanly.
+
+
 ## Entries
 
 29. Date: 2026-05-08

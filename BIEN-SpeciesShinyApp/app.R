@@ -382,7 +382,7 @@ natives_check_with_null_fallback <- function(natives_only = TRUE) {
 # occurrence map and (2) randomize the returned row order on the BIEN side so
 # widespread species are less likely to be dominated by whichever datasource
 # happens to come first in the backend table (for example FIA plot rows).
-query_occurrence_randomized <- function(species_name, cultivated = FALSE, natives_only = TRUE, only_geovalid = TRUE, limit = 1000, record_limit = 500, randomize_order = TRUE) {
+query_occurrence_randomized <- function(species_name, cultivated = FALSE, natives_only = TRUE, only_geovalid = TRUE, limit = 1000, record_limit = 500, randomize_order = TRUE, require_coords = FALSE) {
   cultivated_ <- BIEN:::.cultivated_check(cultivated)
   newworld_ <- BIEN:::.newworld_check(NULL)
   taxonomy_ <- BIEN:::.taxonomy_check(TRUE)
@@ -399,6 +399,19 @@ query_occurrence_randomized <- function(species_name, cultivated = FALSE, native
   # For limit <= 500, natural table order + R-side stratified sampling is sufficient.
   use_randomize <- isTRUE(randomize_order) && limit > 500 && limit <= 10000
   order_clause <- if (use_randomize) "ORDER BY random()" else ""
+
+  # When require_coords=TRUE, add SQL-level latitude/longitude IS NOT NULL filter.
+  # This is the last-resort plan for species where BIEN's natural table order returns
+  # only null-coord records (e.g. Pouteria reticulata where trait/plot rows come first).
+  coord_bearing_clause <- if (isTRUE(require_coords)) {
+    paste(
+      "AND latitude IS NOT NULL AND longitude IS NOT NULL",
+      "AND latitude BETWEEN -90 AND 90",
+      "AND longitude BETWEEN -180 AND 180"
+    )
+  } else {
+    ""
+  }
 
   query <- paste(
     "SELECT scrubbed_species_binomial", taxonomy_$select,
@@ -417,6 +430,7 @@ query_occurrence_randomized <- function(species_name, cultivated = FALSE, native
     "AND scrubbed_species_binomial IS NOT NULL",
     "AND lower(coalesce(observation_type, '')) NOT LIKE '%trait%'",
     "AND lower(coalesce(observation_type, '')) NOT LIKE '%measurement%'",
+    coord_bearing_clause,
     order_clause,
     "LIMIT", as.integer(limit), ";"
   )
@@ -468,10 +482,14 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
 
   # Try the user-requested interpretation first, then relax native-only and finally
   # geovalid constraints if needed so the app can still show some BIEN evidence.
+  # The final fallback_coord_bearing plan adds a SQL-level lat/lon IS NOT NULL guard
+  # for species (e.g. Pouteria reticulata) where BIEN's natural table order returns
+  # only null-coord records under LIMIT N without ORDER BY.
   plans <- list(
-    list(label = "strict", natives.only = natives_only, only.geovalid = only_geovalid, limit = fast_limit, record_limit = fast_page_size),
-    list(label = "fallback_relaxed_native", natives.only = FALSE, only.geovalid = only_geovalid, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
-    list(label = "fallback_relaxed_geo", natives.only = FALSE, only.geovalid = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500))
+    list(label = "strict",                 natives.only = natives_only, only.geovalid = only_geovalid, require_coords = FALSE, limit = fast_limit,            record_limit = fast_page_size),
+    list(label = "fallback_relaxed_native", natives.only = FALSE,        only.geovalid = only_geovalid, require_coords = FALSE, limit = min(fast_limit, 500),  record_limit = min(fast_page_size, 500)),
+    list(label = "fallback_relaxed_geo",   natives.only = FALSE,        only.geovalid = FALSE,         require_coords = FALSE, limit = min(fast_limit, 500),  record_limit = min(fast_page_size, 500)),
+    list(label = "fallback_coord_bearing", natives.only = FALSE,        only.geovalid = FALSE,         require_coords = TRUE,  limit = min(fast_limit, 2000), record_limit = min(fast_page_size, 500))
   )
   plans <- plans[seq_len(max(1, min(length(plans), as.integer(max_plans))))]
 
@@ -481,9 +499,13 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
   query_started <- Sys.time()
   deadline <- query_started + as.numeric(timeout_sec)
   skip_to_relaxed_geo <- FALSE
+  skip_to_coord_bearing <- FALSE
 
   for (plan in plans) {
-    if (isTRUE(skip_to_relaxed_geo) && !identical(plan$label, "fallback_relaxed_geo")) {
+    if (isTRUE(skip_to_relaxed_geo) && !identical(plan$label, "fallback_relaxed_geo") && !identical(plan$label, "fallback_coord_bearing")) {
+      next
+    }
+    if (isTRUE(skip_to_coord_bearing) && !identical(plan$label, "fallback_coord_bearing")) {
       next
     }
 
@@ -504,6 +526,7 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
           cultivated = include_cultivated,
           natives_only = plan$natives.only,
           only_geovalid = plan$only.geovalid,
+          require_coords = isTRUE(plan$require_coords),
           limit = plan$limit,
           record_limit = plan$record_limit,
           randomize_order = randomize_order
@@ -520,13 +543,21 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
     notes <- c(notes, paste0("occ_strategy=", plan$label, "; status=", res$status, "; attempts=", res$attempt, "; limit=", plan$limit))
 
     if (is.data.frame(res$result) && nrow(res$result) > 0) {
-      if (identical(plan$label, "strict") && isTRUE(plan$only.geovalid)) {
-        strict_mappable_n <- count_mappable_occurrences(res$result)
-        notes <- c(notes, paste0("strict_mappable=", strict_mappable_n))
+      plan_mappable_n <- count_mappable_occurrences(res$result)
+      notes <- c(notes, paste0("plan_mappable=", plan_mappable_n, "; plan=", plan$label))
 
-        if (strict_mappable_n == 0 && any(vapply(plans, function(p) identical(p$label, "fallback_relaxed_geo"), logical(1)))) {
-          notes <- c(notes, "strict_zero_mappable_triggered_relaxed_geo_pass")
+      if (plan_mappable_n == 0) {
+        has_coord_bearing_plan <- any(vapply(plans, function(p) identical(p$label, "fallback_coord_bearing"), logical(1)))
+
+        if (identical(plan$label, "strict") && any(vapply(plans, function(p) identical(p$label, "fallback_relaxed_geo"), logical(1)))) {
+          notes <- c(notes, "zero_mappable_triggered_relaxed_geo_pass")
           skip_to_relaxed_geo <- TRUE
+          next
+        }
+
+        if ((identical(plan$label, "fallback_relaxed_geo") || identical(plan$label, "fallback_relaxed_native")) && has_coord_bearing_plan) {
+          notes <- c(notes, paste0("zero_mappable_on_", plan$label, "_triggered_coord_bearing_pass"))
+          skip_to_coord_bearing <- TRUE
           next
         }
       }
@@ -1901,15 +1932,15 @@ ui <- fluidPage(
         border-color: #92b7d6;
         color: #163d5a;
       }
-      .nav-tabs > li:nth-child(1) > a { border-left: 6px solid #2f79b7; }
-      .nav-tabs > li:nth-child(2) > a { border-left: 6px solid #49a078; }
-      .nav-tabs > li:nth-child(3) > a { border-left: 6px solid #69b34c; }
-      .nav-tabs > li:nth-child(4) > a { border-left: 6px solid #d4a537; }
-      .nav-tabs > li:nth-child(5) > a { border-left: 6px solid #e07a5f; }
-      .nav-tabs > li:nth-child(6) > a { border-left: 6px solid #7b8ec8; }
-      .nav-tabs > li:nth-child(7) > a { border-left: 6px solid #4e8c2c; }
-      .nav-tabs > li:nth-child(8) > a { border-left: 6px solid #2a83a8; }
-      .nav-tabs > li:nth-child(9) > a { border-left: 6px solid #6f8f3f; }
+      .nav-tabs > li:nth-child(1) > a { border-left: 6px solid #6f8f3f; }  /* About & Help (visual pos 9)       */
+      .nav-tabs > li:nth-child(2) > a { border-left: 6px solid #2f79b7; }  /* Occurrence   (visual pos 1)       */
+      .nav-tabs > li:nth-child(3) > a { border-left: 6px solid #7b8ec8; }  /* Temporal     (visual pos 6)       */
+      .nav-tabs > li:nth-child(4) > a { border-left: 6px solid #d4a537; }  /* Observations (visual pos 2)       */
+      .nav-tabs > li:nth-child(5) > a { border-left: 6px solid #69b34c; }  /* Traits       (visual pos 3)       */
+      .nav-tabs > li:nth-child(6) > a { border-left: 6px solid #e07a5f; }  /* Community    (visual pos 5)       */
+      .nav-tabs > li:nth-child(7) > a { border-left: 6px solid #49a078; }  /* Range        (visual pos 4)       */
+      .nav-tabs > li:nth-child(8) > a { border-left: 6px solid #4e8c2c; }  /* Download     (visual pos 7)       */
+      .nav-tabs > li:nth-child(9) > a { border-left: 6px solid #2a83a8; }  /* External Links (visual pos 8)     */
       .nav-tabs > li.active > a,
       .nav-tabs > li.active > a:focus,
       .nav-tabs > li.active > a:hover {
@@ -1919,18 +1950,18 @@ ui <- fluidPage(
         box-shadow: 0 2px 0 #18456f, 0 7px 14px rgba(31, 91, 143, 0.25);
         transform: translateY(-1px);
       }
-      .nav-tabs > li.active:nth-child(2) > a,
-      .nav-tabs > li.active:nth-child(2) > a:focus,
-      .nav-tabs > li.active:nth-child(2) > a:hover,
       .nav-tabs > li.active:nth-child(3) > a,
       .nav-tabs > li.active:nth-child(3) > a:focus,
       .nav-tabs > li.active:nth-child(3) > a:hover,
-      .nav-tabs > li.active:nth-child(7) > a,
-      .nav-tabs > li.active:nth-child(7) > a:focus,
-      .nav-tabs > li.active:nth-child(7) > a:hover,
-      .nav-tabs > li.active:nth-child(9) > a,
-      .nav-tabs > li.active:nth-child(9) > a:focus,
-      .nav-tabs > li.active:nth-child(9) > a:hover {
+      .nav-tabs > li.active:nth-child(5) > a,
+      .nav-tabs > li.active:nth-child(5) > a:focus,
+      .nav-tabs > li.active:nth-child(5) > a:hover,
+      .nav-tabs > li.active:nth-child(6) > a,
+      .nav-tabs > li.active:nth-child(6) > a:focus,
+      .nav-tabs > li.active:nth-child(6) > a:hover,
+      .nav-tabs > li.active:nth-child(8) > a,
+      .nav-tabs > li.active:nth-child(8) > a:focus,
+      .nav-tabs > li.active:nth-child(8) > a:hover {
         background: linear-gradient(180deg, #87c95d 0%, #4e8c2c 100%);
         border-color: #4e8c2c;
         box-shadow: 0 2px 0 #386620, 0 7px 14px rgba(62, 112, 36, 0.22);
@@ -2067,6 +2098,96 @@ ui <- fluidPage(
       }
       .bien-help-btn:active {
         box-shadow: 0 2px 0 #bfd4e7, 0 4px 8px rgba(34, 88, 128, 0.1);
+      }
+      /* ── Tab visual reorder: Occurrence first, About last ─────────────── */
+      .nav-tabs { flex-wrap: wrap; }
+      .nav-tabs > li:nth-child(1)  { order: 9; }  /* About & Help  → last  */
+      .nav-tabs > li:nth-child(2)  { order: 1; }  /* Occurrence    → 1st  */
+      .nav-tabs > li:nth-child(3)  { order: 6; }  /* Temporal      → 6th  */
+      .nav-tabs > li:nth-child(4)  { order: 2; }  /* Observations  → 2nd  */
+      .nav-tabs > li:nth-child(5)  { order: 3; }  /* Traits        → 3rd  */
+      .nav-tabs > li:nth-child(6)  { order: 5; }  /* Community     → 5th  */
+      .nav-tabs > li:nth-child(7)  { order: 4; }  /* Range         → 4th  */
+      .nav-tabs > li:nth-child(8)  { order: 7; }  /* Download      → 7th  */
+      .nav-tabs > li:nth-child(9)  { order: 8; }  /* External Links → 8th */
+      /* ── Data quality signal components ──────────────────────────────── */
+      .taxon-match-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background: #fff8f0;
+        border: 1px solid #f0c070;
+        border-left: 4px solid #d97b15;
+        border-radius: 0 4px 4px 0;
+        padding: 10px 14px;
+        margin-bottom: 12px;
+        font-size: 0.9em;
+        line-height: 1.5;
+      }
+      .taxon-match-banner .banner-label {
+        color: #7a5a00;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.78em;
+        white-space: nowrap;
+      }
+      .taxon-match-banner .banner-input  { color: #555; font-style: italic; }
+      .taxon-match-banner .banner-match  { color: #333; font-weight: 600; }
+      .taxon-match-banner .banner-meta   { color: #999; font-size: 0.82em; }
+      .qa-chips-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 6px 0 10px 0;
+      }
+      .qa-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #f7f8fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 14px;
+        padding: 3px 10px;
+        font-size: 0.81em;
+        white-space: nowrap;
+      }
+      .qa-chip .qa-label { color: #888; font-weight: 500; }
+      .qa-chip .qa-value { color: #333; font-weight: 600; }
+      .qa-chip.qa-warn   { background: #fff8f0; border-color: #f0c070; }
+      .qa-chip.qa-warn .qa-value { color: #d97b15; }
+      .map-caption-row {
+        font-size: 0.81em;
+        color: #aaa;
+        padding: 4px 0 6px 0;
+        line-height: 1.4;
+      }
+      .map-caption-row.cap-warn { color: #d97b15; }
+      .recon-callout {
+        background: #f7f8fa;
+        border-left: 3px solid var(--bien-blue);
+        border-radius: 0 4px 4px 0;
+        padding: 8px 14px;
+        margin-bottom: 10px;
+        font-size: 0.87em;
+      }
+      .recon-callout .rc-label { color: #888; font-size: 0.82em; margin-right: 4px; }
+      .recon-callout .rc-value { color: #333; font-weight: 600; }
+      .disclosure-strip {
+        background: #fffbf0;
+        border-top: 1px solid #ffe0a0;
+        border-bottom: 1px solid #ffe0a0;
+        padding: 7px 12px;
+        margin-bottom: 10px;
+        font-size: 0.83em;
+        color: #7a5a00;
+        line-height: 1.5;
+      }
+      .null-status-note {
+        font-size: 0.80em;
+        color: #888;
+        font-style: italic;
+        padding: 2px 0 8px 0;
       }
     "))
   ),
@@ -2264,13 +2385,14 @@ ui <- fluidPage(
       width = 3
     ),
     mainPanel(
+      uiOutput("taxon_match_banner_ui"),
       tabsetPanel(
         id = "main_tabs",
         selected = "Occurrence",
 
-        # ── Overview & About tab ──────────────────────────────────────────────
+        # ── About & Help tab ───────────────────────────────────────────────────
         tabPanel(
-          "Overview & About",
+          "About & Help",
           br(),
 
           # Hero intro
@@ -2463,7 +2585,10 @@ ui <- fluidPage(
         tabPanel(
           "Occurrence",
           br(),
+          uiOutput("recon_callout_ui"),
+          uiOutput("qa_chips_bar_ui"),
           leafletOutput("occurrence_map", height = 550),
+          uiOutput("map_caption_ui"),
           br(),
           uiOutput("overview_notice"),
           uiOutput("slow_query_alert"),
@@ -2472,7 +2597,7 @@ ui <- fluidPage(
             style = "color:#555;max-width:900px;",
             "Summary statistics for the current map are shown below. Optional BIEN total counts and source fractions are loaded on demand."
           ),
-          actionButton("load_summary_counts", "Load BIEN total counts and source mix (slower)", class = "btn-default btn-sm"),
+          actionButton("load_summary_counts", "Load full BIEN counts (slower)", class = "btn-default btn-sm"),
           br(), br(),
           htmlOutput("query_summary")
         ),
@@ -2514,13 +2639,26 @@ ui <- fluidPage(
         tabPanel(
           "Observations",
           br(),
-          tags$h4("Reconciliation Table"),
+          tags$h4("Taxonomic Reconciliation"),
+          tags$p(
+            style = "color:#555;font-size:0.93em;max-width:900px;margin-bottom:8px;",
+            "BIEN-returned name match for the current query. Match is provisional and based on BIEN's internal scrubber only — not cross-validated against GBIF or World Flora Online."
+          ),
           DTOutput("reconciliation_table"),
           br(),
           tags$h4("Observation Source Summary"),
           DTOutput("observation_source_table"),
           br(),
           tags$h4("Observation Records"),
+          tags$div(
+            class = "disclosure-strip",
+            tags$strong("Deduplication note: "),
+            "Records are deduplicated on species + latitude + longitude + observation_type. ",
+            "Two specimens from different collections at the same plot coordinates are collapsed to one record. ",
+            "Observation type (Specimen, Plot, Citizen science, HumanObservation) is classified heuristically from datasource and observation_type fields; some records may be misclassified. ",
+            tags$strong("\u2018Other / unknown\u2019 category "),
+            "includes records where source type could not be determined \u2014 treat these with caution."
+          ),
           DTOutput("occurrence_table")
         ),
         tabPanel(
@@ -2533,6 +2671,13 @@ ui <- fluidPage(
             style = "color:#555;max-width:900px;",
             "Continuous traits only. Histograms are built from parsed single-number values and are kept separate by unit; categorical or mixed-format BIEN values stay in the tables below."
           ),
+          tags$div(
+            class = "disclosure-strip",
+            tags$strong("Trait parsing note: "),
+            "Only single-number numeric values are plotted. Range notation (e.g., \u201810\u201315\u2019), multi-token strings, and categorical values are set to NA and excluded from histograms \u2014 they remain in the raw trait table below. ",
+            "No unit harmonization is performed. Trait values in different units for the same trait should not be pooled for quantitative analysis without converting units first. ",
+            "If multiple units are detected for a single trait, that is noted in the Trait Summary table above."
+          ),
           plotOutput("trait_plot", height = 800),
           br(),
           tags$h4("Trait Visual Summary Table"),
@@ -2544,9 +2689,12 @@ ui <- fluidPage(
         tabPanel(
           "Community",
           br(),
-          tags$p(
-            style = "color:#555;max-width:900px;",
-            "Map shows records categorized as Plot / survey for the current species."
+          tags$div(
+            class = "disclosure-strip",
+            tags$strong("Plot records only: "),
+            "This map shows records categorized as Plot\u2009/\u2009survey for the current species. ",
+            "These are structured floristic surveys with known area and sampling effort \u2014 distinct from herbarium specimens or citizen-science observations shown on the main Occurrence tab. ",
+            "Plot presence reflects detection within a defined monitoring network, not the full species range."
           ),
           uiOutput("community_notice"),
           uiOutput("community_map_ui"),
@@ -2556,11 +2704,13 @@ ui <- fluidPage(
         ),
         tabPanel("Range", br(),
           tags$div(
-            style = "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:0.9em;",
-            tags$strong("Model caveat: "),
+            style = "background:#fff3cd;border:1px solid #ffe69c;border-left:4px solid #d97b15;color:#664d03;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:14px;font-size:0.9em;line-height:1.5;",
+            tags$strong("\u26a0\ufe0f Model caveat \u2014 read before interpreting: "),
             "BIEN range polygons are outputs of species distribution models (SDMs), not surveyed or verified native range boundaries. ",
-            "They represent modeled habitat suitability under the assumptions of the underlying SDM, which may over- or under-predict ",
-            "the realized range. Treat them as coarse biogeographic reference layers, not as authoritative range maps."
+            "They represent modeled habitat suitability under the assumptions of the underlying SDM, which may substantially over- or under-predict the realized range. ",
+            "The polygon is not peer-reviewed for this species specifically. ",
+            "Do not use as a legal basis for conservation status or as evidence of species presence or absence at any specific location. ",
+            "Treat as a coarse biogeographic reference layer only."
           ),
           verbatimTextOutput("range_text"),
           leafletOutput("range_map", height = 500)
@@ -2679,8 +2829,8 @@ server <- function(input, output, session) {
       update_species_select_input(STARTUP_SPECIES, choices = startup_species_suggestions)
     }
 
-    valid_tabs <- c("Overview & About", "Occurrence", "Community", "Observations",
-                    "Traits", "Range", "Download", "Species External Links")
+    valid_tabs <- c("About & Help", "Occurrence", "Community", "Observations",
+                    "Traits", "Range", "Download", "Species External Links", "Temporal Distribution")
     if (!is.null(tab_from_url) && nzchar(tab_from_url) &&
         utils::URLdecode(tab_from_url) %in% valid_tabs) {
       updateTabsetPanel(session, "main_tabs",
@@ -2713,7 +2863,7 @@ server <- function(input, output, session) {
       "Range" = "Load optional BIEN range artifacts and inspect mapped range layers when available.",
       "Download" = "Download occurrence, plot/community, and trait datasets plus matching reproducible R code.",
       "Species External Links" = "Open external species references generated from the current species name.",
-      "Overview & About" = "Read app background, scope, and interpretation context.",
+      "About & Help" = "Read app background, scope, and interpretation context.",
       "Use Query BIEN to run live retrieval."
     )
 
@@ -2745,6 +2895,7 @@ server <- function(input, output, session) {
       strict = requested_natives_only,
       fallback_relaxed_native = FALSE,
       fallback_relaxed_geo = FALSE,
+      fallback_coord_bearing = FALSE,
       requested_natives_only
     )
     effective_only_geovalid <- switch(
@@ -2752,6 +2903,7 @@ server <- function(input, output, session) {
       strict = requested_only_geovalid,
       fallback_relaxed_native = requested_only_geovalid,
       fallback_relaxed_geo = FALSE,
+      fallback_coord_bearing = FALSE,
       requested_only_geovalid
     )
 
@@ -3272,7 +3424,8 @@ server <- function(input, output, session) {
         connection_retry = retry_mode,
         # Even in Lucky mode, keep fallback plans enabled so a strict timeout can
         # still recover mappable records via relaxed native/geovalid strategies.
-        max_plans = 3,
+        # 4 plans: strict -> relaxed_native -> relaxed_geo -> coord_bearing (SQL lat/lon NOT NULL).
+        max_plans = 4,
         per_plan_timeout = if (isTRUE(lucky_fast_mode)) 4 else 60,
         randomize_order = FALSE
       )
@@ -3411,7 +3564,7 @@ server <- function(input, output, session) {
     occ_n <- if (is.data.frame(res$occurrences)) nrow(res$occurrences) else 0
     mappable_n <- if (is.list(res$occurrences_prepared) && is.data.frame(res$occurrences_prepared$data)) nrow(res$occurrences_prepared$data) else 0
 
-    if (isTRUE(res$use_default_filter_profile) && identical(res$occ_strategy, "fallback_relaxed_geo")) {
+    if (isTRUE(res$use_default_filter_profile) && (identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing"))) {
       showNotification(
         "Conservative default profile remained selected, but this query auto-relaxed geovalid/native constraints after strict timeout or zero-mappable results to recover map points.",
         type = "warning",
@@ -4062,14 +4215,14 @@ server <- function(input, output, session) {
       use_cultivated_filter <- isTRUE(res$use_cultivated_filter)
       use_introduced_filter <- isTRUE(res$use_introduced_filter)
       count_include_cultivated <- if (use_cultivated_filter) isTRUE(res$include_cultivated) else TRUE
-      count_natives_only <- if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo")) {
+      count_natives_only <- if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
         FALSE
       } else if (use_introduced_filter) {
         isTRUE(res$natives_only)
       } else {
         FALSE
       }
-      count_only_geovalid <- if (identical(res$occ_strategy, "fallback_relaxed_geo")) {
+      count_only_geovalid <- if (identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
         FALSE
       } else {
         isTRUE(res$only_geovalid)
@@ -4121,6 +4274,184 @@ server <- function(input, output, session) {
       out
     })
   }, ignoreInit = TRUE)
+
+  # ── Shared reactive: BIEN-returned matched taxon name (avoids duplicate
+  #    find_first_col + unique() work in banner and callout outputs) ────────
+  matched_taxon_name_rv <- reactive({
+    res <- bien_results()
+    if (is.null(res) || !is.data.frame(res$occurrences) || nrow(res$occurrences) == 0)
+      return(NA_character_)
+    sp_col <- find_first_col(res$occurrences,
+                             c("scrubbed_species_binomial", "species", "scientific_name"))
+    if (is.null(sp_col)) return(NA_character_)
+    vals <- na.omit(unique(as.character(res$occurrences[[sp_col]])))
+    if (length(vals) > 0) vals[[1]] else NA_character_
+  })
+
+  # ── Taxon match banner: shown across all tabs when BIEN resolves a different name ────
+  output$taxon_match_banner_ui <- renderUI({
+    res <- bien_results()
+    if (is.null(res) || is.null(res$occurrences)) return(NULL)
+    if (is.null(res$species) || length(res$species) == 0) return(NULL)
+
+    input_name   <- trimws(as.character(res$species))
+    matched_name <- matched_taxon_name_rv()
+
+    if (is.na(matched_name)) return(NULL)
+    names_differ <- !identical(
+      tolower(trimws(input_name)),
+      tolower(trimws(matched_name))
+    )
+    if (!names_differ) return(NULL)
+
+    tags$div(
+      class = "taxon-match-banner",
+      tags$span(class = "banner-label", "Name resolved:"),
+      tags$span(class = "banner-input", htmltools::htmlEscape(input_name)),
+      tags$span(style = "color:#aaa;", "\u2192"),
+      tags$span(class = "banner-match", tags$em(htmltools::htmlEscape(matched_name))),
+      tags$span(class = "banner-meta",
+        "BIEN-returned match only \u2014 not cross-validated against GBIF or World Flora Online. Verify this is your intended taxon."
+      )
+    )
+  })
+
+  # ── Compact reconciliation callout above the occurrence map ──────────────
+  output$recon_callout_ui <- renderUI({
+    res <- bien_results()
+    if (is.null(res) || is.null(res$occurrences)) return(NULL)
+    if (is.null(res$species) || length(res$species) == 0) return(NULL)
+
+    input_name   <- trimws(as.character(res$species))
+    matched_name <- matched_taxon_name_rv()
+
+    if (is.na(matched_name)) return(NULL)
+
+    match_status <- if (identical(tolower(trimws(input_name)), tolower(trimws(matched_name)))) {
+      "exact"
+    } else {
+      "resolved"
+    }
+
+    tags$div(
+      class = "recon-callout",
+      tags$span(class = "rc-label", "Queried:"),
+      tags$span(class = "rc-value", htmltools::htmlEscape(input_name)),
+      tags$span(style = "color:#ccc;margin:0 8px;", "|"),
+      tags$span(class = "rc-label", "BIEN match:"),
+      tags$span(class = "rc-value", tags$em(htmltools::htmlEscape(matched_name))),
+      if (match_status == "resolved") {
+        tags$span(
+          style = "margin-left:10px;font-size:0.82em;color:#d97b15;",
+          "\u26a0 Names differ \u2014 see banner above and Observations tab for details."
+        )
+      },
+      tags$span(style = "color:#ccc;margin:0 8px;", "|"),
+      tags$span(class = "rc-label", "Scope:"),
+      tags$span(class = "rc-value", "Western Hemisphere (BIEN)")
+    )
+  })
+
+  # ── QA chips bar above the occurrence map ───────────────────────────────
+  output$qa_chips_bar_ui <- renderUI({
+    res <- bien_results()
+    if (is.null(res) || is.null(res$occurrences)) return(NULL)
+
+    occ          <- if (is.data.frame(res$occurrences)) res$occurrences else NULL
+    if (is.null(occ) || nrow(occ) == 0) return(NULL)
+
+    occ_n        <- nrow(occ)
+    occ_returned <- if (!is.null(res$occurrences_returned) && !is.na(res$occurrences_returned)) as.integer(res$occurrences_returned) else occ_n
+    occ_prep     <- res$occurrences_prepared
+    mapped_n     <- if (is.list(occ_prep) && is.data.frame(occ_prep$data)) nrow(occ_prep$data) else occ_n
+    cap_active   <- isTRUE(occ_prep$map_cap_applied)
+
+    # Introduced status counts — preserve NA before lowercasing to avoid "na" string
+    intro_col  <- find_first_col(occ, c("is_introduced", "native_status"))
+    intro_raw  <- if (!is.null(intro_col)) occ[[intro_col]] else rep(NA_character_, nrow(occ))
+    intro_vals <- ifelse(is.na(intro_raw), NA_character_, tolower(trimws(as.character(intro_raw))))
+    n_native   <- sum(intro_vals %in% c("0", "false", "f", "n", "native", "not introduced"), na.rm = TRUE)
+    n_introd   <- sum(intro_vals %in% c("1", "true", "t", "i", "introduced"), na.rm = TRUE)
+    n_unknown  <- sum(is.na(intro_vals) | intro_vals == "", na.rm = TRUE)
+
+    pct_unknown <- if (occ_n > 0) round(100 * n_unknown / occ_n) else 0
+
+    make_chip <- function(label, value, warn = FALSE) {
+      cls <- if (warn) "qa-chip qa-warn" else "qa-chip"
+      tags$span(
+        class = cls,
+        tags$span(class = "qa-label", label),
+        tags$span(class = "qa-value", value)
+      )
+    }
+
+    chip_list <- list(
+      if (cap_active) {
+        make_chip(
+          "Map showing",
+          paste0(format(mapped_n, big.mark = ","), " of ",
+                 format(occ_returned, big.mark = ","), " fetched"),
+          warn = TRUE
+        )
+      } else {
+        make_chip("Records shown", format(occ_n, big.mark = ","))
+      },
+      make_chip("Native", format(n_native, big.mark = ",")),
+      make_chip("Introduced", format(n_introd, big.mark = ","), warn = n_introd > 0),
+      make_chip("Unknown status",
+                paste0(format(n_unknown, big.mark = ","),
+                       if (pct_unknown > 20) paste0(" \u26a0 ", pct_unknown, "%") else ""),
+                warn = pct_unknown > 20)
+    )
+
+    null_footnote <- if (n_unknown > 0) {
+      tags$div(
+        class = "null-status-note",
+        "\u2020 \u2018Unknown status\u2019 includes records where is_introduced is NULL (not assessed by BIEN). These are not confirmed native."
+      )
+    } else NULL
+
+    tagList(
+      do.call(tags$div, c(list(class = "qa-chips-bar"), chip_list)),
+      null_footnote
+    )
+  })
+
+  # ── Map caption: sampling disclosure below the occurrence map ────────────
+  output$map_caption_ui <- renderUI({
+    res <- bien_results()
+    if (is.null(res) || is.null(res$occurrences)) return(NULL)
+
+    occ_prep  <- res$occurrences_prepared
+    mapped_n  <- if (is.list(occ_prep) && is.data.frame(occ_prep$data)) nrow(occ_prep$data) else 0
+    cap_active <- isTRUE(occ_prep$map_cap_applied)
+    orig_kept  <- if (!is.null(occ_prep$original_kept)) as.integer(occ_prep$original_kept) else mapped_n
+    method_txt <- if (!is.null(res$occurrence_sample_mode) && nzchar(res$occurrence_sample_mode)) res$occurrence_sample_mode else "random"
+
+    if (cap_active) {
+      n_denom <- if (!is.null(occ_prep$original_kept) && as.integer(occ_prep$original_kept) > mapped_n) {
+        paste0(" of ", format(as.integer(occ_prep$original_kept), big.mark = ","), " mappable records")
+      } else {
+        " records (map limit active)"
+      }
+      tags$div(
+        class = "map-caption-row cap-warn",
+        HTML(paste0(
+          "\u26a0 Showing ", format(mapped_n, big.mark = ","), n_denom,
+          " (sampling method: ", htmltools::htmlEscape(method_txt),
+          "). Spatial density is not comparable across taxa. Increase limit in sidebar or download the full dataset."
+        ))
+      )
+    } else if (mapped_n > 0) {
+      tags$div(
+        class = "map-caption-row",
+        paste0("Showing ", format(mapped_n, big.mark = ","),
+               " occurrence records \u00b7 BIEN database (Western Hemisphere)")
+      )
+    } else {
+      NULL
+    }
+  })
 
   output$query_summary <- renderUI({
     res <- bien_results()
@@ -4276,11 +4607,12 @@ server <- function(input, output, session) {
       strict = "Strict query (requested filters kept)",
       fallback_relaxed_native = "Auto-relaxed native filter (geovalid unchanged)",
       fallback_relaxed_geo = "Auto-relaxed native and geovalid filters",
+      fallback_coord_bearing = "Auto-relaxed to coordinate-bearing records only (SQL lat/lon filter)",
       backend_timeout_error = "No successful result (BIEN timeout)",
       backend_connection_error = "No successful result (BIEN connection error)",
       paste0("Strategy: ", strategy)
     )
-    conservative_relaxed <- isTRUE(res$use_default_filter_profile) && strategy %in% c("fallback_relaxed_native", "fallback_relaxed_geo")
+    conservative_relaxed <- isTRUE(res$use_default_filter_profile) && strategy %in% c("fallback_relaxed_native", "fallback_relaxed_geo", "fallback_coord_bearing")
 
     map_status <- if (connection_issue) {
       "BIEN connection failed during this query, so no occurrence records could be retrieved"
@@ -4507,7 +4839,7 @@ server <- function(input, output, session) {
       )
     }
 
-    if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo")) {
+    if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
       return(make_notice(
         "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:10px 12px;border-radius:6px;margin:8px 0;",
         "Filter relaxation note: ",
@@ -4594,7 +4926,7 @@ server <- function(input, output, session) {
     if (!is.null(res$occ_limit) && is.finite(res$occ_limit) && res$occ_limit >= 1000) {
       reasons <- c(reasons, paste0("large app sample request (", res$occ_limit, " rows)"))
     }
-    if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo")) {
+    if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
       reasons <- c(reasons, "fallback retries after strict query")
     }
     if (length(res$query_errors) > 0 && any(grepl("elapsed time limit|timeout", res$query_errors, ignore.case = TRUE))) {
