@@ -1894,3 +1894,8 @@ Added `_news/announcement_5.md` linking to https://www.weforum.org/stories/2023/
 Prompt: Restore the removed "Selected Examples" section (SPARC, Krieger 2022, Hannah 2020, Duncanson 2023, Pillet 2022) to conservation-impacts.md with scientific caveats intact. Fix the "Partner With Us" section where black text was rendering on a dark green background (unreadable) — redesigned to a lightly tinted green card with a left border accent and dark text.
 Files changed: _pages/conservation-impacts.md
 Commit: 1345422
+
+## 2026-05-08 — conservation-impacts: add UNESCO/IUCN 2023 report and partner chips
+Prompt: Add UNESCO (https://www.unesco.org/en/biodiversity-conservation) as a partner and cite the UNESCO/IUCN 2023 World Heritage biodiversity report (DOI: 10.58337/LSRE8424) in which BIEN data were used to estimate >16,000 threatened plant species in UNESCO World Heritage sites. Added to Selected Examples section and added UNESCO/IUCN/SPARC partner chip row to Partner With Us.
+Files changed: _pages/conservation-impacts.md
+Commit: 1112902
