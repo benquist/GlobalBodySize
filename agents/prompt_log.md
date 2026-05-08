@@ -1954,3 +1954,23 @@ Date: 2026-05-08
 Prompt: Yes (implement suggested U4 copy-link, SC-3 cache-hit badge, D1 zip download for BIEN Species Shiny app).
 Project: BIEN-SpeciesShinyApp
 Commits: f22bcdf (features), a05ef20 (provenance log). Bundle 11967856, image 14900088.
+
+---
+Date: 2026-05-08
+Prompt: Add reactive species photo to BIEN Species Shiny app header; photo sourced from iNaturalist (cc-by/cc-by-sa/cc0 only) or Wikipedia fallback; license filter, taxonomic name validation, null guards, session cache, responsive CSS, attribution chip with disclaimer.
+Project: BIEN-SpeciesShinyApp
+Commit: 49c648a
+
+---
+Date: 2026-05-08
+Prompt: Fix fetch_species_photo() return(NULL)-in-tryCatch bug; decouple photo fetch from renderUI startup block using reactiveVal + observeEvent; fix NULL cache policy.
+Project: BIEN-SpeciesShinyApp
+Changes: app.R — fetch_species_photo(), output$species_photo_panel, new species_photo_rv reactiveVal
+
+---
+Date: 2026-05-09
+Prompt: Diagnose broken app at https://benquist.shinyapps.io/bien-species-shinyapp/ after photo feature deployment. code-checker and optimizer reviewed code; 2 CRITICALs found and fixed.
+Project: BIEN-SpeciesShinyApp
+Changes: app.R — moved photo fetch from renderUI into observeEvent, fixed return(NULL)-in-tryCatch bug, fixed NULL cache policy
+Commit: 0bc1ec7
+Deployment: bundle 11968347 → https://benquist.shinyapps.io/bien-species-shinyapp/
