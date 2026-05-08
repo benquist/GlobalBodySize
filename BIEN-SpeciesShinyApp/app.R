@@ -1,6 +1,6 @@
 # Load required packages, installing any missing CRAN dependencies on startup.
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "dplyr", "stringr", "leaflet", "DT", "sf", "ggplot2")
+  required_packages <- c("shiny", "BIEN", "dplyr", "stringr", "leaflet", "DT", "sf", "ggplot2", "jsonlite", "httr")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(
@@ -20,6 +20,8 @@ suppressPackageStartupMessages({
   library(DT)
   library(sf)
   library(ggplot2)
+  library(jsonlite)
+  library(httr)
 })
 
 # Wrap BIEN calls in a timeout-aware `tryCatch` so slow API responses do not lock up the app.
@@ -50,6 +52,88 @@ safe_bien_retry <- function(call_fn, timeout_sec = 90, attempts = 1, sleep_sec =
     attempt = attempts,
     status = if (inherits(last, "error")) "error" else "empty"
   )
+}
+
+# Fetch a species photo from iNaturalist (primary) or Wikipedia REST API (fallback).
+# Returns list(url, attribution_short, attribution, source_url, inat_name) or NULL.
+# Only cc-by, cc-by-sa, and cc0 iNaturalist photos are used; All Rights Reserved and
+# NC/ND licenses are rejected to prevent copyright violations in a public deployed app.
+# The returned iNaturalist taxon name is validated against the queried name to catch
+# silent taxonomic mismatches (estimated 10-30% in complex families).
+fetch_species_photo <- function(species_name, timeout_sec = 5) {
+  if (!nzchar(trimws(species_name))) return(NULL)
+  allowed_licenses <- c("cc-by", "cc-by-sa", "cc0")
+
+  # --- Primary: iNaturalist taxa API ---
+  # NOTE: return(NULL) inside tryCatch exits the enclosing function, bypassing the Wikipedia
+  # fallback. Use stop() instead so the error handler returns NULL from the tryCatch block.
+  inat_result <- tryCatch({
+    resp <- httr::GET(
+      "https://api.inaturalist.org/v1/taxa",
+      query = list(q = species_name, rank = "species", per_page = 1L, locale = "en"),
+      httr::timeout(timeout_sec)
+    )
+    if (httr::http_error(resp)) stop("inat http error")
+    if (!grepl("application/json", httr::http_type(resp), fixed = TRUE)) stop("inat not json")
+    parsed <- jsonlite::fromJSON(
+      httr::content(resp, as = "text", encoding = "UTF-8"),
+      simplifyVector = FALSE
+    )
+    results <- parsed$results
+    if (!is.list(results) || length(results) == 0) stop("inat no results")
+    taxon <- results[[1]]
+    inat_name <- if (!is.null(taxon$name)) taxon$name else ""
+    # Validate taxon name matches queried name (case-insensitive) to prevent mismatch display
+    if (!identical(tolower(trimws(inat_name)), tolower(trimws(species_name)))) stop("inat name mismatch")
+    photo <- taxon$default_photo
+    if (is.null(photo)) stop("inat no default photo")
+    license_code <- if (!is.null(photo$license_code)) tolower(trimws(as.character(photo$license_code))) else ""
+    if (!license_code %in% allowed_licenses) stop("inat license not allowed")
+    photo_url <- if (!is.null(photo$medium_url)) as.character(photo$medium_url) else ""
+    if (!nzchar(photo_url) || !startsWith(photo_url, "https://")) stop("inat no valid url")
+    taxon_id <- if (!is.null(taxon$id)) taxon$id else ""
+    attribution <- if (!is.null(photo$attribution) && nzchar(as.character(photo$attribution))) {
+      as.character(photo$attribution)
+    } else {
+      "iNaturalist"
+    }
+    list(
+      url               = photo_url,
+      attribution_short = paste0("iNaturalist · ", toupper(license_code)),
+      attribution       = attribution,
+      source_url        = paste0("https://www.inaturalist.org/taxa/", taxon_id),
+      inat_name         = inat_name
+    )
+  }, error = function(e) NULL)
+
+  if (!is.null(inat_result)) return(inat_result)
+
+  # --- Fallback: Wikipedia REST summary API (license unverified but labeled) ---
+  tryCatch({
+    slug <- gsub(" ", "_", trimws(species_name))
+    resp <- httr::GET(
+      paste0("https://en.wikipedia.org/api/rest_v1/page/summary/",
+             utils::URLencode(slug, reserved = TRUE)),
+      httr::timeout(timeout_sec)
+    )
+    if (httr::http_error(resp)) stop("wiki http error")
+    if (!grepl("application/json", httr::http_type(resp), fixed = TRUE)) stop("wiki not json")
+    parsed <- jsonlite::fromJSON(
+      httr::content(resp, as = "text", encoding = "UTF-8"),
+      simplifyVector = FALSE
+    )
+    thumb_url <- parsed$thumbnail$source
+    if (is.null(thumb_url) || !nzchar(as.character(thumb_url))) stop("wiki no thumbnail")
+    if (!startsWith(as.character(thumb_url), "https://")) stop("wiki non-https url")
+    list(
+      url               = as.character(thumb_url),
+      attribution_short = "Wikipedia",
+      attribution       = "Wikimedia Commons (license unverified)",
+      source_url        = paste0("https://en.wikipedia.org/wiki/",
+                                 utils::URLencode(slug, reserved = TRUE)),
+      inat_name         = NULL
+    )
+  }, error = function(e) NULL)
 }
 
 # Normalize user-entered species strings so BIEN queries are robust to case.
@@ -506,8 +590,9 @@ find_lucky_species_with_mappable_points <- function(input, min_mappable_points =
       "AND lower(coalesce(observation_type, '')) NOT LIKE '%measurement%'",
       "GROUP BY scrubbed_species_binomial",
       "HAVING COUNT(*) >=", as.integer(min_observations),
-      "ORDER BY random()",
-      "LIMIT", as.integer(pool_size), ";"
+      # No ORDER BY random() — that forces a full-table sort on 100M+ rows.
+      # Fetch a larger natural-order pool and shuffle client-side with sample().
+      "LIMIT", as.integer(pool_size * 5L), ";"
     )
 
     res <- safe_bien_call(
@@ -532,6 +617,10 @@ find_lucky_species_with_mappable_points <- function(input, min_mappable_points =
     )
     out <- out[!is.na(out$species) & nzchar(out$species), , drop = FALSE]
     out <- out[!duplicated(tolower(out$species)), , drop = FALSE]
+    # R-side shuffle: cheaper than ORDER BY random() on a large BIEN table.
+    if (nrow(out) > pool_size) {
+      out <- out[sample.int(nrow(out), pool_size), , drop = FALSE]
+    }
     out
   }
 
@@ -1377,10 +1466,10 @@ compact_label <- function(text, tip = NULL) {
 choose_startup_species_from_local_samples <- function(data_dir = file.path(getwd(), "sample_data")) {
   occ_files <- list.files(data_dir, pattern = "_occurrences\\.csv$", full.names = TRUE)
   if (length(occ_files) == 0) {
-    return("Pinus ponderosa")
+    return("Chimarrhis hookeri")
   }
 
-  best_species <- "Pinus ponderosa"
+  best_species <- "Chimarrhis hookeri"
   best_score <- -Inf
 
   for (occ_file in occ_files) {
@@ -1434,7 +1523,7 @@ choose_startup_species_from_local_samples <- function(data_dir = file.path(getwd
   normalize_species_name(best_species)
 }
 
-STARTUP_SPECIES <- "Pinus ponderosa"
+STARTUP_SPECIES <- "Chimarrhis hookeri"
 STARTUP_SPECIES_SLUG <- gsub("\\s+", "_", tolower(STARTUP_SPECIES))
 STARTUP_CACHE_KEY <- paste0("startup_preloaded_", STARTUP_SPECIES_SLUG)
 
@@ -1506,6 +1595,53 @@ build_preloaded_startup_result <- function() {
 }
 
 startup_preloaded_result <- build_preloaded_startup_result()
+
+# Preload the accepted-species autocomplete list once at app launch (global scope)
+# so every new session gets instant autocomplete without a 60-sec per-session block.
+startup_species_suggestions <- load_accepted_species_suggestions(timeout_sec = 60)
+if (length(startup_species_suggestions) == 0) {
+  startup_species_suggestions <- STARTUP_SPECIES
+}
+
+# ---------------------------------------------------------------------------
+# Shared cross-session cache (global scope)
+# A30-min TTL cache shared across all sessions so popular species are never
+# re-queried from BIEN while a warm result exists.  R assignment is
+# single-threaded so this is race-safe on shinyapps.io's single-process model.
+# ---------------------------------------------------------------------------
+SHARED_CACHE_TTL_SEC  <- 1800L   # 30 minutes
+SHARED_CACHE_MAX_KEYS <- 50L
+
+shared_bien_cache <- new.env(parent = emptyenv())
+
+get_shared_cache <- function(cache_key) {
+  if (is.null(cache_key) ||
+      !exists(cache_key, envir = shared_bien_cache, inherits = FALSE)) {
+    return(NULL)
+  }
+  entry <- get(cache_key, envir = shared_bien_cache, inherits = FALSE)
+  age_sec <- as.numeric(difftime(Sys.time(), entry$cached_at, units = "secs"))
+  if (age_sec > SHARED_CACHE_TTL_SEC) {
+    rm(list = cache_key, envir = shared_bien_cache)
+    return(NULL)
+  }
+  entry$value
+}
+
+set_shared_cache <- function(cache_key, value) {
+  assign(cache_key,
+         list(value = value, cached_at = Sys.time()),
+         envir = shared_bien_cache)
+  keys <- ls(envir = shared_bien_cache, all.names = FALSE)
+  if (length(keys) > SHARED_CACHE_MAX_KEYS) {
+    times <- vapply(keys, function(k) {
+      as.numeric(get(k, envir = shared_bien_cache, inherits = FALSE)$cached_at)
+    }, numeric(1))
+    n_evict <- length(keys) - SHARED_CACHE_MAX_KEYS
+    rm(list = keys[order(times)[seq_len(n_evict)]], envir = shared_bien_cache)
+  }
+  invisible(NULL)
+}
 
 parse_collection_year <- function(date_str) {
   if (is.null(date_str) || is.na(date_str) || !nzchar(as.character(date_str))) {
@@ -1616,6 +1752,10 @@ ui <- fluidPage(
         color: #24445f;
       }
       .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
         padding: 20px;
         background: linear-gradient(180deg, #ffffff 0%, #f2f9ff 100%);
         border-bottom: 1px solid var(--panel-border);
@@ -1627,6 +1767,8 @@ ui <- fluidPage(
         align-items: center;
         gap: 16px;
         flex-wrap: wrap;
+        flex: 1 1 auto;
+        min-width: 0;
       }
       .bien-header-copy {
         min-width: 0;
@@ -1652,6 +1794,64 @@ ui <- fluidPage(
       }
       .bien-logo-fallback {
         display: none;
+      }
+      .bien-species-photo-wrap {
+        flex-shrink: 0;
+        text-align: center;
+      }
+      .bien-species-photo {
+        width: 96px;
+        height: 96px;
+        border-radius: 10px;
+        object-fit: cover;
+        object-position: center 30%;
+        display: block;
+        border: 2px solid var(--panel-border);
+        box-shadow: 0 2px 8px rgba(31, 91, 143, 0.10);
+        transition: opacity 200ms ease;
+      }
+      .bien-photo-attr {
+        font-size: 0.68em;
+        color: #6a8aa6;
+        margin-top: 3px;
+        max-width: 96px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        text-align: center;
+      }
+      .bien-photo-attr a {
+        color: #4a80aa;
+        text-decoration: none;
+      }
+      .bien-photo-disclaimer {
+        font-size: 0.62em;
+        color: #8aaabb;
+        margin-top: 2px;
+        max-width: 96px;
+        text-align: center;
+        line-height: 1.2;
+      }
+      .bien-photo-fallback {
+        width: 96px;
+        height: 96px;
+        border-radius: 10px;
+        background: var(--bien-mint);
+        border: 2px dashed var(--panel-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #9ab5cb;
+        font-size: 0.70em;
+        text-align: center;
+      }
+      @media (max-width: 900px) {
+        .bien-species-photo, .bien-photo-fallback { width: 72px; height: 72px; }
+        .bien-photo-attr { max-width: 72px; }
+        .bien-photo-disclaimer { max-width: 72px; }
+      }
+      @media (max-width: 640px) {
+        .bien-species-photo-wrap { display: none; }
       }
       .well {
         border: 1px solid var(--panel-border);
@@ -1884,7 +2084,8 @@ ui <- fluidPage(
           "Query BIEN species occurrences, traits, and range evidence with the same visual language as the BIEN Traits portal."
         )
       )
-    )
+    ),
+    uiOutput("species_photo_panel")
   ),
   sidebarLayout(
     sidebarPanel(
@@ -1910,7 +2111,29 @@ ui <- fluidPage(
       actionButton("run_query", "Query BIEN", class = "btn btn-primary btn-lg bien-action-btn bien-query-btn"),
       tags$div(
         style = "margin:10px 0 12px 0;",
-        actionButton("open_tab_help", "Help", class = "btn btn-info btn-lg bien-action-btn bien-help-btn")
+        actionButton("open_tab_help", "Help", class = "btn btn-info btn-lg bien-action-btn bien-help-btn"),
+        tags$span("\u00A0"),
+        tags$button(
+          id = "copy_link_btn",
+          class = "btn btn-default btn-sm",
+          style = "vertical-align:middle;",
+          title = "Copy a shareable link for the current species and tab to the clipboard",
+          onclick = paste0(
+            "var url = window.location.href;",
+            "if (navigator.clipboard && navigator.clipboard.writeText) {",
+            "  navigator.clipboard.writeText(url).then(function() {",
+            "    var b = document.getElementById('copy_link_btn');",
+            "    var orig = b.innerHTML;",
+            "    b.innerHTML = 'Copied!';",
+            "    b.style.color = '#2E7D32';",
+            "    setTimeout(function(){ b.innerHTML = orig; b.style.color = ''; }, 1800);",
+            "  });",
+            "} else {",
+            "  window.prompt('Copy this link:', url);",
+            "}"
+          ),
+          "\U0001F517 Copy link"
+        )
       ),
       uiOutput("retry_bien_ui"),
       tags$script(HTML("$(document).on('keydown', '#species-selectized', function(e) { if (e.key === 'Enter') { $('#run_query').click(); return false; } });")),
@@ -2001,7 +2224,7 @@ ui <- fluidPage(
         checkboxInput("use_introduced_filter", compact_label("Filter by native vs introduced", "Controls whether establishment status is enforced. If disabled, records are kept regardless of native or introduced status."), value = TRUE),
         conditionalPanel(
           condition = "input.use_introduced_filter == true",
-          checkboxInput("natives_only", compact_label("Keep native only", "When enabled, retains native records and excludes BIEN records marked introduced."), value = TRUE)
+          checkboxInput("natives_only", compact_label("Keep native / unknown-status only", "When enabled, retains records where BIEN classifies the species as native or where introduced status is unclassified (is_introduced IS NULL). Records explicitly marked introduced are excluded."), value = TRUE)
         ),
         checkboxInput("use_cultivated_filter", compact_label("Filter by cultivated vs wild", "Controls whether cultivation status is enforced. If disabled, both cultivated and non-cultivated records are retained."), value = TRUE),
         conditionalPanel(
@@ -2327,11 +2550,29 @@ ui <- fluidPage(
           tags$h4("Plot Community Summary"),
           uiOutput("community_summary")
         ),
-        tabPanel("Range", br(), verbatimTextOutput("range_text"), leafletOutput("range_map", height = 500)),
+        tabPanel("Range", br(),
+          tags$div(
+            style = "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:0.9em;",
+            tags$strong("Model caveat: "),
+            "BIEN range polygons are outputs of species distribution models (SDMs), not surveyed or verified native range boundaries. ",
+            "They represent modeled habitat suitability under the assumptions of the underlying SDM, which may over- or under-predict ",
+            "the realized range. Treat them as coarse biogeographic reference layers, not as authoritative range maps."
+          ),
+          verbatimTextOutput("range_text"),
+          leafletOutput("range_map", height = 500)
+        ),
         tabPanel(
           "Download",
           br(),
           tags$style(HTML("#bien_query_code, #plot_query_code, #trait_query_code { max-height: 180px; overflow-y: auto; overflow-x: auto; }")),
+          tags$div(
+            style = "background:#e8f5e9;border:1px solid #a5d6a7;border-radius:6px;padding:10px 14px;margin-bottom:16px;",
+            tags$h4(style = "margin-top:0;color:#1b5e20;", "\U0001F4E6 Download everything as a ZIP"),
+            tags$p(style = "color:#2e7d32;margin:0 0 8px 0;font-size:0.93em;",
+              "One bundle: occurrence CSV, plot community CSV, trait CSV, and all three reproducible R scripts."
+            ),
+            downloadButton("download_all_zip", "Download all datasets + code (.zip)", class = "btn btn-success btn-sm")
+          ),
           tags$h4("Occurrence Downloads"),
           tags$p(
             style = "color:#555;max-width:900px;",
@@ -2420,13 +2661,41 @@ server <- function(input, output, session) {
   }
 
   observeEvent(TRUE, {
-    choices <- load_accepted_species_suggestions(timeout_sec = 60)
-    if (length(choices) == 0) {
-      choices <- STARTUP_SPECIES
+    # Use globally preloaded suggestions (loaded once at app launch) — no per-session BIEN call needed.
+    # Also honour ?species= and ?tab= URL parameters for shareable bookmarks.
+    url_query <- parseQueryString(session$clientData$url_search)
+    species_from_url <- url_query[["species"]]
+    tab_from_url     <- url_query[["tab"]]
+
+    if (!is.null(species_from_url) && nzchar(species_from_url)) {
+      sp_decoded <- utils::URLdecode(species_from_url)
+      sp_clean   <- normalize_species_name(sp_decoded)
+      update_species_select_input(sp_clean, choices = startup_species_suggestions)
+    } else {
+      update_species_select_input(STARTUP_SPECIES, choices = startup_species_suggestions)
     }
 
-    update_species_select_input(STARTUP_SPECIES, choices = choices)
+    valid_tabs <- c("Overview & About", "Occurrence", "Community", "Observations",
+                    "Traits", "Range", "Download", "Species External Links")
+    if (!is.null(tab_from_url) && nzchar(tab_from_url) &&
+        utils::URLdecode(tab_from_url) %in% valid_tabs) {
+      updateTabsetPanel(session, "main_tabs",
+                        selected = utils::URLdecode(tab_from_url))
+    }
   }, once = TRUE)
+
+  # Keep the URL bar in sync with the active species + tab so users can copy/
+  # share a link that restores the same view.  Uses mode = "replace" to avoid
+  # polluting the browser history with every tab click.
+  observeEvent(list(input$species, input$main_tabs), {
+    sp  <- if (!is.null(input$species) && nzchar(input$species)) input$species else ""
+    tab <- if (!is.null(input$main_tabs)) input$main_tabs else "Occurrence"
+    new_qs <- paste0(
+      "?species=", utils::URLencode(sp,  reserved = TRUE),
+      "&tab=",     utils::URLencode(tab, reserved = TRUE)
+    )
+    updateQueryString(new_qs, mode = "replace")
+  }, ignoreInit = FALSE)
 
   observeEvent(input$open_tab_help, {
     active_tab <- if (is.null(input$main_tabs)) "Occurrence" else input$main_tabs
@@ -2450,7 +2719,7 @@ server <- function(input, output, session) {
       tags$div(
         style = "background:#e8f5e9;border:1px solid #b7dfb9;color:#1b5e20;padding:8px 10px;border-radius:6px;margin:10px 0 0 0;font-size:0.92em;",
         tags$strong("Default (conservative ecological view): "),
-        "Showing BIEN-classified native / not introduced records only; cultivated records hidden; only BIEN geovalid coordinates shown; all observation-source categories retained (including field observation / citizen science); and all observation categories (plot + non-plot) retained.",
+        "Showing BIEN records where species is classified as native or introduced status is unclassified (confirmed native + unknown status — records explicitly marked introduced are excluded); cultivated records hidden; only BIEN geovalid coordinates shown; all observation-source categories retained (including field observation / citizen science); and all observation categories (plot + non-plot) retained.",
         tags$br(),
         "This is the app's default starting view for biodiversity screening. If BIEN finds no records under these strict settings, the summary section below the map will report whether the app had to broaden the actual query strategy."
       ),
@@ -2812,7 +3081,40 @@ server <- function(input, output, session) {
     if (is.null(cache_key) || !exists(cache_key, envir = cache_env, inherits = FALSE)) {
       return(NULL)
     }
+    # Update LRU timestamp on access.
+    attr(cache_env, "lru_times")[[cache_key]] <- Sys.time()
     get(cache_key, envir = cache_env, inherits = FALSE)
+  }
+
+  # Evict the least-recently-used entry when the cache exceeds max_keys.
+  evict_lru_cache <- function(cache_env, max_keys = 8L) {
+    keys <- ls(envir = cache_env, all.names = FALSE)
+    if (length(keys) <= max_keys) return(invisible(NULL))
+    times <- attr(cache_env, "lru_times")
+    if (is.null(times)) times <- list()
+    # Assign a very old timestamp to any key with no recorded time.
+    key_times <- vapply(keys, function(k) {
+      t <- times[[k]]
+      if (is.null(t)) as.numeric(Sys.time()) - 1e9 else as.numeric(t)
+    }, numeric(1))
+    n_evict <- length(keys) - max_keys
+    evict_keys <- keys[order(key_times)[seq_len(n_evict)]]
+    for (k in evict_keys) {
+      rm(list = k, envir = cache_env)
+      times[[k]] <- NULL
+    }
+    attr(cache_env, "lru_times") <- times
+    invisible(NULL)
+  }
+
+  set_cache <- function(cache_env, cache_key, value, max_keys = 8L) {
+    assign(cache_key, value, envir = cache_env)
+    lru <- attr(cache_env, "lru_times")
+    if (is.null(lru)) lru <- list()
+    lru[[cache_key]] <- Sys.time()
+    attr(cache_env, "lru_times") <- lru
+    evict_lru_cache(cache_env, max_keys = max_keys)
+    invisible(NULL)
   }
 
   set_summary_cache <- function(cache_key, value) {
@@ -2931,11 +3233,21 @@ server <- function(input, output, session) {
       sep = "||"
     )
 
+    # 1. Per-session cache (fastest — no TTL needed within one session).
     if (exists(cache_key, envir = query_cache, inherits = FALSE)) {
       cached_res <- get(cache_key, envir = query_cache, inherits = FALSE)
       cached_res$cache_hit <- TRUE
       cached_res$query_elapsed_sec <- 0
       return(cached_res)
+    }
+
+    # 2. Cross-session shared cache (warm results from other sessions, TTL=30 min).
+    shared_hit <- get_shared_cache(cache_key)
+    if (!is.null(shared_hit)) {
+      shared_hit$cache_hit <- TRUE
+      shared_hit$query_elapsed_sec <- 0
+      set_cache(query_cache, cache_key, shared_hit)   # promote to session cache
+      return(shared_hit)
     }
 
     query_started <- Sys.time()
@@ -3042,7 +3354,8 @@ server <- function(input, output, session) {
         name_suggestion = name_suggestion
       )
 
-      assign(cache_key, result, envir = query_cache)
+      set_cache(query_cache, cache_key, result)
+      set_shared_cache(cache_key, result)   # warm the cross-session cache
       result
     })
   }, ignoreInit = TRUE)
@@ -3197,7 +3510,21 @@ server <- function(input, output, session) {
         write.csv(data.frame(message = "No occurrence dataset available for download."), file, row.names = FALSE)
         return(NULL)
       }
-      write.csv(res$occurrences, file, row.names = FALSE)
+      provenance_lines <- c(
+        "# BIEN Species App - occurrence dataset download",
+        paste0("# Species: ", if (!is.null(res$species)) res$species else "unknown"),
+        paste0("# Download date (UTC): ", format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = "UTC")),
+        paste0("# Filter profile: ", if (isTRUE(res$use_default_filter_profile)) "conservative default" else "custom"),
+        paste0("# Natives only: ", if (!is.null(res$natives_only)) res$natives_only else "unknown"),
+        paste0("# Geo-validated only: ", if (!is.null(res$only_geovalid)) res$only_geovalid else "unknown"),
+        paste0("# Occurrence strategy: ", if (!is.null(res$occ_strategy)) res$occ_strategy else "unknown"),
+        paste0("# BIEN R package: ", as.character(packageVersion("BIEN"))),
+        paste0("# App source: https://github.com/benquist/BIEN-SpeciesShinyApp"),
+        ""
+      )
+      writeLines(provenance_lines, con = file)
+      write.table(res$occurrences, file, row.names = FALSE, col.names = TRUE,
+                  sep = ",", append = TRUE, na = "")
     }
   )
 
@@ -3220,13 +3547,24 @@ server <- function(input, output, session) {
       paste0(species_safe, "_trait_dataset.csv")
     },
     content = function(file) {
+      res <- bien_results()
       trait_bundle <- trait_results()
       traits_df <- trait_bundle$data
       if (!is.data.frame(traits_df)) {
         write.csv(data.frame(message = "No trait dataset available for download."), file, row.names = FALSE)
         return(NULL)
       }
-      write.csv(traits_df, file, row.names = FALSE)
+      provenance_lines <- c(
+        "# BIEN Species App - trait dataset download",
+        paste0("# Species: ", if (!is.null(res$species)) res$species else "unknown"),
+        paste0("# Download date (UTC): ", format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = "UTC")),
+        paste0("# BIEN R package: ", as.character(packageVersion("BIEN"))),
+        paste0("# App source: https://github.com/benquist/BIEN-SpeciesShinyApp"),
+        ""
+      )
+      writeLines(provenance_lines, con = file)
+      write.table(traits_df, file, row.names = FALSE, col.names = TRUE,
+                  sep = ",", append = TRUE, na = "")
     }
   )
 
@@ -3244,7 +3582,17 @@ server <- function(input, output, session) {
         write.csv(data.frame(message = "No Plot / survey dataset available for download under current filters."), file, row.names = FALSE)
         return(NULL)
       }
-      write.csv(plot_df, file, row.names = FALSE)
+      provenance_lines <- c(
+        "# BIEN Species App - plot community dataset download",
+        paste0("# Species: ", if (!is.null(res$species)) res$species else "unknown"),
+        paste0("# Download date (UTC): ", format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = "UTC")),
+        paste0("# BIEN R package: ", as.character(packageVersion("BIEN"))),
+        paste0("# App source: https://github.com/benquist/BIEN-SpeciesShinyApp"),
+        ""
+      )
+      writeLines(provenance_lines, con = file)
+      write.table(plot_df, file, row.names = FALSE, col.names = TRUE,
+                  sep = ",", append = TRUE, na = "")
     }
   )
 
@@ -3271,6 +3619,85 @@ server <- function(input, output, session) {
       writeLines(build_trait_repro_script(res), file, useBytes = TRUE)
     }
   )
+
+  output$download_trait_repro_script <- downloadHandler(
+    filename = function() {
+      res <- bien_results()
+      species_safe <- gsub("[^A-Za-z0-9_]+", "_", if (!is.null(res$species)) res$species else "species")
+      paste0(species_safe, "_reproduce_trait_dataset.R")
+    },
+    content = function(file) {
+      res <- bien_results()
+      writeLines(build_trait_repro_script(res), file, useBytes = TRUE)
+    }
+  )
+
+  output$download_all_zip <- downloadHandler(
+    filename = function() {
+      res <- bien_results()
+      species_safe <- gsub("[^A-Za-z0-9_]+", "_", if (!is.null(res$species)) res$species else "species")
+      paste0(species_safe, "_BIEN_data_bundle_", format(Sys.Date(), "%Y%m%d"), ".zip")
+    },
+    content = function(file) {
+      res         <- bien_results()
+      trait_bundle <- trait_results()
+      sp_safe     <- gsub("[^A-Za-z0-9_]+", "_", if (!is.null(res$species)) res$species else "species")
+
+      tmp_dir <- file.path(tempdir(), paste0("bien_bundle_", sp_safe, "_", floor(as.numeric(Sys.time()))))
+      dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
+
+      provenance_header <- c(
+        paste0("# BIEN Species App - data bundle"),
+        paste0("# Species: ", if (!is.null(res$species)) res$species else "unknown"),
+        paste0("# Download date (UTC): ", format(Sys.time(), "%Y-%m-%d %H:%M:%S", tz = "UTC")),
+        paste0("# Filter profile: ", if (isTRUE(res$use_default_filter_profile)) "conservative default" else "custom"),
+        paste0("# Natives only: ", if (!is.null(res$natives_only)) res$natives_only else "unknown"),
+        paste0("# Geo-validated only: ", if (!is.null(res$only_geovalid)) res$only_geovalid else "unknown"),
+        paste0("# BIEN R package: ", as.character(packageVersion("BIEN"))),
+        paste0("# App source: https://github.com/benquist/BIEN-SpeciesShinyApp"),
+        ""
+      )
+
+      write_csv_with_provenance <- function(df_or_null, fpath, fallback_msg) {
+        if (is.data.frame(df_or_null) && nrow(df_or_null) > 0) {
+          writeLines(provenance_header, con = fpath)
+          write.table(df_or_null, fpath, row.names = FALSE, col.names = TRUE,
+                      sep = ",", append = TRUE, na = "")
+        } else {
+          write.csv(data.frame(message = fallback_msg), fpath, row.names = FALSE)
+        }
+      }
+
+      # Occurrence CSV
+      write_csv_with_provenance(res$occurrences,
+        file.path(tmp_dir, paste0(sp_safe, "_occurrences.csv")),
+        "No occurrence data available.")
+
+      # Trait CSV
+      write_csv_with_provenance(trait_bundle$data,
+        file.path(tmp_dir, paste0(sp_safe, "_traits.csv")),
+        "No trait data available.")
+
+      # Plot community CSV
+      plot_bundle <- tryCatch(get_plot_community_bundle(res), error = function(e) list(raw = NULL))
+      write_csv_with_provenance(plot_bundle$raw,
+        file.path(tmp_dir, paste0(sp_safe, "_plot_community.csv")),
+        "No plot community data available.")
+
+      # R repro scripts
+      writeLines(build_occurrence_repro_script(res),
+        file.path(tmp_dir, paste0(sp_safe, "_reproduce_occurrences.R")), useBytes = TRUE)
+      writeLines(build_trait_repro_script(res),
+        file.path(tmp_dir, paste0(sp_safe, "_reproduce_traits.R")), useBytes = TRUE)
+      writeLines(build_plot_repro_script(res),
+        file.path(tmp_dir, paste0(sp_safe, "_reproduce_plot_community.R")), useBytes = TRUE)
+
+      old_wd <- setwd(tmp_dir)
+      on.exit({ setwd(old_wd); unlink(tmp_dir, recursive = TRUE) }, add = TRUE)
+      zip(file, files = list.files(tmp_dir, full.names = FALSE))
+    }
+  )
+
 
   output$bien_query_code <- renderText({
     res <- bien_results()
@@ -3395,6 +3822,91 @@ server <- function(input, output, session) {
     )
   })
 
+  # Species photo: fetched in an observer (not in renderUI) so the HTTP call never blocks
+  # the render cycle. The startup preloaded result is explicitly skipped so the 5-10 second
+  # iNat/Wikipedia timeout cannot fire at session startup.
+  #
+  # Cache policy: only successful (non-NULL) fetches are cached. NULL results (network failure,
+  # no photo found) are not cached so the next query for the same species will retry.
+  species_photo_rv <- reactiveVal(NULL)
+
+  observeEvent(bien_results(), {
+    res <- bien_results()
+
+    # Startup preloaded result: show fallback emoji immediately, no network call.
+    if (isTRUE(res$is_startup_preloaded)) {
+      species_photo_rv(NULL)
+      return()
+    }
+
+    species_name <- normalize_species_name(
+      if (!is.null(res$species) && nzchar(res$species)) res$species
+      else str_squish(input$species)
+    )
+    if (!nzchar(species_name)) {
+      species_photo_rv(NULL)
+      return()
+    }
+
+    cache_key <- paste0("photo_", tolower(species_name))
+    if (exists(cache_key, envir = query_cache, inherits = FALSE)) {
+      species_photo_rv(get(cache_key, envir = query_cache, inherits = FALSE))
+    } else {
+      photo <- fetch_species_photo(species_name)
+      if (!is.null(photo)) {
+        assign(cache_key, photo, envir = query_cache)
+      }
+      species_photo_rv(photo)
+    }
+  }, ignoreNULL = TRUE)
+
+  # renderUI reads only from species_photo_rv — no network I/O in the render path.
+  output$species_photo_panel <- renderUI({
+    photo <- species_photo_rv()
+    res   <- bien_results()
+    species_name <- normalize_species_name(
+      if (!is.null(res$species) && nzchar(res$species)) res$species
+      else str_squish(input$species)
+    )
+    if (!nzchar(species_name)) species_name <- STARTUP_SPECIES
+
+    if (is.null(photo)) {
+      tags$div(
+        class = "bien-species-photo-wrap",
+        tags$div(class = "bien-photo-fallback", "\U0001F33F")
+      )
+    } else {
+      is_wikipedia <- identical(photo$attribution_short, "Wikipedia")
+      tags$div(
+        class = "bien-species-photo-wrap",
+        tags$a(
+          href = photo$source_url,
+          target = "_blank",
+          rel = "noopener noreferrer",
+          tags$img(
+            src   = photo$url,
+            class = "bien-species-photo",
+            alt   = paste("Photograph of", species_name),
+            title = photo$attribution
+          )
+        ),
+        tags$p(
+          class = "bien-photo-attr",
+          tags$a(
+            href   = photo$source_url,
+            target = "_blank",
+            rel    = "noopener noreferrer",
+            photo$attribution_short
+          )
+        ),
+        tags$p(
+          class = "bien-photo-disclaimer",
+          if (is_wikipedia) "Community photo; license unverified" else "Community photo; not peer-verified"
+        )
+      )
+    }
+  })
+
   # Lazy-load BIEN trait data only when the user opens a trait-focused tab.
   trait_results <- reactive({
     res <- bien_results()
@@ -3435,7 +3947,7 @@ server <- function(input, output, session) {
         error = traits_error,
         loaded = TRUE
       )
-      assign(cache_key, out, envir = trait_cache)
+      set_cache(trait_cache, cache_key, out)
       out
     })
   })
@@ -3465,7 +3977,7 @@ server <- function(input, output, session) {
         loaded = FALSE,
         skipped = TRUE
       )
-      assign(cache_key, out, envir = range_cache)
+      set_cache(range_cache, cache_key, out)
       return(out)
     }
 
@@ -3494,7 +4006,7 @@ server <- function(input, output, session) {
         loaded = TRUE,
         skipped = FALSE
       )
-      assign(cache_key, out, envir = range_cache)
+      set_cache(range_cache, cache_key, out)
       out
     })
   })
@@ -3784,7 +4296,34 @@ server <- function(input, output, session) {
     }
     mapped_pct_guidance <- "If this mapped proportion seems low, click Query BIEN again to refresh a randomized sample, or increase 'Max mapped occurrence points' (and optionally 'Occurrence records to keep in app sample') in the sidebar."
 
+    cache_age_note <- if (isTRUE(res$cache_hit)) {
+      # Estimate age from shared cache if present; otherwise just say cached.
+      entry <- tryCatch(
+        get(res$query_cache_key, envir = shared_bien_cache, inherits = FALSE),
+        error = function(e) NULL
+      )
+      if (!is.null(entry) && !is.null(entry$cached_at)) {
+        age_min <- round(as.numeric(difftime(Sys.time(), entry$cached_at, units = "mins")), 1)
+        paste0("served from cache \u2014 ", age_min, " min old")
+      } else {
+        "served from session cache"
+      }
+    } else {
+      NULL
+    }
+
     HTML(paste0(
+      if (!is.null(cache_age_note)) {
+        paste0(
+          "<div style='display:inline-block;background:#e8f5e9;color:#2E7D32;",
+          "border:1px solid #a5d6a7;border-radius:4px;padding:2px 10px;",
+          "font-size:0.85em;font-weight:600;margin-bottom:8px;'>",
+          "\u26A1 Cache hit \u2014 ", htmltools::htmlEscape(cache_age_note),
+          "</div><br>"
+        )
+      } else {
+        ""
+      },
       "<strong>Species:</strong> ", htmltools::htmlEscape(res$species),
       "<br><strong>Family:</strong> ", htmltools::htmlEscape(family_name),
       "<br><strong>Total BIEN occurrence records matching current strategy (count only; not downloaded):</strong> ", htmltools::htmlEscape(occ_total_txt),
@@ -3954,11 +4493,11 @@ server <- function(input, output, session) {
       ))
     }
 
-    if (occ_n > 0 && mappable_n == 0 && has_range) {
+      if (occ_n > 0 && mappable_n == 0 && has_range) {
       return(make_notice(
         "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:10px 12px;border-radius:6px;margin:8px 0;",
         "Overview note: ",
-        "BIEN returned occurrence rows for this species, but not usable latitude/longitude coordinates in the current response. The map below is showing the BIEN range polygon instead."
+        "BIEN returned occurrence rows for this species, but not usable latitude/longitude coordinates in the current response. The map below is showing the BIEN range polygon instead. Note: BIEN range polygons are SDM model outputs, not verified native range boundaries — treat as coarse biogeographic reference."
       ))
     }
 
