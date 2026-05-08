@@ -1936,3 +1936,21 @@ Commit: f16dae1
 ## 2026-05-08 — Ecophysiology tab: add 7 papers
 **Prompt:** Add leaf-wax, physiochemical, wettability, and plant-physiology papers to Ecophysiology tab.
 **Action:** Added 4 keyword matchers (`/leaf wax/`, `/n-alkane/`, `/physiochem/`, `/wettability/`, `/plant physiology/`) to ecophysiology tab in `_pages/publications.html`. All 7 requested papers were already in the master list; Savage 2010 and von Allmen 2012 already matched via existing `hydraulic` pattern. Committed as ebd4d16 and pushed to main.
+
+---
+Date: 2026-05-08
+Prompt: Fix text justification on publications page — "group" and "search" wrapping to orphan lines, gaps on right side. Remove 82ch max-width constraint from publication page intro/caption paragraphs; remove text-align: justify from .hidden abstract blocks.
+Project: enquistlab-site-migration
+Commit: b52f32f
+
+---
+Date: 2026-05-08
+Prompt: Change default start species in BIEN Species Shiny app from Pinus ponderosa to Chimarrhis hookeri.
+Project: BIEN-SpeciesShinyApp
+Actions: Fetched BIEN occurrence (142 records), trait (44 records), and range data for Chimarrhis hookeri; saved to sample_data/; updated STARTUP_SPECIES and fallback values in app.R; deployed to benquist.shinyapps.io/bien-species-shinyapp/.
+
+---
+Date: 2026-05-08
+Prompt: Yes (implement suggested U4 copy-link, SC-3 cache-hit badge, D1 zip download for BIEN Species Shiny app).
+Project: BIEN-SpeciesShinyApp
+Commits: f22bcdf (features), a05ef20 (provenance log). Bundle 11967856, image 14900088.
