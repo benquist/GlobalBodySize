@@ -1901,3 +1901,34 @@ Commit: 1345422
 Prompt: Add UNESCO (https://www.unesco.org/en/biodiversity-conservation) as a partner and cite the UNESCO/IUCN 2023 World Heritage biodiversity report (DOI: 10.58337/LSRE8424) in which BIEN data were used to estimate >16,000 threatened plant species in UNESCO World Heritage sites. Added to Selected Examples section and added UNESCO/IUCN/SPARC partner chip row to Partner With Us.
 Files changed: _pages/conservation-impacts.md
 Commit: 1112902
+
+## 2026-05-08 — enquistlab-site-migration: gallery.md full curation and redesign
+Prompt: "review the photo gallery and suggest if any updates and reorganization and design changes are needed" for https://enquistlab.github.io/gallery/; identify photos that don't fit each theme; consider different categories; identify duplicates with different resolutions; remove obviously lower-resolution photos. After review: "Yes, implement all of these."
+Agents: design-atelier (review and recommendations), @m (orchestration and implementation)
+Actions:
+- Removed 3 low-res images (<0.5 MP): sefdp_forest_canopy.jpg, img_5352.jpeg, img_3186.jpg
+- Removed 1 panorama tile (11 MB/40 MP): img_3202__db000470.jpg
+- Removed 3 Zoom screenshots: screen-shot-2020-12-15-at-2.29/33/34-pm.png
+- Removed 1 duplicate (lower-res crop): cropped-dsc_9737-2.jpeg
+- Removed entire 'Field Landscapes' section (21 unlabeled Flickr dump images)
+- Removed 25+ uncaptioned/unidentifiable images from People section
+- Added new 'Islands & Special Floras' section; moved Dubautia latifolia here from Arid/Desert (scientific misplacement)
+- Renamed sections: Andean Elevations → Andean & Montane; Climate Experiments → Global Experiment Network; People & Field Work → Science in Action
+- Standardized People section from .gallery-section-title to .gallery-theme-header
+- Fixed shuffle JS: preserve geographic narrative section order; shuffle only within each grid; hero (first .wide) kept stable
+- Added loading=eager to first above-fold image (field_opening.jpeg)
+- Added white-space: nowrap to .gallery-theme-header h2
+- Improved all captions with location, species, context; improved all alt text
+- Result: ~110 images across 7 sections → ~55 curated images across 6 coherent sections
+Files changed: enquistlab-site-migration/_pages/gallery.md
+Commit: 2bc24d8
+
+---
+Date: 2026-05-08
+Prompt: Embed BIEN Species Shiny app in research page BIEN section; fix floating nav clicks not working.
+Project: enquistlab-site-migration
+Commit: f16dae1
+
+## 2026-05-08 — Ecophysiology tab: add 7 papers
+**Prompt:** Add leaf-wax, physiochemical, wettability, and plant-physiology papers to Ecophysiology tab.
+**Action:** Added 4 keyword matchers (`/leaf wax/`, `/n-alkane/`, `/physiochem/`, `/wettability/`, `/plant physiology/`) to ecophysiology tab in `_pages/publications.html`. All 7 requested papers were already in the master list; Savage 2010 and von Allmen 2012 already matched via existing `hydraulic` pattern. Committed as ebd4d16 and pushed to main.
