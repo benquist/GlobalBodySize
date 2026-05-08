@@ -89,7 +89,11 @@ fetch_species_photo <- function(species_name, timeout_sec = 5) {
     if (is.null(photo)) stop("inat no default photo")
     license_code <- if (!is.null(photo$license_code)) tolower(trimws(as.character(photo$license_code))) else ""
     if (!license_code %in% allowed_licenses) stop("inat license not allowed")
-    photo_url <- if (!is.null(photo$medium_url)) as.character(photo$medium_url) else ""
+    photo_url <- if (!is.null(photo$large_url) && nzchar(as.character(photo$large_url)) && startsWith(as.character(photo$large_url), "https://")) {
+      as.character(photo$large_url)
+    } else if (!is.null(photo$medium_url)) {
+      as.character(photo$medium_url)
+    } else ""
     if (!nzchar(photo_url) || !startsWith(photo_url, "https://")) stop("inat no valid url")
     taxon_id <- if (!is.null(taxon$id)) taxon$id else ""
     attribution <- if (!is.null(photo$attribution) && nzchar(as.character(photo$attribution))) {
@@ -1800,9 +1804,9 @@ ui <- fluidPage(
         text-align: center;
       }
       .bien-species-photo {
-        width: 96px;
-        height: 96px;
-        border-radius: 10px;
+        width: 160px;
+        height: 160px;
+        border-radius: 12px;
         object-fit: cover;
         object-position: center 30%;
         display: block;
@@ -1814,7 +1818,7 @@ ui <- fluidPage(
         font-size: 0.68em;
         color: #6a8aa6;
         margin-top: 3px;
-        max-width: 96px;
+        max-width: 160px;
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
@@ -1828,14 +1832,14 @@ ui <- fluidPage(
         font-size: 0.62em;
         color: #8aaabb;
         margin-top: 2px;
-        max-width: 96px;
+        max-width: 160px;
         text-align: center;
         line-height: 1.2;
       }
       .bien-photo-fallback {
-        width: 96px;
-        height: 96px;
-        border-radius: 10px;
+        width: 160px;
+        height: 160px;
+        border-radius: 12px;
         background: var(--bien-mint);
         border: 2px dashed var(--panel-border);
         display: flex;
@@ -1846,9 +1850,9 @@ ui <- fluidPage(
         text-align: center;
       }
       @media (max-width: 900px) {
-        .bien-species-photo, .bien-photo-fallback { width: 72px; height: 72px; }
-        .bien-photo-attr { max-width: 72px; }
-        .bien-photo-disclaimer { max-width: 72px; }
+        .bien-species-photo, .bien-photo-fallback { width: 120px; height: 120px; }
+        .bien-photo-attr { max-width: 120px; }
+        .bien-photo-disclaimer { max-width: 120px; }
       }
       @media (max-width: 640px) {
         .bien-species-photo-wrap { display: none; }
@@ -3295,7 +3299,37 @@ server <- function(input, output, session) {
           occ <- occ[sample.int(nrow(occ)), , drop = FALSE]
         }
         if (nrow(occ) > occ_limit) {
-          occ <- sample_occurrence_rows(occ, target_n = occ_limit, sample_method = display_sampling_method)
+          # Prioritize coordinate-valid rows in the app-level sample so that species
+          # whose BIEN records are a mix of mappable and coordinate-null rows (e.g.
+          # Pouteria reticulata, where trait/plot records dominate the raw pull) do
+          # not end up with an all-null-coord sample after stratified downsampling.
+          pre_lat_col <- find_first_col(occ, c("latitude", "decimal_latitude", "lat"))
+          pre_lon_col <- find_first_col(occ, c("longitude", "decimal_longitude", "lon", "long"))
+          has_coord <- if (!is.null(pre_lat_col) && !is.null(pre_lon_col)) {
+            lat_v <- suppressWarnings(as.numeric(occ[[pre_lat_col]]))
+            lon_v <- suppressWarnings(as.numeric(occ[[pre_lon_col]]))
+            !is.na(lat_v) & !is.na(lon_v) & lat_v >= -90 & lat_v <= 90 & lon_v >= -180 & lon_v <= 180
+          } else {
+            rep(TRUE, nrow(occ))
+          }
+          coord_rows <- occ[has_coord, , drop = FALSE]
+          no_coord_rows <- occ[!has_coord, , drop = FALSE]
+          coord_n <- nrow(coord_rows)
+          if (coord_n > 0 && coord_n < nrow(occ)) {
+            # Draw as many coord-valid rows as possible (up to occ_limit), then pad
+            # with coord-null rows to reach occ_limit if coord_valid rows are sparse.
+            coord_sample_n <- min(coord_n, occ_limit)
+            coord_sample <- sample_occurrence_rows(coord_rows, target_n = coord_sample_n, sample_method = display_sampling_method)
+            remaining_n <- occ_limit - nrow(coord_sample)
+            if (remaining_n > 0 && nrow(no_coord_rows) > 0) {
+              no_coord_sample <- sample_occurrence_rows(no_coord_rows, target_n = remaining_n, sample_method = display_sampling_method)
+              occ <- dplyr::bind_rows(coord_sample, no_coord_sample)
+            } else {
+              occ <- coord_sample
+            }
+          } else {
+            occ <- sample_occurrence_rows(occ, target_n = occ_limit, sample_method = display_sampling_method)
+          }
         }
       }
 
