@@ -485,13 +485,19 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
   # The final fallback_coord_bearing plan adds a SQL-level lat/lon IS NOT NULL guard
   # for species (e.g. Pouteria reticulata) where BIEN's natural table order returns
   # only null-coord records under LIMIT N without ORDER BY.
+  # limit=500 on coord_bearing keeps it under the ORDER BY random() threshold (>500)
+  # so it runs fast on filtered rows.
   plans <- list(
-    list(label = "strict",                 natives.only = natives_only, only.geovalid = only_geovalid, require_coords = FALSE, limit = fast_limit,            record_limit = fast_page_size),
-    list(label = "fallback_relaxed_native", natives.only = FALSE,        only.geovalid = only_geovalid, require_coords = FALSE, limit = min(fast_limit, 500),  record_limit = min(fast_page_size, 500)),
-    list(label = "fallback_relaxed_geo",   natives.only = FALSE,        only.geovalid = FALSE,         require_coords = FALSE, limit = min(fast_limit, 500),  record_limit = min(fast_page_size, 500)),
-    list(label = "fallback_coord_bearing", natives.only = FALSE,        only.geovalid = FALSE,         require_coords = TRUE,  limit = min(fast_limit, 2000), record_limit = min(fast_page_size, 500))
+    list(label = "strict",                 natives.only = natives_only, only.geovalid = only_geovalid, require_coords = FALSE, limit = fast_limit,           record_limit = fast_page_size),
+    list(label = "fallback_relaxed_native", natives.only = FALSE,       only.geovalid = only_geovalid, require_coords = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
+    list(label = "fallback_relaxed_geo",   natives.only = FALSE,        only.geovalid = FALSE,         require_coords = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
+    list(label = "fallback_coord_bearing", natives.only = FALSE,        only.geovalid = FALSE,         require_coords = TRUE,  limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500))
   )
   plans <- plans[seq_len(max(1, min(length(plans), as.integer(max_plans))))]
+
+  # Precompute plan-set membership once so the loop does not recheck on every iteration.
+  has_relaxed_geo_plan    <- any(vapply(plans, function(p) identical(p$label, "fallback_relaxed_geo"),   logical(1)))
+  has_coord_bearing_plan  <- any(vapply(plans, function(p) identical(p$label, "fallback_coord_bearing"), logical(1)))
 
   notes <- character()
   last_result <- NULL
@@ -547,11 +553,17 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
       notes <- c(notes, paste0("plan_mappable=", plan_mappable_n, "; plan=", plan$label))
 
       if (plan_mappable_n == 0) {
-        has_coord_bearing_plan <- any(vapply(plans, function(p) identical(p$label, "fallback_coord_bearing"), logical(1)))
-
-        if (identical(plan$label, "strict") && any(vapply(plans, function(p) identical(p$label, "fallback_relaxed_geo"), logical(1)))) {
-          notes <- c(notes, "zero_mappable_triggered_relaxed_geo_pass")
-          skip_to_relaxed_geo <- TRUE
+        # When strict returns rows but all coords are null, skip directly to the
+        # coord_bearing plan (SQL lat/lon IS NOT NULL) without wasting a round-trip
+        # on fallback_relaxed_geo which cannot fix table-order-driven null coords.
+        if (identical(plan$label, "strict")) {
+          if (has_coord_bearing_plan) {
+            notes <- c(notes, "zero_mappable_strict_triggered_coord_bearing_pass")
+            skip_to_coord_bearing <- TRUE
+          } else if (has_relaxed_geo_plan) {
+            notes <- c(notes, "zero_mappable_strict_triggered_relaxed_geo_pass")
+            skip_to_relaxed_geo <- TRUE
+          }
           next
         }
 
@@ -574,9 +586,14 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
         break
       }
 
-      # Timeouts on strict filters are common for large species; continue to relaxed plans.
+      # Timeouts on strict filters are common for large species; go to coord_bearing
+      # directly (if available) so null-coord table-order species get a chance too.
       if (is_bien_timeout_error(err_msg)) {
-        skip_to_relaxed_geo <- TRUE
+        if (has_coord_bearing_plan) {
+          skip_to_coord_bearing <- TRUE
+        } else {
+          skip_to_relaxed_geo <- TRUE
+        }
         next
       }
     }
