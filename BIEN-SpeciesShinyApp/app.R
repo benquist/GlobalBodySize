@@ -382,7 +382,7 @@ natives_check_with_null_fallback <- function(natives_only = TRUE) {
 # occurrence map and (2) randomize the returned row order on the BIEN side so
 # widespread species are less likely to be dominated by whichever datasource
 # happens to come first in the backend table (for example FIA plot rows).
-query_occurrence_randomized <- function(species_name, cultivated = FALSE, natives_only = TRUE, only_geovalid = TRUE, limit = 1000, record_limit = 500, randomize_order = TRUE, require_coords = FALSE) {
+query_occurrence_randomized <- function(species_name, cultivated = FALSE, natives_only = TRUE, only_geovalid = TRUE, limit = 1000, record_limit = 500, randomize_order = TRUE, require_coords = FALSE, allow_centroids = FALSE) {
   cultivated_ <- BIEN:::.cultivated_check(cultivated)
   newworld_ <- BIEN:::.newworld_check(NULL)
   taxonomy_ <- BIEN:::.taxonomy_check(TRUE)
@@ -413,6 +413,11 @@ query_occurrence_randomized <- function(species_name, cultivated = FALSE, native
     ""
   }
 
+  centroid_clause <- if (isTRUE(allow_centroids)) "" else paste(
+    "AND (georef_protocol is NULL OR georef_protocol<>'county centroid')",
+    "AND (is_centroid IS NULL OR is_centroid=0)"
+  )
+
   query <- paste(
     "SELECT scrubbed_species_binomial", taxonomy_$select,
     native_$select, political_$select,
@@ -425,8 +430,7 @@ query_occurrence_randomized <- function(species_name, cultivated = FALSE, native
     cultivated_$query, newworld_$query, natives_$query,
     observation_$query, geovalid_$query,
     "AND higher_plant_group NOT IN ('Algae','Bacteria','Fungi')",
-    "AND (georef_protocol is NULL OR georef_protocol<>'county centroid')",
-    "AND (is_centroid IS NULL OR is_centroid=0)",
+    centroid_clause,
     "AND scrubbed_species_binomial IS NOT NULL",
     "AND lower(coalesce(observation_type, '')) NOT LIKE '%trait%'",
     "AND lower(coalesce(observation_type, '')) NOT LIKE '%measurement%'",
@@ -470,7 +474,7 @@ resolve_filter_profile <- function(input) {
   )
 }
 
-query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_page_size, timeout_sec, connection_retry = FALSE, max_plans = 3, per_plan_timeout = 25, randomize_order = TRUE) {
+query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_page_size, timeout_sec, connection_retry = FALSE, max_plans = 5, per_plan_timeout = 25, randomize_order = TRUE) {
   filter_cfg <- resolve_filter_profile(input)
   include_cultivated <- if (filter_cfg$use_cultivated_filter) filter_cfg$include_cultivated else TRUE
   natives_only <- if (filter_cfg$use_introduced_filter) filter_cfg$natives_only else FALSE
@@ -488,16 +492,21 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
   # limit=500 on coord_bearing keeps it under the ORDER BY random() threshold (>500)
   # so it runs fast on filtered rows.
   plans <- list(
-    list(label = "strict",                 natives.only = natives_only, only.geovalid = only_geovalid, require_coords = FALSE, limit = fast_limit,           record_limit = fast_page_size),
-    list(label = "fallback_relaxed_native", natives.only = FALSE,       only.geovalid = only_geovalid, require_coords = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
-    list(label = "fallback_relaxed_geo",   natives.only = FALSE,        only.geovalid = FALSE,         require_coords = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
-    list(label = "fallback_coord_bearing", natives.only = FALSE,        only.geovalid = FALSE,         require_coords = TRUE,  limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500))
+    list(label = "strict",                  natives.only = natives_only, only.geovalid = only_geovalid, require_coords = FALSE, allow_centroids = FALSE, limit = fast_limit,           record_limit = fast_page_size),
+    list(label = "fallback_relaxed_native", natives.only = FALSE,       only.geovalid = only_geovalid, require_coords = FALSE, allow_centroids = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
+    list(label = "fallback_relaxed_geo",   natives.only = FALSE,        only.geovalid = FALSE,         require_coords = FALSE, allow_centroids = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
+    list(label = "fallback_coord_bearing", natives.only = FALSE,        only.geovalid = FALSE,         require_coords = TRUE,  allow_centroids = FALSE, limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500)),
+    # Last resort: allow county centroid georeferenced records (georef_protocol='county centroid'
+    # or is_centroid=1). These are imprecise (county-level) but better than no map at all.
+    # Triggered only when fallback_coord_bearing also returns 0 rows.
+    list(label = "fallback_allow_centroids", natives.only = FALSE,      only.geovalid = FALSE,         require_coords = TRUE,  allow_centroids = TRUE,  limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500))
   )
   plans <- plans[seq_len(max(1, min(length(plans), as.integer(max_plans))))]
 
   # Precompute plan-set membership once so the loop does not recheck on every iteration.
-  has_relaxed_geo_plan    <- any(vapply(plans, function(p) identical(p$label, "fallback_relaxed_geo"),   logical(1)))
-  has_coord_bearing_plan  <- any(vapply(plans, function(p) identical(p$label, "fallback_coord_bearing"), logical(1)))
+  has_relaxed_geo_plan      <- any(vapply(plans, function(p) identical(p$label, "fallback_relaxed_geo"),     logical(1)))
+  has_coord_bearing_plan    <- any(vapply(plans, function(p) identical(p$label, "fallback_coord_bearing"),   logical(1)))
+  has_allow_centroids_plan  <- any(vapply(plans, function(p) identical(p$label, "fallback_allow_centroids"), logical(1)))
 
   notes <- character()
   last_result <- NULL
@@ -511,14 +520,18 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
   attempts_n <- if (isTRUE(connection_retry)) 3 else 1
   query_started <- Sys.time()
   deadline <- query_started + as.numeric(timeout_sec)
-  skip_to_relaxed_geo <- FALSE
+  skip_to_relaxed_geo   <- FALSE
   skip_to_coord_bearing <- FALSE
+  skip_to_allow_centroids <- FALSE
 
   for (plan in plans) {
-    if (isTRUE(skip_to_relaxed_geo) && !identical(plan$label, "fallback_relaxed_geo") && !identical(plan$label, "fallback_coord_bearing")) {
+    if (isTRUE(skip_to_relaxed_geo) && !identical(plan$label, "fallback_relaxed_geo") && !identical(plan$label, "fallback_coord_bearing") && !identical(plan$label, "fallback_allow_centroids")) {
       next
     }
-    if (isTRUE(skip_to_coord_bearing) && !identical(plan$label, "fallback_coord_bearing")) {
+    if (isTRUE(skip_to_coord_bearing) && !identical(plan$label, "fallback_coord_bearing") && !identical(plan$label, "fallback_allow_centroids")) {
+      next
+    }
+    if (isTRUE(skip_to_allow_centroids) && !identical(plan$label, "fallback_allow_centroids")) {
       next
     }
 
@@ -540,6 +553,7 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
           natives_only = plan$natives.only,
           only_geovalid = plan$only.geovalid,
           require_coords = isTRUE(plan$require_coords),
+          allow_centroids = isTRUE(plan$allow_centroids),
           limit = plan$limit,
           record_limit = plan$record_limit,
           randomize_order = randomize_order
@@ -587,9 +601,26 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
           skip_to_coord_bearing <- TRUE
           next
         }
+
+        # coord_bearing returned rows but all have null coords (should not happen since
+        # it filters lat IS NOT NULL, but guard here just in case).
+        if (identical(plan$label, "fallback_coord_bearing") && has_allow_centroids_plan) {
+          notes <- c(notes, "zero_mappable_on_coord_bearing_triggered_allow_centroids_pass")
+          skip_to_allow_centroids <- TRUE
+          next
+        }
       }
 
       return(list(data = res$result, strategy = plan$label, notes = notes, limit_used = plan$limit))
+    }
+
+    # When fallback_coord_bearing returns 0 rows (no records with lat/lon after all
+    # relaxations), try allow_centroids which drops the county-centroid exclusion.
+    # This recovers species like Pouteria reticulata where BIEN's only georeferenced
+    # records are county centroids — excluded by the normal filters.
+    if (is.data.frame(res$result) && nrow(res$result) == 0 && identical(plan$label, "fallback_coord_bearing") && has_allow_centroids_plan) {
+      notes <- c(notes, "coord_bearing_empty_triggered_allow_centroids_pass")
+      skip_to_allow_centroids <- TRUE
     }
 
     if (inherits(res$result, "error")) {
@@ -2940,6 +2971,7 @@ server <- function(input, output, session) {
       fallback_relaxed_native = FALSE,
       fallback_relaxed_geo = FALSE,
       fallback_coord_bearing = FALSE,
+      fallback_allow_centroids = FALSE,
       requested_natives_only
     )
     effective_only_geovalid <- switch(
@@ -2948,6 +2980,7 @@ server <- function(input, output, session) {
       fallback_relaxed_native = requested_only_geovalid,
       fallback_relaxed_geo = FALSE,
       fallback_coord_bearing = FALSE,
+      fallback_allow_centroids = FALSE,
       requested_only_geovalid
     )
 
@@ -3468,8 +3501,8 @@ server <- function(input, output, session) {
         connection_retry = retry_mode,
         # Even in Lucky mode, keep fallback plans enabled so a strict timeout can
         # still recover mappable records via relaxed native/geovalid strategies.
-        # 4 plans: strict -> relaxed_native -> relaxed_geo -> coord_bearing (SQL lat/lon NOT NULL).
-        max_plans = 4,
+        # 5 plans: strict -> relaxed_native -> relaxed_geo -> coord_bearing -> allow_centroids.
+        max_plans = 5,
         per_plan_timeout = if (isTRUE(lucky_fast_mode)) 4 else 60,
         randomize_order = FALSE
       )
@@ -4107,7 +4140,11 @@ server <- function(input, output, session) {
         tags$div(class = "bien-photo-fallback", "\U0001F33F")
       )
     } else {
-      is_wikipedia <- identical(photo$attribution_short, "Wikipedia")
+      disclaimer_txt <- if (identical(photo$attribution_short, "POWO (Kew)")) {
+        "Botanical image \u00b7 Plants of the World Online (Kew)"
+      } else {
+        "Community photo; not peer-verified"
+      }
       tags$div(
         class = "bien-species-photo-wrap",
         tags$a(
@@ -4132,7 +4169,7 @@ server <- function(input, output, session) {
         ),
         tags$p(
           class = "bien-photo-disclaimer",
-          if (is_wikipedia) "Community photo; license unverified" else "Community photo; not peer-verified"
+          disclaimer_txt
         )
       )
     }
@@ -4259,14 +4296,14 @@ server <- function(input, output, session) {
       use_cultivated_filter <- isTRUE(res$use_cultivated_filter)
       use_introduced_filter <- isTRUE(res$use_introduced_filter)
       count_include_cultivated <- if (use_cultivated_filter) isTRUE(res$include_cultivated) else TRUE
-      count_natives_only <- if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
+      count_natives_only <- if (res$occ_strategy %in% c("fallback_relaxed_native", "fallback_relaxed_geo", "fallback_coord_bearing", "fallback_allow_centroids")) {
         FALSE
       } else if (use_introduced_filter) {
         isTRUE(res$natives_only)
       } else {
         FALSE
       }
-      count_only_geovalid <- if (identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
+      count_only_geovalid <- if (res$occ_strategy %in% c("fallback_relaxed_geo", "fallback_coord_bearing", "fallback_allow_centroids")) {
         FALSE
       } else {
         isTRUE(res$only_geovalid)
@@ -4652,11 +4689,12 @@ server <- function(input, output, session) {
       fallback_relaxed_native = "Auto-relaxed native filter (geovalid unchanged)",
       fallback_relaxed_geo = "Auto-relaxed native and geovalid filters",
       fallback_coord_bearing = "Auto-relaxed to coordinate-bearing records only (SQL lat/lon filter)",
+      fallback_allow_centroids = "Auto-relaxed to include county centroid records (imprecise, county-level coordinates)",
       backend_timeout_error = "No successful result (BIEN timeout)",
       backend_connection_error = "No successful result (BIEN connection error)",
       paste0("Strategy: ", strategy)
     )
-    conservative_relaxed <- isTRUE(res$use_default_filter_profile) && strategy %in% c("fallback_relaxed_native", "fallback_relaxed_geo", "fallback_coord_bearing")
+    conservative_relaxed <- isTRUE(res$use_default_filter_profile) && strategy %in% c("fallback_relaxed_native", "fallback_relaxed_geo", "fallback_coord_bearing", "fallback_allow_centroids")
 
     map_status <- if (connection_issue) {
       "BIEN connection failed during this query, so no occurrence records could be retrieved"
@@ -4883,7 +4921,7 @@ server <- function(input, output, session) {
       )
     }
 
-    if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
+    if (res$occ_strategy %in% c("fallback_relaxed_native", "fallback_relaxed_geo", "fallback_coord_bearing")) {
       return(make_notice(
         "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:10px 12px;border-radius:6px;margin:8px 0;",
         "Filter relaxation note: ",
@@ -4895,8 +4933,22 @@ server <- function(input, output, session) {
       ))
     }
 
+    if (identical(res$occ_strategy, "fallback_allow_centroids")) {
+      return(make_notice(
+        "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:10px 12px;border-radius:6px;margin:8px 0;",
+        "County centroid note: ",
+        tags$span(
+          "No precise occurrence coordinates were available for this species in BIEN. ",
+          "The map shows ", tags$strong("county centroid"), " coordinates — the geographic center of ",
+          "the county/region of each record, not the actual observation location. ",
+          "Points are imprecise (county-level resolution) and should not be used for ",
+          "fine-scale spatial analyses."
+        )
+      ))
+    }
+
     # Species where BIEN's view stores is_geovalid=1 but latitude/longitude columns
-    # are NULL for all records (e.g. Pouteria reticulata). Detected via query_errors note.
+    # are NULL for all records. Detected via query_errors note.
     if (occ_n > 0 && mappable_n == 0 && any(grepl("no_coord_bearing_records_in_bien_view", res$query_errors, fixed = TRUE))) {
       return(make_notice(
         "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:10px 12px;border-radius:6px;margin:8px 0;",
@@ -4988,7 +5040,7 @@ server <- function(input, output, session) {
     if (!is.null(res$occ_limit) && is.finite(res$occ_limit) && res$occ_limit >= 1000) {
       reasons <- c(reasons, paste0("large app sample request (", res$occ_limit, " rows)"))
     }
-    if (identical(res$occ_strategy, "fallback_relaxed_native") || identical(res$occ_strategy, "fallback_relaxed_geo") || identical(res$occ_strategy, "fallback_coord_bearing")) {
+    if (res$occ_strategy %in% c("fallback_relaxed_native", "fallback_relaxed_geo", "fallback_coord_bearing", "fallback_allow_centroids")) {
       reasons <- c(reasons, "fallback retries after strict query")
     }
     if (length(res$query_errors) > 0 && any(grepl("elapsed time limit|timeout", res$query_errors, ignore.case = TRUE))) {
