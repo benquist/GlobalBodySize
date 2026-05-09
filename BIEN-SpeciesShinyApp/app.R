@@ -400,14 +400,13 @@ query_occurrence_randomized <- function(species_name, cultivated = FALSE, native
   use_randomize <- isTRUE(randomize_order) && limit > 500 && limit <= 10000
   order_clause <- if (use_randomize) "ORDER BY random()" else ""
 
-  # When require_coords=TRUE, add SQL-level latitude/longitude IS NOT NULL filter.
-  # This is the last-resort plan for species where BIEN's natural table order returns
-  # only null-coord records (e.g. Pouteria reticulata where trait/plot rows come first).
+  # When require_coords=TRUE, add SQL-level filter requiring at least one valid coordinate source.
+  # Accept records where either the float lat/lon is in-range OR a PostGIS geom is present.
+  # Records with non-null but out-of-range floats AND no geom are excluded.
   coord_bearing_clause <- if (isTRUE(require_coords)) {
     paste(
-      "AND latitude IS NOT NULL AND longitude IS NOT NULL",
-      "AND latitude BETWEEN -90 AND 90",
-      "AND longitude BETWEEN -180 AND 180"
+      "AND (geom IS NOT NULL",
+      "OR (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180))"
     )
   } else {
     ""
@@ -421,7 +420,14 @@ query_occurrence_randomized <- function(species_name, cultivated = FALSE, native
   query <- paste(
     "SELECT scrubbed_species_binomial", taxonomy_$select,
     native_$select, political_$select,
-    ",latitude, longitude,date_collected,",
+    # Use COALESCE with a range guard so that:
+    # (1) valid float lat/lon is used when available
+    # (2) out-of-range non-null floats fall through to the PostGIS geom column
+    # (3) geom IS NULL when both sources unavailable → NULL (safe, no exception)
+    # ST_Y/ST_X on NULL::geometry = NULL; geography→geometry cast is always safe.
+    ",COALESCE(CASE WHEN latitude BETWEEN -90 AND 90 THEN latitude ELSE NULL END, ST_Y(geom::geometry)) AS latitude,",
+    "COALESCE(CASE WHEN longitude BETWEEN -180 AND 180 THEN longitude ELSE NULL END, ST_X(geom::geometry)) AS longitude,",
+    "date_collected,",
     "datasource,dataset,dataowner,custodial_institution_codes,collection_code,view_full_occurrence_individual.datasource_id",
     collection_$select, cultivated_$select, newworld_$select,
     observation_$select, geovalid_$select,
@@ -432,8 +438,6 @@ query_occurrence_randomized <- function(species_name, cultivated = FALSE, native
     "AND higher_plant_group NOT IN ('Algae','Bacteria','Fungi')",
     centroid_clause,
     "AND scrubbed_species_binomial IS NOT NULL",
-    "AND lower(coalesce(observation_type, '')) NOT LIKE '%trait%'",
-    "AND lower(coalesce(observation_type, '')) NOT LIKE '%measurement%'",
     coord_bearing_clause,
     order_clause,
     "LIMIT", as.integer(limit), ";"
