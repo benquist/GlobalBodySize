@@ -1235,3 +1235,11 @@ Actions: Replaced single SDM worked example with four parallel worked examples (
 2026-05-06 | Added Theory section to enquistlab-site-migration/_pages/research.md: MST (WBE fractal network → 3/4 scaling, MTE) and TDT (trait distributions, multi-scale filtering) subsections with key paper links. Applied enhanced-theory (Scaling/Network modes) and ecology-user (Trait-Environment Mapping, Scaling Logic conditions) agent frameworks.
 2026-05-06 | Research page Theory section drafted, citation-audited, and cleaned. Redundant stubs removed. All changes pushed to enquistlab.github.io.
 2026-05-08 | BIEN-SpeciesShinyApp reactive species photo panel added to app header. Agents involved: design-atelier (UI layout), coder (fetch_species_photo helper, iNat/Wikipedia APIs, session cache), optimizer (timeout and null-guard tuning), code-checker (4 CRITICAL + 2 WARNING issues resolved), biodiversity-science-guard (license filter: cc-by/cc-by-sa/cc0; taxonomic name validation; ARR/NC/ND rejection), code-verifier (parse-OK confirmed). Commit 49c648a pushed to origin/main; deployed to benquist.shinyapps.io/bien-species-shinyapp/.
+
+## 2026-05-09 — Register richard-telford agent as user-invocable
+Prompt: Enable richard-telford.agent.md as an invocable agent in this environment.
+Action: Set user-invocable: false → true in both .github/agents/richard-telford.agent.md and agents/richard-telford.agent.md. Committed and pushed.
+
+## 2026-05-09 — BIEN-SpeciesShinyApp summary statistics panel redesign
+Prompt: Redesign summary statistics panel — three-tier structured layout, amber warning rail, QA chips upgrade, UX fixes, CSS, deploy.
+Action: Rewrote output$summary_stats_ui (3-tier: metric cards/filter chips/scorecard/QA; collapsible Filter Profile & Data Completeness panels; collapsed Diagnostics; reproducibility block). Added output$summary_warn_rail_ui (amber chips for partial coverage, fast mode, cultivated gaps). Upgraded QA chips to show N/Total(pct%). Removed redundant Scope text. Suppressed zero-count Unknown chip. Added ~180 lines CSS. Syntax verified (parse OK). Deployed to https://benquist.shinyapps.io/bien-species-shinyapp/. File: BIEN-SpeciesShinyApp/app.R. Committed and pushed.

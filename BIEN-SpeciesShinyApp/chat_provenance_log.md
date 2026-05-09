@@ -282,3 +282,20 @@ Outcome: Read the full chat_provenance_log.md (all ~280 lines, entries 1–35) a
   Issue 11 — Per-session blocking operations: accepted-name list and startup preload running once per user instead of once globally.
   Issue 12 — ORDER BY random() query timeout: full-table sort before LIMIT on 100M+ row BIEN view.
   All entries follow the standard format: Symptom → Diagnosis journey → Root Cause → Fix → Lessons Learned.
+
+37. Date: 2026-05-09
+Prompt: Redesign the summary statistics panel — replace flat 35-line HTML text dump with structured three-tier layout; add amber warning rail; upgrade QA chips bar; various UX fixes; deploy.
+Source session: current workspace session
+Outcome: Rewrote output$summary_stats_ui in BIEN-SpeciesShinyApp/app.R with a three-tier structured layout:
+  Tier 1: metric cards row (Records Kept, Mapped, Datasources, Traits, Plots), filter chip bar, source scorecard table, QA one-liner sentence, map coverage fraction indicator.
+  Tier 2: two collapsible <details> panels — "Filter Profile & Query" (shows active filters, query strategy, geovalid/native flags) and "Data Completeness & Gaps" (shows per-datasource record counts, coord completeness, native-status gaps).
+  Tier 3: collapsed "Diagnostics" <details> block with raw query metadata for power users.
+  Reproducibility block: citable filter-profile string for methods sections.
+  Added output$summary_warn_rail_ui: amber warning chips rendered above stats section for partial map coverage (< 80% coords mapped), fast mode active, and cultivated-status gaps (unknown fraction > 20%).
+  Upgraded QA chips bar above the map to show records as "N / Total (pct%)" format when BIEN total counts are loaded; falls back to plain N when totals unavailable.
+  Removed redundant "Scope: Western Hemisphere (BIEN)" text from recon callout (already shown in map caption).
+  Suppressed "Unknown status" chip entirely when n_unknown == 0 (removes visual noise for species with complete native-status data).
+  Added ~180 lines of new CSS covering: .summary-metric-cards, .summary-metric-card, .filter-chip-bar, .source-scorecard, .warn-rail, .warn-chip, .repro-block, collapsible details styling, tier separators.
+  Syntax verified clean: Rscript --vanilla -e "invisible(parse('app.R'))" && echo "PARSE OK".
+  Deployed to https://benquist.shinyapps.io/bien-species-shinyapp/.
+  File: BIEN-SpeciesShinyApp/app.R.
