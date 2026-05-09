@@ -1247,3 +1247,12 @@ Action: Rewrote output$summary_stats_ui (3-tier: metric cards/filter chips/score
 ## 2026-05-09 — Register ecology-user agent as user-invocable
 Prompt: Add ecology-user.agent.md to the list of agents we can invoke.
 Action: Created .github/agents/ecology-user.agent.md (synced from agents/ecology-user.agent.md, user-invocable: true already set). Agent covers ecological data analysis, occurrence/trait/phylogenetic data, BIEN workflows, and 13-step reasoning framework.
+
+## 2026-05-09 — biodiversity-informatics-checker audit of GlobalBodySize strategy
+Prompt: Full biodiversity informatics audit of GlobalBodySize data strategy (taxonomy backbone choices, Darwin Core compliance, body mass QA, GBIF MoF, missing sources, provenance requirements).
+Action: Created GlobalBodySize/BIODIVERSITY_INFORMATICS_AUDIT.md. 8 Critical Issues, 10 Likely Issues, 8 Assumptions, 13 Recommended Fixes, 7-step Validation Plan produced. Top critical issues: rgbif::gbif_version() non-existent function; MDD missing from mammal backbone; GBIF usageKey instability; Reptile Database lacks DOI. Key missing sources: NEON mammal mass, WoRMS/OBIS marine, FishLife fish gap-fill. DwC gaps: measurementID, basisOfRecord, higher taxonomy fields missing from schema.
+
+## 2026-05-09 — GlobalBodySize project initiated
+Prompt: Start GlobalBodySize — programmatic body mass harvest across all major animal/plant groups. Overnight work session.
+Agents: ecology-user, merow-ecology, taxonomy-reconciliation, biodiversity-informatics-checker, m (orchestrator)
+Action: Full project scaffold created at GlobalBodySize/. Strategy documents, 6 R library files, 2 pipeline scripts, 3 provider intake scripts, PROJECT_PLAN.md, README.md.
