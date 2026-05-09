@@ -39,6 +39,17 @@ Confirm operational hygiene requirements are complete before handoff.
 - Prefer concrete command evidence over assumptions.
 - Never build Rmd files or R packages when no relevant files changed.
 
+## Behavioral Verification Honesty (mandatory)
+A successful deployment or exit code 0 does NOT mean the behavior works correctly.
+Before reporting any fix as complete:
+- Distinguish explicitly between "deployed" and "verified working."
+- For Shiny app changes involving reactive behavior, UI rendering, or live data queries:
+  - The only valid verification is a human confirming the behavior in a browser, OR
+  - A reproducible local test (e.g., `shiny::runApp()`) with observed output matching the expectation.
+- If neither has occurred, state: "Deployed — please verify in the browser. I cannot confirm the behavior without a live test."
+- NEVER say a behavioral fix is "complete" or "fixed" based solely on deployment success, parse success, or theoretical reasoning about the code.
+- If the fix involves reactive lifecycle subtleties (e.g., `ignoreInit`, `observe` vs `eventReactive`, `session$onFlushed`), flag this explicitly and recommend local testing before deploying.
+
 ## Output Format
 Return exactly:
 - `Status`: PASS or BLOCKED
