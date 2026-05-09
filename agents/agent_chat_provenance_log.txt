@@ -1243,3 +1243,7 @@ Action: Set user-invocable: false → true in both .github/agents/richard-telfor
 ## 2026-05-09 — BIEN-SpeciesShinyApp summary statistics panel redesign
 Prompt: Redesign summary statistics panel — three-tier structured layout, amber warning rail, QA chips upgrade, UX fixes, CSS, deploy.
 Action: Rewrote output$summary_stats_ui (3-tier: metric cards/filter chips/scorecard/QA; collapsible Filter Profile & Data Completeness panels; collapsed Diagnostics; reproducibility block). Added output$summary_warn_rail_ui (amber chips for partial coverage, fast mode, cultivated gaps). Upgraded QA chips to show N/Total(pct%). Removed redundant Scope text. Suppressed zero-count Unknown chip. Added ~180 lines CSS. Syntax verified (parse OK). Deployed to https://benquist.shinyapps.io/bien-species-shinyapp/. File: BIEN-SpeciesShinyApp/app.R. Committed and pushed.
+
+## 2026-05-09 — Register ecology-user agent as user-invocable
+Prompt: Add ecology-user.agent.md to the list of agents we can invoke.
+Action: Created .github/agents/ecology-user.agent.md (synced from agents/ecology-user.agent.md, user-invocable: true already set). Agent covers ecological data analysis, occurrence/trait/phylogenetic data, BIEN workflows, and 13-step reasoning framework.
