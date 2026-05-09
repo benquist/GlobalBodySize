@@ -501,6 +501,13 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
 
   notes <- character()
   last_result <- NULL
+  # best_nonempty_result: first plan that returned >0 rows (even if 0 mappable coords).
+  # Used as a last-resort fallback when coord_bearing also returns 0 rows — e.g. species
+  # like Pouteria reticulata where BIEN's view stores is_geovalid=1 but latitude/longitude
+  # columns are NULL for every record. In that case we return the data so the user at
+  # least sees the statistics table, even though the map will be empty.
+  best_nonempty_result <- NULL
+  best_nonempty_strategy <- NULL
   attempts_n <- if (isTRUE(connection_retry)) 3 else 1
   query_started <- Sys.time()
   deadline <- query_started + as.numeric(timeout_sec)
@@ -549,6 +556,14 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
     notes <- c(notes, paste0("occ_strategy=", plan$label, "; status=", res$status, "; attempts=", res$attempt, "; limit=", plan$limit))
 
     if (is.data.frame(res$result) && nrow(res$result) > 0) {
+      # Save first non-empty result as fallback. Only non-coord-bearing plans are
+      # eligible: the coord_bearing plan by construction returns only coord-valid rows,
+      # and if it returns 0 rows there is no useful fallback to preserve from it.
+      if (is.null(best_nonempty_result) && !isTRUE(plan$require_coords)) {
+        best_nonempty_result   <- res$result
+        best_nonempty_strategy <- plan$label
+      }
+
       plan_mappable_n <- count_mappable_occurrences(res$result)
       notes <- c(notes, paste0("plan_mappable=", plan_mappable_n, "; plan=", plan$label))
 
@@ -597,6 +612,18 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
         next
       }
     }
+  }
+
+  # All plans exhausted with no mappable-coord result.
+  # If BIEN returned records but none had valid lat/lon (e.g. is_geovalid=1 but
+  # latitude/longitude columns are NULL in the view — a known BIEN data issue for
+  # some species), return those records so the statistics table is still populated.
+  # The map will be empty but the user gets provenance and record counts.
+  # Return the actual plan's strategy label (not a synthetic label) so that all
+  # downstream repro-script and count-query logic uses the correct filter params.
+  if (!is.null(best_nonempty_result)) {
+    notes <- c(notes, "no_coord_bearing_records_in_bien_view")
+    return(list(data = best_nonempty_result, strategy = best_nonempty_strategy, notes = notes, limit_used = fast_limit))
   }
 
   final_strategy <- if (is_bien_connection_error(notes)) {
@@ -4864,6 +4891,24 @@ server <- function(input, output, session) {
           "The current result used a fallback BIEN strategy (",
           tags$code(res$occ_strategy),
           ") to recover records. Interpret native/geovalid conclusions cautiously."
+        )
+      ))
+    }
+
+    # Species where BIEN's view stores is_geovalid=1 but latitude/longitude columns
+    # are NULL for all records (e.g. Pouteria reticulata). Detected via query_errors note.
+    if (occ_n > 0 && mappable_n == 0 && any(grepl("no_coord_bearing_records_in_bien_view", res$query_errors, fixed = TRUE))) {
+      return(make_notice(
+        "background:#fff3cd;border:1px solid #ffe69c;color:#664d03;padding:10px 12px;border-radius:6px;margin:8px 0;",
+        "BIEN coordinate note: ",
+        tags$span(
+          "BIEN returned ", occ_n, " records for this species, but the ",
+          tags$code("latitude"), "/", tags$code("longitude"),
+          " columns in the BIEN occurrence view are NULL for all records. ",
+          "This is a known data quality issue for some species in BIEN where ",
+          tags$code("is_geovalid=1"), " is set but actual coordinates are not stored in the view. ",
+          "The statistics table is populated but the map will remain empty. ",
+          "Try opening the Range tab for an SDM-based range polygon."
         )
       ))
     }
