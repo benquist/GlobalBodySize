@@ -168,6 +168,428 @@ AND (geom IS NOT NULL
 
 ---
 
-## Issue 2 — [Future issues documented here]
+## Issue 2 — App frozen / blank on startup: synchronous HTTP photo fetch blocking the Shiny event loop
+
+**Date diagnosed:** 2026-05-09  
+**Commits:** 0bc1ec7, 757da51
+
+---
+
+### Symptom
+
+After a species photo feature was added, the app began timing out and disconnecting sessions on startup at https://benquist.shinyapps.io/bien-species-shinyapp/. Users saw a blank or frozen app within seconds of opening it, even before entering a species name.
+
+---
+
+### Diagnosis journey
+
+Code-checker and optimizer agents reviewed `app.R` and found two CRITICALs.
+
+**CRITICAL 1 — Synchronous HTTP inside `renderUI`**  
+The species photo fetch (`fetch_species_photo()`) was called directly inside a `renderUI({...})` block. Because `bien_results()` immediately returns `startup_preloaded_result` at session start, the `renderUI` fired during the initial render flush — before the session was fully established — and made synchronous HTTP calls to iNaturalist (up to 5 s) and Wikipedia (up to 5 s). On shinyapps.io's free tier this blocked the Shiny event loop for up to 10 seconds, causing startup timeouts and session disconnects.
+
+**CRITICAL 2 — `return(NULL)` inside `tryCatch` exiting the wrong scope**  
+Both `tryCatch({...})` blocks inside `fetch_species_photo()` used `return(NULL)` as an error guard. In R, `return()` inside a `tryCatch` expression exits the **enclosing function**, not the tryCatch block. This made the Wikipedia fallback unreachable for every failure mode except a thrown R exception — the function returned NULL immediately on any HTTP failure without ever trying Wikipedia.
+
+---
+
+### Root Cause
+
+Two independent bugs in the photo feature:
+1. Network I/O placed in a reactive render path that runs at session startup.
+2. Misuse of `return()` inside `tryCatch` — a subtle R scoping issue.
+
+---
+
+### Fix
+
+1. Photo fetch moved into `observeEvent(bien_results(), ..., ignoreNULL=TRUE)` with an `is_startup_preloaded` guard that returns immediately at startup. `renderUI` now reads only from `species_photo_rv <- reactiveVal(NULL)` — no network I/O in the render path.
+2. All `return(NULL)` guards inside `tryCatch` replaced with `stop("reason")` so the `error = function(e) NULL` handler returns NULL from the block and execution continues to the Wikipedia fallback.
+3. NULL photo results no longer cached permanently — only non-NULL photos assigned to `query_cache` so transient network failures are retried on the next query.
+
+---
+
+### Lessons learned
+
+1. **Never put network I/O inside `renderUI`, `renderPlot`, or any reactive render function.** These fire synchronously during the event loop. All external fetches belong in `observe()`, `observeEvent()`, or `reactive()` with appropriate guards.
+2. **`return()` inside `tryCatch({...})` exits the enclosing function, not the tryCatch block.** Use `stop("reason")` inside the `try` expression to trigger the `error = function(e)` handler. This is one of R's most commonly misunderstood scoping rules.
+3. **Startup preloaded results trigger reactive chains immediately.** Any reactive that depends on `bien_results()` will fire at session start if `bien_results()` returns a non-NULL value — guard all side-effectful observeEvents with `ignoreNULL=TRUE` and startup-state checks.
+
+---
+
+## Issue 3 — App frozen: BIEN COUNT queries blocking the event loop
+
+**Date diagnosed:** 2026-04-01  
+**Provenance log entries:** 5, 7
+
+---
+
+### Symptom
+
+The app hung and became unresponsive after the Summary Statistics tab was opened, or sometimes immediately on load. Shinyapps.io logs showed the session timing out during BIEN database queries.
+
+---
+
+### Diagnosis journey
+
+Initial investigation (entry 5): BIEN count-only summary queries (`COUNT(*)`) were placed in the first-load critical path — they ran synchronously before the occurrence map rendered, blocking the entire app until BIEN's backend responded. For species with large record sets, this could take 30–60 seconds.
+
+Second occurrence (entry 7): After moving counts to the Summary Statistics tab, opening that tab still triggered synchronous BIEN queries that froze the UI.
+
+---
+
+### Root Cause
+
+Shiny's single-threaded R process means any long-running synchronous call — including BIEN database queries — blocks all UI updates for the duration. COUNT queries on BIEN's `view_full_occurrence_individual` for large species (e.g. *Solidago canadensis*, *Pinus ponderosa*) can take 30–90 seconds. Placing these in reactive render paths or the session startup sequence makes the app appear frozen.
+
+---
+
+### Fix
+
+COUNT queries moved behind a manual button trigger in the Summary Statistics tab. Users click "Get summary statistics" to initiate the query rather than having it fire automatically. This keeps the app responsive and gives users explicit control over when to incur the query cost.
+
+---
+
+### Lessons learned
+
+1. **BIEN COUNT queries on large species are slow — do not run them automatically.** Any `COUNT(*)` against `view_full_occurrence_individual` without a tight LIMIT can take minutes for widespread species. They belong behind explicit user actions, not in render paths.
+2. **Shiny's event loop is single-threaded.** There is no background execution by default. Any blocking call (BIEN query, HTTP request, file I/O) freezes all UI updates for all users sharing the process on shinyapps.io free tier.
+3. **Progressive disclosure is the right pattern for expensive secondary data.** The occurrence map is the primary value; statistics, traits, and range are secondary. Load them on demand, not on startup.
+
+---
+
+## Issue 4 — FIA/plot sampling bias: large species dominated by plot records in occurrence map
+
+**Date diagnosed:** 2026-04-01  
+**Provenance log entry:** 9  
+**Species confirmed affected:** *Juniperus communis*, *Pinus ponderosa*
+
+---
+
+### Symptom
+
+For widespread North American tree species, the occurrence map was dominated almost entirely by FIA forest inventory plot points arranged in a grid-like pattern. Herbarium specimens and iNaturalist records — which have different geographic signatures — were nearly invisible even though they existed in BIEN.
+
+---
+
+### Root Cause
+
+BIEN's `view_full_occurrence_individual` returns rows in natural PostgreSQL table order when no `ORDER BY` clause is used. FIA plot records are ingested in bulk and occupy a contiguous block of rows in the table. Under `LIMIT N` without randomization, the app retrieved the first N rows — which were overwhelmingly FIA rows — ignoring the full diversity of data sources.
+
+---
+
+### Fix
+
+Added `ORDER BY random()` to the BIEN occurrence SQL query so that the returned sample is randomized across all matching rows regardless of table order. Added stratified display-sampling by datasource/observation type so each source class is represented proportionally in the displayed map sample.
+
+**Important caveat added later (v5):** `ORDER BY random()` was subsequently restricted to queries with `500 < limit <= 10000` because it forces a full-table sort on BIEN's 100M+ row view for large species, which can take minutes. For small limits (≤500), natural order + R-side stratified sampling is sufficient. For very large limits (>10000), the query is too expensive to randomize server-side.
+
+---
+
+### Lessons learned
+
+1. **`LIMIT N` without `ORDER BY` on a large PostgreSQL view returns whatever rows come first in table storage order.** For BIEN this means whichever datasource was ingested first dominates the result. Always randomize or stratify when the goal is a representative sample.
+2. **`ORDER BY random()` has a hidden cost: it forces a full sequential scan of all matching rows before sampling.** For a view returning millions of rows this can take minutes. Restrict randomization to moderate limit sizes and use R-side stratification for small fast queries.
+3. **Stratified sampling by datasource is scientifically more defensible than pure random sampling** for occurrence data, because datasource coverage is geographically non-uniform. A random sample of 1000 from a pool of 900,000 FIA + 1,000 specimens will return ~999 FIA rows; stratification ensures specimens are represented.
+
+---
+
+## Issue 5 — Tooltip double-popup: two tooltip systems rendering simultaneously
+
+**Date diagnosed:** 2026-04-09  
+**Provenance log entries:** 13, 15, 17
+
+---
+
+### Symptom
+
+Filter info icons in the Settings/Filters sidebar showed two tooltip popups on hover — one white (custom) and one black (Bootstrap). The black Bootstrap tooltip did not disappear on mouse leave, leaving a persistent floating label on screen.
+
+---
+
+### Diagnosis journey
+
+Entry 13: Added Bootstrap `data-toggle="tooltip"` attributes and called `$(function() { $('[data-toggle="tooltip"]').tooltip(); })` to initialize. This activated Bootstrap's tooltip plugin but the custom hover CSS was still active — two systems rendered simultaneously.
+
+Entry 15: Added a framework-independent JavaScript fallback tooltip to handle cases where Bootstrap's plugin was unavailable. This created a third potential tooltip layer.
+
+Entry 17: Removed Bootstrap attributes and Bootstrap tooltip initialization entirely, leaving only one tooltip system.
+
+---
+
+### Root Cause
+
+Two independent tooltip implementations were active at the same time: Bootstrap's jQuery plugin (triggered by `data-toggle="tooltip"`) and a custom CSS/JS tooltip. Each rendered its own popup on hover.
+
+---
+
+### Fix
+
+Removed all Bootstrap `data-toggle="tooltip"` attributes and the Bootstrap `.tooltip()` initialization call. Kept only one custom tooltip implementation.
+
+---
+
+### Lessons learned
+
+1. **Pick one tooltip system and use it consistently.** Bootstrap, custom CSS, and Shiny's built-in `title=` attribute each activate different rendering paths — mixing them produces duplicate popups.
+2. **Shiny apps on shinyapps.io may load Bootstrap versions that conflict with app-level jQuery plugin calls.** Test tooltip behavior in the deployed environment, not just locally, since the Bootstrap version may differ.
+
+---
+
+## Issue 6 — `Lucky` / random species selection freezing the app
+
+**Date diagnosed:** 2026-04-09  
+**Provenance log entry:** 16
+
+---
+
+### Symptom
+
+Clicking the random species ("Lucky") button caused the app to freeze for 30–90 seconds or time out entirely, even though the intent was a fast "surprise me" species selection.
+
+---
+
+### Root Cause
+
+The Lucky workflow ran sequential BIEN COUNT prechecks for each candidate species to verify it had mappable records before selecting it. Each COUNT query against `view_full_occurrence_individual` could take 30+ seconds for large species. Verifying even 2–3 candidates before finding one with mappable points could exhaust the query budget and cause a session timeout.
+
+---
+
+### Fix
+
+Replaced the sequential precheck loop with an immediate return from a curated starter pool (`starter_pool_fast_pick`). No BIEN prechecks are run — a species is selected instantly and the normal occurrence query runs after selection. If the species turns out to have no mappable points, the standard zero-mappable UI message is shown. The Lucky UI notification text was updated to reflect whether the pick was range-verified or a fast starter pick.
+
+---
+
+### Lessons learned
+
+1. **Never use synchronous BIEN COUNT queries in an interactive button handler.** The user expects a fast response; BIEN queries are not fast.
+2. **"Optimistic" UX is often better than "verified" UX for exploratory features.** Select the species immediately and let the normal query path handle failures, rather than pre-validating before showing anything.
+3. **The cost of verification is often higher than the cost of a failed query.** Showing "no results found" after 2 seconds beats freezing for 60 seconds to guarantee a result.
+
+---
+
+## Issue 7 — `sprintf("%,d")` format crashing Temporal Distribution tab
+
+**Date diagnosed:** 2026-04-13  
+**Provenance log entries:** 22, 23
+
+---
+
+### Symptom
+
+The Temporal Distribution tab displayed: *"Temporal stats — An error has occurred. Check your logs or contact the app author for clarification."* The error appeared immediately on opening the tab for any species.
+
+---
+
+### Diagnosis journey
+
+Entry 22: Added `req(bien_results())` to prevent the handler from running before results were available. Error persisted.
+
+Entry 23: Checked shinyapps.io logs. The actual error was `unsupported format '%,d'` in `sprintf()` — R's `sprintf` does not support the C-style `%,d` thousands-separator format (which is a Python/Java convention). The fix worked.
+
+---
+
+### Root Cause
+
+`sprintf("%,d", n)` was used to format a count with a thousands separator. R's `sprintf` does not implement `%,d` — this format string is valid in some other languages but throws in R.
+
+---
+
+### Fix
+
+Replaced `sprintf("%,d", n)` with `format(n, big.mark = ",")`, which is the correct R idiom for thousands-separated integer formatting.
+
+---
+
+### Lessons learned
+
+1. **R's `sprintf` does not support `%,d` for thousands separators.** Use `format(n, big.mark = ",")` or `formatC(n, format = "d", big.mark = ",")` instead.
+2. **Always test tab-level render handlers with a NULL-results state.** A `req()` guard is necessary but not sufficient — errors inside the render body still crash the tab even when results are available.
+3. **Check shinyapps.io logs for the actual R error message, not just the user-facing "an error has occurred."** The log shows the exact line and call stack; the UI message is useless for diagnosis.
+
+---
+
+## Issue 8 — Selectize autocomplete: typed text disappearing / free-form names not submitting
+
+**Date diagnosed:** 2026-04-21  
+**Provenance log entries:** 28, 30
+
+---
+
+### Symptom
+
+After replacing the species name free-text input with a selectize autocomplete backed by BIEN taxonomy:
+- Typed characters disappeared as the user typed, resetting the input to empty.
+- Misspelled names (e.g. "Pinus pinderosa") submitted nothing — no fuzzy match was attempted.
+- The startup species (*Pinus ponderosa*) did not appear in the input box even though the map loaded correctly.
+
+---
+
+### Diagnosis journey
+
+**Text disappearing:** The accepted species name list was being reloaded on every keystroke inside an `observe()` that watched `input$species`. Each reload called `updateSelectizeInput()` which reset the choices and cleared the current input value.
+
+**Misspellings not submitted:** `selectize` was initialized with `create = FALSE`, meaning free-form text that didn't exactly match a choice was silently discarded. The fuzzy-match logic (`find_best_species_spelling()`) never received the misspelled name because it was never submitted to the server.
+
+**Startup species not shown:** `selectizeInput` was initialized with `choices = NULL` (empty), so the startup value had no matching choice and was not displayed.
+
+---
+
+### Fix
+
+1. Move the accepted-name list load to a `once = TRUE` `observeEvent(TRUE, ...)` that runs once at session start, not on every keystroke.
+2. Set `create = TRUE, createOnBlur = TRUE` in selectize options so free-form typed text is submitted as-is. The existing fuzzy-match logic then handles misspellings server-side.
+3. Initialize `selectizeInput` with `choices = list(STARTUP_SPECIES)` so the startup value has a matching choice and displays immediately.
+
+---
+
+### Lessons learned
+
+1. **Do not reload selectize choices inside a reactive that watches the same input.** This creates a feedback loop: input changes → reload → reset → input changes again.
+2. **`create = FALSE` in selectize silently discards unmatched input.** If fuzzy matching or free-form names matter, use `create = TRUE` and handle validation server-side.
+3. **Selectize `choices` must include the initial value** or the startup value will not render even if `selected` is set correctly.
+
+---
+
+## Issue 9 — BIEN connection-slot exhaustion: live species returning 0 records
+
+**Date diagnosed:** 2026-04-01  
+**Provenance log entry:** 10  
+**Species confirmed affected:** *Juniperus communis* (during live session)
+
+---
+
+### Symptom
+
+A species known to have thousands of BIEN records (*Juniperus communis*) returned 0 observations during a live demo session. No error message was shown — the app simply displayed an empty map as if the species had no data. Re-querying the same species minutes later returned results normally.
+
+---
+
+### Root Cause
+
+BIEN's public PostgreSQL database at `vegbiendev.nceas.ucsb.edu` has a fixed connection-slot limit. When multiple concurrent app users or background processes exhaust the available slots, new connections are refused. The `BIEN` R package raised a connection error that the app silently caught and returned an empty result as if the query succeeded with zero rows.
+
+---
+
+### Fix
+
+Added a backend-capacity warning message that appears when a connection error is detected. The message distinguishes between "species not found in BIEN" (a real absence) and "BIEN connection refused" (a backend capacity issue), and provides explicit retry guidance including a `Retry BIEN connection (with backoff)` button with exponential-backoff logic.
+
+---
+
+### Lessons learned
+
+1. **A zero-result response and a connection-refused error look identical to the user if both result in an empty map.** Always distinguish backend failures from true data absences in the UI.
+2. **Public shared databases have connection limits.** Design retry logic and user communication for connection exhaustion, not just query errors.
+3. **Exponential backoff with a visible retry button is better than silent automatic retry** for a UI context where the user wants to know what happened.
+
+---
+
+## Issue 10 — "Keep native only" label misleading: includes unknown-status records
+
+**Date diagnosed:** 2026-04-21  
+**Provenance log entry:** 27 (SC-1)
+
+---
+
+### Symptom
+
+The filter checkbox labeled "Keep native only" implied it returned strictly native BIEN records. In reality, the underlying query function `natives_check_with_null_fallback()` returned records where `is_introduced IS NULL OR is_introduced = FALSE` — meaning records with unknown nativity status were included alongside confirmed native records.
+
+---
+
+### Root Cause
+
+The BIEN database `is_introduced` column is NULL for the majority of records (nativity status is unknown or unpublished). Filtering to `is_introduced = FALSE` alone would exclude the bulk of BIEN's data. The app's query function therefore includes NULL-status records as a fallback, but the UI label did not communicate this.
+
+---
+
+### Fix
+
+Relabeled the checkbox to "Keep native / unknown-status only" to accurately describe the filter behavior. Tooltip text updated to explain that many BIEN records lack explicit nativity determination and are included as unknown-status.
+
+---
+
+### Lessons learned
+
+1. **BIEN `is_introduced` is NULL for most records.** A strict `is_introduced = FALSE` filter will return far fewer records than expected. Plan for NULL as a valid "unclassified" state.
+2. **UI label language must match the actual query semantics.** "Native only" implies a strict filter; "native / unknown-status" correctly sets expectations.
+3. **Document NULL-handling behavior in filter tooltips.** Ecological users will interpret "native" differently depending on their field — be explicit about what the filter actually does.
+
+---
+
+## Issue 11 — Per-session blocking operations: autocomplete load and startup preload running per user
+
+**Date diagnosed:** 2026-04-21 / 2026-05-08  
+**Provenance log entries:** 27 (H1), 28
+
+---
+
+### Symptom
+
+After the species autocomplete was added, every new user session experienced a 30–60 second stall before the species name box became usable. The first user to open the app each deploy cycle also experienced a slow map load for the default startup species (*Pinus ponderosa*).
+
+---
+
+### Root Cause
+
+Two functions that produced session-invariant data were called inside `session`-scoped reactive contexts, meaning they re-ran for every new user:
+
+1. `load_accepted_species_suggestions()` — fetched all accepted species binomials from BIEN taxonomy (~75,000 names). This was called inside an `observe()` that ran once per session at startup, taking 30–60 seconds per session instead of 30–60 seconds once at app startup.
+2. `build_preloaded_startup_result()` — ran the full occurrence query for the startup species. Same problem: called per session instead of once globally.
+
+---
+
+### Fix
+
+Both functions moved to **global scope** — executed once when the Shiny app process starts, shared across all sessions:
+- `startup_species_suggestions` — global variable holding the accepted-name list; sessions call `updateSelectizeInput()` using this pre-loaded vector.
+- `startup_preloaded_result` — global variable holding the pre-queried startup species result; sessions read from it directly without re-querying BIEN.
+
+---
+
+### Lessons learned
+
+1. **Session-invariant data should live in global scope in Shiny, not inside reactive session contexts.** Global scope runs once at process start and is shared across all concurrent sessions.
+2. **The cost of a per-session load at 100 users/day is 100× the cost of a once-at-startup load.** For data that doesn't change (taxonomy list, curated starter pool), global scope is almost always correct.
+3. **`observe()` and `observeEvent()` inside `server <- function(input, output, session)` run once per session, not once per app.** Only code in the global scope (outside the `server` function) runs once per app process.
+
+---
+
+## Issue 12 — `ORDER BY random()` query timeout on large BIEN tables
+
+**Date diagnosed:** 2026-04-21  
+**Provenance log entry:** 27 (H2)
+
+---
+
+### Symptom
+
+The `fetch_random_bien_species_pool()` function timed out for large species with many BIEN records. The random pool fetch was intended to be fast, but caused the app to hang for widespread species.
+
+---
+
+### Root Cause
+
+The SQL query used `ORDER BY random()` with `LIMIT N` against `view_full_occurrence_individual`. PostgreSQL cannot use an index for `ORDER BY random()` — it must scan all matching rows, assign a random number to each, then sort the full set before applying the LIMIT. For a species with 500,000 records, this means sorting 500,000 rows for a 100-row LIMIT.
+
+---
+
+### Fix
+
+Removed `ORDER BY random()` from the SQL query. The app now retrieves rows in natural table order (fast) and shuffles with `sample.int()` in R after retrieval. For the pool-fetch use case (selecting a random display sample from returned rows), R-side shuffling is equivalent and eliminates the full-table sort cost.
+
+---
+
+### Lessons learned
+
+1. **`ORDER BY random()` in PostgreSQL forces a full sequential scan of all matching rows before sampling.** For large tables this is O(n log n) — never use it for interactive queries without a tight LIMIT on the filtered set, not the full table.
+2. **For random sampling from a query result, retrieve in natural order and shuffle in R.** R's `sample.int()` or `dplyr::slice_sample()` are fast in-memory operations.
+3. **The exception:** `ORDER BY random()` is acceptable when the filtered result set is small (< ~5,000 rows) and server-side randomization is required for reproducibility. For BIEN, most species exceed this threshold.
+
+---
+
+## Issue 13 — [Future issues documented here]
 
 *New issues should be appended below using the same format: Symptom → Diagnosis journey → Root cause → Fix → Lessons learned.*
