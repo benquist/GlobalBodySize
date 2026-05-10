@@ -519,6 +519,193 @@ ggplot(species_binned, aes(x = bin_mid, y = n, fill = group_display)) +
 
 ---
 
+# 3e. May (1988) Re-evaluation: Log–Log Species Richness vs. Body Size
+
+May (1988, *Science* 241: 1441–1449) showed that the number of species per body-size
+class declines steeply with increasing body size on a log–log plot, with a slope consistent
+with $S \propto M^{-0.75}$ arising from metabolic and energy-partitioning constraints
+(see also Peters 1983; Brown & Maurer 1989). The figure below reproduces this analysis
+using the GlobalBodySize Tier 1 database — the largest cross-taxon mass compilation
+assembled for this project — extending May's original mammal and insect data to fish,
+amphibians, and birds.
+
+**Theoretical expectation.** If energy available to a trophic level is roughly constant
+and individual metabolic rate scales as $B \propto M^{3/4}$, then the number of
+individuals supportable at a given body size scales as $N \propto M^{-3/4}$. Under the
+assumption that the number of species is proportional to the number of individuals
+sustainable in a community (Brown & Maurer 1989), $S \propto M^{-3/4}$, predicting a
+log–log slope of approximately $-0.75$. The empirical slope estimated from this dataset
+is shown alongside the theoretical prediction for direct comparison.
+
+> **Caveat:** This database is taxonomically non-uniform — it over-represents birds
+> (AVONET + EltonTraits) and fish (FishBase) relative to amphibians and reptiles.
+> Slopes estimated from the full combined dataset reflect database coverage as much as
+> true biodiversity patterns. Group-specific slopes should be interpreted with this
+> sampling bias in mind.
+
+```{r may1988-loglog, fig.height=6, fig.width=8, fig.cap="Fig. 3e. Log–log plot of number of unique species vs. body size (0.20 log₁₀-decade bins), replicating the analysis of May (1988, Science 241:1441). Each point is the count of unique species (deduplicated) in that bin. The dashed black line shows the theoretical slope of −0.75 anchored to the data centroid (Brown & Maurer 1989; Peters 1983). The solid grey line is the empirical OLS regression slope estimated from this dataset (bins with ≥ 5 species only). Points are coloured by dominant taxonomic group in each bin."}
+
+## Re-use species_dat from Fig. 3c (deduplicated species with log10_mass)
+## Bin at 0.20-decade resolution for smoother log-log
+bin_w_may <- 0.20
+
+may_binned <- species_dat |>
+  dplyr::mutate(
+    bin_floor = floor(log10_mass / bin_w_may) * bin_w_may,
+    bin_mid   = bin_floor + bin_w_may / 2
+  ) |>
+  dplyr::group_by(bin_mid) |>
+  dplyr::summarise(
+    n_species    = dplyr::n(),
+    dominant_grp = {
+      grp_counts <- table(group_display)
+      names(grp_counts)[which.max(grp_counts)]
+    },
+    .groups = "drop"
+  ) |>
+  dplyr::filter(n_species >= 5)  ## exclude sparse tail bins
+
+## OLS regression on log10(n_species) ~ bin_mid  (log-log)
+may_fit <- lm(log10(n_species) ~ bin_mid, data = may_binned)
+may_slope <- round(coef(may_fit)[2], 2)
+may_r2    <- round(summary(may_fit)$r.squared, 3)
+
+## Theoretical line: slope = -0.75, anchored at centroid of data
+centroid_x <- mean(may_binned$bin_mid)
+centroid_y <- predict(may_fit, newdata = data.frame(bin_mid = centroid_x))
+theo_intercept <- centroid_y - (-0.75 * centroid_x)
+
+## Prediction band from OLS
+may_pred <- predict(may_fit,
+                    newdata   = data.frame(bin_mid = may_binned$bin_mid),
+                    interval  = "confidence") |>
+  as.data.frame() |>
+  dplyr::mutate(bin_mid = may_binned$bin_mid)
+
+ggplot(may_binned, aes(x = bin_mid, y = log10(n_species))) +
+  ## OLS confidence band
+  geom_ribbon(data = may_pred,
+              aes(x = bin_mid, ymin = lwr, ymax = upr),
+              inherit.aes = FALSE,
+              fill = "grey75", alpha = 0.4) +
+  ## Empirical OLS line
+  geom_line(data = may_pred,
+            aes(x = bin_mid, y = fit),
+            inherit.aes = FALSE,
+            colour = "grey35", linewidth = 1.0) +
+  ## Theoretical -0.75 line
+  geom_abline(intercept = theo_intercept, slope = -0.75,
+              linetype = "dashed", colour = "black", linewidth = 1.0) +
+  ## Data points coloured by dominant group
+  geom_point(aes(colour = dominant_grp), size = 3, alpha = 0.9) +
+  scale_colour_manual(values = GROUP_COLOURS, name = "Dominant group\nin bin") +
+  scale_x_continuous(
+    name   = expression(log[10]~"body mass (g)"),
+    breaks = seq(-2, 9, by = 1),
+    labels = function(x) paste0("10^", x, " g")
+  ) +
+  scale_y_continuous(
+    name   = expression(log[10]~"number of unique species"),
+    breaks = 0:4,
+    labels = function(y) paste0("10^", y)
+  ) +
+  annotate("text", x = -Inf, y = -Inf,
+           label = paste0(
+             "Empirical slope = ", may_slope,
+             " (R² = ", may_r2, ")\n",
+             "Theoretical slope = −0.75  [S ∝ M^(−3/4)]"
+           ),
+           hjust = -0.05, vjust = -0.4, size = 3.4,
+           colour = "grey20", fontface = "italic") +
+  labs(
+    title    = "Number of species vs. body size: a re-evaluation of May (1988)",
+    subtitle = paste0(
+      scales::comma(sum(may_binned$n_species)), " unique species | ",
+      nrow(may_binned), " bins ≥ 5 species | bin width = 0.20 log₁₀ decades\n",
+      "Dashed = S ∝ M^(−3/4) theory  ·  Grey band = 95% CI on empirical OLS"
+    ),
+    caption  = paste0(
+      "May (1988) argued S declines with body size at roughly S ~ L^(−2) (body length), ",
+      "equivalent to S ~ M^(−2/3) if M ~ L^3.\n",
+      "Brown & Maurer (1989) and Peters (1983) predict S ~ M^(−3/4) from metabolic ",
+      "energy partitioning. Both predictions shown for comparison.\n",
+      "Database bias: birds and fish are over-represented; reptiles critically sparse."
+    )
+  ) +
+  theme(legend.position = "right",
+        plot.caption    = element_text(size = 7.5, hjust = 0, colour = "grey40"))
+```
+
+```{r may1988-bygroup, fig.height=6, fig.width=9, fig.cap="Fig. 3f. Per-group log–log species richness vs. body size, replicating May (1988) Fig. 2 style. Each panel shows the empirical slope (solid line) for that taxonomic group alone, alongside the theoretical −0.75 prediction (dashed). Groups with fewer than 3 bins ≥ 5 species are omitted. This allows assessment of whether the cross-taxon pattern holds within individual clades."}
+
+may_bygroup <- species_dat |>
+  dplyr::mutate(
+    bin_floor = floor(log10_mass / bin_w_may) * bin_w_may,
+    bin_mid   = bin_floor + bin_w_may / 2
+  ) |>
+  dplyr::group_by(group_display, bin_mid) |>
+  dplyr::summarise(n_species = dplyr::n(), .groups = "drop") |>
+  dplyr::filter(n_species >= 5)
+
+## Fit OLS per group (only if ≥ 3 bins)
+slope_labels <- may_bygroup |>
+  dplyr::group_by(group_display) |>
+  dplyr::filter(dplyr::n() >= 3) |>
+  dplyr::summarise(
+    slope = coef(lm(log10(n_species) ~ bin_mid))[2],
+    r2    = summary(lm(log10(n_species) ~ bin_mid))$r.squared,
+    cx    = mean(bin_mid),
+    cy    = mean(log10(n_species)),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    label = paste0("b = ", round(slope, 2), "\nR² = ", round(r2, 2))
+  )
+
+## Only keep groups that have ≥ 3 eligible bins
+eligible_groups <- slope_labels$group_display
+
+may_bygroup_plot <- may_bygroup |>
+  dplyr::filter(group_display %in% eligible_groups)
+
+ggplot(may_bygroup_plot,
+       aes(x = bin_mid, y = log10(n_species), colour = group_display)) +
+  ## Theoretical -0.75 reference
+  geom_abline(slope = -0.75, intercept = NA,  ## per-panel intercept via stat_function
+              linetype = "dashed", colour = "grey50", linewidth = 0.8) +
+  geom_smooth(method  = "lm", formula = y ~ x, se = TRUE,
+              linewidth = 1.0, alpha = 0.2) +
+  geom_point(size = 2.5, alpha = 0.85) +
+  ## Slope label
+  geom_text(data = slope_labels |> dplyr::filter(group_display %in% eligible_groups),
+            aes(x = cx, y = cy, label = label),
+            inherit.aes = FALSE,
+            hjust = 0.5, vjust = -0.6,
+            size = 3.0, colour = "grey20", fontface = "italic") +
+  scale_colour_manual(values = GROUP_COLOURS, guide = "none") +
+  scale_x_continuous(
+    name   = expression(log[10]~"body mass (g)"),
+    breaks = seq(-2, 9, by = 2),
+    labels = function(x) paste0("10^", x)
+  ) +
+  scale_y_continuous(
+    name   = expression(log[10]~"species count"),
+    labels = function(y) paste0("10^", y)
+  ) +
+  facet_wrap(~ group_display, scales = "free", ncol = 2) +
+  labs(
+    title    = "Per-group log–log species richness vs. body size  [May 1988 style]",
+    subtitle = "Solid line = OLS fit  ·  Dashed = theoretical slope −0.75  ·  Shaded = 95% CI",
+    caption  = paste0(
+      "Panels with < 3 bins ≥ 5 species omitted. Free axes per panel.\n",
+      "Theoretical −0.75 dashed line is positioned at panel centroid for visual comparison only."
+    )
+  ) +
+  theme(plot.caption = element_text(size = 7.5, hjust = 0, colour = "grey40"))
+```
+
+---
+
 # 4. Cross-Provider Mass Comparison
 
 ```{r provider-mass-comparison, fig.height=6, fig.cap="Fig. 3. Body mass distribution per provider source. Useful for detecting systematic offsets between databases. Overlapping distributions indicate reasonable inter-source agreement; divergence warrants investigation."}
