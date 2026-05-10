@@ -153,6 +153,141 @@ prov_summary |>
 
 **Total rows in analysis: `r scales::comma(nrow(dat[!is.na(dat$mass_g) & dat$mass_g > 0, ]))`**
 
+```{r species-per-group-bars, fig.height=5, fig.cap="Fig. 0a. Number of species per taxonomic group: total rows (left bar) vs. unique species after deduplication by GBIF accepted name (right bar, or verbatim name if reconciliation unavailable). The gap between the two bars reflects multi-source overlap (e.g., mammals appear in both PanTHERIA and EltonTraits)."}
+## Build dedup name column (same logic used later in section 3b)
+dedup_col_inv <- if ("accepted_name" %in% names(dat) &&
+                      sum(!is.na(dat$accepted_name)) > nrow(dat) * 0.5)
+                   "accepted_name" else "verbatim_taxon_name"
+
+## Per-group counts: all rows vs. unique species
+group_counts <- dat |>
+  dplyr::filter(!is.na(mass_g), mass_g > 0) |>
+  dplyr::group_by(group_display) |>
+  dplyr::summarise(
+    total_rows      = dplyr::n(),
+    unique_species  = dplyr::n_distinct(.data[[dedup_col_inv]], na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(dplyr::desc(total_rows)) |>
+  tidyr::pivot_longer(cols = c(total_rows, unique_species),
+                      names_to = "count_type", values_to = "n") |>
+  dplyr::mutate(
+    count_label = dplyr::recode(count_type,
+      total_rows     = "Total source rows",
+      unique_species = paste0("Unique species\n(dedup by ", dedup_col_inv, ")")
+    )
+  )
+
+ggplot(group_counts, aes(x = reorder(group_display, -n), y = n,
+                          fill = count_label)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.68,
+           colour = "grey30", linewidth = 0.25, alpha = 0.88) +
+  geom_text(aes(label = scales::comma(n)),
+            position = position_dodge(width = 0.75),
+            vjust = -0.4, size = 3.1, colour = "grey20") +
+  scale_fill_manual(
+    values = c("Total source rows"  = "#2c7bb6",
+               "Unique species\n(dedup by accepted_name)" = "#abd9e9",
+               "Unique species\n(dedup by verbatim_taxon_name)" = "#abd9e9"),
+    name   = NULL
+  ) +
+  scale_y_continuous(labels = scales::comma, expand = expansion(mult = c(0, 0.12)),
+                     name = "Count") +
+  labs(
+    title    = "Number of species per taxonomic group",
+    subtitle = "Blue = total records from all sources; light = unique species after deduplication",
+    caption  = paste0(
+      "Note: mammals appear in multiple providers (PanTHERIA + EltonTraits + AnAge), ",
+      "so total rows >> unique species.\n",
+      "Deduplication key: ", dedup_col_inv, "."
+    ),
+    x = NULL
+  ) +
+  theme(legend.position = "bottom")
+```
+
+```{r species-per-group-by-source, fig.height=5, fig.cap="Fig. 0b. Number of species (unique verbatim names) contributed by each source database, stacked by taxonomic group. Shows the relative contribution and overlap of each provider. PanTHERIA, EltonTraits mammals, and AnAge all overlap for many mammal species — the stacked total exceeds true unique mammal diversity."}
+source_group_counts <- dat |>
+  dplyr::filter(!is.na(mass_g), mass_g > 0) |>
+  dplyr::mutate(
+    source_short = dplyr::case_when(
+      grepl("PanTHERIA",   source_display_name) ~ "PanTHERIA",
+      grepl("EltonTraits.*bird|EltonTraits.*Bir", source_display_name) ~ "EltonTraits\n(birds)",
+      grepl("EltonTraits.*mam|EltonTraits.*Mam", source_display_name) ~ "EltonTraits\n(mammals)",
+      grepl("EltonTraits",  source_display_name) ~ "EltonTraits",
+      grepl("AnAge",        source_display_name) ~ "AnAge",
+      grepl("AmphiBIO",     source_display_name) ~ "AmphiBIO",
+      grepl("FishBase",     source_display_name) ~ "FishBase",
+      grepl("AVONET",       source_display_name) ~ "AVONET",
+      TRUE                                        ~ source_display_name
+    )
+  ) |>
+  dplyr::group_by(source_short, group_display) |>
+  dplyr::summarise(
+    n_species = dplyr::n_distinct(verbatim_taxon_name, na.rm = TRUE),
+    .groups   = "drop"
+  )
+
+## Order sources by total descending
+source_order <- source_group_counts |>
+  dplyr::group_by(source_short) |>
+  dplyr::summarise(tot = sum(n_species)) |>
+  dplyr::arrange(dplyr::desc(tot)) |>
+  dplyr::pull(source_short)
+
+source_group_counts$source_short <- factor(source_group_counts$source_short,
+                                            levels = source_order)
+
+ggplot(source_group_counts, aes(x = source_short, y = n_species,
+                                 fill = group_display)) +
+  geom_col(colour = "grey30", linewidth = 0.25, alpha = 0.88, width = 0.72) +
+  geom_text(aes(label = scales::comma(n_species)),
+            position = position_stack(vjust = 0.5),
+            size = 3, colour = "white", fontface = "bold") +
+  scale_fill_manual(values = GROUP_COLOURS, name = "Taxonomic group") +
+  scale_y_continuous(labels = scales::comma, expand = expansion(mult = c(0, 0.05)),
+                     name = "Unique species (verbatim name)") +
+  labs(
+    title    = "Species contributed per source, broken down by taxonomic group",
+    subtitle = "Stacked bars = group contribution within each source database",
+    caption  = "Note: species shared across multiple sources are counted once per source — stacked totals reflect provider scope, not unique global diversity.",
+    x        = NULL
+  ) +
+  theme(legend.position = "right",
+        axis.text.x = element_text(size = 9))
+```
+
+```{r species-per-group-dedup-only, fig.height=4, fig.cap="Fig. 0c. Best-estimate unique species count per taxonomic group after deduplication. This is the most ecologically meaningful inventory statistic — it shows how many distinct species have at least one body mass record, independent of how many databases contributed data."}
+## Unique species after dedup — the 'truth' for inventory purposes
+unique_by_group <- dat |>
+  dplyr::filter(!is.na(mass_g), mass_g > 0) |>
+  dplyr::group_by(group_display) |>
+  dplyr::summarise(
+    unique_species = dplyr::n_distinct(.data[[dedup_col_inv]], na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(dplyr::desc(unique_species))
+
+ggplot(unique_by_group,
+       aes(x = reorder(group_display, unique_species), y = unique_species,
+           fill = group_display)) +
+  geom_col(colour = "grey30", linewidth = 0.3, alpha = 0.88, width = 0.65) +
+  geom_text(aes(label = scales::comma(unique_species)),
+            hjust = -0.15, size = 3.5, colour = "grey20") +
+  scale_fill_manual(values = GROUP_COLOURS, guide = "none") +
+  scale_y_continuous(labels = scales::comma, expand = expansion(mult = c(0, 0.15)),
+                     name = "Unique species") +
+  coord_flip() +
+  labs(
+    title    = paste0("Unique species with body mass data — all sources combined"),
+    subtitle = paste0("Deduplication key: ", dedup_col_inv,
+                      " | Total unique species: ",
+                      scales::comma(sum(unique_by_group$unique_species))),
+    caption  = "Cross-source deduplication collapses multi-provider species to single counts.",
+    x        = NULL
+  )
+```
+
 ---
 
 # 3. Body Size Distributions by Taxonomic Group
