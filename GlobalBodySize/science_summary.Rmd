@@ -545,6 +545,14 @@ is shown alongside the theoretical prediction for direct comparison.
 
 ```{r may1988-loglog, fig.height=6, fig.width=8, fig.cap="Fig. 3e. Log–log plot of number of unique species vs. body size (0.20 log₁₀-decade bins), replicating the analysis of May (1988, Science 241:1441). Each point is the count of unique species (deduplicated) in that bin. The dashed black line shows the theoretical slope of −0.75 anchored to the data centroid (Brown & Maurer 1989; Peters 1983). The solid grey line is the empirical OLS regression slope estimated from this dataset (bins with ≥ 5 species only). Points are coloured by dominant taxonomic group in each bin."}
 
+## Statistical note: OLS on log10(n_species) ~ bin_mid treats bins as independent
+## observations with homogeneous variance; neither assumption holds strictly.
+## Adjacent bins are not independent (shared boundaries), and n_species is a count
+## variable with heterogeneous variance (variance scales with mean). A negative-
+## binomial GLM with log link on raw counts would be more appropriate for
+## inferential use. The slope and CI band below are DESCRIPTIVE ONLY.
+## Interpret the confidence band as approximate, not inferential.
+
 ## Re-use species_dat from Fig. 3c (deduplicated species with log10_mass)
 ## Bin at 0.20-decade resolution for smoother log-log
 bin_w_may <- 0.20
@@ -627,8 +635,10 @@ ggplot(may_binned, aes(x = bin_mid, y = log10(n_species))) +
     caption  = paste0(
       "May (1988) argued S declines with body size at roughly S ~ L^(−2) (body length), ",
       "equivalent to S ~ M^(−2/3) if M ~ L^3.\n",
-      "Brown & Maurer (1989) and Peters (1983) predict S ~ M^(−3/4) from metabolic ",
-      "energy partitioning. Both predictions shown for comparison.\n",
+      "Brown & Maurer (1989) predict S ~ M^(−3/4) from metabolic energy partitioning. ",
+      "Both predictions shown for comparison.\n",
+      "Statistical caution: OLS on binned counts is descriptive only — bins are not independent; ",
+      "negative-binomial GLM is more appropriate for inference.\n",
       "Database bias: birds and fish are over-represented; reptiles critically sparse."
     )
   ) +
