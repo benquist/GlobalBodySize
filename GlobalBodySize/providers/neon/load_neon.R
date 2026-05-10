@@ -29,8 +29,8 @@ NEON_CITATION        <- paste0(
 ## @param check.size  Passed to neonUtilities::loadByProduct(); FALSE skips size prompt
 run_neon_intake <- function(
     output_file = "output/neon_compiled.csv",
-    startdate   = NULL,
-    enddate     = NULL,
+    startdate   = NA,
+    enddate     = NA,
     check.size  = FALSE
 ) {
   message("=== NEON Small Mammal Intake ===")
@@ -40,13 +40,14 @@ run_neon_intake <- function(
   message("Downloading NEON DP1.10072.001 (all sites) — this may take several minutes...")
   neon_data <- tryCatch(
     neonUtilities::loadByProduct(
-      dpID       = "DP1.10072.001",
-      site       = "all",
-      startdate  = startdate,
-      enddate    = enddate,
-      check.size = check.size,
-      package    = "basic",
-      release    = "current"
+      dpID              = "DP1.10072.001",
+      site              = "all",
+      startdate         = startdate,
+      enddate           = enddate,
+      check.size        = check.size,
+      package           = "basic",
+      release           = "current",
+      include.provisional = TRUE
     ),
     error = function(e) {
       stop("neonUtilities::loadByProduct() failed: ", conditionMessage(e), call. = FALSE)
@@ -149,4 +150,9 @@ run_neon_intake <- function(
   data.table::fwrite(out, output_file)
   message(sprintf("NEON compiled: %d rows -> %s", nrow(out), output_file))
   invisible(out)
+}
+
+## Standalone runner — called when this script is executed directly
+if (!interactive() && !exists("NEON_SOURCED_AS_LIBRARY")) {
+  run_neon_intake(output_file = "output/neon_compiled.csv")
 }

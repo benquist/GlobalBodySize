@@ -1,0 +1,15 @@
+Loading FishBase species list via load_taxa()...
+Joining with `by = join_by(Subfamily, GenCode, FamCode)`
+Joining with `by = join_by(FamCode)`
+Joining with `by = join_by(Order, Ordnum, Class, ClassNum)`
+Joining with `by = join_by(Class, ClassNum)`
+Total FishBase species: 36132
+Running intake for: 36132 species
+Fetching direct weight and max length from species table...
+Joining with `by = join_by(SpecCode)`
+Fetching L-W parameters for 36132 species...
+Joining with `by = join_by(SpecCode)`
+FishBase: retained 16613/25730 LW equations with Type==TL
+FishBase: 2215 species with direct weight, 3443 with LW-modeled weight
+FishBase: 5657 species with mass -> output/fishbase_compiled.csv
+FishBase compiled: 5657 rows -> output/fishbase_compiled.csv

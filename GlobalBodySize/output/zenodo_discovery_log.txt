@@ -1,0 +1,341 @@
+=== GlobalBodySize — Dataset Discovery ===
+Search terms:    83
+Max pages/term:  3
+Per page:        100
+Min score:       6
+Repositories:    zenodo
+
+--- Querying Zenodo ---
+[1/83] Zenodo | '"body mass" species dataset'
+  Zenodo retry 1/2 for term: "body mass" species dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body mass" species dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "body mass" species dataset page: 1
+[2/83] Zenodo | '"body size" species dataset'
+  Zenodo retry 1/2 for term: "body size" species dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body size" species dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "body size" species dataset page: 1
+[3/83] Zenodo | '"body weight" animal species'
+  Zenodo retry 1/2 for term: "body weight" animal species page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body weight" animal species page: 1 (waiting 10s)
+Zenodo API query failed for term: "body weight" animal species page: 1
+[4/83] Zenodo | '"wet mass" animal species'
+  Zenodo retry 1/2 for term: "wet mass" animal species page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "wet mass" animal species page: 1 (waiting 10s)
+Zenodo API query failed for term: "wet mass" animal species page: 1
+[5/83] Zenodo | '"dry mass" animal body'
+  Zenodo retry 1/2 for term: "dry mass" animal body page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "dry mass" animal body page: 1 (waiting 10s)
+Zenodo API query failed for term: "dry mass" animal body page: 1
+[6/83] Zenodo | '"live weight" species data'
+  Zenodo retry 1/2 for term: "live weight" species data page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "live weight" species data page: 1 (waiting 10s)
+Zenodo API query failed for term: "live weight" species data page: 1
+[7/83] Zenodo | '"body mass" trait database'
+  Zenodo retry 1/2 for term: "body mass" trait database page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body mass" trait database page: 1 (waiting 10s)
+Zenodo API query failed for term: "body mass" trait database page: 1
+[8/83] Zenodo | '"body mass" compendium vertebrate'
+  Zenodo retry 1/2 for term: "body mass" compendium vertebrate page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body mass" compendium vertebrate page: 1 (waiting 10s)
+Zenodo API query failed for term: "body mass" compendium vertebrate page: 1
+[9/83] Zenodo | '"body size" allometry dataset'
+  Zenodo retry 1/2 for term: "body size" allometry dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body size" allometry dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "body size" allometry dataset page: 1
+[10/83] Zenodo | '"mammal body mass"'
+  Zenodo retry 1/2 for term: "mammal body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "mammal body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "mammal body mass" page: 1
+[11/83] Zenodo | '"mammal* mass" trait'
+  Zenodo retry 1/2 for term: "mammal* mass" trait page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "mammal* mass" trait page: 1 (waiting 10s)
+Zenodo API query failed for term: "mammal* mass" trait page: 1
+[12/83] Zenodo | '"rodent body mass"'
+  Zenodo retry 1/2 for term: "rodent body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "rodent body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "rodent body mass" page: 1
+[13/83] Zenodo | '"bat body mass"'
+  Zenodo retry 1/2 for term: "bat body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "bat body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "bat body mass" page: 1
+[14/83] Zenodo | '"carnivore body mass"'
+  Zenodo retry 1/2 for term: "carnivore body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "carnivore body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "carnivore body mass" page: 1
+[15/83] Zenodo | '"ungulate body mass"'
+  Zenodo retry 1/2 for term: "ungulate body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "ungulate body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "ungulate body mass" page: 1
+[16/83] Zenodo | '"primate body mass"'
+  Zenodo retry 1/2 for term: "primate body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "primate body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "primate body mass" page: 1
+[17/83] Zenodo | '"marsupial body mass"'
+  Zenodo retry 1/2 for term: "marsupial body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "marsupial body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "marsupial body mass" page: 1
+[18/83] Zenodo | '"mammal life history" body mass'
+  Zenodo retry 1/2 for term: "mammal life history" body mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "mammal life history" body mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "mammal life history" body mass page: 1
+[19/83] Zenodo | '"small mammal" body mass dataset'
+  Zenodo retry 1/2 for term: "small mammal" body mass dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "small mammal" body mass dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "small mammal" body mass dataset page: 1
+[20/83] Zenodo | '"bird body mass"'
+  Zenodo retry 1/2 for term: "bird body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "bird body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "bird body mass" page: 1
+[21/83] Zenodo | '"avian body mass"'
+  Zenodo retry 1/2 for term: "avian body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "avian body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "avian body mass" page: 1
+[22/83] Zenodo | '"avian morphology" mass'
+  Zenodo retry 1/2 for term: "avian morphology" mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "avian morphology" mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "avian morphology" mass page: 1
+[23/83] Zenodo | '"bird morphometrics"'
+  Zenodo retry 1/2 for term: "bird morphometrics" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "bird morphometrics" page: 1 (waiting 10s)
+Zenodo API query failed for term: "bird morphometrics" page: 1
+[24/83] Zenodo | '"passerine body mass"'
+  Zenodo retry 1/2 for term: "passerine body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "passerine body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "passerine body mass" page: 1
+[25/83] Zenodo | '"raptor body mass"'
+  Zenodo retry 1/2 for term: "raptor body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "raptor body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "raptor body mass" page: 1
+[26/83] Zenodo | '"waterbird body mass"'
+  Zenodo retry 1/2 for term: "waterbird body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "waterbird body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "waterbird body mass" page: 1
+[27/83] Zenodo | '"avian life history" body mass'
+  Zenodo retry 1/2 for term: "avian life history" body mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "avian life history" body mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "avian life history" body mass page: 1
+[28/83] Zenodo | '"fish body mass"'
+  Zenodo retry 1/2 for term: "fish body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "fish body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "fish body mass" page: 1
+[29/83] Zenodo | '"length-weight relationship" fish'
+  Zenodo retry 1/2 for term: "length-weight relationship" fish page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "length-weight relationship" fish page: 1 (waiting 10s)
+Zenodo API query failed for term: "length-weight relationship" fish page: 1
+[30/83] Zenodo | '"fish wet mass"'
+  Zenodo retry 1/2 for term: "fish wet mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "fish wet mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "fish wet mass" page: 1
+[31/83] Zenodo | '"fish weight" species data'
+  Zenodo retry 1/2 for term: "fish weight" species data page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "fish weight" species data page: 1 (waiting 10s)
+Zenodo API query failed for term: "fish weight" species data page: 1
+[32/83] Zenodo | '"length weight" fish species data'
+  Zenodo retry 1/2 for term: "length weight" fish species data page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "length weight" fish species data page: 1 (waiting 10s)
+Zenodo API query failed for term: "length weight" fish species data page: 1
+[33/83] Zenodo | '"teleost body mass"'
+  Zenodo retry 1/2 for term: "teleost body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "teleost body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "teleost body mass" page: 1
+[34/83] Zenodo | '"elasmobranch body mass"'
+  Zenodo retry 1/2 for term: "elasmobranch body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "elasmobranch body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "elasmobranch body mass" page: 1
+[35/83] Zenodo | '"weight-at-age" fish species'
+  Zenodo retry 1/2 for term: "weight-at-age" fish species page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "weight-at-age" fish species page: 1 (waiting 10s)
+Zenodo API query failed for term: "weight-at-age" fish species page: 1
+[36/83] Zenodo | '"reptile body mass"'
+  Zenodo retry 1/2 for term: "reptile body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "reptile body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "reptile body mass" page: 1
+[37/83] Zenodo | '"snake body mass"'
+  Zenodo retry 1/2 for term: "snake body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "snake body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "snake body mass" page: 1
+[38/83] Zenodo | '"lizard body mass"'
+  Zenodo retry 1/2 for term: "lizard body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "lizard body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "lizard body mass" page: 1
+[39/83] Zenodo | '"herpetofauna body size"'
+  Zenodo retry 1/2 for term: "herpetofauna body size" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "herpetofauna body size" page: 1 (waiting 10s)
+Zenodo API query failed for term: "herpetofauna body size" page: 1
+[40/83] Zenodo | '"squamate body mass"'
+  Zenodo retry 1/2 for term: "squamate body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "squamate body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "squamate body mass" page: 1
+[41/83] Zenodo | '"reptile trait" body size dataset'
+  Zenodo retry 1/2 for term: "reptile trait" body size dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "reptile trait" body size dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "reptile trait" body size dataset page: 1
+[42/83] Zenodo | '"amphibian body mass"'
+  Zenodo retry 1/2 for term: "amphibian body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "amphibian body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "amphibian body mass" page: 1
+[43/83] Zenodo | '"frog body mass"'
+  Zenodo retry 1/2 for term: "frog body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "frog body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "frog body mass" page: 1
+[44/83] Zenodo | '"salamander body mass"'
+  Zenodo retry 1/2 for term: "salamander body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "salamander body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "salamander body mass" page: 1
+[45/83] Zenodo | '"anuran body size"'
+  Zenodo retry 1/2 for term: "anuran body size" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "anuran body size" page: 1 (waiting 10s)
+Zenodo API query failed for term: "anuran body size" page: 1
+[46/83] Zenodo | '"amphibian life history" body size'
+  Zenodo retry 1/2 for term: "amphibian life history" body size page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "amphibian life history" body size page: 1 (waiting 10s)
+Zenodo API query failed for term: "amphibian life history" body size page: 1
+[47/83] Zenodo | '"insect body mass"'
+  Zenodo retry 1/2 for term: "insect body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "insect body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "insect body mass" page: 1
+[48/83] Zenodo | '"arthropod body size"'
+  Zenodo retry 1/2 for term: "arthropod body size" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "arthropod body size" page: 1 (waiting 10s)
+Zenodo API query failed for term: "arthropod body size" page: 1
+[49/83] Zenodo | '"beetle body mass"'
+  Zenodo retry 1/2 for term: "beetle body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "beetle body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "beetle body mass" page: 1
+[50/83] Zenodo | '"invertebrate body mass"'
+  Zenodo retry 1/2 for term: "invertebrate body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "invertebrate body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "invertebrate body mass" page: 1
+[51/83] Zenodo | '"insect morphometrics"'
+  Zenodo retry 1/2 for term: "insect morphometrics" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "insect morphometrics" page: 1 (waiting 10s)
+Zenodo API query failed for term: "insect morphometrics" page: 1
+[52/83] Zenodo | '"ant body mass"'
+  Zenodo retry 1/2 for term: "ant body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "ant body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "ant body mass" page: 1
+[53/83] Zenodo | '"insect biomass" species'
+  Zenodo retry 1/2 for term: "insect biomass" species page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "insect biomass" species page: 1 (waiting 10s)
+Zenodo API query failed for term: "insect biomass" species page: 1
+[54/83] Zenodo | '"arthropod biomass" dataset'
+  Zenodo retry 1/2 for term: "arthropod biomass" dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "arthropod biomass" dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "arthropod biomass" dataset page: 1
+[55/83] Zenodo | '"zooplankton body mass"'
+  Zenodo retry 1/2 for term: "zooplankton body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "zooplankton body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "zooplankton body mass" page: 1
+[56/83] Zenodo | '"zooplankton body size"'
+  Zenodo retry 1/2 for term: "zooplankton body size" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "zooplankton body size" page: 1 (waiting 10s)
+Zenodo API query failed for term: "zooplankton body size" page: 1
+[57/83] Zenodo | '"marine organism body mass"'
+  Zenodo retry 1/2 for term: "marine organism body mass" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "marine organism body mass" page: 1 (waiting 10s)
+Zenodo API query failed for term: "marine organism body mass" page: 1
+[58/83] Zenodo | '"fish length weight" marine'
+  Zenodo retry 1/2 for term: "fish length weight" marine page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "fish length weight" marine page: 1 (waiting 10s)
+Zenodo API query failed for term: "fish length weight" marine page: 1
+[59/83] Zenodo | '"body mass allometry"'
+  Zenodo retry 1/2 for term: "body mass allometry" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body mass allometry" page: 1 (waiting 10s)
+Zenodo API query failed for term: "body mass allometry" page: 1
+[60/83] Zenodo | '"metabolic scaling" body mass'
+  Zenodo retry 1/2 for term: "metabolic scaling" body mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "metabolic scaling" body mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "metabolic scaling" body mass page: 1
+[61/83] Zenodo | '"allometric scaling" mass exponent'
+  Zenodo retry 1/2 for term: "allometric scaling" mass exponent page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "allometric scaling" mass exponent page: 1 (waiting 10s)
+Zenodo API query failed for term: "allometric scaling" mass exponent page: 1
+[62/83] Zenodo | '"interspecific allometry" body mass'
+  Zenodo retry 1/2 for term: "interspecific allometry" body mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "interspecific allometry" body mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "interspecific allometry" body mass page: 1
+[63/83] Zenodo | '"intraspecific allometry" mass'
+  Zenodo retry 1/2 for term: "intraspecific allometry" mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "intraspecific allometry" mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "intraspecific allometry" mass page: 1
+[64/83] Zenodo | '"mass scaling" species dataset'
+  Zenodo retry 1/2 for term: "mass scaling" species dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "mass scaling" species dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "mass scaling" species dataset page: 1
+[65/83] Zenodo | '"Kleiber" metabolic body mass data'
+  Zenodo retry 1/2 for term: "Kleiber" metabolic body mass data page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "Kleiber" metabolic body mass data page: 1 (waiting 10s)
+Zenodo API query failed for term: "Kleiber" metabolic body mass data page: 1
+[66/83] Zenodo | '"seed mass" species global dataset'
+  Zenodo retry 1/2 for term: "seed mass" species global dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "seed mass" species global dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "seed mass" species global dataset page: 1
+[67/83] Zenodo | '"plant height" species trait data'
+  Zenodo retry 1/2 for term: "plant height" species trait data page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "plant height" species trait data page: 1 (waiting 10s)
+Zenodo API query failed for term: "plant height" species trait data page: 1
+[68/83] Zenodo | '"above-ground biomass" species dataset'
+  Zenodo retry 1/2 for term: "above-ground biomass" species dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "above-ground biomass" species dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "above-ground biomass" species dataset page: 1
+[69/83] Zenodo | '"plant biomass" allometry dataset'
+  Zenodo retry 1/2 for term: "plant biomass" allometry dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "plant biomass" allometry dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "plant biomass" allometry dataset page: 1
+[70/83] Zenodo | '"stem mass" plant species'
+  Zenodo retry 1/2 for term: "stem mass" plant species page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "stem mass" plant species page: 1 (waiting 10s)
+Zenodo API query failed for term: "stem mass" plant species page: 1
+[71/83] Zenodo | '"museum specimen" body mass'
+  Zenodo retry 1/2 for term: "museum specimen" body mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "museum specimen" body mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "museum specimen" body mass page: 1
+[72/83] Zenodo | '"natural history collection" measurements'
+  Zenodo retry 1/2 for term: "natural history collection" measurements page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "natural history collection" measurements page: 1 (waiting 10s)
+Zenodo API query failed for term: "natural history collection" measurements page: 1
+[73/83] Zenodo | '"specimen weight" vertebrate collection'
+  Zenodo retry 1/2 for term: "specimen weight" vertebrate collection page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "specimen weight" vertebrate collection page: 1 (waiting 10s)
+Zenodo API query failed for term: "specimen weight" vertebrate collection page: 1
+[74/83] Zenodo | '"banded" body mass bird'
+  Zenodo retry 1/2 for term: "banded" body mass bird page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "banded" body mass bird page: 1 (waiting 10s)
+Zenodo API query failed for term: "banded" body mass bird page: 1
+[75/83] Zenodo | '"body mass database"'
+  Zenodo retry 1/2 for term: "body mass database" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body mass database" page: 1 (waiting 10s)
+Zenodo API query failed for term: "body mass database" page: 1
+[76/83] Zenodo | '"body size database"'
+  Zenodo retry 1/2 for term: "body size database" page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body size database" page: 1 (waiting 10s)
+Zenodo API query failed for term: "body size database" page: 1
+[77/83] Zenodo | '"body mass compilation" species'
+  Zenodo retry 1/2 for term: "body mass compilation" species page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body mass compilation" species page: 1 (waiting 10s)
+Zenodo API query failed for term: "body mass compilation" species page: 1
+[78/83] Zenodo | '"life history" body mass data'
+  Zenodo retry 1/2 for term: "life history" body mass data page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "life history" body mass data page: 1 (waiting 10s)
+Zenodo API query failed for term: "life history" body mass data page: 1
+[79/83] Zenodo | '"trait database" body mass'
+  Zenodo retry 1/2 for term: "trait database" body mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "trait database" body mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "trait database" body mass page: 1
+[80/83] Zenodo | '"functional traits" body mass vertebrate'
+  Zenodo retry 1/2 for term: "functional traits" body mass vertebrate page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "functional traits" body mass vertebrate page: 1 (waiting 10s)
+Zenodo API query failed for term: "functional traits" body mass vertebrate page: 1
+[81/83] Zenodo | '"species traits" body mass dataset'
+  Zenodo retry 1/2 for term: "species traits" body mass dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "species traits" body mass dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "species traits" body mass dataset page: 1
+[82/83] Zenodo | '"global database" body mass'
+  Zenodo retry 1/2 for term: "global database" body mass page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "global database" body mass page: 1 (waiting 10s)
+Zenodo API query failed for term: "global database" body mass page: 1
+[83/83] Zenodo | '"body size" macroecology dataset'
+  Zenodo retry 1/2 for term: "body size" macroecology dataset page: 1 (waiting 5s)
+  Zenodo retry 2/2 for term: "body size" macroecology dataset page: 1 (waiting 10s)
+Zenodo API query failed for term: "body size" macroecology dataset page: 1
+No candidates found above score threshold. Try lowering --min-score.

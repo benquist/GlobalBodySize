@@ -1,0 +1,24 @@
+[2026-05-10 20:33:07] === Tier-1 merge started === 
+[2026-05-10 20:33:07]   pantheria_compiled.csv                               5416 rows 
+[2026-05-10 20:33:07]   eltontraits_compiled.csv                            15393 rows 
+[2026-05-10 20:33:07]   anage_compiled.csv                                    627 rows 
+[2026-05-10 20:33:07]   amphibio_compiled.csv                                 591 rows 
+[2026-05-10 20:33:07]   fishbase_compiled.csv                                5657 rows 
+[2026-05-10 20:33:07]   avonet_compiled.csv                                 11009 rows 
+[2026-05-10 20:33:07] WARNING: dropped 1874 rows with NA/non-positive mass_g 
+[2026-05-10 20:33:07] Total rows after merge: 36819 
+[2026-05-10 20:33:07] Provider row counts: 
+[2026-05-10 20:33:07]   amphibio_oliveira2017                       591 
+[2026-05-10 20:33:07]   anage_demagalhaes2009                       627 
+[2026-05-10 20:33:07]   avonet_tobias2022                         11009 
+[2026-05-10 20:33:07]   eltontraits_bird                           9993 
+[2026-05-10 20:33:07]   eltontraits_mammal                         5400 
+[2026-05-10 20:33:07]   fishbase_rfishbase                         5657 
+[2026-05-10 20:33:07]   pantheria_jones2009                        3542 
+[2026-05-10 20:33:07] Taxonomic group row counts: 
+[2026-05-10 20:33:07]   amphibian                         609 
+[2026-05-10 20:33:07]   bird                            21173 
+[2026-05-10 20:33:07]   fish                             5657 
+[2026-05-10 20:33:07]   mammal                           9364 
+[2026-05-10 20:33:07]   reptile                            16 
+[2026-05-10 20:33:07] === tier1_combined.csv written: 36819 rows -> data/compiled/tier1_combined.csv === 
