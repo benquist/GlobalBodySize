@@ -3,8 +3,8 @@
 **A reproducible, provenance-rich, cross-taxon animal body mass database.**
 
 [![Phase](https://img.shields.io/badge/Phase-1%20Tier--1%20Intake-blue)]()
-[![Rows](https://img.shields.io/badge/Rows-36%2C819-green)]()
-[![Groups](https://img.shields.io/badge/Taxa-mammals%20%7C%20birds%20%7C%20fish%20%7C%20amphibians-orange)]()
+[![Rows](https://img.shields.io/badge/Rows-37%2C619-green)]()
+[![Groups](https://img.shields.io/badge/Taxa-mammals%20%7C%20birds%20%7C%20fish%20%7C%20amphibians%20%7C%20NEON-orange)]()
 
 Body mass is the central ecological trait — it determines metabolic rate, population density, home range, generation time, and extinction risk across all animal life. This project assembles a unified, Darwin Core-compatible body mass database from authoritative curated sources, designed for macroecological synthesis, scaling law tests, and trait-based biodiversity analyses.
 
@@ -111,20 +111,20 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 | FishBase via rfishbase | Fish | 5,657 | direct max weight + LW-modeled | Living database — no single DOI | ✅ COMPLETE |
 | AnAge Build 14 (de Magalhães & Costa 2009) | Multi-taxon | 627 | literature mean | [10.1111/j.1420-9101.2009.01783.x](https://doi.org/10.1111/j.1420-9101.2009.01783.x) | ✅ COMPLETE |
 | AmphiBIO v1 (Oliveira et al. 2017) | Amphibians | 591 | literature mean | [10.1038/sdata.2017.123](https://doi.org/10.1038/sdata.2017.123) | ✅ COMPLETE |
-| NEON DP1.10072.001 | Mammals | pending | field trapping max weight | 10.48443/s4ph-2z37 **(UNVERIFIED)** | 🔄 IN PROGRESS |
+| NEON DP1.10072.001 | Mammals | 800 | field trapping max weight | 10.48443/s4ph-2z37 **(UNVERIFIED)** | ✅ COMPLETE |
 
 > **Note:** The NEON DOI `10.48443/s4ph-2z37` is used internally but has not been independently verified. Confirm before citing in any publication.
 
 > **LW-modeled mass (FishBase):** Mass estimated via FishBase length-weight regression W = a × L^b (species-specific a, b coefficients from FishBase literature). Input length = maximum recorded length. Not directly equivalent to mean adult mass; tends toward maximum adult mass. Never pool `wet` and `LW_modeled` without filtering on `mass_type`. See `providers/fishbase/load_fishbase.R` for exact fields used.
 
-**Phase 1 total (as of 2026-05-10): 36,819 rows across 7 completed providers.**
+**Phase 1 total (as of 2026-05-10): 37,619 rows across 8 completed providers.**
 
 ### Taxonomic Group Breakdown
 
 | Group | Rows | Sources |
 |---|---|---|
 | Birds | 21,173 | EltonTraits (Birds), AVONET |
-| Mammals | 9,364 | PanTHERIA, EltonTraits (Mammals), AnAge |
+| Mammals | 10,164 | PanTHERIA, EltonTraits (Mammals), AnAge, NEON |
 | Fish | 5,657 | FishBase |
 | Amphibians | 609 | AmphiBIO, AnAge |
 | Reptiles | 16 | AnAge only — **critically sparse; do not use for richness estimates** |
@@ -254,8 +254,8 @@ As of 2026-05-10:
 
 | Statistic | Value |
 |---|---|
-| Total rows (all providers merged) | 36,819 |
-| Providers completed | 7 of 8 planned (NEON in progress) |
+| Total rows (all providers merged) | 37,619 |
+| Providers completed | 8 of 8 planned |
 | GBIF EXACT match rate | 97.7% |
 | Body size range | ~0.07 g (amphibians) to ~150,000,000 g (blue whale) |
 | Range in orders of magnitude | ~9.3 log₁₀ decades |
@@ -352,7 +352,7 @@ rmarkdown::render("science_summary.Rmd", output_file = "science_summary.html")
 |---|---|---|
 | 0 | Add LICENSE file (CC BY 4.0 recommended) and CITATION.cff | None |
 | 0 | Run `renv::snapshot()` to pin R package versions | None |
-| 1 | Complete NEON small mammal intake | In progress |
+| 1 | ~~Complete NEON small mammal intake~~ | ✅ Done (800 rows, 2026-05-10) |
 | 2 | Re-run GBIF reconciliation on updated 36,819-row file | None |
 | 3 | Deduplicate species across providers (mammals triple-counted) | None |
 | 4 | Add reptile body mass source (Meiri et al. or Reptile Database) | Requires download |

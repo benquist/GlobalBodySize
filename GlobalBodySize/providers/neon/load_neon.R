@@ -112,7 +112,7 @@ run_neon_intake <- function(
 
     verbatim_taxon_name    = agg$scientificName,
     verbatim_authorship    = NA_character_,
-    input_taxonomic_group  = "mammalia",
+    input_taxonomic_group  = "mammal",
     input_taxonomic_rank   = "species",
 
     mass_g                 = agg$mass_g,
