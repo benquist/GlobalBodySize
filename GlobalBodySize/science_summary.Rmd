@@ -244,6 +244,146 @@ ggplot(violin_dat, aes(x = reorder(group_display, log10_mass, FUN = median),
 
 ---
 
+# 3b. Combined Body Size Distribution — All Datasets
+
+```{r combined-all-histogram, fig.height=5, fig.cap="Fig. 3a. Frequency distribution of log₁₀ body mass across all datasets combined, stacked by taxonomic group. Each bar represents the total number of species-source records in that body size bin. The overall distribution shows the macroecological 'right skew of life' — most animal species are small, with a long tail of large-bodied forms."}
+ggplot(plot_dat, aes(x = log10_mass, fill = group_display)) +
+  geom_histogram(binwidth = 0.15, colour = "white", linewidth = 0.15, alpha = 0.88,
+                 position = "stack") +
+  geom_vline(xintercept = median(plot_dat$log10_mass, na.rm = TRUE),
+             linetype = "dashed", colour = "grey20", linewidth = 0.8) +
+  annotate("text",
+           x     = median(plot_dat$log10_mass, na.rm = TRUE) + 0.07,
+           y     = Inf,
+           label = paste0("Overall median\n10^",
+                          round(median(plot_dat$log10_mass, na.rm = TRUE), 2), " g"),
+           hjust = 0, vjust = 1.4, size = 3.2, colour = "grey20") +
+  scale_fill_manual(values = GROUP_COLOURS, name = "Taxonomic group") +
+  scale_x_continuous(
+    name   = expression(log[10]~"body mass (g)"),
+    breaks = -2:9,
+    labels = function(x) paste0("10^", x)
+  ) +
+  scale_y_continuous(name = "Number of records", labels = scales::comma) +
+  labs(
+    title    = "Body mass frequency distribution — all datasets combined",
+    subtitle = paste0("All sources, all mass types | n = ",
+                      scales::comma(nrow(plot_dat)), " species-source records"),
+    caption  = "Dashed line = overall median. LW-modeled FishBase mass included (see mass_type column)."
+  ) +
+  theme(legend.position = "right")
+```
+
+```{r combined-all-density, fig.height=5, fig.cap="Fig. 3b. Density-normalised view of all datasets combined, with per-group overlaid curves. This shows the shape of the distribution independently of sample size differences between groups."}
+ggplot(plot_dat, aes(x = log10_mass)) +
+  geom_histogram(aes(y = after_stat(density), fill = group_display),
+                 binwidth = 0.15, colour = "white", linewidth = 0.15,
+                 alpha = 0.7, position = "stack") +
+  geom_density(aes(colour = group_display), linewidth = 0.9, adjust = 1.2) +
+  scale_fill_manual(values = GROUP_COLOURS, name = "Group (bars)") +
+  scale_colour_manual(values = GROUP_COLOURS, name = "Group (density)") +
+  scale_x_continuous(
+    name   = expression(log[10]~"body mass (g)"),
+    breaks = -2:9,
+    labels = function(x) paste0("10^", x)
+  ) +
+  scale_y_continuous(name = "Density") +
+  labs(
+    title    = "Body mass density — all datasets combined, per-group curves overlaid",
+    subtitle = "Stacked bars normalised to density; coloured curves = per-group kernel density estimates",
+    caption  = "All mass types included."
+  ) +
+  theme(legend.position = "right")
+```
+
+```{r species-by-bodysize, fig.height=6, fig.cap="Fig. 3c. Number of unique species (deduplicated by GBIF accepted name, or verbatim name if reconciliation unavailable) as a function of body size bin (0.15 decade bins). This represents the body size frequency distribution of animal diversity independent of record duplication. Coloured by taxonomic group."}
+## Deduplicate: one row per unique accepted species, taking median log10 mass
+## Use accepted_name if available (from GBIF reconciliation), else verbatim_taxon_name
+dedup_name_col <- if ("accepted_name" %in% names(dat) &&
+                       sum(!is.na(dat$accepted_name)) > nrow(dat) * 0.5)
+                    "accepted_name" else "verbatim_taxon_name"
+
+species_dat <- dat |>
+  dplyr::filter(!is.na(log10_mass), is.finite(log10_mass)) |>
+  dplyr::group_by(.data[[dedup_name_col]], group_display) |>
+  dplyr::summarise(
+    log10_mass = median(log10_mass, na.rm = TRUE),
+    .groups    = "drop"
+  )
+
+n_unique_spp <- nrow(species_dat)
+
+## Bin into 0.15-decade bins
+bin_width <- 0.15
+species_binned <- species_dat |>
+  dplyr::mutate(
+    bin_floor = floor(log10_mass / bin_width) * bin_width,
+    bin_mid   = bin_floor + bin_width / 2
+  ) |>
+  dplyr::count(bin_mid, group_display)
+
+## Overall median across unique species
+overall_spp_median <- median(species_dat$log10_mass, na.rm = TRUE)
+
+ggplot(species_binned, aes(x = bin_mid, y = n, fill = group_display)) +
+  geom_col(colour = "white", linewidth = 0.15, alpha = 0.88,
+           position = "stack", width = bin_width * 0.92) +
+  geom_vline(xintercept = overall_spp_median,
+             linetype = "dashed", colour = "grey20", linewidth = 0.8) +
+  annotate("text",
+           x     = overall_spp_median + 0.08,
+           y     = Inf,
+           label = paste0("Median unique species\n10^",
+                          round(overall_spp_median, 2), " g"),
+           hjust = 0, vjust = 1.4, size = 3.2, colour = "grey20") +
+  scale_fill_manual(values = GROUP_COLOURS, name = "Taxonomic group") +
+  scale_x_continuous(
+    name   = expression(log[10]~"body mass (g)"),
+    breaks = seq(-2, 9, by = 1),
+    labels = function(x) paste0("10^", x)
+  ) +
+  scale_y_continuous(name = "Number of unique species", labels = scales::comma) +
+  labs(
+    title    = "Number of species as a function of body size",
+    subtitle = paste0(
+      scales::comma(n_unique_spp), " unique species | deduplicated on ",
+      ifelse(dedup_name_col == "accepted_name", "GBIF accepted name", "verbatim taxon name"),
+      " | median mass per species used"
+    ),
+    caption  = paste0(
+      "Bin width = 0.15 log₁₀ decades. Deduplication collapses multi-source species to one row.\n",
+      "Stacked bars show group contribution to each body size bin."
+    )
+  ) +
+  theme(legend.position = "right")
+```
+
+```{r species-by-bodysize-facet, fig.height=7, fig.cap="Fig. 3d. Per-group view of unique species as a function of body size. Same deduplication as Fig. 3c — each group's body size distribution shown on a free y-axis to reveal within-group structure independently of the large between-group richness differences."}
+ggplot(species_binned, aes(x = bin_mid, y = n, fill = group_display)) +
+  geom_col(colour = "white", linewidth = 0.15, alpha = 0.85, width = bin_width * 0.92) +
+  geom_vline(
+    data = species_dat |>
+      dplyr::group_by(group_display) |>
+      dplyr::summarise(med = median(log10_mass, na.rm = TRUE), .groups = "drop"),
+    aes(xintercept = med), linetype = "dashed", colour = "grey20", linewidth = 0.6
+  ) +
+  scale_fill_manual(values = GROUP_COLOURS, guide = "none") +
+  scale_x_continuous(
+    name   = expression(log[10]~"body mass (g)"),
+    breaks = seq(-2, 9, by = 2),
+    labels = function(x) paste0("10^", x)
+  ) +
+  scale_y_continuous(name = "Number of unique species", labels = scales::comma) +
+  facet_wrap(~ group_display, scales = "free_y", ncol = 2) +
+  labs(
+    title    = "Number of unique species by body size — per taxonomic group",
+    subtitle = "Dashed line = group median | Free y-axis per panel",
+    caption  = "Bin width = 0.15 log₁₀ decades."
+  )
+```
+
+---
+
 # 4. Cross-Provider Mass Comparison
 
 ```{r provider-mass-comparison, fig.height=6, fig.cap="Fig. 3. Body mass distribution per provider source. Useful for detecting systematic offsets between databases. Overlapping distributions indicate reasonable inter-source agreement; divergence warrants investigation."}
