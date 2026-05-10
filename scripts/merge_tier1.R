@@ -8,6 +8,7 @@
 ##   - AnAge           (multi-taxon, literature)
 ##   - AmphiBIO        (amphibia, literature mean)
 ##   - FishBase        (actinopterygii, direct + LW-modeled)
+##   - AVONET          (aves, morphology + mass)
 ##   - NEON            (mammalia, field trapping — optional; include if file exists)
 
 suppressPackageStartupMessages(library(data.table))
@@ -22,7 +23,8 @@ PROVIDERS <- c(
   "output/eltontraits_compiled.csv",
   "output/anage_compiled.csv",
   "output/amphibio_compiled.csv",
-  "output/fishbase_compiled.csv"
+  "output/fishbase_compiled.csv",
+  "output/avonet_compiled.csv"
 )
 
 OPTIONAL_PROVIDERS <- c(

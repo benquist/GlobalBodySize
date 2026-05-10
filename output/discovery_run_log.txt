@@ -1,0 +1,349 @@
+=== GlobalBodySize — Dataset Discovery ===
+Search terms:    83
+Max pages/term:  3
+Per page:        100
+Min score:       6
+Repositories:    dryad, zenodo, figshare
+
+--- Querying Dryad ---
+[1/83] theme=general_body_mass    term='"body mass" species dataset'
+[2/83] theme=general_body_mass    term='"body size" species dataset'
+[3/83] theme=general_body_mass    term='"body weight" animal species'
+[4/83] theme=general_body_mass    term='"wet mass" animal species'
+[5/83] theme=general_body_mass    term='"dry mass" animal body'
+[6/83] theme=general_body_mass    term='"live weight" species data'
+[7/83] theme=general_body_mass    term='"body mass" trait database'
+[8/83] theme=general_body_mass    term='"body mass" compendium vertebrate'
+[9/83] theme=general_body_mass    term='"body size" allometry dataset'
+[10/83] theme=mammal               term='"mammal body mass"'
+[11/83] theme=mammal               term='"mammal* mass" trait'
+[12/83] theme=mammal               term='"rodent body mass"'
+[13/83] theme=mammal               term='"bat body mass"'
+[14/83] theme=mammal               term='"carnivore body mass"'
+[15/83] theme=mammal               term='"ungulate body mass"'
+[16/83] theme=mammal               term='"primate body mass"'
+[17/83] theme=mammal               term='"marsupial body mass"'
+[18/83] theme=mammal               term='"mammal life history" body mass'
+[19/83] theme=mammal               term='"small mammal" body mass dataset'
+[20/83] theme=bird                 term='"bird body mass"'
+[21/83] theme=bird                 term='"avian body mass"'
+[22/83] theme=bird                 term='"avian morphology" mass'
+[23/83] theme=bird                 term='"bird morphometrics"'
+[24/83] theme=bird                 term='"passerine body mass"'
+[25/83] theme=bird                 term='"raptor body mass"'
+[26/83] theme=bird                 term='"waterbird body mass"'
+[27/83] theme=bird                 term='"avian life history" body mass'
+[28/83] theme=fish                 term='"fish body mass"'
+[29/83] theme=fish                 term='"length-weight relationship" fish'
+[30/83] theme=fish                 term='"fish wet mass"'
+[31/83] theme=fish                 term='"fish weight" species data'
+[32/83] theme=fish                 term='"length weight" fish species data'
+[33/83] theme=fish                 term='"teleost body mass"'
+[34/83] theme=fish                 term='"elasmobranch body mass"'
+[35/83] theme=fish                 term='"weight-at-age" fish species'
+[36/83] theme=reptile              term='"reptile body mass"'
+[37/83] theme=reptile              term='"snake body mass"'
+[38/83] theme=reptile              term='"lizard body mass"'
+[39/83] theme=reptile              term='"herpetofauna body size"'
+[40/83] theme=reptile              term='"squamate body mass"'
+[41/83] theme=reptile              term='"reptile trait" body size dataset'
+[42/83] theme=amphibian            term='"amphibian body mass"'
+[43/83] theme=amphibian            term='"frog body mass"'
+[44/83] theme=amphibian            term='"salamander body mass"'
+[45/83] theme=amphibian            term='"anuran body size"'
+[46/83] theme=amphibian            term='"amphibian life history" body size'
+[47/83] theme=arthropod            term='"insect body mass"'
+[48/83] theme=arthropod            term='"arthropod body size"'
+[49/83] theme=arthropod            term='"beetle body mass"'
+[50/83] theme=arthropod            term='"invertebrate body mass"'
+[51/83] theme=arthropod            term='"insect morphometrics"'
+[52/83] theme=arthropod            term='"ant body mass"'
+[53/83] theme=arthropod            term='"insect biomass" species'
+[54/83] theme=arthropod            term='"arthropod biomass" dataset'
+[55/83] theme=marine               term='"zooplankton body mass"'
+[56/83] theme=marine               term='"zooplankton body size"'
+[57/83] theme=marine               term='"marine organism body mass"'
+[58/83] theme=marine               term='"fish length weight" marine'
+[59/83] theme=allometry            term='"body mass allometry"'
+[60/83] theme=allometry            term='"metabolic scaling" body mass'
+[61/83] theme=allometry            term='"allometric scaling" mass exponent'
+Dryad API query failed for term: "allometric scaling" mass exponent page: 1
+[62/83] theme=allometry            term='"interspecific allometry" body mass'
+[63/83] theme=allometry            term='"intraspecific allometry" mass'
+[64/83] theme=allometry            term='"mass scaling" species dataset'
+[65/83] theme=allometry            term='"Kleiber" metabolic body mass data'
+[66/83] theme=plant                term='"seed mass" species global dataset'
+[67/83] theme=plant                term='"plant height" species trait data'
+[68/83] theme=plant                term='"above-ground biomass" species dataset'
+[69/83] theme=plant                term='"plant biomass" allometry dataset'
+[70/83] theme=plant                term='"stem mass" plant species'
+[71/83] theme=specimen             term='"museum specimen" body mass'
+[72/83] theme=specimen             term='"natural history collection" measurements'
+[73/83] theme=specimen             term='"specimen weight" vertebrate collection'
+[74/83] theme=specimen             term='"banded" body mass bird'
+[75/83] theme=data_paper           term='"body mass database"'
+[76/83] theme=data_paper           term='"body size database"'
+[77/83] theme=data_paper           term='"body mass compilation" species'
+[78/83] theme=data_paper           term='"life history" body mass data'
+[79/83] theme=data_paper           term='"trait database" body mass'
+[80/83] theme=data_paper           term='"functional traits" body mass vertebrate'
+[81/83] theme=data_paper           term='"species traits" body mass dataset'
+[82/83] theme=data_paper           term='"global database" body mass'
+[83/83] theme=data_paper           term='"body size" macroecology dataset'
+Dryad candidates above score 6: 520
+
+--- Querying Zenodo ---
+[1/83] Zenodo | '"body mass" species dataset'
+Zenodo API query failed for term: "body mass" species dataset page: 1
+[2/83] Zenodo | '"body size" species dataset'
+Zenodo API query failed for term: "body size" species dataset page: 1
+[3/83] Zenodo | '"body weight" animal species'
+Zenodo API query failed for term: "body weight" animal species page: 1
+[4/83] Zenodo | '"wet mass" animal species'
+Zenodo API query failed for term: "wet mass" animal species page: 1
+[5/83] Zenodo | '"dry mass" animal body'
+Zenodo API query failed for term: "dry mass" animal body page: 1
+[6/83] Zenodo | '"live weight" species data'
+Zenodo API query failed for term: "live weight" species data page: 1
+[7/83] Zenodo | '"body mass" trait database'
+Zenodo API query failed for term: "body mass" trait database page: 1
+[8/83] Zenodo | '"body mass" compendium vertebrate'
+Zenodo API query failed for term: "body mass" compendium vertebrate page: 1
+[9/83] Zenodo | '"body size" allometry dataset'
+Zenodo API query failed for term: "body size" allometry dataset page: 1
+[10/83] Zenodo | '"mammal body mass"'
+Zenodo API query failed for term: "mammal body mass" page: 1
+[11/83] Zenodo | '"mammal* mass" trait'
+Zenodo API query failed for term: "mammal* mass" trait page: 1
+[12/83] Zenodo | '"rodent body mass"'
+Zenodo API query failed for term: "rodent body mass" page: 1
+[13/83] Zenodo | '"bat body mass"'
+Zenodo API query failed for term: "bat body mass" page: 1
+[14/83] Zenodo | '"carnivore body mass"'
+Zenodo API query failed for term: "carnivore body mass" page: 1
+[15/83] Zenodo | '"ungulate body mass"'
+Zenodo API query failed for term: "ungulate body mass" page: 1
+[16/83] Zenodo | '"primate body mass"'
+Zenodo API query failed for term: "primate body mass" page: 1
+[17/83] Zenodo | '"marsupial body mass"'
+Zenodo API query failed for term: "marsupial body mass" page: 1
+[18/83] Zenodo | '"mammal life history" body mass'
+Zenodo API query failed for term: "mammal life history" body mass page: 1
+[19/83] Zenodo | '"small mammal" body mass dataset'
+Zenodo API query failed for term: "small mammal" body mass dataset page: 1
+[20/83] Zenodo | '"bird body mass"'
+Zenodo API query failed for term: "bird body mass" page: 1
+[21/83] Zenodo | '"avian body mass"'
+Zenodo API query failed for term: "avian body mass" page: 1
+[22/83] Zenodo | '"avian morphology" mass'
+Zenodo API query failed for term: "avian morphology" mass page: 1
+[23/83] Zenodo | '"bird morphometrics"'
+Zenodo API query failed for term: "bird morphometrics" page: 1
+[24/83] Zenodo | '"passerine body mass"'
+Zenodo API query failed for term: "passerine body mass" page: 1
+[25/83] Zenodo | '"raptor body mass"'
+Zenodo API query failed for term: "raptor body mass" page: 1
+[26/83] Zenodo | '"waterbird body mass"'
+Zenodo API query failed for term: "waterbird body mass" page: 1
+[27/83] Zenodo | '"avian life history" body mass'
+Zenodo API query failed for term: "avian life history" body mass page: 1
+[28/83] Zenodo | '"fish body mass"'
+Zenodo API query failed for term: "fish body mass" page: 1
+[29/83] Zenodo | '"length-weight relationship" fish'
+Zenodo API query failed for term: "length-weight relationship" fish page: 1
+[30/83] Zenodo | '"fish wet mass"'
+Zenodo API query failed for term: "fish wet mass" page: 1
+[31/83] Zenodo | '"fish weight" species data'
+Zenodo API query failed for term: "fish weight" species data page: 1
+[32/83] Zenodo | '"length weight" fish species data'
+Zenodo API query failed for term: "length weight" fish species data page: 1
+[33/83] Zenodo | '"teleost body mass"'
+Zenodo API query failed for term: "teleost body mass" page: 1
+[34/83] Zenodo | '"elasmobranch body mass"'
+Zenodo API query failed for term: "elasmobranch body mass" page: 1
+[35/83] Zenodo | '"weight-at-age" fish species'
+Zenodo API query failed for term: "weight-at-age" fish species page: 1
+[36/83] Zenodo | '"reptile body mass"'
+Zenodo API query failed for term: "reptile body mass" page: 1
+[37/83] Zenodo | '"snake body mass"'
+Zenodo API query failed for term: "snake body mass" page: 1
+[38/83] Zenodo | '"lizard body mass"'
+Zenodo API query failed for term: "lizard body mass" page: 1
+[39/83] Zenodo | '"herpetofauna body size"'
+Zenodo API query failed for term: "herpetofauna body size" page: 1
+[40/83] Zenodo | '"squamate body mass"'
+Zenodo API query failed for term: "squamate body mass" page: 1
+[41/83] Zenodo | '"reptile trait" body size dataset'
+Zenodo API query failed for term: "reptile trait" body size dataset page: 1
+[42/83] Zenodo | '"amphibian body mass"'
+Zenodo API query failed for term: "amphibian body mass" page: 1
+[43/83] Zenodo | '"frog body mass"'
+Zenodo API query failed for term: "frog body mass" page: 1
+[44/83] Zenodo | '"salamander body mass"'
+Zenodo API query failed for term: "salamander body mass" page: 1
+[45/83] Zenodo | '"anuran body size"'
+Zenodo API query failed for term: "anuran body size" page: 1
+[46/83] Zenodo | '"amphibian life history" body size'
+Zenodo API query failed for term: "amphibian life history" body size page: 1
+[47/83] Zenodo | '"insect body mass"'
+Zenodo API query failed for term: "insect body mass" page: 1
+[48/83] Zenodo | '"arthropod body size"'
+Zenodo API query failed for term: "arthropod body size" page: 1
+[49/83] Zenodo | '"beetle body mass"'
+Zenodo API query failed for term: "beetle body mass" page: 1
+[50/83] Zenodo | '"invertebrate body mass"'
+Zenodo API query failed for term: "invertebrate body mass" page: 1
+[51/83] Zenodo | '"insect morphometrics"'
+Zenodo API query failed for term: "insect morphometrics" page: 1
+[52/83] Zenodo | '"ant body mass"'
+Zenodo API query failed for term: "ant body mass" page: 1
+[53/83] Zenodo | '"insect biomass" species'
+Zenodo API query failed for term: "insect biomass" species page: 1
+[54/83] Zenodo | '"arthropod biomass" dataset'
+Zenodo API query failed for term: "arthropod biomass" dataset page: 1
+[55/83] Zenodo | '"zooplankton body mass"'
+Zenodo API query failed for term: "zooplankton body mass" page: 1
+[56/83] Zenodo | '"zooplankton body size"'
+Zenodo API query failed for term: "zooplankton body size" page: 1
+[57/83] Zenodo | '"marine organism body mass"'
+Zenodo API query failed for term: "marine organism body mass" page: 1
+[58/83] Zenodo | '"fish length weight" marine'
+Zenodo API query failed for term: "fish length weight" marine page: 1
+[59/83] Zenodo | '"body mass allometry"'
+Zenodo API query failed for term: "body mass allometry" page: 1
+[60/83] Zenodo | '"metabolic scaling" body mass'
+Zenodo API query failed for term: "metabolic scaling" body mass page: 1
+[61/83] Zenodo | '"allometric scaling" mass exponent'
+Zenodo API query failed for term: "allometric scaling" mass exponent page: 1
+[62/83] Zenodo | '"interspecific allometry" body mass'
+Zenodo API query failed for term: "interspecific allometry" body mass page: 1
+[63/83] Zenodo | '"intraspecific allometry" mass'
+Zenodo API query failed for term: "intraspecific allometry" mass page: 1
+[64/83] Zenodo | '"mass scaling" species dataset'
+Zenodo API query failed for term: "mass scaling" species dataset page: 1
+[65/83] Zenodo | '"Kleiber" metabolic body mass data'
+Zenodo API query failed for term: "Kleiber" metabolic body mass data page: 1
+[66/83] Zenodo | '"seed mass" species global dataset'
+Zenodo API query failed for term: "seed mass" species global dataset page: 1
+[67/83] Zenodo | '"plant height" species trait data'
+Zenodo API query failed for term: "plant height" species trait data page: 1
+[68/83] Zenodo | '"above-ground biomass" species dataset'
+Zenodo API query failed for term: "above-ground biomass" species dataset page: 1
+[69/83] Zenodo | '"plant biomass" allometry dataset'
+Zenodo API query failed for term: "plant biomass" allometry dataset page: 1
+[70/83] Zenodo | '"stem mass" plant species'
+Zenodo API query failed for term: "stem mass" plant species page: 1
+[71/83] Zenodo | '"museum specimen" body mass'
+Zenodo API query failed for term: "museum specimen" body mass page: 1
+[72/83] Zenodo | '"natural history collection" measurements'
+Zenodo API query failed for term: "natural history collection" measurements page: 1
+[73/83] Zenodo | '"specimen weight" vertebrate collection'
+Zenodo API query failed for term: "specimen weight" vertebrate collection page: 1
+[74/83] Zenodo | '"banded" body mass bird'
+Zenodo API query failed for term: "banded" body mass bird page: 1
+[75/83] Zenodo | '"body mass database"'
+Zenodo API query failed for term: "body mass database" page: 1
+[76/83] Zenodo | '"body size database"'
+Zenodo API query failed for term: "body size database" page: 1
+[77/83] Zenodo | '"body mass compilation" species'
+Zenodo API query failed for term: "body mass compilation" species page: 1
+[78/83] Zenodo | '"life history" body mass data'
+Zenodo API query failed for term: "life history" body mass data page: 1
+[79/83] Zenodo | '"trait database" body mass'
+Zenodo API query failed for term: "trait database" body mass page: 1
+[80/83] Zenodo | '"functional traits" body mass vertebrate'
+Zenodo API query failed for term: "functional traits" body mass vertebrate page: 1
+[81/83] Zenodo | '"species traits" body mass dataset'
+Zenodo API query failed for term: "species traits" body mass dataset page: 1
+[82/83] Zenodo | '"global database" body mass'
+Zenodo API query failed for term: "global database" body mass page: 1
+[83/83] Zenodo | '"body size" macroecology dataset'
+Zenodo API query failed for term: "body size" macroecology dataset page: 1
+
+--- Querying Figshare ---
+[1/83] Figshare | '"body mass" species dataset'
+[2/83] Figshare | '"body size" species dataset'
+[3/83] Figshare | '"body weight" animal species'
+[4/83] Figshare | '"wet mass" animal species'
+[5/83] Figshare | '"dry mass" animal body'
+[6/83] Figshare | '"live weight" species data'
+[7/83] Figshare | '"body mass" trait database'
+[8/83] Figshare | '"body mass" compendium vertebrate'
+[9/83] Figshare | '"body size" allometry dataset'
+[10/83] Figshare | '"mammal body mass"'
+[11/83] Figshare | '"mammal* mass" trait'
+[12/83] Figshare | '"rodent body mass"'
+[13/83] Figshare | '"bat body mass"'
+[14/83] Figshare | '"carnivore body mass"'
+[15/83] Figshare | '"ungulate body mass"'
+[16/83] Figshare | '"primate body mass"'
+[17/83] Figshare | '"marsupial body mass"'
+[18/83] Figshare | '"mammal life history" body mass'
+[19/83] Figshare | '"small mammal" body mass dataset'
+[20/83] Figshare | '"bird body mass"'
+[21/83] Figshare | '"avian body mass"'
+[22/83] Figshare | '"avian morphology" mass'
+[23/83] Figshare | '"bird morphometrics"'
+[24/83] Figshare | '"passerine body mass"'
+[25/83] Figshare | '"raptor body mass"'
+[26/83] Figshare | '"waterbird body mass"'
+[27/83] Figshare | '"avian life history" body mass'
+[28/83] Figshare | '"fish body mass"'
+[29/83] Figshare | '"length-weight relationship" fish'
+[30/83] Figshare | '"fish wet mass"'
+[31/83] Figshare | '"fish weight" species data'
+[32/83] Figshare | '"length weight" fish species data'
+[33/83] Figshare | '"teleost body mass"'
+[34/83] Figshare | '"elasmobranch body mass"'
+[35/83] Figshare | '"weight-at-age" fish species'
+[36/83] Figshare | '"reptile body mass"'
+[37/83] Figshare | '"snake body mass"'
+[38/83] Figshare | '"lizard body mass"'
+[39/83] Figshare | '"herpetofauna body size"'
+[40/83] Figshare | '"squamate body mass"'
+[41/83] Figshare | '"reptile trait" body size dataset'
+[42/83] Figshare | '"amphibian body mass"'
+[43/83] Figshare | '"frog body mass"'
+[44/83] Figshare | '"salamander body mass"'
+[45/83] Figshare | '"anuran body size"'
+[46/83] Figshare | '"amphibian life history" body size'
+[47/83] Figshare | '"insect body mass"'
+[48/83] Figshare | '"arthropod body size"'
+[49/83] Figshare | '"beetle body mass"'
+[50/83] Figshare | '"invertebrate body mass"'
+[51/83] Figshare | '"insect morphometrics"'
+[52/83] Figshare | '"ant body mass"'
+[53/83] Figshare | '"insect biomass" species'
+[54/83] Figshare | '"arthropod biomass" dataset'
+[55/83] Figshare | '"zooplankton body mass"'
+[56/83] Figshare | '"zooplankton body size"'
+[57/83] Figshare | '"marine organism body mass"'
+[58/83] Figshare | '"fish length weight" marine'
+[59/83] Figshare | '"body mass allometry"'
+[60/83] Figshare | '"metabolic scaling" body mass'
+[61/83] Figshare | '"allometric scaling" mass exponent'
+[62/83] Figshare | '"interspecific allometry" body mass'
+[63/83] Figshare | '"intraspecific allometry" mass'
+[64/83] Figshare | '"mass scaling" species dataset'
+[65/83] Figshare | '"Kleiber" metabolic body mass data'
+[66/83] Figshare | '"seed mass" species global dataset'
+[67/83] Figshare | '"plant height" species trait data'
+[68/83] Figshare | '"above-ground biomass" species dataset'
+[69/83] Figshare | '"plant biomass" allometry dataset'
+[70/83] Figshare | '"stem mass" plant species'
+[71/83] Figshare | '"museum specimen" body mass'
+[72/83] Figshare | '"natural history collection" measurements'
+[73/83] Figshare | '"specimen weight" vertebrate collection'
+[74/83] Figshare | '"banded" body mass bird'
+[75/83] Figshare | '"body mass database"'
+[76/83] Figshare | '"body size database"'
+[77/83] Figshare | '"body mass compilation" species'
+[78/83] Figshare | '"life history" body mass data'
+[79/83] Figshare | '"trait database" body mass'
+[80/83] Figshare | '"functional traits" body mass vertebrate'
+[81/83] Figshare | '"species traits" body mass dataset'
+[82/83] Figshare | '"global database" body mass'
+[83/83] Figshare | '"body size" macroecology dataset'
+Figshare candidates above score 6: 249
+
+Total candidates written: 430 -> /Users/brianjenquist/VSCode/GlobalBodySize/output/candidate_datasets.csv

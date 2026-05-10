@@ -1,0 +1,11 @@
+# GlobalBodySize .gitignore
+data/raw/
+data/compiled/
+output/*.csv
+*.zip
+*.tar.gz
+.DS_Store
+nohup.out
+Rplots.pdf
+*.Rhistory
+.Rproj.user/
