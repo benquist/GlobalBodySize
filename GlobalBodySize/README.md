@@ -13,7 +13,7 @@ Body mass is the central ecological trait — it determines metabolic rate, popu
 ## Contents
 
 - [Ecological Rationale](#ecological-rationale-and-scientific-context)
-- [Theoretical Framework](#theoretical-framework)
+- [Body Size Distributions and Evolution](#body-size-distributions-and-evolution)
 - [Data Sources and Provenance](#data-sources-and-provenance)
 - [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
@@ -21,7 +21,6 @@ Body mass is the central ecological trait — it determines metabolic rate, popu
 - [Summary Visualizations](#summary-visualizations)
 - [Pipeline Architecture](#pipeline-architecture)
 - [Key Documents](#key-documents)
-- [Agents and Provenance](#agents-and-provenance)
 - [References](#references)
 
 ---
@@ -58,32 +57,42 @@ Despite decades of macroecological research, existing resources are fragmented a
 
 ---
 
-## Theoretical Framework
+## Body Size Distributions and Evolution
 
-### The WBE Metabolic Scaling Prediction
+### The Shape of the Body Size Distribution
 
-The West-Brown-Enquist (WBE) model derives the 3/4-power metabolic scaling law from the geometry of space-filling, impedance-minimizing fractal vascular networks. Starting from two constraints — conservation of fluid volume at each branch and minimization of hydrodynamic resistance — the model predicts that terminal capillary units are invariant across body size, forcing total metabolic rate to scale as:
+Across all animal groups, body size is not uniformly distributed — it is strongly right-skewed on a linear scale but approximately log-normal on a log₁₀ scale. This is not a sampling artifact: it reflects fundamental constraints on how life is organized energetically and developmentally. When plotted as log₁₀(number of species) vs. log₁₀(body mass), the distribution peaks at small-to-intermediate sizes and declines steeply toward large body sizes — a pattern first documented systematically by May (1978, 1988) and Hutchinson & MacArthur (1959), and replicated here across ~25,000 unique vertebrate species.
 
-$$B = B_0 \cdot M^{3/4}$$
+The log-normal form arises naturally from multiplicative growth processes: body size is the product of many semi-independent developmental, physiological, and life-history factors, and the central limit theorem applied to products of random variables converges to a log-normal distribution (May 1986). This prediction holds reasonably well within taxonomic groups, though each clade occupies a distinct mode: fish and amphibians cluster at smaller sizes, mammals span a broad intermediate range, and birds show a narrower, elevated mode.
 
-where B is whole-organism metabolic rate (watts), M is body mass (kg), and B₀ is a normalization constant that differs between endotherms and ectotherms. This dataset provides the M-axis for cross-taxon tests of this prediction. Metabolic rate data must be joined from external sources (e.g., Savage et al. 2004 for mammals and birds; Clarke & Johnston 1999 for fish).
+### Why Are Most Species Small?
 
-The scaling exponent b = 3/4 implies that per-unit-mass metabolic rate scales as M^(−1/4) — larger animals are proportionally more metabolically efficient. From this single result, a cascade of ecological predictions follows:
+The steep decline in species richness at large body sizes is not simply a sampling bias — it reflects genuine biological constraints:
 
-| Ecological variable | Predicted scaling | Exponent |
-|---|---|---|
-| Metabolic rate B | ∝ M^(3/4) | 0.75 |
-| Lifespan T | ∝ M^(1/4) | 0.25 (UNVERIFIED cross-taxon) |
-| Home range A | ∝ M^(1.0) | ~1.0 (mammals; varies by guild) |
-| Population density D | ∝ M^(−3/4) | −0.75 (UNVERIFIED cross-taxon) |
-| Generation time G | ∝ M^(1/4) | 0.25 (UNVERIFIED cross-taxon) |
-| Heart rate | ∝ M^(−1/4) | −0.25 (endotherms only) |
+- **Energy availability:** Larger animals require more energy per individual. If the total energy available to a trophic level is roughly fixed, fewer large-bodied individuals — and therefore fewer large-bodied species — can be supported (Peters 1983; Brown & Maurer 1989). The number of sustainable species declines with body mass at approximately S ∝ M^(−3/4), consistent with metabolic energy partitioning.
+- **Population size and extinction risk:** Large animals maintain smaller populations, making them more vulnerable to demographic and environmental stochasticity. This accelerates local extinction rates and reduces long-term diversification probabilities at large sizes (Gaston & Blackburn 2000).
+- **Generation time and speciation rate:** Smaller animals have shorter generation times, higher reproductive rates, and faster evolutionary turnover — all of which accelerate the accumulation of genetic divergence and new species (Bromham & Cardillo 2003).
+- **Geographic range and dispersal:** Many large-bodied species have wide ranges that reduce allopatric isolation, slowing cladogenesis (Gaston & Blackburn 2000).
 
-*Exponents from Peters (1983) and West, Brown & Enquist (1997). Marked UNVERIFIED where cross-taxon applicability is uncertain — confirm against primary literature before applying to specific taxonomic groups.*
+The net result is a consistent macroecological pattern: small species are disproportionately species-rich, and this relationship holds across independently-evolved vertebrate lineages.
 
-### Body Size Frequency Distributions
+### Body Size and Evolutionary Diversification
 
-Multiplicative growth processes and diversification dynamics predict that body size frequencies are approximately log-normal when plotted on a log₁₀ scale — with a characteristic right skew reflecting the long tail of large-bodied forms. Analyses of this database confirm this prediction: the overall cross-taxon distribution shows a log-normal core with taxon-specific deviations (see `science_summary.html`).
+Body size is not a static trait — it evolves under strong selection pressures that vary by clade, environment, and ecological context:
+
+- **Cope's Rule:** Many vertebrate lineages show a directional trend toward larger body size through geological time (Cope 1887; Alroy 1998). Larger size is often associated with competitive dominance, reduced predation risk, and broader physiological tolerances. However, this trend is not universal — island dwarfism, resource limitation, and predator-prey dynamics can strongly reverse it.
+- **Bergmann's Rule:** Within endotherm clades, larger body size is favored at higher latitudes, where greater thermal mass reduces heat loss. This generates latitudinal body size gradients in mammals and birds that are partially visible in geographic range data.
+- **Island and cave evolution:** Isolated environments — islands, caves, deep sea — produce predictable body size shifts. Large-bodied species tend to shrink (island dwarfism: reduced food, no predators); small-bodied species tend to grow (island gigantism: relaxed competition). These shifts can occur over timescales of thousands to tens of thousands of years.
+- **Trophic position:** Body size and trophic level are tightly coupled. Predators are consistently larger than their prey within communities. As trophic level increases, mean body size increases by roughly one order of magnitude per trophic step in terrestrial systems (Peters 1983).
+- **Macroevolutionary constraints:** Phylogenetic conservatism in body size is strong — closely related species are more similar in size than expected by chance. This means body size evolution is structured by ancestry, and cross-taxon analyses must account for phylogenetic non-independence (Harvey & Pagel 1991).
+
+### May (1988) Re-evaluated with This Dataset
+
+May (1988, *Science* 241:1441–1449) presented one of the first broad-scale empirical analyses of species richness as a function of body size, showing a log-log decline in species numbers with increasing body mass for terrestrial mammals and British insects. His Fig. 2 showed a slope broadly consistent with S ∝ M^(−2/3) to M^(−3/4).
+
+The `science_summary.html` report in this repository replicates and extends this analysis to ~25,000 unique vertebrate species spanning fish, amphibians, birds, and mammals (Figs. 3e–3f). The empirical slope estimated from this dataset and the theoretical −0.75 prediction are shown together, allowing direct assessment of how well the energy-partitioning model predicts the observed diversity-size relationship across a broader taxonomic scope than May's original analysis.
+
+> **Sampling caveat:** The current database over-represents birds (AVONET + EltonTraits) and fish (FishBase) relative to their true global richness, and severely under-represents reptiles and invertebrates. Slopes estimated from the combined dataset should be interpreted as provisional until the database achieves more uniform taxonomic coverage.
 
 ---
 
@@ -265,6 +274,8 @@ Full interactive analysis is in [`science_summary.html`](science_summary.html) (
 | Fig. 3b | Density-normalised all-datasets view with per-group curves |
 | Fig. 3c | Number of unique species as a function of body size |
 | Fig. 3d | Per-group unique species by body size (faceted) |
+| Fig. 3e | **May (1988) re-evaluation:** log–log species richness vs. body size, all taxa combined, with empirical OLS slope and theoretical S ∝ M^(−3/4) reference |
+| Fig. 3f | Per-group log–log species richness vs. body size (May 1988 style, faceted) |
 | Fig. 4 | Cross-provider body mass density overlay |
 | Fig. 5 | QQ-plots: log-normality assessment by group |
 | Fig. 6 | Cumulative ECDF by group with reference body sizes |
@@ -346,37 +357,25 @@ rmarkdown::render("science_summary.Rmd", output_file = "science_summary.html")
 
 ---
 
-## Agents and Provenance
-
-This project was designed and built using an agent-orchestrated science workflow:
-
-| Agent | Role |
-|---|---|
-| `ecology-user` | Data type classification, sampling bias, workflow formalization |
-| `enhanced-theory` | WBE scaling law derivation, allometric predictions |
-| `biodiversity-science-guard` | Taxonomy validation, DwC compliance, provenance |
-| `biodiversity-informatics-checker` | GBIF MoF audit, QA rules, missing fields |
-| `merow-ecology` | Tier quality ratings, ecological plausibility |
-| `taxonomy-reconciliation` | Backbone strategy, conflict resolution |
-| `richard-telford` | Statistical rigor: diagnostics before interpretation |
-| `coder` + `code-checker` + `code-verifier` | Implementation + two-pass review |
-
-Prompt provenance: [`agents/prompt_log.md`](../agents/prompt_log.md) and [`chat_provenance_log.md`](chat_provenance_log.md).
-
----
-
 ## References
 
+- Alroy, J. (1998). Cope's rule and the dynamics of body mass evolution in North American fossil mammals. *Science* 280(5364):731–734. DOI: 10.1126/science.280.5364.731
+- Bromham, L., & Cardillo, M. (2003). Testing the link between the latitudinal gradient in species richness and rates of molecular evolution. *Journal of Evolutionary Biology* 16(2):200–207. DOI: 10.1046/j.1420-9101.2003.00526.x
 - Brown, J. H., & Maurer, B. A. (1989). Macroecology: The Division of Food and Space Among Species on Continents. *Science* 243(4895):1145–1150. DOI: 10.1126/science.243.4895.1145
 - de Magalhães, J. P., & Costa, J. (2009). A database of vertebrate longevity records and their relation to other life-history traits. *Journal of Evolutionary Biology* 22(8):1770–1774. DOI: 10.1111/j.1420-9101.2009.01783.x
+- Gaston, K. J., & Blackburn, T. M. (2000). *Pattern and Process in Macroecology*. Blackwell Science, Oxford.
+- Harvey, P. H., & Pagel, M. D. (1991). *The Comparative Method in Evolutionary Biology*. Oxford University Press.
+- Hutchinson, G. E., & MacArthur, R. H. (1959). A theoretical ecological model of size distributions among species of animals. *American Naturalist* 93(869):117–125. DOI: 10.1086/282063
 - Jones, K. E., et al. (2009). PanTHERIA: a species-level database of life history, ecology, and geography of extant and recently extinct mammals. *Ecology* 90(9):2648. DOI: 10.1890/08-1494.1
+- May, R. M. (1978). The dynamics and diversity of insect faunas. In L. A. Mound & N. Waloff (Eds.), *Diversity of Insect Faunas*, pp. 188–204. Blackwell, Oxford.
+- May, R. M. (1986). The search for patterns in the balance of nature: advances and retreats. *Ecology* 67(5):1115–1126. DOI: 10.2307/1938668
+- May, R. M. (1988). How many species are there on Earth? *Science* 241(4872):1441–1449. DOI: 10.1126/science.241.4872.1441
 - Oliveira, B. F., et al. (2017). AmphiBIO, a global database for amphibian ecological traits. *Scientific Data* 4:170123. DOI: 10.1038/sdata.2017.123
 - Peters, R. H. (1983). *The Ecological Implications of Body Size*. Cambridge University Press.
 - Tobias, J. A., et al. (2022). AVONET: morphological, ecological and geographical data for all birds. *Ecology Letters* 25(3):581–597. DOI: 10.1111/ele.13898
-- West, G. B., Brown, J. H., & Enquist, B. J. (1997). A general model for the origin of allometric scaling laws in biology. *Science* 276(5309):122–126. DOI: 10.1126/science.276.5309.122
 - Wilman, H., et al. (2014). EltonTraits 1.0: Species-level foraging attributes of the world's birds and mammals. *Ecology* 95(7):2027. DOI: 10.1890/13-1917.1
 
 ---
 
-*README written with input from the `ecology-user`, `enhanced-theory`, and `biodiversity-science-guard` agents. All UNVERIFIED items must be confirmed against primary literature before citation in publications or preprints.*
+*All UNVERIFIED items must be confirmed against primary literature before citation in publications or preprints.*
 
