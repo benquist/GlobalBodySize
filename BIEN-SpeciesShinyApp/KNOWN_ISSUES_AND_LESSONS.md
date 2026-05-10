@@ -590,6 +590,155 @@ Removed `ORDER BY random()` from the SQL query. The app now retrieves rows in na
 
 ---
 
-## Issue 13 — [Future issues documented here]
+## Issue 13 — Download tab reproducibility gaps: scripts labelled "reproducible" that cannot actually reproduce the same result
+
+**Date diagnosed:** 2026-05-09  
+**Implemented:** 2026-05-09  
+**Review agents:** coder (code analysis), biodiversity-informatics-checker, biodiversity-science-guard, Richard Telford statistical-ecology framework  
+**Implementation agents:** m (supervisor), coder, always  
+**Commits:** `73ec262` (app.R, BIEN-SpeciesShinyApp repo), `82f58a0` (prompt_log.md, parent workspace)  
+**Deployed:** shinyapps.io `bien-species-shinyapp` (same session)  
+**Status:** RESOLVED — all agreed fixes implemented and deployed
+
+---
+
+### Symptom
+
+The Download tab presents three R script files and three CSV downloads under the heading "reproducible R code." A multi-agent review of the download logic found that the scripts contain at least four independent ways in which the output would differ from the app result shown to the user, and several additional ways in which the scripts would fail silently or produce errors when run by a new user.
+
+---
+
+### Diagnosis
+
+**1. CSV provenance header breaks `read.csv()`**  
+`downloadHandler` for all three CSVs prepends `#`-prefixed comment lines (species, date, filters) using `writeLines()`, then appends actual CSV rows with `write.table(..., append = TRUE)`. The resulting file is not valid CSV. A user running `read.csv("file.csv")` will either import the `#` lines as data rows or crash with a parse error. No `skip=` instruction is documented anywhere.
+
+**2. No `set.seed()` — sampling is stochastic**  
+The occurrence repro script calls `sample.int()` and `dplyr::slice_sample()` inside `sample_occurrence_rows()`. No seed is set anywhere in the generated code. The Download tab UI states *"This script reproduces the exact occurrence dataset currently shown in the Observations tab."* This is false: every run of the script produces a different random sample of rows. The species, query flags, and filters are reproducible; the specific rows are not.
+
+**3. Private BIEN internal functions in user-facing scripts**  
+The occurrence script calls `BIEN:::.cultivated_check()`, `BIEN:::.BIEN_sql()`, `BIEN:::.native_check()`, `BIEN:::.geovalid_check()`, etc. These are unexported internal functions (prefix `.`). They can be renamed, removed, or changed in any BIEN release without a deprecation notice. A user who upgrades BIEN and reruns the script may get a silent error or wrong results with no diagnostic message.
+
+**4. Plot/community script depends on an intermediate file**  
+`build_plot_repro_script()` embeds the entire occurrence script, runs it to write a CSV, then reads that CSV back with `read.csv(out_file)` and filters to `observation_category == "Plot / survey"`. If the working directory already contains a same-named file from a different species or filter run, the read-back silently uses stale data. This is a latent data-leakage bug.
+
+**5. Missing citation block in all scripts and CSVs**  
+Neither the scripts nor the CSV provenance headers include the BIEN publication:  
+*Enquist et al. (2026). BIEN: Botanical Information and Ecology Network. Methods in Ecology and Evolution. DOI: 10.1111/2041-210x.70274.*  
+Users who publish with this data and copy the script header have incomplete attribution.
+
+**6. No `sessionInfo()` — environment is not captured**  
+Nothing records the R version, OS, or package versions at run time. A collaborator running the same script two years later has no record of what environment produced the original data.
+
+**7. Trait script has no plain-language header**  
+The occurrence and plot scripts have a multi-line comment header (species, strategy, effective flags, sampling mode). The trait script has only `# Reproducible BIEN trait dataset script` and immediately calls `library(BIEN)`. The `limit=` parameter truncation is also not disclosed: if BIEN holds more trait records than `trait_limit`, the returned table is a silent subset.
+
+**8. No ZIP README, no install instructions, no data dictionary**  
+The ZIP bundle contains six files with no explanation of contents, no required citation, no instructions for loading CSVs (with or without the `skip=` fix), and no description of the BIEN column schema.
+
+---
+
+### Root Cause
+
+The Download tab was built incrementally alongside the query and map features; reproducibility properties of the generated scripts were not systematically validated. The scripts expose the app's internal query logic (including the private BIEN SQL helpers) rather than being rewritten from scratch to use the public BIEN R API.
+
+---
+
+### Agreed Fix Plan — Implementation Status
+
+All items were implemented in `app.R` commit `73ec262` and deployed to shinyapps.io on 2026-05-09.
+
+| Rank | Issue | Severity | Status |
+|------|-------|----------|--------|
+| 1 | Fix CSV provenance header — make files valid CSV; move metadata to README.txt sidecar in ZIP | CRITICAL | ✅ Done |
+| 2 | Add `set.seed(42)` to occurrence and plot scripts with explanation | CRITICAL | ✅ Done |
+| T-A | Change script language from "reproduces the **exact** dataset" to an honest statement | HIGH | ✅ Done |
+| 3 | Replace `BIEN:::.*` private calls with public `BIEN_occurrence_species()` API | HIGH | ✅ Done |
+| 4 | Add citation block (Enquist et al. 2026, DOI 10.1111/2041-210x.70274) to all three scripts | HIGH | ✅ Done |
+| 5 | Add `sessionInfo()` at end of all three scripts | HIGH | ✅ Done |
+| T-B | Disclose `trait_limit` truncation in trait script with runtime `warning()` if limit reached | HIGH | ✅ Done |
+| 6 | Expand trait script plain-language header to match occurrence script | MEDIUM | ✅ Done |
+| 7 | Add README.txt to ZIP bundle (citation, file list with row counts, filter settings, notes) | MEDIUM | ✅ Done |
+| 8 | Add commented `install.packages()` block to top of all scripts | MEDIUM | ✅ Done |
+| T-C | Add comment noting that `observation_category` is a heuristic classification | MEDIUM | ✅ Done |
+| 9 | Refactor plot script to be self-contained — no intermediate file, no `read.csv(out_file)` | MEDIUM | ✅ Done |
+| 10 | Translate `occ_strategy` codes to plain English in Download banner and script header | LOW–MEDIUM | ✅ Done |
+| 11 | Increase code preview box from 180px → 450px | UX | ✅ Done |
+| 12 | Show pre-download row counts (occ / plot / trait) above download buttons | UX | ✅ Done |
+| 13 | Add data dictionary comment block to occurrence script | LOW | ✅ Done |
+| 14 | Add Darwin Core column mapping comment to occurrence script | LOW | ✅ Done |
+
+---
+
+### Lessons Learned
+
+1. **"Reproducible" is a falsifiable claim — test it before publishing it.**  
+   A script that calls stochastic functions without a seed, depends on private library internals, and produces CSV files that crash `read.csv()` is not reproducible. Labelling it reproducible misleads users and undermines trust in the data. Before adding a "Download reproducible R code" feature, run the generated script on a clean machine and verify it produces the same output.
+
+2. **Private library functions are not part of the API contract.**  
+   `BIEN:::.*` functions are implementation details. Using them in user-facing generated code creates a hidden dependency on an internal contract that can break silently. Always prefer the documented public API, even if it means the generated script has less control over query parameters.
+
+3. **CSV files with comment headers require explicit documentation.**  
+   The pattern of prepending `#`-prefixed provenance lines before CSV content is common in scientific computing but breaks default CSV parsers. Every file that uses this pattern must document the `skip=` argument needed to parse it, or use an alternative format (sidecar README, separate metadata JSON, or embedded columns).
+
+4. **Honest uncertainty is a feature, not a limitation.**  
+   Stating "this script fetches the same query parameters but may return a different random sample each run" is more useful to a researcher than claiming exact reproducibility that does not exist. Users building analyses on top of these downloads need to know what is stable (species, filters, query logic) and what varies (specific rows selected when BIEN returns more than the app limit).
+
+5. **Trait data limits must be disclosed at the point of download.**  
+   Returning a `limit=`-truncated subset of trait records without disclosure is equivalent to analysing a biased sample without reporting the sampling frame. For any data download with a row cap, state the cap, report how many rows BIEN holds versus how many were downloaded, and warn users not to compute aggregate statistics (mean, range, N) without accounting for possible truncation.
+
+6. **Apply the Telford test before shipping any "reproducible" feature.**  
+   The Telford framework asks: *can someone run this from a clean R session and get a result that is honest about what it does and does not reproduce?* Apply that test to generated scripts before release, not after.
+
+---
+
+## Issue 14 — "Conservative default profile" silently returned non-native records for Old-World taxa (Markhamia lutea case)
+
+**Status:** RESOLVED 2026-05-10 (commit pending)
+
+### Symptom
+A user querying *Markhamia lutea* (Bignoniaceae, native to tropical Africa per POWO/Kew) with the **"Conservative default profile"** checkbox enabled (the default state) received occurrence records from India, Australia, and Mexico — the species' horticultural/cultivated footprint, not its native range. Unchecking the box and re-querying with the default granular controls returned only African records, matching POWO. The two paths used semantically identical SQL filters, so the user-visible difference was *non-deterministic* and the "Conservative" label was actively misleading.
+
+### Diagnosis journey
+- Subagents `biodiversity-informatics-checker`, `taxonomy-reconciliation`, and `coder` were run against [BIEN-SpeciesShinyApp/app.R](app.R) lines 440–700, 2670–2700, 4220–4280, 5370–5670, and 6140–6175.
+- Two compounding root causes were confirmed (see below). The "non-deterministic" Africa-only vs India-Australia-Mexico difference between checked/unchecked runs was traced to BIEN backend timing — strict returned 0 mappable rows on one run (triggering the silent fallback) and not on the other.
+
+### Root cause(s)
+
+**(a) Silent auto-relaxation of the "conservative" filters.**  
+`query_occurrence_with_fallback` ran a 5-step plan ladder (`strict` → `fallback_relaxed_native` → `fallback_relaxed_geo` → `fallback_coord_bearing` → `fallback_allow_centroids`). Plans 2–5 unconditionally set `natives.only = FALSE` and (from plan 3) `only.geovalid = FALSE`, **even when the conservative profile was checked**. When BIEN's strict pass returned 0 mappable rows for an Old-World species (the common case for any taxon outside BIEN's NSR coverage), the chain advanced to `fallback_relaxed_native` and returned introduced/cultivated records labeled as if they were the conservative result. The only warning was a transient `showNotification`; exports carried no strategy provenance.
+
+**(b) `is_introduced IS NULL` was treated as "native" outside BIEN's NSR coverage.**  
+`natives_check_with_null_fallback(TRUE)` emitted SQL `AND (is_introduced=0 OR is_introduced IS NULL)`. BIEN's Native Species Resolver is New-World–centric. African records of *M. lutea* (and any Old-World native) are typically `is_introduced IS NULL` because **NSR has no checklist evidence** for those regions, *not* because the species is native there. The same NULL-permissive clause re-admitted horticultural/escaped New-World records. This was the inverse of "conservative" semantics for any taxon outside NSR's coverage footprint.
+
+**(c) The checkbox label and tooltip did not disclose either behavior.**  
+The label "Conservative default profile" with tooltip "keeps native and non-introduced records, excludes cultivated records, and keeps only BIEN geovalid coordinates" described only the strict plan. The conservative checkbox provided **no semantic guarantee distinct from the granular defaults** — both paths fed the same auto-fallback ladder.
+
+### Fix (applied 2026-05-10)
+
+1. **Renamed the checkbox** from "Conservative default profile" → **"Strict-only BIEN profile (no auto-relaxation)"** with a rewritten tooltip that explicitly documents the NSR coverage caveat and Markhamia lutea as an example. ([app.R](app.R#L2701))
+2. **Flipped the default value to `FALSE`** so the granular filter toggles are visible by default and users see exactly what filters are applied. ([app.R](app.R#L2701))
+3. **Restricted the plan ladder to `strict` only when the profile is checked.** Added `if (isTRUE(filter_cfg$use_default_profile)) plans <- plans[1]` so silent fallback is impossible under strict-only. ([app.R](app.R#L588-L596))
+4. **Added a persistent yellow banner above the occurrence map** (`output$occ_strategy_banner_ui`) that fires whenever the effective `occ_strategy` is anything other than `"strict"`. The banner names the strategy and the dropped constraints; this is now the source-of-truth for filter provenance, replacing the easily missed transient toast. ([app.R](app.R#L2948), [app.R](app.R#L5086))
+5. **Added a `bien_query_strategy` column** to every returned occurrence row in both return paths of `query_occurrence_with_fallback` so exports carry the per-row provenance of which plan produced the record. ([app.R](app.R#L666-L675), [app.R](app.R#L740-L750))
+6. **Added an opt-in "Strict native (exclude unevaluated)" checkbox** under `natives_only`. When enabled it threads `strict_native_no_unknown = TRUE` through `query_occurrence_randomized` to `natives_check_with_null_fallback`, which then emits SQL `AND is_introduced = 0` (no NULL fallback). This is the recommended setting for Old-World taxa where NSR has no coverage. ([app.R](app.R#L445-L460), [app.R](app.R#L468), [app.R](app.R#L548), [app.R](app.R#L2710-L2713))
+
+### Lessons learned
+
+1. **A "default" must mean what it says.** A checkbox labelled "Conservative" cannot legally hand off to a relaxed plan ladder without telling the user — and certainly cannot do so silently. If recall-tolerant fallback is desired, give it its own opt-in label and surface the effective strategy alongside every record.
+
+2. **Establishment-status backbones have geographic scope.** BIEN's NSR is dense in the Americas and sparse-to-absent across Africa, Asia, Australia, and most of the Old World. Any biodiversity app that surfaces a "native" filter must either (a) restrict use to the backbone's coverage footprint, or (b) offer a strict variant that excludes unevaluated records. Conflating `IS NULL` with `native` is correct only inside the backbone's coverage.
+
+3. **Per-row provenance is mandatory for filtered/fallback queries.** A single result-level `strategy` field is not enough — once a CSV is exported, the per-row provenance of which plan produced each record is lost. A `bien_query_strategy` column on the data frame makes the trade-off auditable downstream.
+
+4. **Persistent UI banners > transient `showNotification`.** Toast notifications are dismissed (intentionally or not) and never appear in screenshots, exports, or downstream reports. Anything that changes the meaning of the displayed data must persist on the UI surface alongside the data.
+
+5. **Old-World species are the canary for any New-World–trained pipeline.** When stress-testing biodiversity defaults, include taxa whose accepted distribution lies entirely outside the training/coverage domain. *Markhamia lutea*, *Eucalyptus globulus*, and *Encephalartos altensteinii* are useful diagnostic species — if the app silently returns New-World introductions for any of them, the default is wrong.
+
+6. **The `is_cultivated` column has the same NULL-permissiveness trap.** `is_cultivated = 0` does not catch escapes flagged `IS NULL`. A future issue should consider applying the same strict/permissive split to the cultivated filter.
+
+---
+
+## Issue 15 — [Future issues documented here]
 
 *New issues should be appended below using the same format: Symptom → Diagnosis journey → Root cause → Fix → Lessons learned.*

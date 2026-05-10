@@ -442,10 +442,18 @@ sql_quote_literal <- function(x) {
 # which causes species with missing is_introduced data to return zero records.
 # This version includes NULL as a valid case since absence of classification
 # shouldn't exclude a species from a 'natives only' query.
-natives_check_with_null_fallback <- function(natives_only = TRUE) {
+natives_check_with_null_fallback <- function(natives_only = TRUE, strict_no_unknown = FALSE) {
   if (isTRUE(natives_only)) {
-    # Include records where is_introduced = 0 (native) OR is_introduced IS NULL (unknown)
-    list(query = "AND (is_introduced=0 OR is_introduced IS NULL) ")
+    if (isTRUE(strict_no_unknown)) {
+      # Strict native: exclude both introduced AND unevaluated (is_introduced IS NULL).
+      # Use this for Old-World taxa where BIEN's NSR has no coverage and IS NULL would
+      # otherwise re-admit introduced/cultivated New-World records (e.g. Markhamia lutea
+      # returning India/Australia/Mexico horticultural records as 'native').
+      list(query = "AND is_introduced=0 ")
+    } else {
+      # Include records where is_introduced = 0 (native) OR is_introduced IS NULL (unknown)
+      list(query = "AND (is_introduced=0 OR is_introduced IS NULL) ")
+    }
   } else {
     # Include all records regardless of native/introduced status
     list(query = "")
@@ -457,14 +465,14 @@ natives_check_with_null_fallback <- function(natives_only = TRUE) {
 # occurrence map and (2) randomize the returned row order on the BIEN side so
 # widespread species are less likely to be dominated by whichever datasource
 # happens to come first in the backend table (for example FIA plot rows).
-query_occurrence_randomized <- function(species_name, cultivated = FALSE, natives_only = TRUE, only_geovalid = TRUE, limit = 1000, record_limit = 500, randomize_order = TRUE, require_coords = FALSE, allow_centroids = FALSE) {
+query_occurrence_randomized <- function(species_name, cultivated = FALSE, natives_only = TRUE, only_geovalid = TRUE, limit = 1000, record_limit = 500, randomize_order = TRUE, require_coords = FALSE, allow_centroids = FALSE, strict_native_no_unknown = FALSE) {
   cultivated_ <- BIEN:::.cultivated_check(cultivated)
   newworld_ <- BIEN:::.newworld_check(NULL)
   taxonomy_ <- BIEN:::.taxonomy_check(TRUE)
   native_ <- BIEN:::.native_check(TRUE)
   observation_ <- BIEN:::.observation_check(TRUE)
   political_ <- BIEN:::.political_check(FALSE)
-  natives_ <- natives_check_with_null_fallback(natives_only)
+  natives_ <- natives_check_with_null_fallback(natives_only, strict_no_unknown = strict_native_no_unknown)
   collection_ <- BIEN:::.collection_check(FALSE)
   geovalid_ <- BIEN:::.geovalid_check(only_geovalid)
 
@@ -533,6 +541,7 @@ resolve_filter_profile <- function(input) {
       use_default_profile = TRUE,
       use_introduced_filter = TRUE,
       natives_only = TRUE,
+      strict_native_no_unknown = FALSE,
       use_cultivated_filter = TRUE,
       include_cultivated = FALSE,
       only_geovalid = TRUE,
@@ -545,6 +554,7 @@ resolve_filter_profile <- function(input) {
     use_default_profile = FALSE,
     use_introduced_filter = if (is.null(input$use_introduced_filter)) TRUE else isTRUE(input$use_introduced_filter),
     natives_only = if (is.null(input$natives_only)) TRUE else isTRUE(input$natives_only),
+    strict_native_no_unknown = if (is.null(input$strict_native_no_unknown)) FALSE else isTRUE(input$strict_native_no_unknown),
     use_cultivated_filter = if (is.null(input$use_cultivated_filter)) TRUE else isTRUE(input$use_cultivated_filter),
     include_cultivated = if (is.null(input$include_cultivated)) FALSE else isTRUE(input$include_cultivated),
     only_geovalid = if (is.null(input$only_geovalid)) TRUE else isTRUE(input$only_geovalid),
@@ -557,6 +567,7 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
   filter_cfg <- resolve_filter_profile(input)
   include_cultivated <- if (filter_cfg$use_cultivated_filter) filter_cfg$include_cultivated else TRUE
   natives_only <- if (filter_cfg$use_introduced_filter) filter_cfg$natives_only else FALSE
+  strict_native_no_unknown <- isTRUE(filter_cfg$strict_native_no_unknown) && isTRUE(natives_only)
   only_geovalid <- filter_cfg$only_geovalid
 
   # Respect larger user-requested sample sizes while keeping an upper guardrail for server stability.
@@ -580,7 +591,16 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
     # Triggered only when fallback_coord_bearing also returns 0 rows.
     list(label = "fallback_allow_centroids", natives.only = FALSE,      only.geovalid = FALSE,         require_coords = TRUE,  allow_centroids = TRUE,  limit = min(fast_limit, 500), record_limit = min(fast_page_size, 500))
   )
-  plans <- plans[seq_len(max(1, min(length(plans), as.integer(max_plans))))]
+  # When the strict-only profile is on, suppress the auto-relaxation ladder so
+  # that records returned to the UI cannot have silently dropped natives.only or
+  # only.geovalid constraints. The user sees strict results or an empty map and
+  # an explicit banner — never India/Australia/Mexico records mislabeled as the
+  # 'conservative' interpretation of an Old-World native (e.g. Markhamia lutea).
+  if (isTRUE(filter_cfg$use_default_profile)) {
+    plans <- plans[1]
+  } else {
+    plans <- plans[seq_len(max(1, min(length(plans), as.integer(max_plans))))]
+  }
 
   # Precompute plan-set membership once so the loop does not recheck on every iteration.
   has_relaxed_geo_plan      <- any(vapply(plans, function(p) identical(p$label, "fallback_relaxed_geo"),     logical(1)))
@@ -635,7 +655,8 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
           allow_centroids = isTRUE(plan$allow_centroids),
           limit = plan$limit,
           record_limit = plan$record_limit,
-          randomize_order = randomize_order
+          randomize_order = randomize_order,
+          strict_native_no_unknown = isTRUE(strict_native_no_unknown) && isTRUE(plan$natives.only)
         )
       },
       timeout_sec = plan_timeout_sec,
@@ -690,7 +711,9 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
         }
       }
 
-      return(list(data = res$result, strategy = plan$label, notes = notes, limit_used = plan$limit))
+      tagged <- res$result
+      if (is.data.frame(tagged)) tagged$bien_query_strategy <- plan$label
+      return(list(data = tagged, strategy = plan$label, notes = notes, limit_used = plan$limit))
     }
 
     # When fallback_coord_bearing returns 0 rows (no records with lat/lon after all
@@ -733,6 +756,7 @@ query_occurrence_with_fallback <- function(species_name, input, occ_limit, occ_p
   # downstream repro-script and count-query logic uses the correct filter params.
   if (!is.null(best_nonempty_result)) {
     notes <- c(notes, "no_coord_bearing_records_in_bien_view")
+    if (is.data.frame(best_nonempty_result)) best_nonempty_result$bien_query_strategy <- best_nonempty_strategy
     return(list(data = best_nonempty_result, strategy = best_nonempty_strategy, notes = notes, limit_used = fast_limit))
   }
 
@@ -2673,13 +2697,17 @@ ui <- fluidPage(
       tags$hr(),
       tags$h4("Settings", style = "margin:0 0 8px 0;font-size:1.08em;"),
       tags$h5("Filters", style = "margin:6px 0 6px 0;font-size:0.98em;color:#444;"),
-      checkboxInput("use_default_bien_filter_profile", compact_label("Conservative default profile", "Uses a biodiversity-conservative screen: keeps native and non-introduced records, excludes cultivated records, and keeps only BIEN geovalid coordinates."), value = TRUE),
+      checkboxInput("use_default_bien_filter_profile", compact_label("Strict-only BIEN profile (no auto-relaxation)", "Runs ONLY the strict plan: cultivated records excluded, BIEN geovalid coordinates required, and native-or-unknown semantics (is_introduced = 0 OR is_introduced IS NULL). Important caveat: BIEN's NSR (Native Species Resolver) has incomplete coverage for Old World taxa, so 'IS NULL' can re-admit introduced/cultivated New World records for non-American species (e.g. Markhamia lutea returning India/Australia/Mexico horticultural records). When this box is checked the app will NOT silently fall back to relaxed native or relaxed geovalid plans; if strict returns no records you will see an empty map rather than relaxed records mislabeled as conservative. For Old-World taxa, ALSO enable the 'Strict native (exclude unevaluated)' option in the granular controls. Uncheck to expose the individual filter toggles and the auto-fallback ladder."), value = FALSE),
       conditionalPanel(
         condition = "input.use_default_bien_filter_profile == false",
         checkboxInput("use_introduced_filter", compact_label("Filter by native vs introduced", "Controls whether establishment status is enforced. If disabled, records are kept regardless of native or introduced status."), value = TRUE),
         conditionalPanel(
           condition = "input.use_introduced_filter == true",
-          checkboxInput("natives_only", compact_label("Keep native / unknown-status only", "When enabled, retains records where BIEN classifies the species as native or where introduced status is unclassified (is_introduced IS NULL). Records explicitly marked introduced are excluded."), value = TRUE)
+          checkboxInput("natives_only", compact_label("Keep native / unknown-status only", "When enabled, retains records where BIEN classifies the species as native or where introduced status is unclassified (is_introduced IS NULL). Records explicitly marked introduced are excluded."), value = TRUE),
+          conditionalPanel(
+            condition = "input.natives_only == true",
+            checkboxInput("strict_native_no_unknown", compact_label("Strict native (exclude unevaluated)", "Emits SQL 'AND is_introduced = 0' with NO NULL fallback. Use this for Old-World taxa (e.g. Markhamia lutea) where BIEN's NSR has no coverage and the default IS NULL fallback would otherwise re-admit introduced/cultivated New-World records. Trade-off: species with sparse establishment-status metadata may return zero records."), value = FALSE)
+          )
         ),
         checkboxInput("use_cultivated_filter", compact_label("Filter by cultivated vs wild", "Controls whether cultivation status is enforced. If disabled, both cultivated and non-cultivated records are retained."), value = TRUE),
         conditionalPanel(
@@ -2917,6 +2945,7 @@ ui <- fluidPage(
           br(),
           uiOutput("recon_callout_ui"),
           uiOutput("qa_chips_bar_ui"),
+          uiOutput("occ_strategy_banner_ui"),
           leafletOutput("occurrence_map", height = 550),
           uiOutput("map_caption_ui"),
           br(),
@@ -3119,7 +3148,7 @@ ui <- fluidPage(
           verbatimTextOutput("trait_query_code")
         ),
         tabPanel(
-          "Species External Links",
+          "Explore this species",
           br(),
           tags$p(
             style = "color:#555;max-width:900px;",
@@ -3201,7 +3230,7 @@ server <- function(input, output, session) {
     }
 
     valid_tabs <- c("About & Help", "Occurrence", "Community", "Observations",
-                    "Traits", "Range", "Download", "Species External Links", "Temporal Distribution")
+                    "Traits", "Range", "Download", "Explore this species", "Temporal Distribution")
     if (!is.null(tab_from_url) && nzchar(tab_from_url) &&
         utils::URLdecode(tab_from_url) %in% valid_tabs) {
       updateTabsetPanel(session, "main_tabs",
@@ -3233,7 +3262,7 @@ server <- function(input, output, session) {
       "Traits" = "See grouped trait counts and example values by trait name and unit at the top, with raw BIEN trait records below.",
       "Range" = "Load optional BIEN range artifacts and inspect mapped range layers when available.",
       "Download" = "Download occurrence, plot/community, and trait datasets plus matching reproducible R code.",
-      "Species External Links" = "Open external species references generated from the current species name.",
+      "Explore this species" = "Open external species references generated from the current species name.",
       "About & Help" = "Read app background, scope, and interpretation context.",
       "Use Query BIEN to run live retrieval."
     )
@@ -5051,6 +5080,40 @@ server <- function(input, output, session) {
           "\u26a0 Names differ \u2014 see banner above and Observations tab for details."
         )
       }
+    )
+  })
+
+  # ── Persistent banner: effective BIEN query strategy when not strict ────
+  # Surfaces the actual plan that produced the displayed records whenever the
+  # auto-fallback ladder relaxed native or geovalid constraints. This is the
+  # source of truth for filter provenance — the showNotification toasts elsewhere
+  # are transient and easily missed.
+  output$occ_strategy_banner_ui <- renderUI({
+    res <- bien_results()
+    if (is.null(res)) return(NULL)
+    strategy <- if (!is.null(res$occ_strategy) && nzchar(res$occ_strategy)) res$occ_strategy else "strict"
+    if (identical(strategy, "strict") || identical(strategy, "startup_preloaded_local_dataset")) return(NULL)
+
+    dropped <- switch(strategy,
+      "fallback_relaxed_native"   = "native-only constraint dropped (records of any establishment status included)",
+      "fallback_relaxed_geo"      = "native-only AND BIEN geovalid constraints dropped",
+      "fallback_coord_bearing"    = "native-only AND geovalid dropped; SQL lat/lon-not-null guard applied",
+      "fallback_allow_centroids"  = "native-only AND geovalid dropped; county-centroid georeferences allowed (county-level precision)",
+      "backend_connection_error"  = "BIEN backend connection error — no records loaded",
+      "backend_timeout_error"     = "BIEN backend timeout — no records loaded",
+      "none"                      = "no plan returned records",
+      paste("non-strict strategy:", strategy)
+    )
+
+    tags$div(
+      style = "background:#fff3cd;border:1px solid #ffeeba;color:#856404;
+               padding:10px 14px;margin:6px 0 10px 0;border-radius:4px;
+               font-size:0.95em;",
+      tags$strong("Filter notice: "),
+      sprintf("Effective BIEN query strategy is '%s'. ", strategy),
+      dropped, ". ",
+      tags$br(),
+      tags$em("Records shown do not match the strict-profile semantics. To restore strict-only behavior, check the 'Strict-only BIEN profile (no auto-relaxation)' box in the sidebar.")
     )
   })
 
