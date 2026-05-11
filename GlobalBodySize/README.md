@@ -108,7 +108,7 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 | EltonTraits 1.0 — Birds (Wilman et al. 2014) | Birds | 9,993 | literature mean | [10.1890/13-1917.1](https://doi.org/10.1890/13-1917.1) | ✅ COMPLETE |
 | EltonTraits 1.0 — Mammals (Wilman et al. 2014) | Mammals | 5,400 | literature mean | [10.1890/13-1917.1](https://doi.org/10.1890/13-1917.1) | ✅ COMPLETE |
 | AVONET (Tobias et al. 2022) | Birds | 11,009 | morphology / literature | [10.1111/ele.13898](https://doi.org/10.1111/ele.13898) | ✅ COMPLETE |
-| FishBase via rfishbase | Fish | 5,657 | direct max weight + LW-modeled | Living database — no single DOI | ✅ COMPLETE |
+| FishBase via rfishbase v5.0.3 | Fish | 5,657 | direct max weight + LW-modeled | Living database — no single DOI. Accessed 2026-05-10 | ✅ COMPLETE |
 | AnAge Build 14 (de Magalhães & Costa 2009) | Multi-taxon | 627 | literature mean | [10.1111/j.1420-9101.2009.01783.x](https://doi.org/10.1111/j.1420-9101.2009.01783.x) | ✅ COMPLETE |
 | AmphiBIO v1 (Oliveira et al. 2017) | Amphibians | 591 | literature mean | [10.1038/sdata.2017.123](https://doi.org/10.1038/sdata.2017.123) | ✅ COMPLETE |
 | NEON DP1.10072.001 | Mammals | 800 | field trapping max weight | 10.48443/s4ph-2z37 **(UNVERIFIED)** | ✅ COMPLETE |

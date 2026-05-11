@@ -16,8 +16,8 @@
 
 FISHBASE_SOURCE_ID   <- "fishbase_rfishbase"
 FISHBASE_DISPLAY     <- "FishBase via rfishbase"
-FISHBASE_CITATION    <- "Froese R, Pauly D (Eds). FishBase. World Wide Web electronic publication. www.fishbase.org. Accessed [date]. rfishbase: Boettiger C, et al."
-FISHBASE_DOI         <- NA_character_  # UNVERIFIED — rfishbase package DOI
+FISHBASE_CITATION    <- "Froese R, Pauly D (Eds). FishBase. World Wide Web electronic publication. www.fishbase.org. Accessed 2026-05-10 via rfishbase v5.0.3 (Boettiger C, et al.)."
+FISHBASE_DOI         <- NA_character_  # Living database; cite access date, not DOI
 
 ## ---- Extract length-weight parameters and compute reference mass -----------
 ##
