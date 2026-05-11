@@ -57,12 +57,19 @@ theme_globalsize <- function(base_size = 12) {
 theme_set(theme_globalsize())
 
 ## Colour palette: one colour per taxonomic group, colour-blind aware
+## Keys match tools::toTitleCase(tolower(input_taxonomic_group))
 GROUP_COLOURS <- c(
-  "mammal"    = "#E69F00",
-  "bird"      = "#56B4E9",
-  "fish"      = "#009E73",
-  "amphibian" = "#CC79A7",
-  "reptile"   = "#D55E00"
+  "Mammal"     = "#E69F00",
+  "Bird"       = "#56B4E9",
+  "Fish"       = "#009E73",
+  "Amphibian"  = "#CC79A7",
+  "Reptile"    = "#D55E00",
+  "Insect"     = "#F0E442",
+  "Arachnid"   = "#0072B2",
+  "Crustacean" = "#999999",
+  "Annelid"    = "#BBBBBB",
+  "Gastropod"  = "#CCCCCC",
+  "Myriapod"   = "#DDDDDD"
 )
 ```
 
@@ -72,7 +79,7 @@ GROUP_COLOURS <- c(
 
 The **GlobalBodySize** project assembles a reproducible, provenance-rich, cross-taxonomic body mass database from authoritative curated sources. Body mass is the central ecological trait — it determines metabolic rate (Kleiber's law: $B \propto M^{3/4}$), home range, population density, generation time, extinction risk, trophic position, and biogeographic distribution (Peters 1983; Brown & Maurer 1989; West, Brown & Enquist 1997).
 
-This document summarises the **Phase 1 Tier-1 intake**: nine provider databases merged into a single flat file (47,108 rows), covering mammals, birds, fish, amphibians, and lizards, with GBIF Backbone taxonomic reconciliation applied to all names. Nine providers are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO, FishBase, AVONET, NEON, and Lizard Traits of the World (Meiri 2018). Body mass is not only a determinant of metabolic rate and life-history pace (Peters 1983; West, Brown & Enquist 1997), but also a primary driver of the fast-slow life-history continuum across vertebrate classes — including amphibians, where body mass explains a dominant share of trait variance (Cejp & Griebeler 2024).
+This document summarises the **Phase 1 Tier-1 intake**: ten provider databases merged into a single flat file (47,108 rows), covering mammals, birds, fish, reptiles, amphibians, and invertebrates (insects, arachnids, crustaceans), with GBIF Backbone taxonomic reconciliation applied to all names. Ten providers are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO, FishBase, AVONET, NEON, AnimalTraits (Herberstein et al. 2022), and Lizard Traits of the World (Meiri 2018). Body mass is not only a determinant of metabolic rate and life-history pace (Peters 1983; West, Brown & Enquist 1997), but also a primary driver of the fast-slow life-history continuum across vertebrate classes — including amphibians, where body mass explains a dominant share of trait variance (Cejp & Griebeler 2024).
 
 **Data file used for this summary:** `data/compiled/tier1_reconciled.csv`
 
@@ -107,9 +114,19 @@ dat$log10_mass  <- log10(dat$mass_g)
 ## Normalise taxonomic group labels to title case for display
 dat$group_display <- tools::toTitleCase(tolower(trimws(dat$input_taxonomic_group)))
 
+## Persistent is_lw_modeled flag — works in dplyr pipes without referencing
+## optional columns that may be absent (e.g. mass_measurement_type in reconciled file)
+.lw_flag <- grepl("LW_model", dat$mass_type, ignore.case = TRUE)
+if ("mass_measurement_type" %in% names(dat)) {
+  .lw_flag <- .lw_flag | grepl("lw_modeled", dat$mass_measurement_type, ignore.case = TRUE)
+}
+dat$is_lw_modeled <- .lw_flag
+rm(.lw_flag)
+
 ## Flag mass type for display
 dat$mass_type_display <- ifelse(
-  grepl("LW_model", dat$mass_type, ignore.case = TRUE), "LW-modeled (FishBase)",
+  dat$is_lw_modeled,
+  "LW-modeled",
   tools::toTitleCase(tolower(trimws(dat$mass_type)))
 )
 
@@ -289,15 +306,11 @@ ggplot(unique_by_group,
 
 Body mass distributions are examined on a log₁₀ scale. Empirical distributions within taxonomic groups typically approximate log-normal, reflecting multiplicative growth processes and diversification dynamics (Brown & Maurer 1989; Dial et al. 2008).
 
-```{r dist-main, fig.height=8, fig.cap="Fig. 1. Log\u2081\u2080 body mass distributions by taxonomic group. Vertical dashed line = group median. Note: 3,442 FishBase rows carry LW-modeled mass (not directly measured) \u2014 shown in lighter shading."}
+```{r dist-main, fig.height=8, fig.cap="Fig. 1. Log\u2081\u2080 body mass distributions by taxonomic group. Vertical dashed line = group median. Note: 3,442 FishBase rows and 6,633 Lizard Traits rows carry LW-modeled mass (not directly measured) \u2014 shown in lighter shading."}
 plot_dat <- dat |>
   dplyr::filter(!is.na(log10_mass) & is.finite(log10_mass)) |>
   dplyr::mutate(
-    group_f = factor(group_display,
-                     levels = c("Mammalia", "Aves", "Actinopterygii",
-                                "Amphibia", "Reptilia", "Mammal", "Bird",
-                                "Fish", "Amphibian", "Reptile")),
-    is_modeled = grepl("LW_model|LW-model", mass_type, ignore.case = TRUE)
+    is_modeled = is_lw_modeled
   )
 
 ## Compute group medians for reference lines
@@ -312,7 +325,7 @@ ggplot(plot_dat, aes(x = log10_mass, fill = is_modeled)) +
   scale_fill_manual(
     values = c(`FALSE` = "#2c7bb6", `TRUE` = "#abd9e9"),
     labels = c(`FALSE` = "Directly measured / literature mean",
-               `TRUE`  = "LW-modeled (FishBase only)"),
+               `TRUE`  = "LW-modeled (FishBase + Lizard Traits)"),
     name   = "Mass source"
   ) +
   scale_x_continuous(
@@ -366,7 +379,7 @@ ggplot(violin_dat, aes(x = reorder(group_display, log10_mass, FUN = median),
   ) +
   labs(
     title    = "Body mass range by taxonomic group (directly measured / literature mean only)",
-    subtitle = "LW-modeled FishBase mass excluded for comparability",
+    subtitle = "LW-modeled mass excluded (FishBase + Lizard Traits) for comparability",
     caption  = "Hollow dot = median; box = IQR; violin = density",
     x        = NULL
   )
@@ -725,6 +738,9 @@ provider_plot_dat <- dat |>
       grepl("AmphiBIO",    source_display_name) ~ "AmphiBIO\n(amphibians)",
       grepl("FishBase",    source_display_name) ~ "FishBase\n(fish)",
       grepl("AVONET",      source_display_name) ~ "AVONET\n(birds)",
+      grepl("NEON",        source_display_name) ~ "NEON\n(small mammals)",
+      grepl("AnimalTraits",source_display_name) ~ "AnimalTraits\n(multi-taxon)",
+      grepl("Lizard Traits",source_display_name)~ "Lizard Traits\n(lizards)",
       TRUE                                       ~ source_display_name
     )
   )
@@ -751,7 +767,7 @@ ggplot(provider_plot_dat,
 
 # 5. Mass Type and Data Quality Composition
 
-```{r mass-type-breakdown, fig.height=4, fig.cap="Fig. 4. Composition of mass_type field. LW-modeled entries are FishBase only. All other sources contribute directly measured or literature-mean values. Analyses mixing mass types require explicit sensitivity testing."}
+```{r mass-type-breakdown, fig.height=4, fig.cap="Fig. 4. Composition of mass_type field. LW-modeled entries include FishBase L-W estimates (mass_type = 'LW_modeled') and Lizard Traits allometric estimates (mass_measurement_type = 'lw_modeled'). All other sources contribute directly measured or literature-mean values. Analyses mixing mass types require explicit sensitivity testing."}
 mt_summary <- dat |>
   dplyr::filter(!is.na(mass_g), mass_g > 0) |>
   dplyr::count(mass_type_display, group_display) |>
@@ -765,7 +781,7 @@ ggplot(mt_summary, aes(x = reorder(mass_type_display, n), y = n, fill = group_di
   labs(
     title    = "Mass type composition by taxonomic group",
     subtitle = "Critical: LW-modeled mass must not be mixed with wet mass without stratification",
-    caption  = "mass_type = 'LW_modeled' entries are FishBase L-W equation estimates only",
+    caption  = "mass_type = 'LW_modeled' includes FishBase L-W equation estimates (3,442 rows) and Lizard Traits allometric estimates (6,633 rows; flagged via mass_measurement_type = 'lw_modeled')",
     x        = NULL
   )
 ```
@@ -874,7 +890,7 @@ The scaling exponent $b = 3/4$ implies that per-unit-mass metabolic rate scales 
 ## QQ plot by group — Telford: diagnostics before interpretation
 qq_dat <- dat |>
   dplyr::filter(!is.na(log10_mass), is.finite(log10_mass),
-                !grepl("LW_model", mass_type, ignore.case = TRUE)) |>
+                !is_lw_modeled) |>
   dplyr::group_by(group_display) |>
   dplyr::filter(dplyr::n() >= 50) |>  # only groups with ≥50 wet/direct rows
   dplyr::mutate(
@@ -894,7 +910,7 @@ ggplot(qq_dat, aes(x = theoretical, y = sample_quantile, colour = group_display)
   facet_wrap(~ group_display, scales = "free") +
   labs(
     title    = expression("QQ-plot: log"[10]*" body mass vs. theoretical normal"),
-    subtitle = "LW-modeled FishBase mass excluded | Groups with ≥50 direct measurements shown",
+    subtitle = "LW-modeled mass excluded (FishBase + Lizard Traits) | Groups with ≥50 direct measurements shown",
     caption  = "Dashed line = perfect log-normality. Systematic departures indicate skew or multimodality.",
     x        = "Theoretical normal quantiles",
     y        = expression("log"[10]*" body mass (g) — sample quantiles")
@@ -938,7 +954,7 @@ scale_stats |>
 ```{r cross-group-scaling, fig.height=5, fig.cap="Fig. 6. Cumulative body size distribution (ECDF) on log₁₀ scale for each taxonomic group. Horizontal offset between curves reflects differences in modal body size. The width of each curve reflects the range of sizes within the group. For reference, dashed vertical lines mark iconic body sizes."}
 ecdf_dat <- dat |>
   dplyr::filter(!is.na(log10_mass), is.finite(log10_mass),
-                !grepl("LW_model", mass_type, ignore.case = TRUE)) |>
+                !is_lw_modeled) |>
   dplyr::group_by(group_display) |>
   dplyr::filter(dplyr::n() >= 50) |>
   dplyr::ungroup()
@@ -967,7 +983,7 @@ ggplot(ecdf_dat, aes(x = log10_mass, colour = group_display)) +
   scale_y_continuous(name = "Cumulative proportion", labels = scales::percent) +
   labs(
     title    = "Cumulative body mass distribution by taxonomic group",
-    subtitle = "LW-modeled FishBase mass excluded | Groups with ≥50 directly measured rows",
+    subtitle = "LW-modeled mass excluded (FishBase + Lizard Traits) | Groups with ≥50 directly measured rows",
     caption  = "Dotted lines = iconic reference body masses"
   )
 ```
@@ -979,8 +995,8 @@ ggplot(ecdf_dat, aes(x = log10_mass, colour = group_display)) +
 ```{r gap-analysis}
 ## Known approximate species richness per group (UNVERIFIED — approximate for context only)
 known_richness <- data.frame(
-  group_display = c("Mammalia", "Aves", "Actinopterygii",
-                    "Amphibia", "Reptilia"),
+  group_display = c("Mammal", "Bird", "Fish",
+                    "Amphibian", "Reptile"),
   approx_total_species = c(6600, 10900, 35000, 8500, 10900),
   richness_source = c("MDD v1.12", "BirdLife 2024", "FishBase 2024",
                       "ASW 2024", "Reptile Database 2024"),
