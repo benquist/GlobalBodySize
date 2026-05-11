@@ -2040,6 +2040,698 @@ All data were loaded from local CSV files in `output/` compiled by the `Animal_s
 
 ---
 
+# Summary Statistics for Slope Distributions Across Taxonomic Levels
+
+This section computes 95% confidence intervals on the mean slope (t-distribution) and on the median slope (bootstrap, 5000 resamples) at each taxonomic level of aggregation: order, family, genus, and intraspecific.
+
+```{r slope-ci-helpers}
+# Bootstrap 95% CI on median (5000 resamples, percentile method)
+boot_median_ci <- function(x, R = 5000, alpha = 0.05) {
+  x <- x[!is.na(x)]
+  if (length(x) < 3) return(c(NA_real_, NA_real_))
+  set.seed(42)
+  boot_meds <- replicate(R, median(sample(x, length(x), replace = TRUE)))
+  quantile(boot_meds, c(alpha / 2, 1 - alpha / 2))
+}
+
+# t-distribution 95% CI on the mean
+mean_ci <- function(x) {
+  x <- x[!is.na(x)]
+  n <- length(x)
+  if (n < 2) return(c(NA_real_, NA_real_))
+  se <- sd(x) / sqrt(n)
+  hw <- qt(0.975, df = n - 1) * se
+  c(mean(x) - hw, mean(x) + hw)
+}
+
+# Build one summary row given a slope vector and a level label
+slope_summary_row <- function(slopes, level_label) {
+  slopes <- slopes[!is.na(slopes)]
+  n <- length(slopes)
+  if (n < 3) return(NULL)
+  m_ci  <- mean_ci(slopes)
+  b_ci  <- boot_median_ci(slopes)
+  data.table(
+    Level          = level_label,
+    N_groups       = n,
+    Mean_slope     = round(mean(slopes), 4),
+    CI95_lo_mean   = round(m_ci[1], 4),
+    CI95_hi_mean   = round(m_ci[2], 4),
+    Median_slope   = round(median(slopes), 4),
+    CI95_lo_med    = round(b_ci[1], 4),
+    CI95_hi_med    = round(b_ci[2], 4)
+  )
+}
+```
+
+## Order-level slope CI
+
+```{r slope-ci-order}
+ord_slopes_vec <- if (!is.null(reg_order) && nrow(reg_order) > 0)
+  reg_order$Slope[!is.na(reg_order$Slope)] else numeric(0)
+
+ci_order <- slope_summary_row(ord_slopes_vec, "Order")
+if (!is.null(ci_order)) {
+  kable(ci_order,
+        col.names = c("Level", "N groups", "Mean slope", "95% CI lo (mean)",
+                      "95% CI hi (mean)", "Median slope", "95% CI lo (median)",
+                      "95% CI hi (median)"),
+        caption = paste("Order-level metabolic scaling slope summary.",
+                        "95% CI on mean: t-distribution.",
+                        "95% CI on median: bootstrap percentile, 5000 resamples.",
+                        "WBE reference: β = 0.75.")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+} else {
+  cat("Insufficient order-level slopes for CI computation.\n")
+}
+```
+
+## Family-level slope CI
+
+```{r slope-ci-family}
+fam_slopes_vec <- if (!is.null(reg_fam) && nrow(reg_fam) > 0)
+  reg_fam$Slope[!is.na(reg_fam$Slope)] else numeric(0)
+
+ci_fam <- slope_summary_row(fam_slopes_vec, "Family")
+if (!is.null(ci_fam)) {
+  kable(ci_fam,
+        col.names = c("Level", "N groups", "Mean slope", "95% CI lo (mean)",
+                      "95% CI hi (mean)", "Median slope", "95% CI lo (median)",
+                      "95% CI hi (median)"),
+        caption = paste("Family-level metabolic scaling slope summary.",
+                        "95% CI on mean: t-distribution.",
+                        "95% CI on median: bootstrap percentile, 5000 resamples.",
+                        "WBE reference: β = 0.75.")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+} else {
+  cat("Insufficient family-level slopes for CI computation.\n")
+}
+```
+
+## Genus-level slope CI
+
+```{r slope-ci-genus}
+# Compute genus-level regressions if the column exists in met_sources
+if ("genus" %in% names(met_sources)) {
+  reg_genus_ci <- fit_log_lm(met_sources, "body_mass_g", "metabolic_rate_value",
+                              group_col = "genus", min_n = 10)
+  reg_genus_ci <- reg_genus_ci[Group != "All taxa combined"]
+  reg_genus_ci <- reg_genus_ci[is.na(Slope) | abs(Slope) <= SLOPE_MAX]
+  gen_slopes_vec <- reg_genus_ci$Slope[!is.na(reg_genus_ci$Slope)]
+} else {
+  reg_genus_ci   <- data.table()
+  gen_slopes_vec <- numeric(0)
+  cat("Column 'genus' not found in met_sources; genus-level CI skipped.\n")
+}
+
+ci_gen <- slope_summary_row(gen_slopes_vec, "Genus")
+if (!is.null(ci_gen)) {
+  kable(ci_gen,
+        col.names = c("Level", "N groups", "Mean slope", "95% CI lo (mean)",
+                      "95% CI hi (mean)", "Median slope", "95% CI lo (median)",
+                      "95% CI hi (median)"),
+        caption = paste("Genus-level metabolic scaling slope summary.",
+                        "95% CI on mean: t-distribution.",
+                        "95% CI on median: bootstrap percentile, 5000 resamples.",
+                        "WBE reference: β = 0.75.")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+} else {
+  cat("Insufficient genus-level slopes for CI computation.\n")
+}
+```
+
+## Intraspecific slope CI
+
+```{r slope-ci-intraspecific}
+intra_slopes_vec <- if (exists("intra_slopes") && !is.null(intra_slopes) && nrow(intra_slopes) > 0)
+  intra_slopes$slope[!is.na(intra_slopes$slope)] else numeric(0)
+
+ci_intra <- slope_summary_row(intra_slopes_vec, "Intraspecific")
+if (!is.null(ci_intra)) {
+  kable(ci_intra,
+        col.names = c("Level", "N groups", "Mean slope", "95% CI lo (mean)",
+                      "95% CI hi (mean)", "Median slope", "95% CI lo (median)",
+                      "95% CI hi (median)"),
+        caption = paste("Intraspecific metabolic scaling slope summary.",
+                        "Each group = one species with N ≥ 5 records.",
+                        "95% CI on mean: t-distribution.",
+                        "95% CI on median: bootstrap percentile, 5000 resamples.",
+                        "WBE reference: β = 0.75.")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+} else {
+  cat("Insufficient intraspecific slopes for CI computation.\n")
+}
+```
+
+## Combined CI comparison across taxonomic levels
+
+```{r slope-ci-combined-table}
+ci_all_levels <- rbindlist(Filter(Negate(is.null),
+                                  list(ci_order, ci_fam, ci_gen, ci_intra)),
+                           fill = TRUE)
+
+if (!is.null(ci_all_levels) && nrow(ci_all_levels) >= 2) {
+  kable(ci_all_levels,
+        col.names = c("Level", "N groups", "Mean β", "95% CI lo (mean)",
+                      "95% CI hi (mean)", "Median β", "95% CI lo (median)",
+                      "95% CI hi (median)"),
+        caption = paste("Summary of mean and median metabolic scaling slopes with 95% CIs",
+                        "across taxonomic levels of aggregation.",
+                        "WBE reference: β = 0.75.",
+                        "Mean CI: t-distribution; Median CI: bootstrap percentile (R = 5000).")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r slope-ci-combined-plot, fig.width=10, fig.height=6}
+if (!is.null(ci_all_levels) && nrow(ci_all_levels) >= 2) {
+  # Reshape to long for mean and median
+  ci_mean_long <- ci_all_levels[, .(
+    Level, N_groups,
+    Estimate = Mean_slope,
+    CI_lo    = CI95_lo_mean,
+    CI_hi    = CI95_hi_mean,
+    Type     = "Mean (t-CI)"
+  )]
+  ci_med_long <- ci_all_levels[, .(
+    Level, N_groups,
+    Estimate = Median_slope,
+    CI_lo    = CI95_lo_med,
+    CI_hi    = CI95_hi_med,
+    Type     = "Median (bootstrap CI)"
+  )]
+  ci_long <- rbind(ci_mean_long, ci_med_long)
+  ci_long[, Level := factor(Level, levels = c("Order", "Family", "Genus", "Intraspecific"))]
+
+  ggplot(ci_long, aes(x = Level, y = Estimate, colour = Type,
+                      ymin = CI_lo, ymax = CI_hi)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_errorbar(aes(ymin = CI_lo, ymax = CI_hi),
+                  width = 0.15, position = position_dodge(width = 0.4),
+                  linewidth = 0.9) +
+    geom_point(size = 3.5, position = position_dodge(width = 0.4)) +
+    scale_colour_manual(values = c("Mean (t-CI)" = pal8[1],
+                                   "Median (bootstrap CI)" = pal8[2]),
+                        name = "Statistic") +
+    annotate("text", x = 0.55, y = 0.75, label = "WBE β = 0.75",
+             colour = "firebrick", hjust = 0, vjust = -0.5, size = 3.5) +
+    labs(
+      title   = "Mean and median metabolic scaling slopes with 95% CIs across taxonomic levels",
+      subtitle = "Error bars: t-CI (mean) and bootstrap percentile CI (median); dashed = WBE reference",
+      x       = "Taxonomic level",
+      y       = "OLS slope (β)"
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+---
+
+# Filtered Analyses: Animals Only, N ≥ 10, Size Range ≥ 3 Orders of Magnitude
+
+This section repeats the metabolic scaling analyses after applying three additional filters:
+
+1. **Animals only** — rows where `input_taxonomic_group` matches non-animal patterns (bacteria, archaea, fungi, algae, plants, protists, etc.) are excluded.
+2. **N ≥ 10** — each taxon group must have at least 10 valid observations.
+3. **Body mass span ≥ 3 orders of magnitude** — within each group, max(body_mass_g)/min(body_mass_g) ≥ 1000, ensuring the regression spans ecologically meaningful size variation rather than spuriously extrapolating from a narrow range.
+
+> **Rationale:** Including microbes, plants, and groups with narrow mass ranges can distort the slope distribution and inflate apparent agreement with WBE theory. These filters isolate the signal from well-sampled animal groups with broad mass coverage.
+
+## Define animal-only dataset
+
+```{r filtered-animals-prep}
+non_animal_pattern <- "plant|microbe|bacteri|archae|fungi|alga|phyto|protist"
+
+met_animals <- met_sources[
+  !grepl(non_animal_pattern, input_taxonomic_group, ignore.case = TRUE) &
+  !is.na(input_taxonomic_group) & input_taxonomic_group != ""
+]
+
+cat("Animal-only metabolic records:", nrow(met_animals), "\n")
+cat("Groups retained:\n")
+print(unique(met_animals$input_taxonomic_group))
+cat("\nTotal records in met_sources:", nrow(met_sources), "\n")
+cat("Records excluded (non-animal):", nrow(met_sources) - nrow(met_animals), "\n")
+```
+
+## Define filtered regression helper
+
+```{r filtered-lm-helper}
+# fit_log_lm_filtered: like fit_log_lm but additionally requires
+#   max(body_mass_g)/min(body_mass_g) >= 1000 within each group (3 OOM)
+fit_log_lm_filtered <- function(dt, x_col, y_col, group_col = NULL,
+                                 min_n = 10, min_mass_ratio = 1000) {
+  if (is.null(dt) || nrow(dt) == 0) return(data.table())
+  if (!all(c(x_col, y_col) %in% names(dt))) return(data.table())
+
+  sub <- dt[!is.na(get(x_col)) & get(x_col) > 0 &
+            !is.na(get(y_col)) & get(y_col) > 0]
+  if (nrow(sub) == 0) return(data.table())
+  sub <- copy(sub)
+  sub[, lx := log10(get(x_col))]
+  sub[, ly := log10(get(y_col))]
+
+  fit_one_f <- function(d, label) {
+    if (nrow(d) < min_n) return(NULL)
+    mass_vals  <- d[[x_col]]
+    mass_ratio <- max(mass_vals, na.rm = TRUE) / min(mass_vals, na.rm = TRUE)
+    if (!is.finite(mass_ratio) || mass_ratio < min_mass_ratio) return(NULL)
+    if (length(unique(d$lx)) < 2) return(NULL)
+    fit <- tryCatch(lm(ly ~ lx, data = d), error = function(e) NULL)
+    if (is.null(fit)) return(NULL)
+    s  <- coef(summary(fit))
+    if (nrow(s) < 2) return(NULL)
+    ci <- tryCatch(confint(fit), error = function(e) matrix(NA_real_, 2, 2))
+    data.table(
+      Group               = label,
+      n                   = nrow(d),
+      Intercept           = round(s[1, 1], 3),
+      Slope               = round(s[2, 1], 3),
+      Slope_SE            = round(s[2, 2], 3),
+      CI_95_lo            = round(ci[2, 1], 3),
+      CI_95_hi            = round(ci[2, 2], 3),
+      R2                  = round(summary(fit)$r.squared, 3),
+      p_value             = signif(s[2, 4], 3),
+      mass_range_log10    = round(log10(mass_ratio), 2)
+    )
+  }
+
+  res_all <- fit_one_f(sub, "All groups combined")
+
+  if (!is.null(group_col) && group_col %in% names(sub)) {
+    grps    <- sort(unique(sub[[group_col]]))
+    res_grp <- rbindlist(
+      lapply(grps, function(g) fit_one_f(sub[get(group_col) == g], g)),
+      fill = TRUE
+    )
+    res_all <- rbind(res_all, res_grp, fill = TRUE)
+  }
+  res_all
+}
+```
+
+## Filtered metabolic scaling by order
+
+```{r filtered-order-compute}
+reg_order_filt_all <- fit_log_lm_filtered(
+  met_animals, "body_mass_g", "metabolic_rate_value",
+  group_col = "order", min_n = 10, min_mass_ratio = 1000
+)
+
+if (!is.null(reg_order_filt_all) && nrow(reg_order_filt_all) > 0) {
+  reg_order_filt <- reg_order_filt_all[
+    Group != "All groups combined" & (is.na(Slope) | abs(Slope) <= SLOPE_MAX)
+  ]
+  cat(sprintf("Orders passing all filters: %d\n", nrow(reg_order_filt)))
+} else {
+  reg_order_filt <- data.table()
+  cat("No orders passed the animal / N>=10 / 3-OOM filters.\n",
+      "This may reflect limited body mass spread within orders in the current datasets.\n")
+}
+```
+
+```{r filtered-order-table}
+if (!is.null(reg_order_filt) && nrow(reg_order_filt) >= 1) {
+  kable(reg_order_filt[order(-n)],
+        col.names = c("Order", "n", "Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value",
+                      "Mass range (log₁₀ decades)"),
+        caption = paste(
+          "Filtered order-level OLS metabolic scaling regressions.",
+          "Filters: animals only; N ≥ 10 per order; body mass span ≥ 3 orders of magnitude.",
+          "WBE reference: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r filtered-order-forest, fig.width=10, fig.height=6}
+if (!is.null(reg_order_filt) && nrow(reg_order_filt) >= 3) {
+  ggplot(reg_order_filt[!is.na(Slope)],
+         aes(x = reorder(Group, Slope), y = Slope,
+             ymin = CI_95_lo, ymax = CI_95_hi)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_errorbar(width = 0.25, colour = "grey50", linewidth = 0.8) +
+    geom_point(size = 3.0, colour = pal8[1]) +
+    coord_flip() +
+    labs(
+      title    = "Filtered metabolic scaling slopes by order (animals, N ≥ 10, ≥ 3 OOM mass span)",
+      subtitle = "Points = OLS slope; error bars = 95% CI; dashed = WBE β = 0.75",
+      x        = "Order",
+      y        = "OLS slope (β)",
+      caption  = "Filters: animals only; N ≥ 10 per order; max/min body mass ≥ 1000× within order."
+    ) +
+    theme_bw(base_size = 13)
+} else if (!is.null(reg_order_filt) && nrow(reg_order_filt) > 0) {
+  cat(sprintf("Only %d order(s) passed filters; forest plot requires ≥ 3.\n",
+              nrow(reg_order_filt)))
+}
+```
+
+## Filtered metabolic scaling by family
+
+```{r filtered-family-compute}
+reg_fam_filt_all <- fit_log_lm_filtered(
+  met_animals, "body_mass_g", "metabolic_rate_value",
+  group_col = "family", min_n = 10, min_mass_ratio = 1000
+)
+
+if (!is.null(reg_fam_filt_all) && nrow(reg_fam_filt_all) > 0) {
+  reg_fam_filt <- reg_fam_filt_all[
+    Group != "All groups combined" & (is.na(Slope) | abs(Slope) <= SLOPE_MAX)
+  ]
+  cat(sprintf("Families passing all filters: %d\n", nrow(reg_fam_filt)))
+} else {
+  reg_fam_filt <- data.table()
+  cat("No families passed the animal / N>=10 / 3-OOM filters.\n")
+}
+```
+
+```{r filtered-family-table}
+if (!is.null(reg_fam_filt) && nrow(reg_fam_filt) >= 1) {
+  kable(reg_fam_filt[order(-n)],
+        col.names = c("Family", "n", "Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value",
+                      "Mass range (log₁₀ decades)"),
+        caption = paste(
+          "Filtered family-level OLS metabolic scaling regressions.",
+          "Filters: animals only; N ≥ 10 per family; body mass span ≥ 3 orders of magnitude.",
+          "WBE reference: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r filtered-family-forest, fig.width=10, fig.height=7}
+if (!is.null(reg_fam_filt) && nrow(reg_fam_filt) >= 3) {
+  ggplot(reg_fam_filt[!is.na(Slope)],
+         aes(x = reorder(Group, Slope), y = Slope,
+             ymin = CI_95_lo, ymax = CI_95_hi)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_errorbar(width = 0.25, colour = "grey50", linewidth = 0.8) +
+    geom_point(size = 3.0, colour = pal8[1]) +
+    coord_flip() +
+    labs(
+      title    = "Filtered metabolic scaling slopes by family (animals, N ≥ 10, ≥ 3 OOM mass span)",
+      subtitle = "Points = OLS slope; error bars = 95% CI; dashed = WBE β = 0.75",
+      x        = "Family",
+      y        = "OLS slope (β)",
+      caption  = "Filters: animals only; N ≥ 10 per family; max/min body mass ≥ 1000× within family."
+    ) +
+    theme_bw(base_size = 13)
+} else if (!is.null(reg_fam_filt) && nrow(reg_fam_filt) > 0) {
+  cat(sprintf("Only %d family/families passed filters; forest plot requires ≥ 3.\n",
+              nrow(reg_fam_filt)))
+}
+```
+
+## Filtered metabolic scaling by genus
+
+```{r filtered-genus-compute}
+if ("genus" %in% names(met_animals)) {
+  reg_genus_filt_all <- fit_log_lm_filtered(
+    met_animals, "body_mass_g", "metabolic_rate_value",
+    group_col = "genus", min_n = 10, min_mass_ratio = 1000
+  )
+  if (!is.null(reg_genus_filt_all) && nrow(reg_genus_filt_all) > 0) {
+    reg_genus_filt <- reg_genus_filt_all[
+      Group != "All groups combined" & (is.na(Slope) | abs(Slope) <= SLOPE_MAX)
+    ]
+    cat(sprintf("Genera passing all filters: %d\n", nrow(reg_genus_filt)))
+  } else {
+    reg_genus_filt <- data.table()
+    cat("No genera passed the animal / N>=10 / 3-OOM filters.\n")
+  }
+} else {
+  reg_genus_filt <- data.table()
+  cat("Column 'genus' not found in met_animals; genus-level filtered analysis skipped.\n")
+}
+```
+
+```{r filtered-genus-table}
+if (!is.null(reg_genus_filt) && nrow(reg_genus_filt) >= 1) {
+  kable(reg_genus_filt[order(-n)],
+        col.names = c("Genus", "n", "Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value",
+                      "Mass range (log₁₀ decades)"),
+        caption = paste(
+          "Filtered genus-level OLS metabolic scaling regressions.",
+          "Filters: animals only; N ≥ 10 per genus; body mass span ≥ 3 orders of magnitude.",
+          "WBE reference: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r filtered-genus-forest, fig.width=10, fig.height=7}
+if (!is.null(reg_genus_filt) && nrow(reg_genus_filt) >= 3) {
+  ggplot(reg_genus_filt[!is.na(Slope)],
+         aes(x = reorder(Group, Slope), y = Slope,
+             ymin = CI_95_lo, ymax = CI_95_hi)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_errorbar(width = 0.25, colour = "grey50", linewidth = 0.8) +
+    geom_point(size = 3.0, colour = pal8[1]) +
+    coord_flip() +
+    labs(
+      title    = "Filtered metabolic scaling slopes by genus (animals, N ≥ 10, ≥ 3 OOM mass span)",
+      subtitle = "Points = OLS slope; error bars = 95% CI; dashed = WBE β = 0.75",
+      x        = "Genus",
+      y        = "OLS slope (β)",
+      caption  = "Filters: animals only; N ≥ 10 per genus; max/min body mass ≥ 1000× within genus."
+    ) +
+    theme_bw(base_size = 13)
+} else if (!is.null(reg_genus_filt) && nrow(reg_genus_filt) > 0) {
+  cat(sprintf("Only %d genus/genera passed filters; forest plot requires ≥ 3.\n",
+              nrow(reg_genus_filt)))
+}
+```
+
+## Filtered intraspecific scaling (animals, N ≥ 10, ≥ 3 OOM)
+
+```{r filtered-intraspecific-compute}
+if ("species" %in% names(met_animals) || exists("sp_col")) {
+  sp_col_f <- if ("species" %in% names(met_animals)) "species" else sp_col
+
+  if (sp_col_f %in% names(met_animals)) {
+    intra_filt_spp <- met_animals[
+      !is.na(get(sp_col_f)) & get(sp_col_f) != "" &
+      !is.na(body_mass_g) & body_mass_g > 0 &
+      !is.na(metabolic_rate_value) & metabolic_rate_value > 0,
+      .(N           = .N,
+        mass_ratio  = max(body_mass_g, na.rm = TRUE) / min(body_mass_g, na.rm = TRUE)),
+      by = .(species = get(sp_col_f))
+    ]
+    intra_filt_spp <- intra_filt_spp[N >= 10 & is.finite(mass_ratio) & mass_ratio >= 1000]
+    cat(sprintf("Species meeting animal + N>=10 + 3-OOM criteria: %d\n",
+                nrow(intra_filt_spp)))
+
+    if (nrow(intra_filt_spp) >= 1) {
+      intra_slopes_filt <- rbindlist(lapply(intra_filt_spp$species, function(sp) {
+        d <- met_animals[get(sp_col_f) == sp &
+                         !is.na(body_mass_g) & body_mass_g > 0 &
+                         !is.na(metabolic_rate_value) & metabolic_rate_value > 0]
+        if (nrow(d) < 10) return(NULL)
+        mass_ratio <- max(d$body_mass_g, na.rm = TRUE) / min(d$body_mass_g, na.rm = TRUE)
+        if (!is.finite(mass_ratio) || mass_ratio < 1000) return(NULL)
+        fit <- tryCatch(
+          lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data = d),
+          error = function(e) NULL
+        )
+        if (is.null(fit)) return(NULL)
+        s <- coef(summary(fit))
+        if (nrow(s) < 2) return(NULL)
+        ci <- tryCatch(confint(fit), error = function(e) matrix(NA_real_, 2, 2))
+        data.table(
+          species              = sp,
+          n                    = nrow(d),
+          slope                = round(s[2, 1], 3),
+          slope_se             = round(s[2, 2], 3),
+          ci_lo                = round(ci[2, 1], 3),
+          ci_hi                = round(ci[2, 2], 3),
+          r2                   = round(summary(fit)$r.squared, 3),
+          p_value              = signif(s[2, 4], 3),
+          mass_range_log10     = round(log10(mass_ratio), 2)
+        )
+      }), fill = TRUE)
+      intra_slopes_filt <- intra_slopes_filt[is.na(slope) | abs(slope) <= SLOPE_MAX]
+      cat(sprintf("Species with valid filtered intraspecific slopes: %d\n",
+                  nrow(intra_slopes_filt)))
+    } else {
+      intra_slopes_filt <- data.table()
+      cat("No species met all three intraspecific filters.\n")
+    }
+  } else {
+    intra_slopes_filt <- data.table()
+    cat("Species column not found in met_animals; filtered intraspecific analysis skipped.\n")
+  }
+} else {
+  intra_slopes_filt <- data.table()
+  cat("No species column available; filtered intraspecific analysis skipped.\n")
+}
+```
+
+```{r filtered-intraspecific-table}
+if (!is.null(intra_slopes_filt) && nrow(intra_slopes_filt) >= 1) {
+  kable(intra_slopes_filt[order(-n)],
+        col.names = c("Species", "n", "Slope (β)", "SE", "95% CI lo", "95% CI hi",
+                      "R²", "p-value", "Mass range (log₁₀ decades)"),
+        caption = paste(
+          "Filtered intraspecific OLS metabolic scaling regressions.",
+          "Filters: animals only; N ≥ 10 per species; body mass span ≥ 3 orders of magnitude.",
+          "WBE reference: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r filtered-intraspecific-histogram, fig.width=10, fig.height=5}
+if (!is.null(intra_slopes_filt) && nrow(intra_slopes_filt) >= 5) {
+  med_filt_intra <- median(intra_slopes_filt$slope, na.rm = TRUE)
+  ggplot(intra_slopes_filt[!is.na(slope)], aes(x = slope)) +
+    geom_histogram(binwidth = 0.15, fill = pal8[3], colour = "white", alpha = 0.85) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.2) +
+    geom_vline(xintercept = med_filt_intra, linetype = "solid", colour = pal8[1],
+               linewidth = 1.0) +
+    annotate("text", x = 0.75 + 0.06, y = Inf, label = "WBE β = 0.75",
+             colour = "firebrick", vjust = 1.5, hjust = 0, size = 3.5) +
+    annotate("text", x = med_filt_intra - 0.06, y = Inf,
+             label = sprintf("Median β = %.3f", med_filt_intra),
+             colour = pal8[1], vjust = 3, hjust = 1, size = 3.5) +
+    labs(
+      title    = "Filtered intraspecific slopes: animals, N ≥ 10, ≥ 3 OOM mass span",
+      subtitle = sprintf("N = %d species; dashed = WBE 0.75; solid = median",
+                         sum(!is.na(intra_slopes_filt$slope))),
+      x        = "OLS slope (β) per species",
+      y        = "Number of species",
+      caption  = "Filters: animals only; N ≥ 10 per species; max/min body mass ≥ 1000× within species."
+    ) +
+    theme_bw(base_size = 13)
+}
+```
+
+```{r filtered-intraspecific-forest, fig.width=10, fig.height=6}
+if (!is.null(intra_slopes_filt) && nrow(intra_slopes_filt) >= 3) {
+  ggplot(intra_slopes_filt[!is.na(slope)],
+         aes(x = reorder(species, slope), y = slope,
+             ymin = ci_lo, ymax = ci_hi)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_errorbar(width = 0.25, colour = "grey50", linewidth = 0.8) +
+    geom_point(size = 3.0, colour = pal8[1]) +
+    coord_flip() +
+    labs(
+      title    = "Filtered intraspecific metabolic scaling slopes",
+      subtitle = "Points = OLS slope; error bars = 95% CI; dashed = WBE β = 0.75",
+      x        = "Species",
+      y        = "OLS slope (β)",
+      caption  = "Filters: animals only; N ≥ 10 per species; max/min body mass ≥ 1000× within species."
+    ) +
+    theme_bw(base_size = 13)
+}
+```
+
+## Summary comparison: unfiltered vs filtered
+
+```{r filtered-comparison-table}
+# Collect unfiltered mean/median slopes per level
+unf_rows <- rbindlist(Filter(Negate(is.null), list(
+  if (length(ord_slopes_vec)   >= 3) slope_summary_row(ord_slopes_vec,   "Order (unfiltered)"),
+  if (length(fam_slopes_vec)   >= 3) slope_summary_row(fam_slopes_vec,   "Family (unfiltered)"),
+  if (length(gen_slopes_vec)   >= 3) slope_summary_row(gen_slopes_vec,   "Genus (unfiltered)"),
+  if (length(intra_slopes_vec) >= 3) slope_summary_row(intra_slopes_vec, "Intraspecific (unfiltered)")
+)), fill = TRUE)
+
+# Collect filtered mean/median slopes per level
+filt_ord_vec   <- if (!is.null(reg_order_filt) && nrow(reg_order_filt) >= 3)
+                    reg_order_filt$Slope[!is.na(reg_order_filt$Slope)] else numeric(0)
+filt_fam_vec   <- if (!is.null(reg_fam_filt) && nrow(reg_fam_filt) >= 3)
+                    reg_fam_filt$Slope[!is.na(reg_fam_filt$Slope)] else numeric(0)
+filt_gen_vec   <- if (!is.null(reg_genus_filt) && nrow(reg_genus_filt) >= 3)
+                    reg_genus_filt$Slope[!is.na(reg_genus_filt$Slope)] else numeric(0)
+filt_intra_vec <- if (!is.null(intra_slopes_filt) && nrow(intra_slopes_filt) >= 3)
+                    intra_slopes_filt$slope[!is.na(intra_slopes_filt$slope)] else numeric(0)
+
+filt_rows <- rbindlist(Filter(Negate(is.null), list(
+  if (length(filt_ord_vec)   >= 3) slope_summary_row(filt_ord_vec,   "Order (filtered)"),
+  if (length(filt_fam_vec)   >= 3) slope_summary_row(filt_fam_vec,   "Family (filtered)"),
+  if (length(filt_gen_vec)   >= 3) slope_summary_row(filt_gen_vec,   "Genus (filtered)"),
+  if (length(filt_intra_vec) >= 3) slope_summary_row(filt_intra_vec, "Intraspecific (filtered)")
+)), fill = TRUE)
+
+comp_table <- rbind(unf_rows, filt_rows, fill = TRUE)
+
+if (!is.null(comp_table) && nrow(comp_table) >= 2) {
+  kable(comp_table,
+        col.names = c("Level", "N groups", "Mean β", "95% CI lo (mean)",
+                      "95% CI hi (mean)", "Median β", "95% CI lo (median)",
+                      "95% CI hi (median)"),
+        caption = paste(
+          "Comparison of unfiltered vs filtered slope distributions across taxonomic levels.",
+          "Filtered: animals only; N ≥ 10 per group; body mass span ≥ 3 OOM.",
+          "WBE reference: β = 0.75.",
+          "Mean CI: t-distribution; Median CI: bootstrap percentile (R = 5000)."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+} else {
+  cat("Insufficient data for unfiltered vs filtered comparison table.\n")
+}
+```
+
+```{r filtered-comparison-plot, fig.width=10, fig.height=7}
+if (!is.null(comp_table) && nrow(comp_table) >= 2) {
+  # Derive base level label and filter status for faceting
+  comp_table[, base_level := gsub(" \\(.*\\)", "", Level)]
+  comp_table[, filter_status := ifelse(grepl("filtered", Level, ignore.case = TRUE),
+                                        "Filtered", "Unfiltered")]
+
+  comp_long <- rbind(
+    comp_table[, .(base_level, filter_status, N_groups,
+                   Estimate = Mean_slope, CI_lo = CI95_lo_mean, CI_hi = CI95_hi_mean,
+                   Type = "Mean")],
+    comp_table[, .(base_level, filter_status, N_groups,
+                   Estimate = Median_slope, CI_lo = CI95_lo_med, CI_hi = CI95_hi_med,
+                   Type = "Median")]
+  )
+  comp_long[, base_level := factor(base_level,
+                                    levels = c("Order", "Family", "Genus", "Intraspecific"))]
+
+  ggplot(comp_long,
+         aes(x = filter_status, y = Estimate, colour = filter_status,
+             ymin = CI_lo, ymax = CI_hi, shape = Type)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 0.9) +
+    geom_errorbar(aes(ymin = CI_lo, ymax = CI_hi),
+                  width = 0.2, position = position_dodge(width = 0.5),
+                  linewidth = 0.9) +
+    geom_point(size = 3.5, position = position_dodge(width = 0.5)) +
+    facet_wrap(~ base_level, scales = "free_y", ncol = 2) +
+    scale_colour_manual(values = c("Unfiltered" = pal8[2], "Filtered" = pal8[1]),
+                        name = "Dataset") +
+    scale_shape_manual(values = c("Mean" = 16, "Median" = 17), name = "Statistic") +
+    annotate("text", x = 0.55, y = 0.75, label = "WBE 0.75",
+             colour = "firebrick", size = 3.0, hjust = 0, vjust = -0.4) +
+    labs(
+      title    = "Unfiltered vs filtered metabolic scaling slopes by taxonomic level",
+      subtitle = "Filtered: animals only; N ≥ 10 per group; body mass span ≥ 3 OOM",
+      x        = NULL,
+      y        = "OLS slope (β)",
+      caption  = "Error bars: t-CI (mean) and bootstrap percentile CI (median); dashed = WBE β = 0.75."
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom", strip.text = element_text(face = "bold"))
+} else {
+  cat("Insufficient data for unfiltered vs filtered comparison plot.\n")
+}
+```
+
+---
+
 # References
 
 West GB, Brown JH, Enquist BJ. 1997. A general model for the origin of allometric scaling laws in biology. *Science* 276:122–126. DOI: [10.1126/science.276.5309.122](https://doi.org/10.1126/science.276.5309.122)

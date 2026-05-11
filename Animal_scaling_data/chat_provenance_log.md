@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-05-11 (CI + filtered analyses append)
+
+**Prompt:** Add two new top-level sections to animal_allometric_scaling.Rmd (appended before # References): (A) 95% CI on mean (t-distribution) and median (bootstrap, 5000 resamples) for slope distributions at order, family, genus, and intraspecific levels; (B) filtered analyses restricted to animals only + N ≥ 10 + body mass span ≥ 3 OOM — computed for order, family, genus, and intraspecific levels, with forest plots, histograms, tables, and a faceted unfiltered vs filtered comparison plot.
+
+**Changes:**
+- `Animal_scaling_data/animal_allometric_scaling.Rmd` — appended Section A ("Summary Statistics for Slope Distributions Across Taxonomic Levels") and Section B ("Filtered Analyses: Animals Only, N ≥ 10, Size Range ≥ 3 Orders of Magnitude") before the References section. No existing code modified. New helpers: `boot_median_ci`, `mean_ci`, `slope_summary_row`, `fit_log_lm_filtered`. New objects: `met_animals`, `reg_order_filt`, `reg_fam_filt`, `reg_genus_filt`, `intra_slopes_filt`, `ci_all_levels`, `comp_table`.
+
+---
+
 ## 2026-05-11
 
 **Prompt:** Create Animal_scaling_data project with intake scripts for AnimalTraits (zenodo 6468938), PNAS 2303764120 supplementary data. Project focuses on body mass, metabolic rate, life history, and growth data for animal scaling analyses.
@@ -53,3 +62,14 @@
 **Changes:**
 - `hatton_figures_reconstruction.Rmd` — new 1,225-line Rmd; Part 1 reconstructs four key Hatton et al. figures: (1) Hatton 2019 metabolic rate vs. body mass (n=8,098, β≈0.75); (2) Hatton 2019 growth rate vs. body mass (n=1,140); (3) Hatton 2019 mortality rate vs. body mass using raw Mortality.csv (n≈4,865, β≈−0.25); (4) Hatton 2015 predator vs. prey body mass (n=1,705); (5) combined three-panel analogue of PNAS 2019 Fig 4. Part 2 extends each plot with non-Hatton sources: Hoehler 2023 PNAS (adds bacteria/archaea/fungi/microalgae), AnimalTraits (adds arachnids/insects), Chown 2007 (insect-specific, temperature-corrected), and Grady et al. 2014 (metabolic rate + growth rate; extinct/mesotherm taxa shown with distinct shapes). Grady 2014 path: `../GlobalBodySize/output/grady2014_growth_compiled.csv`. OLS regression summary table covers all figures × all datasets. Full data provenance section with DOIs.
 - `hatton_figures_reconstruction.html` — rendered successfully (11 MB, 45/45 chunks, 2026-05-11 15:27)
+
+---
+## 2026-05-11 — Extended Synthesis plots redesigned for dataset visibility
+
+Replaced all six prep+plot chunks and three reg-table chunks in `hatton_figures_reconstruction.Rmd`:
+- New `ds_pal` palette (colorblind-friendly, per-dataset color) defined once and reused across Ext Figs 1–3
+- `geom_smooth(method="lm", se=TRUE)` replaces `geom_abline`; ribbons span actual data range per source only
+- All datasets at equal visual weight (alpha=0.45, size=1.5); foreground/background distinction removed
+- n= count subtitle added to each extended figure
+- Extended Fig 1 gains a faceted reference panel (Ext Fig 1b): each non-Hatton source facet shows its data colored against grey Hatton 2019 reference
+- Rendered cleanly with no errors
