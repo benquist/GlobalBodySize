@@ -59,15 +59,10 @@ theme_set(theme_globalsize())
 ## Colour palette: one colour per taxonomic group, colour-blind aware
 GROUP_COLOURS <- c(
   "mammal"    = "#E69F00",
-  "mammalia"  = "#E69F00",
   "bird"      = "#56B4E9",
-  "aves"      = "#56B4E9",
   "fish"      = "#009E73",
-  "actinopterygii" = "#009E73",
   "amphibian" = "#CC79A7",
-  "amphibia"  = "#CC79A7",
-  "reptile"   = "#D55E00",
-  "reptilia"  = "#D55E00"
+  "reptile"   = "#D55E00"
 )
 ```
 
@@ -77,11 +72,11 @@ GROUP_COLOURS <- c(
 
 The **GlobalBodySize** project assembles a reproducible, provenance-rich, cross-taxonomic body mass database from authoritative curated sources. Body mass is the central ecological trait — it determines metabolic rate (Kleiber's law: $B \propto M^{3/4}$), home range, population density, generation time, extinction risk, trophic position, and biogeographic distribution (Peters 1983; Brown & Maurer 1989; West, Brown & Enquist 1997).
 
-This document summarises the **Phase 1 Tier-1 intake**: six provider databases merged into a single flat file, covering mammals, birds, fish, and amphibians, with GBIF Backbone taxonomic reconciliation applied to all names.
+This document summarises the **Phase 1 Tier-1 intake**: eight provider databases merged into a single flat file (37,619 rows), covering mammals, birds, fish, and amphibians, with GBIF Backbone taxonomic reconciliation applied to all names. All eight providers are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO, FishBase, AVONET, and NEON.
 
 **Data file used for this summary:** `data/compiled/tier1_reconciled.csv`
 
-> **Honest uncertainty notice (Telford standard):** Statistics in this document are descriptive summaries of the current intake. The dataset is incomplete (reptiles critically underrepresented; amphibians sparse; AVONET birds not yet merged). No inferential claims should be drawn from provider-level comparisons without accounting for the different taxonomic scopes and mass methodologies of each source.
+> **Honest uncertainty notice (Telford standard):** Statistics in this document are descriptive summaries of the current intake. The dataset is incomplete (reptiles critically underrepresented; amphibians sparse; mammals triple-counted across PanTHERIA, EltonTraits, and AnAge — deduplication pending). No inferential claims should be drawn from provider-level comparisons without accounting for the different taxonomic scopes and mass methodologies of each source.
 
 ---
 
@@ -294,7 +289,7 @@ ggplot(unique_by_group,
 
 Body mass distributions are examined on a log₁₀ scale. Empirical distributions within taxonomic groups typically approximate log-normal, reflecting multiplicative growth processes and diversification dynamics (Brown & Maurer 1989; Dial et al. 2008).
 
-```{r dist-main, fig.height=8, fig.cap="Fig. 1. Log₁₀ body mass distributions by taxonomic group. Vertical dashed line = group median. Note: 3,443 FishBase rows carry LW-modeled mass (not directly measured) — shown in lighter shading."}
+```{r dist-main, fig.height=8, fig.cap="Fig. 1. Log\u2081\u2080 body mass distributions by taxonomic group. Vertical dashed line = group median. Note: 3,442 FishBase rows carry LW-modeled mass (not directly measured) \u2014 shown in lighter shading."}
 plot_dat <- dat |>
   dplyr::filter(!is.na(log10_mass) & is.finite(log10_mass)) |>
   dplyr::mutate(
@@ -1077,7 +1072,7 @@ if ("basis_of_record" %in% names(dat)) {
 
 3. **Amphibian mass is sparse** (591 of ~8,500 species). This coverage is sufficient for macroecological pattern analyses but not for species-level applications.
 
-4. **AVONET bird data (11,009 rows) is not yet in tier1_combined.csv.** Add to `scripts/merge_tier1.R` PROVIDERS list and re-run to obtain the most complete bird mass dataset.
+4. **AVONET bird data (11,009 rows) is included** in tier1_combined.csv. Bird coverage: 21,173 rows (EltonTraits 9,993 + AVONET 11,009). Overlap deduplication across these two bird sources has not yet been run.
 
 5. **Mammals contain duplicate species across PanTHERIA and EltonTraits.** Deduplication by GBIF `accepted_name` is needed before unique species counts or richness-based analyses.
 
@@ -1089,14 +1084,15 @@ if ("basis_of_record" %in% names(dat)) {
 
 | Priority | Action | Blocker? |
 |---|---|---|
-| 1 | Add AVONET to tier1_combined.csv merge | No |
-| 2 | Deduplicate species across providers by GBIF accepted_name | No |
-| 3 | Run NEON small mammal intake | Requires neonUtilities install |
-| 4 | Add VertNet museum specimens | Requires spocc API |
-| 5 | Add Reptile Database / Meiri reptile traits | Requires download |
-| 6 | Populate measurementID for DwC compliance | Design decision needed |
-| 7 | Run renv::snapshot() to pin R environment | No |
-| 8 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
+| 1 | ~~Add AVONET to tier1_combined.csv merge~~ | ✅ Done (11,009 rows) |
+| 2 | ~~Run NEON small mammal intake~~ | ✅ Done (800 rows, 2026-05-10) |
+| 3 | Deduplicate species across providers by GBIF accepted_name | No |
+| 4 | Add Reptile Database / Meiri reptile traits | Requires download |
+| 5 | Add VertNet museum specimens | Requires spocc API |
+| 6 | Re-run GBIF reconciliation on full 37,619-row file | No |
+| 7 | Populate measurementID for DwC compliance | Design decision needed |
+| 8 | Run renv::snapshot() to pin R environment | No |
+| 9 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
 
 ---
 
