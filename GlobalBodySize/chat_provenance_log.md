@@ -161,3 +161,29 @@
 **Agents invoked:** @m (supervisor), biodiversity-science-guard, ecology-user, coder (intake script), always (final gate)
 
 **Files created/changed:** providers/animaltraits/load_animaltraits.R (new), output/animaltraits_compiled.csv (new), scripts/merge_tier1.R, README.md, chat_provenance_log.md, data/compiled/tier1_combined.csv (re-merged, 40,475 rows)
+
+---
+## Session 6 — 2026-05-11
+
+**Prompt**: Add lizard traits (Meiri 2018, Dryad doi:10.5061/dryad.f6t39kj) as new provider for GlobalBodySize. User provided Appendix S1 CSV and Appendix S2 metadata. Body size measure is SVL (Snout-vent length, mm).
+
+**Actions**:
+- Confirmed paper DOI 10.1111/geb.12773 via CrossRef (Meiri 2018, Global Ecology and Biogeography 27:1004-1016)
+- Inspected metadata (Appendix S2): 6,657 species; SVL in mm (max, female, neonate); intercept+slope allometric equations covering 100% of species (Feldman et al. 2016)
+- Wrote `providers/lizardtraits/load_lizardtraits.R` — outputs mass table (allometric LW-modeled, mass_g = 10^(intercept + slope*log10(SVL_mm))) and linear table (3 SVL cols pivoted to long, mm÷10 = cm)
+- Cached raw data to `providers/lizardtraits/data/raw/lizard_traits_meiri2018.csv` (copied from user Downloads; Dryad requires auth for direct download)
+- Ran intake: 6,633 mass rows → `output/lizardtraits_mass_compiled.csv`; 13,111 linear rows → `output/lizardtraits_linear_compiled.csv` (6,633 SVL_max + 4,405 SVL_female + 2,073 SVL_neonate)
+- Added lizardtraits outputs to `scripts/merge_linear_size.R` (LINEAR_PROVIDERS) and `scripts/merge_tier1.R` (OPTIONAL_PROVIDERS)
+- Re-ran `scripts/merge_tier1.R`: tier1_combined.csv now 47,108 rows (6,633 lizard species added; reptile group up from 108 to 6,741)
+
+**Scientific notes**:
+- All mass values are ALLOMETRIC ESTIMATES (lw_modeled), not direct measurements. Equations from Feldman et al. 2016 log-log regression; grouped by clade (e.g. "Legged Scincidae", "Gekkonidae"). Flagged with `mass_measurement_type = "lw_modeled"` and `data_quality_flag = "allometric_modeled"`.
+- SVL units: mm in source → divided by 10 for cm in output.
+- 24 species have NA maximum SVL (from metadata); 29 fail mass computation (non-numeric or SVL=0).
+- "hatchling/neonate SVL" represents the midpoint of neonate size range — not adult; flagged as `life_stage = "neonate"`.
+- Taxonomy from Reptile Database (Uetz 2017/2018); no WoRMS reconciliation applicable.
+
+**Pending**:
+- Run repttraits, sealifebase, disperse intakes
+- Re-run merge_linear_size.R with all providers
+- Update README.md
