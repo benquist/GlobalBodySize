@@ -271,3 +271,93 @@ GBIF Backbone version is recorded in every reconciliation row (`backbone_version
 ---
 
 *Log maintained in `GlobalBodySize/PROJECT_LOG_HISTORY.md`. Per-session details in `chat_provenance_log.md`.*
+
+---
+
+## Phase 2: Database Expansion Planning — 2026-05-11
+
+**Goal:** Identify and prioritize additional body mass data sources to fill critical taxonomic gaps. Multi-agent review (merow-ecology, biodiversity-science-guard, ecology-user, enhanced-theory, scholarly-rigor-reviewer) completed 2026-05-11.
+
+---
+
+### Current State (as of 2026-05-11)
+
+| Group | Rows | ~Global spp | Raw coverage | Gap severity |
+|---|---|---|---|---|
+| Birds | 22,121 | ~10,900 | >100% (overlap) | ✅ Adequate |
+| Mammals | 11,270 | ~6,600 | >100% (overlap) | ✅ Adequate |
+| Reptiles | 6,773 | ~10,900 | ~62%, lizards only | ⚠️ Snakes/crocs absent |
+| Fish | 5,739 | ~35,000 | ~16% | ⚠️ Modest |
+| Amphibians | 619 | ~8,500 | **~7%** | 🔴 Critical |
+| Insects | 772 | ~1,000,000 | **<0.1%** | 🔴 Critical for 9 OoM span |
+| Arachnids | 131 | ~50,000 | <0.3% | 🔴 |
+| Crustaceans | 28 | ~50,000 | <0.1% | 🔴 |
+
+**Critical finding from merow-ecology agent:** For the May (1988) species richness vs. body size replication spanning 9+ orders of magnitude, insects are the single most important gap — extending the mass axis down by ~3–4 log decades. Amphibians fill a critical small-body intermediate region (0.1–100 g) with only ~7% species coverage. ReptTraits (snakes, crocodilians) is blocking the reptile tail of the distribution.
+
+---
+
+### Tier A — Scripts Already Written; Run in Order
+
+| Step | Provider | What it adds | Status | Schema pre-req |
+|---|---|---|---|---|
+| A1 | **ReptTraits** (Meiri et al. 2024, Sci Data 11:386; DOI: 10.1038/s41597-024-03079-5) | ~12,060 reptile spp: snakes, crocs, turtles, lizards with **directly measured** maximum mass | ⬜ Not yet run | `mass_type = "literature_maximum"` — **ADDED 2026-05-11** |
+| A2 | **SeaLifeBase** (rfishbase) | Marine non-fish: echinoderms, molluscs, cephalopods | ⬜ Not yet run | Verify Weight units against known species before trusting |
+| A3 | **DISPERSE** (Sarremejane et al. 2020, Sci Data 7:386; DOI: 10.1038/s41597-020-00732-7) | Aquatic macroinvertebrate **body lengths** (NOT mass); European freshwater; genus-level | ⬜ Not yet run | Routes to linear size table only; `mass_type = NA` |
+
+**Key caveat — ReptTraits mass type:** ReptTraits `Maximum body mass (g)` is the **maximum recorded** mass across literature, not a species mean. This is distinct from `wet` (species mean) and from `LW_modeled` (allometric estimate). `mass_type = "literature_maximum"` added to schema 2026-05-11. Do NOT average with `wet` values in scaling regressions without explicit stratification.
+
+**Key caveat — DISPERSE:** DISPERSE provides body length, not body mass. It feeds `tier1_linear_size_combined.csv`, not `tier1_combined.csv`. Any mass derivation from length would require invertebrate-specific LW equations with large uncertainty — do not implement without explicit justification.
+
+---
+
+### Tier B — New Providers to Script (high confidence, accessible)
+
+| Priority | Dataset | Groups | ~Species with mass | Access | Citation confidence |
+|---|---|---|---|---|---|
+| B1 | **Myhrvold et al. 2015 Amniote Life History Database** | Birds, mammals, reptiles | ~21,322 amniote spp | Ecological Archives direct download | DOI `10.1890/15-0846R.1` — verify before citing |
+| B2 | **AmphiBIO mass filter audit** | Amphibians | ~6,776 in DB; only 619 extracted | Already have script — investigate `!is.na(body_mass_g)` filter | Known source |
+| B3 | **VertNet via `rvertnet`** | Vertebrates (esp. tropical reptiles, amphibians) | Individual specimen masses | R package on CRAN; query by taxon group | Moderate — living query |
+| B4 | **GBIF MeasurementOrFact scan** | Insects, fish, amphibians | Unknown — targeted scan | `rgbif::occ_download()` with MoF extension | Uncertain yield |
+
+---
+
+### Tier C — Invertebrate & Insect (requires literature search / access confirmation)
+
+| Priority | Dataset | Notes | Confidence |
+|---|---|---|---|
+| C1 | **PREDICTS (NHM London)** | Individual-level field mass; insects + inverts; DOI `10.1002/ece3.1303` — UNVERIFIED | Verify DOI and access terms before scripting |
+| C2 | **Ant Trait Database (Parr et al.)** | Formicidae worker mass + head width; search Dryad/Zenodo | UNVERIFIED citation — locate paper before committing |
+
+**Honest data gap:** No verified global insect body mass database analogous to PanTHERIA currently exists. Insect body mass coverage will remain a patchwork. Most insect body mass literature reports **dry mass** — fundamentally incompatible with mammal/bird wet mass without explicit taxon-specific conversion.
+
+---
+
+### Schema Changes Completed 2026-05-11
+
+1. `R/body_mass_schema.R`: added `"literature_maximum"` and `"SVL_allometric"` to `globalsize_mass_type_vocab()` with documented meanings.
+2. `providers/repttraits/load_repttraits.R`: corrected `mass_type` from `"wet"` → `"literature_maximum"` and `measurement_method` from `"literature_mean"` → `"literature_maximum"`; updated `qa_note` to include `data_quality_flag=maximum_not_mean`.
+
+---
+
+### Critical Pre-Analysis Warnings (merow-ecology + biodiversity-science-guard)
+
+1. **Measurement type heterogeneity is the most dangerous bias for scaling exponents.** The database mixes: direct live weighing, museum specimens, LW-allometric estimates, and literature maximums. All scaling analyses must stratify on `mass_type` and run sensitivity checks.
+2. **Tropical taxa are underrepresented.** Tropical vertebrates (especially amphibians, small reptiles) are systematically smaller — undersampling shifts the apparent mode rightward, attenuating the species richness vs. body size slope.
+3. **GBIF deduplication required before species counting.** Current 47,456 rows include heavy overlap for mammals (PanTHERIA + EltonTraits + AnAge) and birds (AVONET + EltonTraits). Use `gbif_usage_key` (accepted name) for deduplication before the May (1988) replication.
+4. **Dry mass vs. wet mass for insects:** Never pool insect dry mass with mammal/bird wet mass without a documented taxon-specific conversion factor and sensitivity analysis.
+5. **ReptTraits snake mass coverage uncertain:** After ReptTraits runs, stratify `sum(!is.na(mass_g))` by Order — snake mass coverage may be sparse even within ReptTraits.
+
+---
+
+### Run Order for Phase 2
+
+```
+1. providers/repttraits/load_repttraits.R    # A1 — highest value, schema fixed
+2. providers/sealifebase/load_sealifebase.R  # A2 — verify Weight units first
+3. providers/disperse/load_disperse.R        # A3 — linear size only
+4. scripts/merge_tier1.R                     # re-merge after A1+A2
+5. Investigate AmphiBIO 619-row gap          # B2
+6. Script Myhrvold 2015                      # B1
+7. VertNet targeted query                    # B3
+```
