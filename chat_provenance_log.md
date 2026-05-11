@@ -202,3 +202,17 @@
 - Re-ran `scripts/merge_tier1.R` → 57,925 rows, 12 providers. Reptile group: 17,242 rows.
 
 **Agents consulted:** @M (supervisor), coder, biodiversity-science-guard.
+
+---
+
+## 2026-05-11 — @M Session 7 Part 3: SeaLifeBase + DISPERSE intake; AmphiBIO audit
+
+**Prompt:** "Ok, lets do the next steps"
+
+**Actions:**
+- `providers/sealifebase/load_sealifebase.R`: Fixed `rfishbase::species()` call — removed non-existent `"Species"` field from fields list; added `load_taxa()` join on SpecCode to get full binomial + Family, Order, Class, Phylum, Kingdom. Fixed `verbatim_taxon_name` from `paste(Genus, Species)` to `as.character(Species)` (full binomial from load_taxa). Ran intake → 616 mass rows, 13,498 linear rows. Unit check: *Octopus vulgaris* = 10,000 g (10 kg, plausible maximum) ✅; blue whale = 160,000 kg ✅. Units confirmed grams.
+- `providers/disperse/load_disperse.R`: Ran DISPERSE intake → 823 linear rows (473 body_length_max + 350 wing_length_female), size range 0-3 cm. Taxonomy columns NA (merged-header XLSX structure); flagged needs_review. Linear size only — NOT in body mass table.
+- AmphiBIO gap audit: 6,776 total species, 591 with non-NA `Body_mass_g` (8.7%). CONFIRMED correct — not a script bug; reflects true data sparsity in AmphiBIO.
+- Re-ran `scripts/merge_tier1.R` → **58,541 rows, 13 providers** (added sealifebase_froese2024: 616 rows, marine_other group).
+
+**Agents consulted:** @M (supervisor), coder.
