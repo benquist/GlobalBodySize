@@ -23,6 +23,9 @@ library(knitr)
 library(scales)
 library(smatr)      # standardised major axis regression
 library(ggrepel)    # label repulsion for family plots
+library(ape)        # phylogenetics base
+library(caper)      # PGLS
+library(V.PhyloMaker2)  # backbone plant phylogeny
 
 theme_set(theme_bw(base_size = 12))
 
@@ -59,11 +62,35 @@ sma_tidy <- function(df, response, predictor, group_label = "all") {
       slope     = s[2, 1],
       slope_lo  = s[2, 3],
       slope_hi  = s[2, 4],
-      r2        = cor(log10(df[[response]]), log10(df[[predictor]]))^2
+      r2        = cor(log10(df[[response]]), log10(df[[predictor]]))^2,
+      method   = "SMA"
     )
   }, error = function(e) {
     data.frame(group = group_label, n = nrow(df),
-               intercept = NA, slope = NA, slope_lo = NA, slope_hi = NA, r2 = NA)
+               intercept = NA, slope = NA, slope_lo = NA, slope_hi = NA, r2 = NA,
+               method = "SMA")
+  })
+}
+
+# Helper: run OLS and return a tidy 1-row data.frame (same structure as sma_tidy)
+ols_tidy <- function(df, response, predictor, group_label = "all") {
+  tryCatch({
+    fit <- lm(log10(df[[response]]) ~ log10(df[[predictor]]))
+    ci  <- confint(fit)
+    data.frame(
+      group     = group_label,
+      n         = nrow(df),
+      intercept = coef(fit)[1],
+      slope     = coef(fit)[2],
+      slope_lo  = ci[2, 1],
+      slope_hi  = ci[2, 2],
+      r2        = summary(fit)$r.squared,
+      method    = "OLS"
+    )
+  }, error = function(e) {
+    data.frame(group = group_label, n = nrow(df),
+               intercept = NA, slope = NA, slope_lo = NA, slope_hi = NA, r2 = NA,
+               method = "OLS")
   })
 }
 ```
@@ -106,6 +133,61 @@ kable(data.frame(
 ), caption = "Record counts for the two focal relationships")
 ```
 
+```{r pgls-prep, echo=TRUE, warning=FALSE, message=FALSE}
+# ── PGLS: species-mean data frames ───────────────────────────────────────────
+sp_lf <- d_lf %>%
+  filter(!is.na(speciesMatched), !is.na(family)) %>%
+  group_by(speciesMatched) %>%
+  summarise(
+    log_mto = mean(log10(m.to), na.rm = TRUE),
+    log_mlf = mean(log10(m.lf), na.rm = TRUE),
+    family  = first(family),
+    .groups = "drop"
+  ) %>%
+  drop_na() %>%
+  mutate(sp_phylo = gsub(" ", "_", speciesMatched))
+
+sp_al <- d_al %>%
+  filter(!is.na(speciesMatched), !is.na(family)) %>%
+  group_by(speciesMatched) %>%
+  summarise(
+    log_mto = mean(log10(m.to), na.rm = TRUE),
+    log_al  = mean(log10(a.lf), na.rm = TRUE),
+    family  = first(family),
+    .groups = "drop"
+  ) %>%
+  drop_na() %>%
+  mutate(sp_phylo = gsub(" ", "_", speciesMatched))
+
+# ── Build backbone phylogeny via V.PhyloMaker2 ────────────────────────────────
+species_list <- bind_rows(
+  sp_lf %>% dplyr::select(species = speciesMatched, family),
+  sp_al %>% dplyr::select(species = speciesMatched, family)
+) %>%
+  distinct(species, .keep_all = TRUE) %>%
+  mutate(genus = sub(" .*", "", species)) %>%
+  dplyr::select(species, genus, family)
+
+baad_tree <- tryCatch({
+  phy_out <- V.PhyloMaker2::phylo.maker(
+    sp.list   = species_list,
+    tree      = GBOTB.extended.TPL,
+    nodes     = nodes.info.1.TPL,
+    scenarios = "S3"
+  )
+  phy_out$scenario.3
+}, error = function(e) {
+  message("Phylogeny construction failed: ", conditionMessage(e))
+  NULL
+})
+
+if (!is.null(baad_tree)) {
+  cat("Phylogeny built:", ape::Ntip(baad_tree), "tips\n")
+} else {
+  cat("baad_tree is NULL — PGLS will be skipped.\n")
+}
+```
+
 ---
 
 # Interspecific scaling — all woody plants
@@ -118,10 +200,19 @@ sl_lf  <- round(coef(fit_lf)[2], 3)
 int_lf <- round(coef(fit_lf)[1], 3)
 r2_lf  <- round(cor(log10(d_lf$m.lf), log10(d_lf$m.to))^2, 3)
 
+# OLS fit
+lm_lf      <- lm(log10(m.lf) ~ log10(m.to), data = d_lf)
+ols_sl_lf  <- round(coef(lm_lf)[2], 3)
+ols_int_lf <- round(coef(lm_lf)[1], 3)
+ols_ci_lf  <- round(confint(lm_lf)[2, ], 3)
+ols_r2_lf  <- round(summary(lm_lf)$r.squared, 3)
+
 ggplot(d_lf, aes(x = m.to, y = m.lf, colour = pft)) +
   geom_point(alpha = 0.25, size = 0.7) +
   geom_abline(intercept = int_lf, slope = sl_lf,
               colour = "black", linewidth = 1.2) +
+  geom_abline(intercept = ols_int_lf, slope = ols_sl_lf,
+              colour = "firebrick", linewidth = 1.0, linetype = "solid") +
   geom_abline(slope = 0.75, intercept = int_lf, linetype = "dashed",
               colour = "grey40", linewidth = 0.9) +
   scale_x_log10(labels = comma) +
@@ -133,14 +224,26 @@ ggplot(d_lf, aes(x = m.to, y = m.lf, colour = pft)) +
     y = "Leaf mass, m.lf (kg)",
     colour = "PFT",
     title = paste0("Leaf mass ~ AGB  |  SMA β = ", sl_lf,
-                   "  |  R² = ", r2_lf,
+                   "  OLS β = ", ols_sl_lf,
                    "  |  n = ", format(nrow(d_lf), big.mark = ",")),
-    subtitle = "Solid line: SMA fit.  Dashed line: 3/4-power reference (WBE prediction)"
+    subtitle = "Black: SMA fit.  Red: OLS fit.  Dashed: 3/4-power reference (WBE)"
   )
 ```
 
 > **SMA result:** m.lf = 10^`r int_lf` × m.to^`r sl_lf`  
 > (n = `r format(nrow(d_lf), big.mark=",")`; R² = `r r2_lf`)
+
+```{r method-compare-lf, echo=TRUE, warning=FALSE, message=FALSE}
+kable(data.frame(
+  Method = c("OLS", "SMA"),
+  Slope  = c(ols_sl_lf, sl_lf),
+  CI_lo  = c(ols_ci_lf[1], round(fit_lf$coef[[1]][2, 2], 3)),
+  CI_hi  = c(ols_ci_lf[2], round(fit_lf$coef[[1]][2, 3], 3)),
+  R2     = c(ols_r2_lf, r2_lf)
+),
+col.names = c("Method", "Slope", "95% CI lo", "95% CI hi", "R²"),
+caption   = "OLS vs. SMA comparison — leaf mass ~ AGB")
+```
 
 ## Leaf area ~ AGB
 
@@ -150,10 +253,19 @@ sl_al  <- round(coef(fit_al)[2], 3)
 int_al <- round(coef(fit_al)[1], 3)
 r2_al  <- round(cor(log10(d_al$a.lf), log10(d_al$m.to))^2, 3)
 
+# OLS fit
+lm_al      <- lm(log10(a.lf) ~ log10(m.to), data = d_al)
+ols_sl_al  <- round(coef(lm_al)[2], 3)
+ols_int_al <- round(coef(lm_al)[1], 3)
+ols_ci_al  <- round(confint(lm_al)[2, ], 3)
+ols_r2_al  <- round(summary(lm_al)$r.squared, 3)
+
 ggplot(d_al, aes(x = m.to, y = a.lf, colour = pft)) +
   geom_point(alpha = 0.25, size = 0.7) +
   geom_abline(intercept = int_al, slope = sl_al,
               colour = "black", linewidth = 1.2) +
+  geom_abline(intercept = ols_int_al, slope = ols_sl_al,
+              colour = "firebrick", linewidth = 1.0, linetype = "solid") +
   geom_abline(slope = 0.75, intercept = int_al, linetype = "dashed",
               colour = "grey40", linewidth = 0.9) +
   scale_x_log10(labels = comma) +
@@ -165,14 +277,26 @@ ggplot(d_al, aes(x = m.to, y = a.lf, colour = pft)) +
     y = "Leaf area, a.lf (m²)",
     colour = "PFT",
     title = paste0("Leaf area ~ AGB  |  SMA β = ", sl_al,
-                   "  |  R² = ", r2_al,
+                   "  OLS β = ", ols_sl_al,
                    "  |  n = ", format(nrow(d_al), big.mark = ",")),
-    subtitle = "Solid line: SMA fit.  Dashed line: 3/4-power reference"
+    subtitle = "Black: SMA fit.  Red: OLS fit.  Dashed: 3/4-power reference"
   )
 ```
 
 > **SMA result:** a.lf = 10^`r int_al` × m.to^`r sl_al`  
 > (n = `r format(nrow(d_al), big.mark=",")`; R² = `r r2_al`)
+
+```{r method-compare-al, echo=TRUE, warning=FALSE, message=FALSE}
+kable(data.frame(
+  Method = c("OLS", "SMA"),
+  Slope  = c(ols_sl_al, sl_al),
+  CI_lo  = c(ols_ci_al[1], round(fit_al$coef[[1]][2, 2], 3)),
+  CI_hi  = c(ols_ci_al[2], round(fit_al$coef[[1]][2, 3], 3)),
+  R2     = c(ols_r2_al, r2_al)
+),
+col.names = c("Method", "Slope", "95% CI lo", "95% CI hi", "R²"),
+caption   = "OLS vs. SMA comparison — leaf area ~ AGB")
+```
 
 ---
 
@@ -211,6 +335,23 @@ clade_lf <- d_lf_c %>%
   }) %>%
   ungroup()
 
+# OLS per clade — leaf mass
+ols_clade_lf <- d_lf_c %>%
+  group_by(clade) %>%
+  group_modify(~ {
+    tryCatch({
+      fit <- lm(log10(.x$m.lf) ~ log10(.x$m.to))
+      ci  <- confint(fit)
+      data.frame(ols_slope = round(coef(fit)[2], 3),
+                 ols_slope_lo = round(ci[2, 1], 3),
+                 ols_slope_hi = round(ci[2, 2], 3))
+    }, error = function(e) {
+      data.frame(ols_slope = NA_real_, ols_slope_lo = NA_real_, ols_slope_hi = NA_real_)
+    })
+  }) %>%
+  ungroup()
+clade_lf <- clade_lf %>% left_join(ols_clade_lf, by = "clade")
+
 # Build prediction lines across AGB range
 pred_range <- seq(log10(min(d_lf_c$m.to)), log10(max(d_lf_c$m.to)), length.out = 200)
 
@@ -241,9 +382,10 @@ ggplot(d_lf_c, aes(x = m.to, y = m.lf, colour = clade)) +
 ```{r clade-leaf-mass-table}
 kable(clade_lf %>%
         mutate(across(where(is.numeric), ~ round(.x, 3))) %>%
-        select(clade, n, slope, slope_lo, slope_hi, r2),
-      col.names = c("Clade", "N", "SMA slope", "95% CI lo", "95% CI hi", "R²"),
-      caption = "SMA slopes for leaf mass ~ AGB by clade")
+        dplyr::select(clade, n, slope, slope_lo, slope_hi, ols_slope, ols_slope_lo, ols_slope_hi, r2),
+      col.names = c("Clade", "N", "SMA slope", "SMA CI lo", "SMA CI hi",
+                    "OLS slope", "OLS CI lo", "OLS CI hi", "R²"),
+      caption = "SMA and OLS slopes for leaf mass ~ AGB by clade")
 ```
 
 ## Leaf area ~ AGB by clade
@@ -274,6 +416,23 @@ clade_al <- d_al_c %>%
   }) %>%
   ungroup()
 
+# OLS per clade — leaf area
+ols_clade_al <- d_al_c %>%
+  group_by(clade) %>%
+  group_modify(~ {
+    tryCatch({
+      fit <- lm(log10(.x$a.lf) ~ log10(.x$m.to))
+      ci  <- confint(fit)
+      data.frame(ols_slope = round(coef(fit)[2], 3),
+                 ols_slope_lo = round(ci[2, 1], 3),
+                 ols_slope_hi = round(ci[2, 2], 3))
+    }, error = function(e) {
+      data.frame(ols_slope = NA_real_, ols_slope_lo = NA_real_, ols_slope_hi = NA_real_)
+    })
+  }) %>%
+  ungroup()
+clade_al <- clade_al %>% left_join(ols_clade_al, by = "clade")
+
 pred_range_al <- seq(log10(min(d_al_c$m.to)), log10(max(d_al_c$m.to)), length.out = 200)
 
 clade_lines_al <- clade_al %>%
@@ -303,9 +462,178 @@ ggplot(d_al_c, aes(x = m.to, y = a.lf, colour = clade)) +
 ```{r clade-leaf-area-table}
 kable(clade_al %>%
         mutate(across(where(is.numeric), ~ round(.x, 3))) %>%
-        select(clade, n, slope, slope_lo, slope_hi, r2),
-      col.names = c("Clade", "N", "SMA slope", "95% CI lo", "95% CI hi", "R²"),
-      caption = "SMA slopes for leaf area ~ AGB by clade")
+        dplyr::select(clade, n, slope, slope_lo, slope_hi, ols_slope, ols_slope_lo, ols_slope_hi, r2),
+      col.names = c("Clade", "N", "SMA slope", "SMA CI lo", "SMA CI hi",
+                    "OLS slope", "OLS CI lo", "OLS CI hi", "R²"),
+      caption = "SMA and OLS slopes for leaf area ~ AGB by clade")
+```
+
+---
+
+# Phylogenetic regression (PGLS)
+
+PGLS models residual covariance using Brownian motion, accounting for shared
+evolutionary history across species. Analysis is conducted on **species means**
+(one row per species, computed in the `pgls-prep` chunk above). Pagel’s
+λ is estimated by maximum likelihood. Backbone phylogeny from V.PhyloMaker2
+(Jin & Qian 2022, *J. Biogeography* 49:1731–1744).
+
+```{r pgls-analysis, echo=TRUE, warning=FALSE, message=FALSE}
+# Initialise result holders in the global chunk environment
+pgls_lf_fit    <- NULL
+pgls_al_fit    <- NULL
+pgls_lf_result <- NULL
+pgls_al_result <- NULL
+
+if (!is.null(baad_tree)) {
+  tree_tips <- baad_tree$tip.label
+
+  # --- Leaf mass ~ AGB PGLS ---
+  sp_lf_match  <- sp_lf %>% filter(sp_phylo %in% tree_tips)
+  n_matched_lf <- nrow(sp_lf_match)
+  cat("Leaf mass: species matched to tree:", n_matched_lf, "of", nrow(sp_lf), "\n")
+  if (n_matched_lf >= 10) {
+    tryCatch({
+      tree_lf      <- ape::drop.tip(baad_tree, setdiff(tree_tips, sp_lf_match$sp_phylo))
+      df_lf_pgls   <- as.data.frame(sp_lf_match)
+      rownames(df_lf_pgls) <- df_lf_pgls$sp_phylo
+      cd_lf        <- caper::comparative.data(phy = tree_lf, data = df_lf_pgls,
+                                              names.col = "sp_phylo", warn.dropped = FALSE)
+      pgls_lf_fit  <- caper::pgls(log_mlf ~ log_mto, data = cd_lf, lambda = "ML")
+      pgls_lf_result <- list(
+        n       = n_matched_lf,
+        slope   = round(coef(pgls_lf_fit)[2], 3),
+        se      = round(summary(pgls_lf_fit)$coefficients[2, 2], 3),
+        lambda  = round(pgls_lf_fit$param[["lambda"]], 3),
+        p_value = round(summary(pgls_lf_fit)$coefficients[2, 4], 4)
+      )
+    }, error = function(e) message("Leaf mass PGLS failed: ", conditionMessage(e)))
+  }
+
+  # --- Leaf area ~ AGB PGLS ---
+  sp_al_match  <- sp_al %>% filter(sp_phylo %in% tree_tips)
+  n_matched_al <- nrow(sp_al_match)
+  cat("Leaf area: species matched to tree:", n_matched_al, "of", nrow(sp_al), "\n")
+  if (n_matched_al >= 10) {
+    tryCatch({
+      tree_al      <- ape::drop.tip(baad_tree, setdiff(tree_tips, sp_al_match$sp_phylo))
+      df_al_pgls   <- as.data.frame(sp_al_match)
+      rownames(df_al_pgls) <- df_al_pgls$sp_phylo
+      cd_al        <- caper::comparative.data(phy = tree_al, data = df_al_pgls,
+                                              names.col = "sp_phylo", warn.dropped = FALSE)
+      pgls_al_fit  <- caper::pgls(log_al ~ log_mto, data = cd_al, lambda = "ML")
+      pgls_al_result <- list(
+        n       = n_matched_al,
+        slope   = round(coef(pgls_al_fit)[2], 3),
+        se      = round(summary(pgls_al_fit)$coefficients[2, 2], 3),
+        lambda  = round(pgls_al_fit$param[["lambda"]], 3),
+        p_value = round(summary(pgls_al_fit)$coefficients[2, 4], 4)
+      )
+    }, error = function(e) message("Leaf area PGLS failed: ", conditionMessage(e)))
+  }
+} else {
+  cat("Phylogeny construction failed; PGLS skipped.\n")
+}
+```
+
+## Leaf mass ~ AGB (PGLS)
+
+```{r pgls-lf-results, echo=TRUE, warning=FALSE, message=FALSE}
+if (!is.null(pgls_lf_result)) {
+  kable(data.frame(
+    Method  = "PGLS (Brownian motion, λ ML)",
+    N_sp    = pgls_lf_result$n,
+    Slope   = pgls_lf_result$slope,
+    SE      = pgls_lf_result$se,
+    Lambda  = pgls_lf_result$lambda,
+    P_value = pgls_lf_result$p_value
+  ),
+  col.names = c("Method", "N species", "Slope", "SE", "Pagel's λ (ML)", "p-value"),
+  caption = "PGLS result — leaf mass ~ AGB (species means)")
+} else {
+  cat("PGLS not available for leaf mass ~ AGB.\n")
+}
+```
+
+```{r pgls-lf-plot, echo=TRUE, warning=FALSE, message=FALSE, fig.height=6}
+if (nrow(sp_lf) > 0) {
+  ols_sp_lf     <- lm(log_mlf ~ log_mto, data = sp_lf)
+  sma_sp_lf     <- sma(log_mlf ~ log_mto, data = sp_lf)
+  sma_sp_lf_int <- sma_sp_lf$coef[[1]][1, 1]
+  sma_sp_lf_sl  <- sma_sp_lf$coef[[1]][2, 1]
+
+  subtitle_lf <- paste0(
+    "Black: SMA (β=", round(sma_sp_lf_sl, 3), ")",
+    "  Red: OLS (β=", round(coef(ols_sp_lf)[2], 3), ")",
+    if (!is.null(pgls_lf_result)) paste0("  Green: PGLS (β=", pgls_lf_result$slope, ")") else ""
+  )
+
+  p_pgls_lf <- ggplot(sp_lf, aes(x = log_mto, y = log_mlf)) +
+    geom_point(aes(colour = family), alpha = 0.5, size = 1.5, show.legend = FALSE) +
+    geom_abline(intercept = coef(ols_sp_lf)[1], slope = coef(ols_sp_lf)[2],
+                colour = "firebrick", linewidth = 1.0) +
+    geom_abline(intercept = sma_sp_lf_int, slope = sma_sp_lf_sl,
+                colour = "black", linewidth = 1.0) +
+    labs(x = "log₁₀ AGB (kg)", y = "log₁₀ leaf mass (kg)",
+         title = "Species means — leaf mass ~ AGB", subtitle = subtitle_lf)
+
+  if (!is.null(pgls_lf_fit)) {
+    p_pgls_lf <- p_pgls_lf +
+      geom_abline(intercept = coef(pgls_lf_fit)[1], slope = coef(pgls_lf_fit)[2],
+                  colour = "darkgreen", linewidth = 1.0, linetype = "dashed")
+  }
+  print(p_pgls_lf)
+}
+```
+
+## Leaf area ~ AGB (PGLS)
+
+```{r pgls-al-results, echo=TRUE, warning=FALSE, message=FALSE}
+if (!is.null(pgls_al_result)) {
+  kable(data.frame(
+    Method  = "PGLS (Brownian motion, λ ML)",
+    N_sp    = pgls_al_result$n,
+    Slope   = pgls_al_result$slope,
+    SE      = pgls_al_result$se,
+    Lambda  = pgls_al_result$lambda,
+    P_value = pgls_al_result$p_value
+  ),
+  col.names = c("Method", "N species", "Slope", "SE", "Pagel's λ (ML)", "p-value"),
+  caption = "PGLS result — leaf area ~ AGB (species means)")
+} else {
+  cat("PGLS not available for leaf area ~ AGB.\n")
+}
+```
+
+```{r pgls-al-plot, echo=TRUE, warning=FALSE, message=FALSE, fig.height=6}
+if (nrow(sp_al) > 0) {
+  ols_sp_al     <- lm(log_al ~ log_mto, data = sp_al)
+  sma_sp_al     <- sma(log_al ~ log_mto, data = sp_al)
+  sma_sp_al_int <- sma_sp_al$coef[[1]][1, 1]
+  sma_sp_al_sl  <- sma_sp_al$coef[[1]][2, 1]
+
+  subtitle_al <- paste0(
+    "Black: SMA (β=", round(sma_sp_al_sl, 3), ")",
+    "  Red: OLS (β=", round(coef(ols_sp_al)[2], 3), ")",
+    if (!is.null(pgls_al_result)) paste0("  Green: PGLS (β=", pgls_al_result$slope, ")") else ""
+  )
+
+  p_pgls_al <- ggplot(sp_al, aes(x = log_mto, y = log_al)) +
+    geom_point(aes(colour = family), alpha = 0.5, size = 1.5, show.legend = FALSE) +
+    geom_abline(intercept = coef(ols_sp_al)[1], slope = coef(ols_sp_al)[2],
+                colour = "firebrick", linewidth = 1.0) +
+    geom_abline(intercept = sma_sp_al_int, slope = sma_sp_al_sl,
+                colour = "black", linewidth = 1.0) +
+    labs(x = "log₁₀ AGB (kg)", y = "log₁₀ leaf area (m²)",
+         title = "Species means — leaf area ~ AGB", subtitle = subtitle_al)
+
+  if (!is.null(pgls_al_fit)) {
+    p_pgls_al <- p_pgls_al +
+      geom_abline(intercept = coef(pgls_al_fit)[1], slope = coef(pgls_al_fit)[2],
+                  colour = "darkgreen", linewidth = 1.0, linetype = "dashed")
+  }
+  print(p_pgls_al)
+}
 ```
 
 ---
@@ -355,7 +683,20 @@ fam_lf_slopes <- d_lf %>%
   filter(!is.na(slope)) %>%
   arrange(slope)
 
-# Forest-style dot-range plot ─────────────────────────────────────────────────
+# OLS per family — leaf mass
+fam_lf_ols <- d_lf %>%
+  filter(!is.na(family), family %in% fam_lf_counts) %>%
+  group_by(family) %>%
+  group_modify(~ {
+    tryCatch({
+      fit <- lm(log10(.x$m.lf) ~ log10(.x$m.to))
+      data.frame(ols_slope = round(coef(fit)[2], 3))
+    }, error = function(e) data.frame(ols_slope = NA_real_))
+  }) %>%
+  ungroup()
+fam_lf_slopes <- fam_lf_slopes %>% left_join(fam_lf_ols, by = "family")
+
+# Forest-style dot-range plot─
 ggplot(fam_lf_slopes, aes(x = slope, y = reorder(family, slope))) +
   geom_vline(xintercept = 0.75, colour = "grey50", linetype = "dashed", linewidth = 0.8) +
   geom_vline(xintercept = 1.00, colour = "grey70", linetype = "dotted", linewidth = 0.6) +
@@ -378,11 +719,11 @@ ggplot(fam_lf_slopes, aes(x = slope, y = reorder(family, slope))) +
 kable(
   fam_lf_slopes %>%
     arrange(desc(n)) %>%
-    mutate(across(c(slope, slope_lo, slope_hi, r2, intercept), ~ round(.x, 3))) %>%
-    select(family, n, n_sp, slope, slope_lo, slope_hi, r2),
+    mutate(across(c(slope, slope_lo, slope_hi, r2, intercept, ols_slope), ~ round(.x, 3))) %>%
+    dplyr::select(family, n, n_sp, slope, slope_lo, slope_hi, ols_slope, r2),
   col.names = c("Family", "N records", "N species", "SMA slope",
-                "95% CI lo", "95% CI hi", "R²"),
-  caption = paste0("Family-level SMA slopes — leaf mass ~ AGB (≥ ", MIN_N_FAM, " records)")
+                "SMA CI lo", "SMA CI hi", "OLS slope", "R²"),
+  caption = paste0("Family-level SMA and OLS slopes — leaf mass ~ AGB (≥ ", MIN_N_FAM, " records)")
 )
 ```
 
@@ -422,6 +763,19 @@ fam_al_slopes <- d_al %>%
   filter(!is.na(slope)) %>%
   arrange(slope)
 
+# OLS per family — leaf area
+fam_al_ols <- d_al %>%
+  filter(!is.na(family), family %in% fam_al_counts) %>%
+  group_by(family) %>%
+  group_modify(~ {
+    tryCatch({
+      fit <- lm(log10(.x$a.lf) ~ log10(.x$m.to))
+      data.frame(ols_slope = round(coef(fit)[2], 3))
+    }, error = function(e) data.frame(ols_slope = NA_real_))
+  }) %>%
+  ungroup()
+fam_al_slopes <- fam_al_slopes %>% left_join(fam_al_ols, by = "family")
+
 ggplot(fam_al_slopes, aes(x = slope, y = reorder(family, slope))) +
   geom_vline(xintercept = 0.75, colour = "grey50", linetype = "dashed", linewidth = 0.8) +
   geom_vline(xintercept = 1.00, colour = "grey70", linetype = "dotted", linewidth = 0.6) +
@@ -444,11 +798,11 @@ ggplot(fam_al_slopes, aes(x = slope, y = reorder(family, slope))) +
 kable(
   fam_al_slopes %>%
     arrange(desc(n)) %>%
-    mutate(across(c(slope, slope_lo, slope_hi, r2, intercept), ~ round(.x, 3))) %>%
-    select(family, n, n_sp, slope, slope_lo, slope_hi, r2),
+    mutate(across(c(slope, slope_lo, slope_hi, r2, intercept, ols_slope), ~ round(.x, 3))) %>%
+    dplyr::select(family, n, n_sp, slope, slope_lo, slope_hi, ols_slope, r2),
   col.names = c("Family", "N records", "N species", "SMA slope",
-                "95% CI lo", "95% CI hi", "R²"),
-  caption = paste0("Family-level SMA slopes — leaf area ~ AGB (≥ ", MIN_N_FAM, " records)")
+                "SMA CI lo", "SMA CI hi", "OLS slope", "R²"),
+  caption = paste0("Family-level SMA and OLS slopes — leaf area ~ AGB (≥ ", MIN_N_FAM, " records)")
 )
 ```
 
@@ -735,6 +1089,16 @@ kable(data.frame(
                                  fit_al$coef[[1]][2, 3],
                                  clade_al$slope_hi[clade_al$clade == "Angiosperm"],
                                  clade_al$slope_hi[clade_al$clade == "Gymnosperm"]), 3),
+  OLS_slope           = round(c(ols_sl_lf,
+                                 clade_lf$ols_slope[clade_lf$clade == "Angiosperm"],
+                                 clade_lf$ols_slope[clade_lf$clade == "Gymnosperm"],
+                                 ols_sl_al,
+                                 clade_al$ols_slope[clade_al$clade == "Angiosperm"],
+                                 clade_al$ols_slope[clade_al$clade == "Gymnosperm"]), 3),
+  PGLS_slope          = c(if (!is.null(pgls_lf_result)) pgls_lf_result$slope else NA,
+                           NA, NA,
+                           if (!is.null(pgls_al_result)) pgls_al_result$slope else NA,
+                           NA, NA),
   R2                  = round(c(r2_lf,
                                  clade_lf$r2[clade_lf$clade == "Angiosperm"],
                                  clade_lf$r2[clade_lf$clade == "Gymnosperm"],
@@ -742,8 +1106,9 @@ kable(data.frame(
                                  clade_al$r2[clade_al$clade == "Angiosperm"],
                                  clade_al$r2[clade_al$clade == "Gymnosperm"]), 3)
 ),
-col.names = c("Relationship", "N records", "SMA slope", "95% CI lo", "95% CI hi", "R²"),
-caption = "Summary of interspecific SMA slopes (all and by clade)")
+col.names = c("Relationship", "N records", "SMA slope", "SMA CI lo", "SMA CI hi",
+              "OLS slope", "PGLS slope", "R²"),
+caption = "Summary of interspecific slopes by method (all and by clade); PGLS on species means only")
 ```
 
 ---
@@ -752,10 +1117,19 @@ caption = "Summary of interspecific SMA slopes (all and by clade)")
 
 - **Data source:** BAAD v1 (Falster et al. 2015), accessed via the `baad.data` R
   package. All measurements are individual-level.
-- **Regression method:** Standardised Major Axis (SMA) using the `smatr` package
-  (Warton et al. 2012, *Methods Ecol. Evol.* 3:257–259). SMA is appropriate
-  when both variables carry error and the goal is to characterise the
-  bivariate relationship rather than predict one from the other.
+- **OLS:** `lm()` on log₁₀-transformed data. Assumes all error is in the response
+  variable; appropriate for prediction but biased for characterising bivariate
+  allometric relationships when both axes carry measurement error.
+- **SMA (Standardised Major Axis):** `smatr::sma()` (Warton et al. 2012,
+  *Methods Ecol. Evol.* 3:257–259; Warton et al. 2006, *Biol. Rev.* 81:259–282).
+  Appropriate when both axes carry error and the goal is to characterise the
+  bivariate relationship rather than predict one from the other; standard for
+  allometry.
+- **PGLS (Phylogenetic Generalised Least Squares):** `caper::pgls()` fitted to
+  species means; Pagel’s λ estimated by maximum likelihood; accounts for
+  shared evolutionary history (Freckleton et al. 2002, *Am. Nat.* 160:712–726).
+  Backbone phylogeny from V.PhyloMaker2 (Jin & Qian 2022, *J. Biogeography*
+  49:1731–1744; Qian & Jin 2016, *J. Systematics & Evolution* 54:380–388).
 - **Angio/Gymno classification:** derived from the BAAD `pft` field (trailing
   letter A = Angiosperm, G = Gymnosperm). Records with missing `pft` are excluded
   from the clade-level comparisons.
