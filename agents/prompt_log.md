@@ -2089,3 +2089,27 @@ Action: Root cause was .hero-photo using width:100vw which is wider than the vis
 **Project**: GlobalBodySize
 **Prompt**: "here are metadata associated with that last project. All data are from here https://datadryad.org/dataset/doi:10.5061/dryad.f6t39kj"
 **Action**: Wrote providers/lizardtraits/load_lizardtraits.R; ran intake (6,633 mass rows, 13,111 linear rows); updated merge scripts; re-ran merge_tier1.R (47,108 rows total).
+
+---
+**Date**: 2026-05-11
+**Project**: GlobalBodySize
+**Prompt**: "Update GlobalBodySize/science_summary.Rmd: nine providers / 47,108 rows; add Cejp & Griebeler 2024 citation (ECE 70377); revise limitation #2 (lizard mass = allometric LW estimates, flagged); revise limitation #3 (amphibian sparseness → cite Cejp & Griebeler 2024); update priority next steps (lizardtraits done; ReptTraits, SeaLifeBase, DISPERSE pending); add references: Cejp & Griebeler 2024, Meiri 2018 GEB 12773. Re-render HTML."
+**Action**: Updated GlobalBodySize/science_summary.Rmd — project overview count updated to nine providers / 47,108 rows; Cejp & Griebeler (2024) ECE 70377 citation integrated into scientific rationale; limitation #2 rewritten to flag lizard mass as allometric LW estimates; limitation #3 updated to cite Cejp & Griebeler 2024 as motivation; priority next steps revised (lizardtraits marked done, ReptTraits/SeaLifeBase/DISPERSE added as pending, GBIF reconciliation row count updated); references section extended with Cejp & Griebeler 2024 and Meiri 2018. Re-rendered science_summary.html (4.4 MB, 57 chunks, HTML newer than Rmd). Committed as d6e5b96, pushed to origin/master.
+
+---
+**Date**: 2026-05-11
+**Project**: Animal_scaling_data
+**Prompt**: "Design and write a complete R Markdown file for a scientific summary of animal scaling laws. Path: Animal_scaling_data/science_summary.Rmd. Four datasets: AnimalTraits, Hoehler 2023 PNAS, Hatton 2019 PNAS, Hatton 2015 Science. Sections: intro/theory (WBE quarter-power), data coverage, metabolic scaling (B∝M^3/4), lifespan scaling (L∝M^1/4), growth rate scaling (G∝M^3/4), predator-prey mass scaling, synthesis with exponent comparison plot, citations. Full ggplot2/data.table/kableExtra implementation with regression tables (slope, SE, 95% CI, R²) and color-blind palette. Render to HTML."
+**Action**: Created Animal_scaling_data/science_summary.Rmd — 8 sections; setup chunk loads all 4 CSVs with dataset_label disambiguation (both animaltraits and pnas share source_id "pnas_hoehler2023" — resolved via dataset_label); QA filter handles "ok" (hatton) and "" (at/pnas) qa_flag formats; log-log OLS helper fit_log_lm() with 95% CI; metabolic scaling across all 3 metabolic sources + basal-only subset; lifespan and growth from Hatton 2019; predator-prey from Hatton 2015 with log10 ratio table; synthesis plot of all 4 scaling exponents with CI bars and reference lines; temperature/type caveats embedded. Rendered successfully: 44 chunks, science_summary.html created.
+
+---
+**Date**: 2026-05-11
+**Project**: Animal_scaling_data
+**Prompt**: "Add Hatton et al. 2019 (Zenodo 3145281), Hatton et al. 2015 predator-prey power law (user-provided database_s1.xls), and Hatton et al. 2021 ocean size spectrum (Sci Adv 7:eabh3732) as data sources. Create science summary Rmd/HTML for scaling relationships."
+**Action**: Created providers/hatton2019/load_hatton2019.R (8,098 rows; Zenodo download), providers/hatton2015/load_hatton2015.R (1,705 predator-prey pairs; user-provided XLS). Wired both into scripts/run_all_intake.R and scripts/merge_providers.R. Created animal_scaling_summary.Rmd + animal_scaling_summary.html — 8-section scaling law summary covering metabolic (B∝M^3/4), lifespan (L∝M^1/4), growth rate, and predator-prey mass scaling. Biodiversity-science-guard reviewed; 6 fixes applied (QA transparency, temperature caveat, Kleiber claim precision, DOIs, min_n=10, phylogenetic caveat). Hatton 2021 data not resolved (paywalled supplement). Renamed files to animal_scaling_summary.* to avoid namespace collision.
+
+---
+**Date**: 2026-05-11
+**Project**: GlobalBodySize
+**Prompt**: "Run the always gate check. Updated GlobalBodySize/README.md: badges 37,619 → 47,108 rows; taxa badge now includes reptiles; scientific context 'reptile gap' note replaced with lizardtraits + Cejp & Griebeler 2024; provider table added Lizard Traits of the World row (6,633 rows, LW-modeled); now 10 providers; added LW-modeled mass caveat; taxonomic group breakdown reptile row updated (6,741 rows from multiple sources); known limitations #2 updated from 'reptiles absent' to 'lizard mass is allometric'; project structure added body_size_schema.R, tier1_linear_size_combined.csv, new providers (disperse, lizardtraits, mobs, repttraits, sealifebase), merge_linear_size.R; current data inventory updated row counts, added linear size table row; priority next steps: lizardtraits ✅, MOBS ✅, 3 pending scripts; references: Cejp & Griebeler 2024, Feldman et al. 2016, Meiri 2018, Meiri et al. 2024 (ReptTraits). Committed as 9db3d6e, pushed to origin/master."
+**Action**: README-only change (GlobalBodySize/README.md). No Rmd files changed. No R packages changed. Verified: commit 9db3d6e is HEAD on origin/master. Git push confirmed (HEAD -> master, origin/master). Always gate: all checks PASS.
