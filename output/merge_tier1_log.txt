@@ -1,24 +1,45 @@
-[2026-05-10 20:33:07] === Tier-1 merge started === 
-[2026-05-10 20:33:07]   pantheria_compiled.csv                               5416 rows 
-[2026-05-10 20:33:07]   eltontraits_compiled.csv                            15393 rows 
-[2026-05-10 20:33:07]   anage_compiled.csv                                    627 rows 
-[2026-05-10 20:33:07]   amphibio_compiled.csv                                 591 rows 
-[2026-05-10 20:33:07]   fishbase_compiled.csv                                5657 rows 
-[2026-05-10 20:33:07]   avonet_compiled.csv                                 11009 rows 
-[2026-05-10 20:33:07] WARNING: dropped 1874 rows with NA/non-positive mass_g 
-[2026-05-10 20:33:07] Total rows after merge: 36819 
-[2026-05-10 20:33:07] Provider row counts: 
-[2026-05-10 20:33:07]   amphibio_oliveira2017                       591 
-[2026-05-10 20:33:07]   anage_demagalhaes2009                       627 
-[2026-05-10 20:33:07]   avonet_tobias2022                         11009 
-[2026-05-10 20:33:07]   eltontraits_bird                           9993 
-[2026-05-10 20:33:07]   eltontraits_mammal                         5400 
-[2026-05-10 20:33:07]   fishbase_rfishbase                         5657 
-[2026-05-10 20:33:07]   pantheria_jones2009                        3542 
-[2026-05-10 20:33:07] Taxonomic group row counts: 
-[2026-05-10 20:33:07]   amphibian                         609 
-[2026-05-10 20:33:07]   bird                            21173 
-[2026-05-10 20:33:07]   fish                             5657 
-[2026-05-10 20:33:07]   mammal                           9364 
-[2026-05-10 20:33:07]   reptile                            16 
-[2026-05-10 20:33:07] === tier1_combined.csv written: 36819 rows -> data/compiled/tier1_combined.csv === 
+[2026-05-11 19:36:49] === Tier-1 merge started === 
+[2026-05-11 19:36:49] Including optional providers: output/neon_compiled.csv, output/animaltraits_compiled.csv, output/repttraits_mass_compiled.csv, output/sealifebase_mass_compiled.csv, output/lizardtraits_mass_compiled.csv, output/grady2014_mass_compiled.csv 
+[2026-05-11 19:36:49]   pantheria_compiled.csv                               5416 rows 
+[2026-05-11 19:36:49]   eltontraits_compiled.csv                            15393 rows 
+[2026-05-11 19:36:49]   anage_compiled.csv                                    627 rows 
+[2026-05-11 19:36:49]   amphibio_compiled.csv                                 591 rows 
+[2026-05-11 19:36:49]   fishbase_compiled.csv                                5657 rows 
+[2026-05-11 19:36:49]   avonet_compiled.csv                                 11009 rows 
+[2026-05-11 19:36:49]   neon_compiled.csv                                     800 rows 
+[2026-05-11 19:36:49]   animaltraits_compiled.csv                            2856 rows 
+[2026-05-11 19:36:49]   repttraits_mass_compiled.csv                        10469 rows 
+[2026-05-11 19:36:49]   sealifebase_mass_compiled.csv                         616 rows 
+[2026-05-11 19:36:49]   lizardtraits_mass_compiled.csv                       6633 rows 
+[2026-05-11 19:36:49]   grady2014_mass_compiled.csv                           348 rows 
+[2026-05-11 19:36:49] WARNING: columns not shared across all providers: source_doi, source_access_date, bibliographic_citation, dataset_id, original_row_id, source_file_path, verbatim_authorship, input_taxonomic_rank, mass_g_min, mass_g_max, mass_se, mass_n, mass_type, measurement_method, life_stage, sex, decimal_latitude, decimal_longitude, coordinate_uncertainty_m, country_code, year_measured, date_measured, measurement_type, measurement_unit, basis_of_record, mass_confidence, qa_status, qa_note, source_phylum, source_class, source_order, source_family, mass_comments, primary_citation, resolved_taxon_name, resolved_authorship, resolved_taxon_rank, resolved_taxonomic_group, kingdom, phylum, class, order, family, genus, primary_backbone, gbif_usage_key, group_specific_taxon_id, group_specific_backbone, match_method, match_confidence, matched_status, synonym_type, cross_group_collision_flag, genus_only_flag, reconciliation_note, reconciliation_timestamp_utc, backbone_version, measurement_id, measurement_value, measurement_determined_date, range_check_pass, unit_check_pass, outlier_flag, worms_valid_name, worms_aphia_id, taxon_name_used, mass_measurement_type, mass_notes, n_individuals, measurement_precision, geographic_region, habitat, data_quality_flag, data_notes 
+[2026-05-11 19:36:49] WARNING: dropped 1874 rows with NA/non-positive mass_g 
+[2026-05-11 19:36:49] Total rows after merge: 58541 
+[2026-05-11 19:36:49] Provider row counts: 
+[2026-05-11 19:36:49]   amphibio_oliveira2017                       591 
+[2026-05-11 19:36:49]   anage_demagalhaes2009                       627 
+[2026-05-11 19:36:49]   animaltraits_herberstein2022               2856 
+[2026-05-11 19:36:49]   avonet_tobias2022                         11009 
+[2026-05-11 19:36:49]   eltontraits_bird                           9993 
+[2026-05-11 19:36:49]   eltontraits_mammal                         5400 
+[2026-05-11 19:36:49]   fishbase_rfishbase                         5657 
+[2026-05-11 19:36:49]   grady_etal_2014                             348 
+[2026-05-11 19:36:49]   lizardtraits_meiri2018                     6633 
+[2026-05-11 19:36:49]   NEON_DP1.10072.001                          800 
+[2026-05-11 19:36:49]   pantheria_jones2009                        3542 
+[2026-05-11 19:36:49]   repttraits_meiri2024                      10469 
+[2026-05-11 19:36:49]   sealifebase_froese2024                      616 
+[2026-05-11 19:36:49] Taxonomic group row counts: 
+[2026-05-11 19:36:49]   amphibian                         619 
+[2026-05-11 19:36:49]   annelid                             1 
+[2026-05-11 19:36:49]   arachnid                          131 
+[2026-05-11 19:36:49]   bird                            22121 
+[2026-05-11 19:36:49]   crustacean                         28 
+[2026-05-11 19:36:49]   fish                             5739 
+[2026-05-11 19:36:49]   gastropod                           1 
+[2026-05-11 19:36:49]   insect                            772 
+[2026-05-11 19:36:49]   mammal                          11270 
+[2026-05-11 19:36:49]   marine_other                      616 
+[2026-05-11 19:36:49]   myriapod                            1 
+[2026-05-11 19:36:49]   reptile                         17242 
+[2026-05-11 19:36:49] === tier1_combined.csv written: 58541 rows -> data/compiled/tier1_combined.csv === 

@@ -1,0 +1,30 @@
+[2026-05-11 09:58:37] === Linear size merge started === 
+[2026-05-11 09:58:37] Merging 1 provider file(s) 
+[2026-05-11 09:58:37]   mobs_linear_compiled.csv                                183175 rows 
+[2026-05-11 09:58:37] Required column check: PASS 
+[2026-05-11 09:58:38] WARNING: dropped 33 rows with NA/non-positive size_value_cm 
+[2026-05-11 09:58:38] Total rows after merge: 183142 
+[2026-05-11 09:58:38] Provider count: 1 
+[2026-05-11 09:58:38] Provider row counts: 
+[2026-05-11 09:58:38]   mobs_mcclain2025                              183142 
+[2026-05-11 09:58:38] Dimension type row counts: 
+[2026-05-11 09:58:38]   linear_diameter                 18367 
+[2026-05-11 09:58:38]   linear_height                   61550 
+[2026-05-11 09:58:38]   linear_length                  103225 
+[2026-05-11 09:58:38] Taxonomic group row counts: 
+[2026-05-11 09:58:38]   annelid                          1829 
+[2026-05-11 09:58:38]   arachnid                           80 
+[2026-05-11 09:58:38]   bird                              410 
+[2026-05-11 09:58:38]   brachiopod                        439 
+[2026-05-11 09:58:38]   bryozoan                          179 
+[2026-05-11 09:58:38]   cnidarian                        2009 
+[2026-05-11 09:58:38]   crustacean                      14298 
+[2026-05-11 09:58:38]   echinoderm                       1118 
+[2026-05-11 09:58:38]   fish                            32342 
+[2026-05-11 09:58:38]   flatworm                           59 
+[2026-05-11 09:58:38]   mammal                            433 
+[2026-05-11 09:58:38]   marine_other                    10820 
+[2026-05-11 09:58:38]   mollusc                        112686 
+[2026-05-11 09:58:38]   nematode                         6257 
+[2026-05-11 09:58:38]   sponge                            183 
+[2026-05-11 09:58:38] === tier1_linear_size_combined.csv written: 183142 rows -> data/compiled/tier1_linear_size_combined.csv === 
