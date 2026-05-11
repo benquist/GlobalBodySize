@@ -72,11 +72,11 @@ GROUP_COLOURS <- c(
 
 The **GlobalBodySize** project assembles a reproducible, provenance-rich, cross-taxonomic body mass database from authoritative curated sources. Body mass is the central ecological trait — it determines metabolic rate (Kleiber's law: $B \propto M^{3/4}$), home range, population density, generation time, extinction risk, trophic position, and biogeographic distribution (Peters 1983; Brown & Maurer 1989; West, Brown & Enquist 1997).
 
-This document summarises the **Phase 1 Tier-1 intake**: eight provider databases merged into a single flat file (37,619 rows), covering mammals, birds, fish, and amphibians, with GBIF Backbone taxonomic reconciliation applied to all names. All eight providers are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO, FishBase, AVONET, and NEON.
+This document summarises the **Phase 1 Tier-1 intake**: nine provider databases merged into a single flat file (47,108 rows), covering mammals, birds, fish, amphibians, and lizards, with GBIF Backbone taxonomic reconciliation applied to all names. Nine providers are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO, FishBase, AVONET, NEON, and Lizard Traits of the World (Meiri 2018). Body mass is not only a determinant of metabolic rate and life-history pace (Peters 1983; West, Brown & Enquist 1997), but also a primary driver of the fast-slow life-history continuum across vertebrate classes — including amphibians, where body mass explains a dominant share of trait variance (Cejp & Griebeler 2024).
 
 **Data file used for this summary:** `data/compiled/tier1_reconciled.csv`
 
-> **Honest uncertainty notice (Telford standard):** Statistics in this document are descriptive summaries of the current intake. The dataset is incomplete (reptiles critically underrepresented; amphibians sparse; mammals triple-counted across PanTHERIA, EltonTraits, and AnAge — deduplication pending). No inferential claims should be drawn from provider-level comparisons without accounting for the different taxonomic scopes and mass methodologies of each source.
+> **Honest uncertainty notice (Telford standard):** Statistics in this document are descriptive summaries of the current intake. The dataset is incomplete (amphibians sparse; mammals triple-counted across PanTHERIA, EltonTraits, and AnAge — deduplication pending; lizard mass values are allometric estimates, not direct measurements). No inferential claims should be drawn from provider-level comparisons without accounting for the different taxonomic scopes and mass methodologies of each source.
 
 ---
 
@@ -1068,9 +1068,9 @@ if ("basis_of_record" %in% names(dat)) {
 
 1. **LW-modeled mass must never be mixed with wet mass** without explicit stratification or sensitivity analysis. Always filter on `mass_type` before cross-taxon comparisons.
 
-2. **Reptile coverage is essentially absent** (16 rows, all from AnAge). Do not include Reptilia in any scaling analysis without adding a dedicated reptile source (Meiri et al., Reptile Database).
+2. **Lizard mass values are allometric estimates (LW-modeled), not direct measurements.** The 6,633 lizard species from Meiri (2018) use log-log equations from Feldman et al. (2016). These are flagged as `mass_measurement_type = "lw_modeled"` and `data_quality_flag = "allometric_modeled"`. Always stratify on `mass_measurement_type` before cross-taxon comparisons. Note: ReptTraits (Meiri et al. 2024) is pending intake and will add directly measured reptile maximum body masses.
 
-3. **Amphibian mass is sparse** (591 of ~8,500 species). This coverage is sufficient for macroecological pattern analyses but not for species-level applications.
+3. **Amphibian mass is sparse** (591 of ~8,500 species covered by AmphiBIO). This gap limits analyses such as those in Cejp & Griebeler (2024), who demonstrate that body mass is the primary driver of the fast-slow life-history continuum in amphibians — analyses that require broad species representation. Adding further amphibian trait databases remains a high priority.
 
 4. **AVONET bird data (11,009 rows) is included** in tier1_combined.csv. Bird coverage: 21,173 rows (EltonTraits 9,993 + AVONET 11,009). Overlap deduplication across these two bird sources has not yet been run.
 
@@ -1086,13 +1086,16 @@ if ("basis_of_record" %in% names(dat)) {
 |---|---|---|
 | 1 | ~~Add AVONET to tier1_combined.csv merge~~ | ✅ Done (11,009 rows) |
 | 2 | ~~Run NEON small mammal intake~~ | ✅ Done (800 rows, 2026-05-10) |
-| 3 | Deduplicate species across providers by GBIF accepted_name | No |
-| 4 | Add Reptile Database / Meiri reptile traits | Requires download |
-| 5 | Add VertNet museum specimens | Requires spocc API |
-| 6 | Re-run GBIF reconciliation on full 37,619-row file | No |
-| 7 | Populate measurementID for DwC compliance | Design decision needed |
-| 8 | Run renv::snapshot() to pin R environment | No |
-| 9 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
+| 3 | ~~Add Lizard Traits of the World (Meiri 2018)~~ | ✅ Done (6,633 spp, allometric LW-modeled, 2026-05-11) |
+| 4 | Run ReptTraits intake (Meiri et al. 2024, Sci Data) | Script ready — run pending |
+| 5 | Run SeaLifeBase intake (rfishbase) | Script ready — run pending |
+| 6 | Run DISPERSE intake (Sarremejane et al. 2020) | Script ready — run pending |
+| 7 | Add amphibian body mass database (Cejp & Griebeler 2024 motivates this; no open deposit found yet) | Data unavailable |
+| 8 | Deduplicate species across providers by GBIF accepted_name | No |
+| 9 | Re-run GBIF reconciliation on full 47,108-row file | No |
+| 10 | Populate measurementID for DwC compliance | Design decision needed |
+| 11 | Run renv::snapshot() to pin R environment | No |
+| 12 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
 
 ---
 
@@ -1113,6 +1116,8 @@ sessionInfo()
 
 - Brown JH, Maurer BA. 1989. Macroecology: The Division of Food and Space Among Species on Continents. *Science* 243(4895):1145–1150. DOI: 10.1126/science.243.4895.1145
 
+- Cejp B, Griebeler EM. 2024. Body Mass Shapes Most Life History Traits and a Fast-Slow Continuum in Amphibians. *Ecology and Evolution* 14(10):e70377. DOI: 10.1002/ece3.70377
+
 - Clarke A, Johnston NM. 1999. Scaling of metabolic rate with body mass and temperature in teleost fish. *Journal of Animal Ecology* 68(5):893–905. DOI: 10.1046/j.1365-2656.1999.00337.x
 
 - de Magalhães JP, Costa J. 2009. A database of vertebrate longevity records and their relation to other life-history traits. *Journal of Evolutionary Biology* 22(8):1770–1774. DOI: 10.1111/j.1420-9101.2009.01783.x
@@ -1130,5 +1135,7 @@ sessionInfo()
 - Tobias JA et al. 2022. AVONET: morphological, ecological and geographical data for all birds. *Ecology Letters* 25(3):581–597. DOI: 10.1111/ele.13898
 
 - West GB, Brown JH, Enquist BJ. 1997. A general model for the origin of allometric scaling laws in biology. *Science* 276(5309):122–126. DOI: 10.1126/science.276.5309.122
+
+- Meiri S. 2018. Traits of lizards of the world: Variation around a successful evolutionary design. *Global Ecology and Biogeography* 27(10):1144–1155. DOI: 10.1111/geb.12773. Data: https://doi.org/10.5061/dryad.f6t39kj
 
 - Wilman H et al. 2014. EltonTraits 1.0: Species-level foraging attributes of the world's birds and mammals. *Ecology* 95(7):2027. DOI: 10.1890/13-1917.1
