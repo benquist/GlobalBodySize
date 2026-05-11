@@ -98,3 +98,66 @@
 **Agents consulted:** ecology-user (ecological framing, 13-step reasoning), enhanced-theory (WBE scaling laws, allometric exponents, modes of mathematical analysis), biodiversity-informatics-audit (DwC compliance table, mass_type caveat), richard-telford (QQ-plots before interpretation, honest uncertainty, log-scale required).
 
 **Files created:** PROJECT_LOG_HISTORY.md, science_summary.Rmd, science_summary.html
+
+---
+
+## 2026-05-11 — Scholarly audit fixes and NEON/FishBase completion (Session 3)
+
+**User prompt:** Apply scholarly-rigor-reviewer and biodiversity-science-guard audit fixes to README and science_summary.Rmd. Incorporate completed NEON intake (800 rows). Fill FishBase citation placeholder with actual access date. Update science_summary.Rmd and HTML to reflect Phase 1 complete state.
+
+**Actions completed:**
+- Applied 12 critical/high scholarly-rigor-reviewer fixes to README: added Kleiber 1932, Dodds et al. 2001, West et al. 1997, Bergmann 1847, Blackburn et al. 1999, Stanley 1973, Foster 1964, Lomolino 2005, Cope 1887 references; fixed mechanistic overclaims; added statistical caveats.
+- Fixed NEON group label (`mammalia` → `mammal`) in neon_compiled.csv and load_neon.R.
+- Re-merged to 37,619 rows (mammal 10,164 | bird 21,173 | fish 5,657 | amphibian 609 | reptile 16).
+- Filled FishBase citation placeholder: `FISHBASE_CITATION` updated with access date 2026-05-10 and rfishbase v5.0.3.
+- Updated science_summary.Rmd: GROUP_COLOURS aliases removed, Project Overview updated to 8 providers / 37,619 rows, honest uncertainty notice updated, known limitations #4 corrected (AVONET now included), priority next steps updated, Fig 1 LW count corrected (3,443 → 3,442).
+- Re-rendered science_summary.html (57 chunks, flatly theme).
+- All commits pushed to origin/master and globalbodysize/main.
+
+**Key decisions:**
+- LW-modeled row count verified from tier1_combined.csv: 3,442 (not 3,443).
+- mammalia alias removed from GROUP_COLOURS — only clean lowercase group labels remain.
+
+**Files changed:** README.md, science_summary.Rmd, science_summary.html, providers/neon/load_neon.R, output/neon_compiled.csv, providers/fishbase/load_fishbase.R, output/fishbase_compiled.csv
+
+---
+
+## 2026-05-11 — Dataset evaluations: ShareTrait and AnimalTraits (Session 4)
+
+**User prompt (1):** Evaluate ShareTrait v1.2.0 (Zenodo 14826294) as a candidate dataset for GlobalBodySize.
+
+**Evaluation outcome — ShareTrait:**
+- Agents invoked: biodiversity-science-guard + ecology-user (full 13-step assessment)
+- Verdict: **DO NOT INTEGRATE — Phase 1 rejected; Phase 2 candidate only**
+- Critical findings: body mass is an ancillary covariate (not focal trait); only 24 unique species with mass; 41% of mass rows have no numeric value; no mammals, no birds; class/phylum blank for all rows; Wikipedia used as taxonomy authority; lab/aquarium/hatchery origin for 35% of rows.
+- Phase 2 conditions: class/phylum reconstruction via ITIS/WoRMS, Wikipedia exclusion, field-origin-only rows, CoL version pinned, ≥200 species threshold before integration engineering begins.
+
+**User prompt (2):** Evaluate AnimalTraits (animaltraits.org, Zenodo 6468938) and add to project; expand scope to include invertebrates.
+
+**AnimalTraits dataset facts (live inspection 2026-05-11):**
+- DOI: 10.5281/zenodo.6468938 | paper DOI: 10.1038/s41597-022-01364-9
+- License: public domain waiver (no restrictions)
+- 3,580 observation rows; 2,856 with body mass; 1,830 unique species with mass
+- All body mass in kg (converted to g at intake)
+- Classes: Mammalia 622 spp, Aves 760 spp, Insecta 296 spp, Reptilia 72 spp, Arachnida 65 spp, Amphibia 10 spp, Malacostraca 2 spp + Chilopoda, Clitellata, Gastropoda
+
+**Actions completed:**
+- Created `providers/animaltraits/load_animaltraits.R` — full intake script: Zenodo download, kg→g conversion, CLASS_TO_GROUP mapping (5 vertebrate + 8 invertebrate classes), plausibility filter, schema alignment, row-level primary citation column retained.
+- Ran intake: `output/animaltraits_compiled.csv` — 2,856 rows, 1,830 unique species.
+  - mammal: 935 | bird: 885 | insect: 772 | arachnid: 131 | reptile: 92 | crustacean: 28 | amphibian: 10 | annelid/gastropod/myriapod: 3
+- Added `animaltraits_compiled.csv` to OPTIONAL_PROVIDERS in `scripts/merge_tier1.R`.
+- Re-ran merge: `tier1_combined.csv` → **40,475 rows across 9 providers**.
+  - Net-new invertebrate groups: insect 772, arachnid 131, crustacean 28, myriapod 1, annelid 1, gastropod 1
+  - Reptile coverage improved: 16 → 108 rows (AnAge + AnimalTraits combined)
+- Updated README.md: AnimalTraits row added to source table, group breakdown updated, totals updated to 40,475 / 9 providers, priority next steps updated.
+- Appended to chat_provenance_log.md.
+
+**Key scientific notes:**
+- Vertebrate rows in AnimalTraits overlap with existing providers; cross-provider deduplication required before species richness analyses.
+- Invertebrate rows are net-new to GlobalBodySize; no deduplication needed yet.
+- AnimalTraits provides row-level primary citations (`fullReference`) preserved in `primary_citation` column for audit trail.
+- Mass confidence set to "moderate" — curated literature compilation with some within-species replication.
+
+**Agents invoked:** @m (supervisor), biodiversity-science-guard, ecology-user, coder (intake script), always (final gate)
+
+**Files created/changed:** providers/animaltraits/load_animaltraits.R (new), output/animaltraits_compiled.csv (new), scripts/merge_tier1.R, README.md, chat_provenance_log.md, data/compiled/tier1_combined.csv (re-merged, 40,475 rows)
