@@ -43,3 +43,13 @@
 - `animal_allometric_scaling.Rmd` — ch07 added to `all_list` and `met_sources`; new section "# Insect Metabolic Scaling (Chown 2007, corrected)" with subsections: overall OLS + SMA with WBE 3/4 reference line; within-order scaling (9 orders N≥10, Isoptera highlighted); wing status intercept comparison (winged vs. wingless ANCOVA); Termitidae deviation analysis (scaling with and without Termitidae); within-family OLS (11 families N≥10, Formicidae and Termitidae highlighted); fixed palette size mismatches in scale_colour/fill_manual calls throughout document
 - `animal_allometric_scaling.html` — re-rendered successfully (11 MB); HTML timestamp 2026-05-11 14:34
 - Committed as 91f8e00 and pushed to origin/master
+
+---
+
+## 2026-05-11 (Hatton et al. figure reconstruction + extended synthesis)
+
+**Prompt:** "For the Animal_Scaling_Data I would like you to use all of the Hatton et al. data to generate plots as reported in the Hatton et al. papers. Consult those papers and see if you can reconstruct the figures in those papers... Create a separate .rmd and .html file for these. Then see what data we can add to those plots from the other datasets we have assimilated. Then redo those same plots (dont delete the first round of plot) just update them with any data that are not shared with the Hatton et al. data. Make sure to include the Grady et al. data"
+
+**Changes:**
+- `hatton_figures_reconstruction.Rmd` — new 1,225-line Rmd; Part 1 reconstructs four key Hatton et al. figures: (1) Hatton 2019 metabolic rate vs. body mass (n=8,098, β≈0.75); (2) Hatton 2019 growth rate vs. body mass (n=1,140); (3) Hatton 2019 mortality rate vs. body mass using raw Mortality.csv (n≈4,865, β≈−0.25); (4) Hatton 2015 predator vs. prey body mass (n=1,705); (5) combined three-panel analogue of PNAS 2019 Fig 4. Part 2 extends each plot with non-Hatton sources: Hoehler 2023 PNAS (adds bacteria/archaea/fungi/microalgae), AnimalTraits (adds arachnids/insects), Chown 2007 (insect-specific, temperature-corrected), and Grady et al. 2014 (metabolic rate + growth rate; extinct/mesotherm taxa shown with distinct shapes). Grady 2014 path: `../GlobalBodySize/output/grady2014_growth_compiled.csv`. OLS regression summary table covers all figures × all datasets. Full data provenance section with DOIs.
+- `hatton_figures_reconstruction.html` — rendered successfully (11 MB, 45/45 chunks, 2026-05-11 15:27)
