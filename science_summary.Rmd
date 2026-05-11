@@ -79,7 +79,7 @@ GROUP_COLOURS <- c(
 
 The **GlobalBodySize** project assembles a reproducible, provenance-rich, cross-taxonomic body mass database from authoritative curated sources. Body mass is the central ecological trait — it determines metabolic rate (Kleiber's law: $B \propto M^{3/4}$), home range, population density, generation time, extinction risk, trophic position, and biogeographic distribution (Peters 1983; Brown & Maurer 1989; West, Brown & Enquist 1997).
 
-This document summarises the **Phase 1 Tier-1 intake**: ten provider databases merged into a single flat file (47,108 rows), covering mammals, birds, fish, reptiles, amphibians, and invertebrates (insects, arachnids, crustaceans), with GBIF Backbone taxonomic reconciliation applied to all names. Ten providers are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO, FishBase, AVONET, NEON, AnimalTraits (Herberstein et al. 2022), and Lizard Traits of the World (Meiri 2018). Body mass is not only a determinant of metabolic rate and life-history pace (Peters 1983; West, Brown & Enquist 1997), but also a primary driver of the fast-slow life-history continuum across vertebrate classes — including amphibians, where body mass explains a dominant share of trait variance (Cejp & Griebeler 2024).
+This document summarises the **Phase 1 Tier-1 intake**: eleven provider databases merged into a single flat file (47,456 rows), covering mammals, birds, fish, reptiles, amphibians, and invertebrates (insects, arachnids, crustaceans), with GBIF Backbone taxonomic reconciliation applied to all names. Eleven providers are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO, FishBase, AVONET, NEON, AnimalTraits (Herberstein et al. 2022), Lizard Traits of the World (Meiri 2018), and Grady et al. 2014 (348 extant mass rows; body mass as growth-curve asymptote, cross-taxon). Body mass is not only a determinant of metabolic rate and life-history pace (Peters 1983; West, Brown & Enquist 1997), but also a primary driver of the fast-slow life-history continuum across vertebrate classes — including amphibians, where body mass explains a dominant share of trait variance (Cejp & Griebeler 2024).
 
 **Data file used for this summary:** `data/compiled/tier1_reconciled.csv`
 
@@ -231,6 +231,10 @@ source_group_counts <- dat |>
       grepl("AmphiBIO",     source_display_name) ~ "AmphiBIO",
       grepl("FishBase",     source_display_name) ~ "FishBase",
       grepl("AVONET",       source_display_name) ~ "AVONET",
+      grepl("NEON",         source_display_name) ~ "NEON",
+      grepl("AnimalTraits", source_display_name) ~ "AnimalTraits",
+      grepl("Lizard Traits",source_display_name) ~ "Lizard Traits",
+      grepl("Grady",        source_display_name) ~ "Grady 2014",
       TRUE                                        ~ source_display_name
     )
   ) |>
@@ -339,7 +343,8 @@ ggplot(plot_dat, aes(x = log10_mass, fill = is_modeled)) +
     title    = "Body mass distributions across taxonomic groups",
     subtitle = "Dashed line = group median; log₁₀ scale",
     caption  = paste0(
-      "Data: tier1_combined.csv | FishBase LW-modeled values in light blue | ",
+      "Data: tier1_combined.csv | FishBase + Lizard Traits LW-modeled values in light blue | ",
+      "Grady 2014 values are growth-curve asymptotes | ",
       "n = ", scales::comma(nrow(plot_dat)), " species-source rows"
     )
   ) +
@@ -741,6 +746,7 @@ provider_plot_dat <- dat |>
       grepl("NEON",        source_display_name) ~ "NEON\n(small mammals)",
       grepl("AnimalTraits",source_display_name) ~ "AnimalTraits\n(multi-taxon)",
       grepl("Lizard Traits",source_display_name)~ "Lizard Traits\n(lizards)",
+      grepl("Grady",       source_display_name) ~ "Grady 2014\n(cross-taxon)",
       TRUE                                       ~ source_display_name
     )
   )
@@ -1086,6 +1092,8 @@ if ("basis_of_record" %in% names(dat)) {
 
 2. **Lizard mass values are allometric estimates (LW-modeled), not direct measurements.** The 6,633 lizard species from Meiri (2018) use log-log equations from Feldman et al. (2016). These are flagged as `mass_measurement_type = "lw_modeled"` and `data_quality_flag = "allometric_modeled"`. Always stratify on `mass_measurement_type` before cross-taxon comparisons. Note: ReptTraits (Meiri et al. 2024) is pending intake and will add directly measured reptile maximum body masses.
 
+3a. **Grady et al. 2014 mass values are growth-curve asymptotes, not direct measurements.** The 348 extant rows from Grady et al. (2014, *Science* 344:1268) use the final adult mass from fitted growth curves (von Bertalanffy or logistic) as the body mass estimate (`mass_measurement_type = "literature_asymptote"`). Covers 11 cross-taxon groups including extinct dinosaurs (excluded here), crocodylia, sharks, squamata, teleost fish, and testudines alongside birds and mammals. The full growth-rate (Gmax) and metabolic-rate (W) data are in `output/grady2014_growth_compiled.csv` for use in allometric scaling analyses.
+
 3. **Amphibian mass is sparse** (591 of ~8,500 species covered by AmphiBIO). This gap limits analyses such as those in Cejp & Griebeler (2024), who demonstrate that body mass is the primary driver of the fast-slow life-history continuum in amphibians — analyses that require broad species representation. Adding further amphibian trait databases remains a high priority.
 
 4. **AVONET bird data (11,009 rows) is included** in tier1_combined.csv. Bird coverage: 21,173 rows (EltonTraits 9,993 + AVONET 11,009). Overlap deduplication across these two bird sources has not yet been run.
@@ -1103,12 +1111,13 @@ if ("basis_of_record" %in% names(dat)) {
 | 1 | ~~Add AVONET to tier1_combined.csv merge~~ | ✅ Done (11,009 rows) |
 | 2 | ~~Run NEON small mammal intake~~ | ✅ Done (800 rows, 2026-05-10) |
 | 3 | ~~Add Lizard Traits of the World (Meiri 2018)~~ | ✅ Done (6,633 spp, allometric LW-modeled, 2026-05-11) |
+| 3b | ~~Add Grady et al. 2014 (growth-curve body mass, cross-taxon)~~ | ✅ Done (348 extant mass rows merged, 2026-05-11) |
 | 4 | Run ReptTraits intake (Meiri et al. 2024, Sci Data) | Script ready — run pending |
 | 5 | Run SeaLifeBase intake (rfishbase) | Script ready — run pending |
 | 6 | Run DISPERSE intake (Sarremejane et al. 2020) | Script ready — run pending |
 | 7 | Add amphibian body mass database (Cejp & Griebeler 2024 motivates this; no open deposit found yet) | Data unavailable |
 | 8 | Deduplicate species across providers by GBIF accepted_name | No |
-| 9 | Re-run GBIF reconciliation on full 47,108-row file | No |
+| 9 | Re-run GBIF reconciliation on full 47,456-row file | No |
 | 10 | Populate measurementID for DwC compliance | Design decision needed |
 | 11 | Run renv::snapshot() to pin R environment | No |
 | 12 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
