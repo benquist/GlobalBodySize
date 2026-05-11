@@ -343,6 +343,19 @@ Multiple fragmented sources; no unified global database:
 |---|---|
 | **Notes** | No unified global insect body mass database exists; patchwork from entomology journals. Key literature: Chown & Gaston, Peters (1983), Moran & Woods. Dryad and Zenodo searches are primary discovery strategy. |
 
+#### 1.22d Chown et al. 2007 — Insect Metabolic Rate Scaling Dataset
+
+| Field | Value |
+|---|---|
+| **Taxonomic scope** | Insects (Hymenoptera: ants — 8 species, primarily Formicidae) |
+| **Body size variables** | Individual body mass (kg; individual worker-level measurements, not species means) |
+| **Other variables** | Metabolic rate (W), measurement temperature (°C) |
+| **Species** | *Anoplolepis steinergroeveri*, *Atta columbica*, *Camponotus fulvopilosus*, *C. maculatus*, *Eciton hamatum*, *E. rufa*, *Messor capensis*, *M. pergandei* |
+| **Record count** | 244 individual-level records |
+| **Citation** | Chown SL, Marais E, Terblanche JS, Klok CJ, Lighton JRB, Blackburn TM. 2007. Scaling of insect metabolic rate is inconsistent with the nutrient supply network model. *Functional Ecology* 21(2):282–290. DOI: 10.1111/j.1365-2435.2007.01245.x |
+| **Overlap status** | **FULLY COVERED** — all 244 records are already present in **AnimalTraits (Herberstein et al. 2022)**, which ingests Chown et al. 2007 as a primary literature source. See provider `providers/animaltraits/load_animaltraits.R`. No separate provider is needed. |
+| **Important caveat** | This paper is a metabolic scaling study, not a body size compilation. Body mass values are individual ant worker measurements (range ~0.94–1.17 mg for *Anoplolepis*) used as metabolic rate covariates. If the merge pipeline computes species-mean body masses, these individual-level records should be flagged accordingly. Do not use as primary species-mean body mass values without aggregation. |
+
 ---
 
 ### 1.23 Reptile-Trait Database
