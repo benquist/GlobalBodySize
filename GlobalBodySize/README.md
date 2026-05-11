@@ -3,7 +3,7 @@
 **A reproducible, provenance-rich, cross-taxon animal body mass database.**
 
 [![Phase](https://img.shields.io/badge/Phase-1%20Tier--1%20Intake-blue)]()
-[![Rows](https://img.shields.io/badge/Rows-47%2C108-green)]()
+[![Rows](https://img.shields.io/badge/Rows-47%2C108%20%2B%20Grady2014%20pending-green)]()
 [![Groups](https://img.shields.io/badge/Taxa-mammals%20%7C%20birds%20%7C%20fish%20%7C%20amphibians%20%7C%20reptiles-orange)]()
 
 Body mass is the central ecological trait — it determines metabolic rate, population density, home range, generation time, and extinction risk across all animal life. This project assembles a unified, Darwin Core-compatible body mass database from authoritative curated sources, designed for macroecological synthesis, scaling law tests, and trait-based biodiversity analyses.
@@ -115,6 +115,7 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 | NEON DP1.10072.001 | Mammals | 800 | field trapping max weight | 10.48443/s4ph-2z37 **(UNVERIFIED)** | ✅ COMPLETE |
 | AnimalTraits (Herberstein et al. 2022) | Vertebrates + Invertebrates | 2,856 | wet / literature mean | [10.1038/s41597-022-01364-9](https://doi.org/10.1038/s41597-022-01364-9); data [10.5281/zenodo.6468938](https://doi.org/10.5281/zenodo.6468938) | ✅ COMPLETE |
 | Lizard Traits of the World (Meiri 2018) | Lizards (Squamata) | 6,633 | **LW-modeled** (allometric; Feldman et al. 2016) | [10.1111/geb.12773](https://doi.org/10.1111/geb.12773); data [10.5061/dryad.f6t39kj](https://doi.org/10.5061/dryad.f6t39kj) | ✅ COMPLETE |
+| Grady et al. 2014 (Science 344:1268) | Vertebrates + Sharks (cross-taxon) | 348 extant mass rows; 381 growth rows | wet / literature asymptote (final adult mass from growth curves) | PDF supplement only — no open deposit; [10.1126/science.1253143](https://doi.org/10.1126/science.1253143) | ⚠️ Intake run; **merge into tier1 pending** |
 
 > **Note:** The NEON DOI `10.48443/s4ph-2z37` is used internally but has not been independently verified. Confirm before citing in any publication.
 
@@ -124,7 +125,9 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 
 > **LW-modeled mass (Lizard Traits):** Mass computed from allometric equations: log₁₀(mass_g) = intercept + slope × log₁₀(SVL_mm), where intercept and slope are clade-specific regression coefficients from Feldman et al. (2016) and Meiri (2008). Input SVL = maximum SVL in mm. These values are flagged `mass_measurement_type = "lw_modeled"` and `data_quality_flag = "allometric_modeled"`. Do not pool with directly measured mass without filtering on `mass_measurement_type`.
 
-**Phase 1 + AnimalTraits + LizardTraits total (as of 2026-05-11): 47,108 rows across 10 completed providers.**
+> **Grady et al. 2014 mass:** `final_adult_mass_g` from the growth curve asymptote (von Bertalanffy or logistic fits to mass-at-age data), flagged `mass_measurement_type = "literature_asymptote"`. Covers 348 extant species from 11 groups (Crocodylia, Placental Mammals, Marsupials, Monotremata, Neornithes, Sharks, Squamata, Teleost Fish, Testudines). Data extracted from Table S1 of the PDF supplement — no open deposit. Full growth (Gmax g/d) and metabolic rate (W) columns are in `output/grady2014_growth_compiled.csv` for use in scaling law analyses.
+
+**Phase 1 + AnimalTraits + LizardTraits total (as of 2026-05-11): 47,108 rows across 10 completed providers. Grady 2014 (348 extant mass rows) pending merge.**
 
 ### Taxonomic Group Breakdown
 
@@ -199,6 +202,8 @@ GlobalBodySize/
 │   ├── anage_compiled.csv
 │   ├── eltontraits_compiled.csv
 │   ├── fishbase_compiled.csv
+│   ├── grady2014_mass_compiled.csv         # NEW — 348 extant rows (gitignored)
+│   ├── grady2014_growth_compiled.csv       # NEW — 381 rows all taxa (gitignored)
 │   ├── lizardtraits_mass_compiled.csv      # NEW — 6,633 rows
 │   ├── lizardtraits_linear_compiled.csv    # NEW — 13,111 rows
 │   ├── mobs_linear_compiled.csv            # NEW — 183,175 rows
@@ -211,6 +216,7 @@ GlobalBodySize/
 │   ├── disperse/load_disperse.R        # NEW — aquatic macroinvertebrates
 │   ├── eltontraits/load_eltontraits.R
 │   ├── fishbase/load_fishbase.R
+│   ├── grady2014/load_grady2014.R      # NEW — growth rates + body mass (Grady et al. 2014)
 │   ├── lizardtraits/load_lizardtraits.R  # NEW — Meiri 2018
 │   ├── mobs/load_mobs.R                # NEW — MOBS marine linear size
 │   ├── neon/load_neon.R
@@ -291,6 +297,7 @@ As of 2026-05-11:
 | Total rows — mass table (tier1_combined.csv) | 47,108 |
 | Total rows — linear size table (tier1_linear_size_combined.csv) | 183,142+ (MOBS only; others pending) |
 | Providers completed (mass) | 10 |
+| Providers intake run, merge pending | 1 (Grady 2014 — 348 extant mass rows) |
 | Providers with scripts ready but not yet run | 3 (ReptTraits, SeaLifeBase, DISPERSE) |
 | GBIF EXACT match rate | 97.7% |
 | Body size range | ~0.07 g (amphibians) to ~150,000,000 g (blue whale) |
@@ -392,15 +399,17 @@ rmarkdown::render("science_summary.Rmd", output_file = "science_summary.html")
 | 2 | ~~Add AnimalTraits (invertebrate scope expansion)~~ | ✅ Done (2,856 rows, 2026-05-11) |
 | 3 | ~~Add Lizard Traits of the World (Meiri 2018)~~ | ✅ Done (6,633 spp, allometric LW-modeled, 2026-05-11) |
 | 4 | ~~Add MOBS 1.0 marine linear size (McClain et al. 2025)~~ | ✅ Done (183,175 rows, 2026-05-11) |
-| 5 | Run ReptTraits intake (Meiri et al. 2024, Sci Data, 12,060 reptile spp) | Script ready (`providers/repttraits/load_repttraits.R`) |
-| 6 | Run SeaLifeBase intake (rfishbase) | Script ready (`providers/sealifebase/load_sealifebase.R`) |
-| 7 | Run DISPERSE intake (Sarremejane et al. 2020, aquatic macroinvertebrates) | Script ready (`providers/disperse/load_disperse.R`) |
-| 8 | Re-run GBIF reconciliation on full 47,108-row mass table | None |
-| 9 | Deduplicate species across providers (mammals/birds multi-counted) | Requires reconciliation first |
-| 10 | Retry Zenodo discovery with `--min-score=3` | API stability |
-| 11 | Populate DwC `measurementID` | Design decision needed |
-| 12 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
-| 13 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
+| 4b | ~~Extract Grady et al. 2014 Table S1 from PDF~~ | ✅ Done (381 taxa parsed; 348 extant mass rows + 381 growth rows; 2026-05-11) |
+| 5 | Merge Grady 2014 mass into tier1_combined.csv and re-run GBIF reconciliation | Run `scripts/merge_tier1.R` after merging |
+| 6 | Run ReptTraits intake (Meiri et al. 2024, Sci Data, 12,060 reptile spp) | Script ready (`providers/repttraits/load_repttraits.R`) |
+| 7 | Run SeaLifeBase intake (rfishbase) | Script ready (`providers/sealifebase/load_sealifebase.R`) |
+| 8 | Run DISPERSE intake (Sarremejane et al. 2020, aquatic macroinvertebrates) | Script ready (`providers/disperse/load_disperse.R`) |
+| 9 | Integrate Grady 2014 growth + metabolic rate data into Animal_scaling_data | Gmax + metabolic_rate_W columns in `grady2014_growth_compiled.csv` |
+| 10 | Deduplicate species across providers (mammals/birds multi-counted) | Requires reconciliation first |
+| 11 | Retry Zenodo discovery with `--min-score=3` | API stability |
+| 12 | Populate DwC `measurementID` | Design decision needed |
+| 13 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
+| 14 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
 
 ---
 
@@ -428,6 +437,7 @@ To cite this database compilation once archived:
 - Dodds, P. S., Rothman, D. H., & Weitz, J. S. (2001). Re-examination of the "3/4-law" of metabolism. *Journal of Theoretical Biology* 209(1):9–27. DOI: 10.1006/jtbi.2000.2238
 - Foster, J. B. (1964). Evolution of mammals on islands. *Nature* 202:234–235. DOI: 10.1038/202234a0
 - Gaston, K. J., & Blackburn, T. M. (2000). *Pattern and Process in Macroecology*. Blackwell Science, Oxford.
+- Grady, J. M., Enquist, B. J., Dettweiler-Robinson, E., Wright, N. A., & Smith, F. A. (2014). Evidence for mesothermy in dinosaurs. *Science* 344(6188):1268–1272. DOI: 10.1126/science.1253143
 - Harvey, P. H., & Pagel, M. D. (1991). *The Comparative Method in Evolutionary Biology*. Oxford University Press.
 - Hutchinson, G. E., & MacArthur, R. H. (1959). A theoretical ecological model of size distributions among species of animals. *American Naturalist* 93(869):117–125. DOI: 10.1086/282063
 - Jones, K. E., et al. (2009). PanTHERIA: a species-level database of life history, ecology, and geography of extant and recently extinct mammals. *Ecology* 90(9):2648. DOI: 10.1890/08-1494.1
