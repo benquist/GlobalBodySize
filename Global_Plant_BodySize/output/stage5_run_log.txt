@@ -1,0 +1,21 @@
+
+Attaching package: ‘data.table’
+
+The following object is masked from ‘package:base’:
+
+    %notin%
+
+[Stage 5] Growth form records loaded: 330047
+[Stage 5] Reconciled growth form written: 330047 records
+[Stage 5] Species with growth form data: 83580
+[Stage 5] Growth form distribution:
+
+     herb      tree     shrub   unknown      vine graminoid  parasite  epiphyte 
+    38856     17855     14410      5977      4708       992       354       233 
+  aquatic  subshrub 
+      153        42 
+[Stage 5] Species with conflicting growth forms: 3378
+[Stage 5] Graminoid species: 0
+[Stage 5] Bamboo species:    363
+[Stage 5] Species growth form table: output/species_growth_form.csv
+=== Stage 5 complete ===

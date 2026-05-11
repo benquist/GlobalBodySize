@@ -1,0 +1,21 @@
+
+Attaching package: ‘data.table’
+
+The following object is masked from ‘package:base’:
+
+    %notin%
+
+[Stage 4] Species roster: 333778 species
+[Stage 4] Unique trait verbatim names: 85381
+[Stage 4] Trait names in roster:     79864
+[Stage 4] Trait names NOT in roster: 5517
+  First 20 unmatched: Schefflera morototonii; Henriettea squamulosum; Eugenia xerophytica; Acacia anegadensis; Eugenia corozalensis; Psychotria maricaensis; Prunus damascena; Toona australis; Scolopia brownii; Litsea areolata; Syzygium coolminianum; Oreocallis pinnata; Gmelina leichhardtii; Ackama paniculata; Sarcopteryx stipitata; Platanus x hispanica cv.. acerifolia; Salvinia natans; Ixora elongata; Palaquium ellipticum; Nothopegia beddomei
+[Stage 4] Enriching: output/bien_height_raw.csv
+  Written: 10167913 records to output/bien_height_raw.csv
+[Stage 4] Enriching: output/bien_dbh_raw.csv
+  Written: 14929488 records to output/bien_dbh_raw.csv
+[Stage 4] Enriching: output/bien_growth_form_raw.csv
+  Written: 330047 records to output/bien_growth_form_raw.csv
+[Stage 4] Reconciliation report: 5517 unmatched names
+[Stage 4] Enriched roster written to: output/bien_species_roster.csv
+=== Stage 4 complete ===
