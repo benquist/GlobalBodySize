@@ -59,7 +59,7 @@ globalsize_schema_columns <- function() {
     "mass_n",                      # Sample size underlying the mass value (NA if not provided)
 
     # --- 5. Mass metadata (mandatory non-nullable for QA) ---
-    "mass_type",                   # MANDATORY: wet | dry | fat_free | LW_modeled | ash_free | unspecified
+    "mass_type",                   # MANDATORY: wet | dry | fat_free | LW_modeled | ash_free | literature_maximum | SVL_allometric | unspecified
     "measurement_method",          # direct_scale | LW_equation | literature_mean | museum_label | model_estimate | unknown
     "life_stage",                  # adult | subadult | juvenile | larval | neonate | unknown
     "sex",                         # male | female | pooled | unknown
@@ -95,7 +95,12 @@ globalsize_schema_columns <- function() {
 ## ---- Controlled vocabulary definitions --------------------------------------
 
 globalsize_mass_type_vocab <- function() {
-  c("wet", "dry", "fat_free", "LW_modeled", "ash_free", "unspecified")
+  # literature_maximum : maximum recorded mass across literature (ReptTraits, some FishBase entries)
+  #                       NOT equivalent to mean adult mass; flag data_quality_flag = "maximum_not_mean"
+  # SVL_allometric     : mass estimated from SVL via published allometric equation (e.g., AmphiBIO expansion)
+  #                       flag data_quality_flag = "allometric_modeled"
+  c("wet", "dry", "fat_free", "LW_modeled", "ash_free",
+    "literature_maximum", "SVL_allometric", "unspecified")
 }
 
 globalsize_life_stage_vocab <- function() {

@@ -187,3 +187,18 @@
 - Run repttraits, sealifebase, disperse intakes
 - Re-run merge_linear_size.R with all providers
 - Update README.md
+
+---
+
+## 2026-05-11 — @M Session 7 Part 2: Schema fix + ReptTraits intake
+
+**Prompt:** Add expansion plan to PROJECT_LOG_HISTORY.md; fix schema; run ReptTraits (Steps 1 & 2).
+
+**Actions:**
+- `R/body_mass_schema.R`: added `"literature_maximum"` and `"SVL_allometric"` to `globalsize_mass_type_vocab()` with documented meanings.
+- `providers/repttraits/load_repttraits.R`: corrected `mass_type = "wet"` → `"literature_maximum"` and `measurement_method = "literature_mean"` → `"literature_maximum"`; updated `qa_note` to include `data_quality_flag=maximum_not_mean`.
+- `PROJECT_LOG_HISTORY.md`: appended full Phase 2 expansion plan (Tier A/B/C, gap analysis, critical caveats, run order).
+- Ran `load_repttraits.R` → 10,469 mass rows, 15,224 linear size rows. Audit by Order: Squamata 10,131; Testudines 313; Crocodilia 24; Rhynchocephalia 1. All `mass_type = "literature_maximum"` confirmed.
+- Re-ran `scripts/merge_tier1.R` → 57,925 rows, 12 providers. Reptile group: 17,242 rows.
+
+**Agents consulted:** @M (supervisor), coder, biodiversity-science-guard.
