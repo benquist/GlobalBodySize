@@ -3,8 +3,8 @@
 **A reproducible, provenance-rich, cross-taxon animal body mass database.**
 
 [![Phase](https://img.shields.io/badge/Phase-1%20Tier--1%20Intake-blue)]()
-[![Rows](https://img.shields.io/badge/Rows-37%2C619-green)]()
-[![Groups](https://img.shields.io/badge/Taxa-mammals%20%7C%20birds%20%7C%20fish%20%7C%20amphibians%20%7C%20NEON-orange)]()
+[![Rows](https://img.shields.io/badge/Rows-47%2C108-green)]()
+[![Groups](https://img.shields.io/badge/Taxa-mammals%20%7C%20birds%20%7C%20fish%20%7C%20amphibians%20%7C%20reptiles-orange)]()
 
 Body mass is the central ecological trait — it determines metabolic rate, population density, home range, generation time, and extinction risk across all animal life. This project assembles a unified, Darwin Core-compatible body mass database from authoritative curated sources, designed for macroecological synthesis, scaling law tests, and trait-based biodiversity analyses.
 
@@ -52,7 +52,8 @@ Scaling relationships emerge most clearly when analyzed across taxa and body-siz
 Despite decades of macroecological research, existing resources are fragmented across isolated repositories with inconsistent taxonomy, missing provenance, and limited interoperability:
 
 - **Multi-source provenance**: records are annotated with primary source, access date, and data quality flags, enabling reproducible synthesis
-- **Reptile gap**: reptiles are absent from major compiled databases (PanTHERIA, AnAge); targeted ingestion from herpetological literature and data repositories is a Phase 2 priority
+- **Reptile coverage expanding**: Lizard Traits of the World (Meiri 2018) added 6,633 lizard species via allometric L-W equations (Feldman et al. 2016). ReptTraits (Meiri et al. 2024, Sci Data) with directly measured body masses is the next priority. Snake, amphisbaenian, and tuatara body mass data remain gaps. Body mass shapes life-history pace across squamates and other reptiles, motivating continued reptile coverage expansion.
+- **Amphibian gap**: body mass drives the fast-slow life-history continuum in amphibians (Cejp & Griebeler 2024); AmphiBIO covers only ~591 of ~8,500 amphibian species — a critical coverage gap for macroecological analyses
 - **Darwin Core compliance**: all records are harmonized to DwC fields, enabling direct submission to GBIF and integration with occurrence and phylogenetic data streams
 
 ---
@@ -113,6 +114,7 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 | AmphiBIO v1 (Oliveira et al. 2017) | Amphibians | 591 | literature mean | [10.1038/sdata.2017.123](https://doi.org/10.1038/sdata.2017.123) | ✅ COMPLETE |
 | NEON DP1.10072.001 | Mammals | 800 | field trapping max weight | 10.48443/s4ph-2z37 **(UNVERIFIED)** | ✅ COMPLETE |
 | AnimalTraits (Herberstein et al. 2022) | Vertebrates + Invertebrates | 2,856 | wet / literature mean | [10.1038/s41597-022-01364-9](https://doi.org/10.1038/s41597-022-01364-9); data [10.5281/zenodo.6468938](https://doi.org/10.5281/zenodo.6468938) | ✅ COMPLETE |
+| Lizard Traits of the World (Meiri 2018) | Lizards (Squamata) | 6,633 | **LW-modeled** (allometric; Feldman et al. 2016) | [10.1111/geb.12773](https://doi.org/10.1111/geb.12773); data [10.5061/dryad.f6t39kj](https://doi.org/10.5061/dryad.f6t39kj) | ✅ COMPLETE |
 
 > **Note:** The NEON DOI `10.48443/s4ph-2z37` is used internally but has not been independently verified. Confirm before citing in any publication.
 
@@ -120,7 +122,9 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 
 > **LW-modeled mass (FishBase):** Mass estimated via FishBase length-weight regression W = a × L^b (species-specific a, b coefficients from FishBase literature). Input length = maximum recorded length. Not directly equivalent to mean adult mass; tends toward maximum adult mass. Never pool `wet` and `LW_modeled` without filtering on `mass_type`. See `providers/fishbase/load_fishbase.R` for exact fields used.
 
-**Phase 1 + AnimalTraits total (as of 2026-05-11): 40,475 rows across 9 completed providers.**
+> **LW-modeled mass (Lizard Traits):** Mass computed from allometric equations: log₁₀(mass_g) = intercept + slope × log₁₀(SVL_mm), where intercept and slope are clade-specific regression coefficients from Feldman et al. (2016) and Meiri (2008). Input SVL = maximum SVL in mm. These values are flagged `mass_measurement_type = "lw_modeled"` and `data_quality_flag = "allometric_modeled"`. Do not pool with directly measured mass without filtering on `mass_measurement_type`.
+
+**Phase 1 + AnimalTraits + LizardTraits total (as of 2026-05-11): 47,108 rows across 10 completed providers.**
 
 ### Taxonomic Group Breakdown
 
@@ -128,13 +132,15 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 |---|---|---|
 | Birds | 22,058 | EltonTraits (Birds), AVONET, AnimalTraits |
 | Mammals | 11,099 | PanTHERIA, EltonTraits (Mammals), AnAge, NEON, AnimalTraits |
+| Reptiles (lizards) | 6,741 | Lizard Traits of the World (Meiri 2018), AnAge, AnimalTraits |
 | Fish | 5,657 | FishBase |
 | Insects | 772 | AnimalTraits |
 | Arachnids | 131 | AnimalTraits |
 | Amphibians | 619 | AmphiBIO, AnAge, AnimalTraits |
-| Reptiles | 108 | AnAge, AnimalTraits |
 | Crustaceans | 28 | AnimalTraits |
 | Myriapods / Annelids / Gastropods | 3 | AnimalTraits |
+
+> **Reptile note:** 6,633 of the 6,741 reptile rows are lizard species from Meiri (2018) with allometric (LW-modeled) mass estimates; 108 rows from AnAge and AnimalTraits carry literature means. ReptTraits (Meiri et al. 2024) with directly measured maximum body masses for 12,060 reptile species is the next priority intake.
 
 > **Deduplication note:** Mammals, birds, reptiles, and amphibians are now multi-provider and require GBIF-reconciled deduplication before species richness or coverage estimates are made. Invertebrate groups (insect, arachnid, crustacean, myriapod, annelid, gastropod) are sourced from AnimalTraits only — no deduplication required yet.
 
@@ -153,7 +159,7 @@ Output: `data/compiled/tier1_reconciled.csv`
 ### Known Limitations (read before citing)
 
 1. **FishBase mass type is heterogeneous — never pool `wet` and `LW_modeled` silently.** Filter on `mass_type` before any cross-taxon or fish-specific analysis.
-2. **Reptiles critically underrepresented** (~16 rows from AnAge only). Reptile richness estimates from this database are not defensible without explicit caveat.
+2. **Lizard mass values are allometric estimates, not direct measurements.** The 6,633 lizard rows from Meiri (2018) use log-log equations from Feldman et al. (2016). These are flagged `mass_measurement_type = "lw_modeled"`. Always stratify on `mass_measurement_type` before cross-taxon comparisons. Non-squamate reptiles (snakes, turtles, crocodilians) remain underrepresented.
 3. **Mammals triple-counted** across PanTHERIA, EltonTraits Mammals, and AnAge. Species-level deduplication on GBIF `accepted_name` is required before reporting unique species counts.
 4. **GBIF synonyms preserved verbatim** — rows with `SYNONYM`, `DOUBTFUL`, or `FUZZY` match types must not be silently promoted to accepted names.
 5. **Darwin Core `measurementID` not populated** — GBIF MoF submission is blocked until unique stable identifiers are assigned.
@@ -173,8 +179,18 @@ GlobalBodySize/
 │   ├── search_terms.R              # 83-term body mass vocabulary
 │   ├── taxon_reconciliation.R      # GBIF Backbone reconciliation
 │   └── zenodo_api.R                # Zenodo REST API client
+├── R/
+│   ├── body_mass_schema.R          # Standard mass output schema
+│   ├── body_size_schema.R          # Linear size / volume schema (NEW)
+│   ├── candidate_filter.R
+│   ├── dryad_api.R
+│   ├── qa_checks.R
+│   ├── search_terms.R
+│   ├── taxon_reconciliation.R
+│   └── zenodo_api.R
 ├── data/compiled/
-│   ├── tier1_combined.csv          # Merged Tier 1 (36,819 rows)
+│   ├── tier1_combined.csv          # Merged Tier 1 mass (47,108 rows)
+│   ├── tier1_linear_size_combined.csv  # Merged linear size (183k+ rows, NEW)
 │   ├── tier1_reconciled.csv        # + GBIF reconciliation columns
 │   └── taxon_match_cache.csv       # GBIF match cache (21,696 rows)
 ├── output/                         # Per-provider compiled CSVs
@@ -183,25 +199,34 @@ GlobalBodySize/
 │   ├── anage_compiled.csv
 │   ├── eltontraits_compiled.csv
 │   ├── fishbase_compiled.csv
+│   ├── lizardtraits_mass_compiled.csv      # NEW — 6,633 rows
+│   ├── lizardtraits_linear_compiled.csv    # NEW — 13,111 rows
+│   ├── mobs_linear_compiled.csv            # NEW — 183,175 rows
 │   ├── pantheria_compiled.csv
 │   └── candidate_datasets.csv      # 1,043 Dryad+Figshare candidates
 ├── providers/                      # One subfolder per data source
 │   ├── avonet/load_avonet.R
 │   ├── amphibio/load_amphibio.R
 │   ├── anage/load_anage.R
+│   ├── disperse/load_disperse.R        # NEW — aquatic macroinvertebrates
 │   ├── eltontraits/load_eltontraits.R
 │   ├── fishbase/load_fishbase.R
+│   ├── lizardtraits/load_lizardtraits.R  # NEW — Meiri 2018
+│   ├── mobs/load_mobs.R                # NEW — MOBS marine linear size
 │   ├── neon/load_neon.R
-│   └── pantheria/load_pantheria.R
+│   ├── pantheria/load_pantheria.R
+│   ├── repttraits/load_repttraits.R    # NEW — Meiri et al. 2024
+│   └── sealifebase/load_sealifebase.R  # NEW — marine non-fish
 ├── scripts/                        # Pipeline orchestration
-│   ├── discover_body_mass_datasets.R   # Cross-repo API discovery
-│   ├── merge_tier1.R                   # Stack all provider outputs
-│   ├── run_taxon_reconciliation.R      # GBIF reconciliation
+│   ├── discover_body_mass_datasets.R
+│   ├── merge_tier1.R                   # Mass merge (10 providers)
+│   ├── merge_linear_size.R             # Linear size merge (NEW)
+│   ├── run_taxon_reconciliation.R
 │   ├── run_fishbase_intake.sh
 │   ├── run_neon_intake.sh
 │   └── run_zenodo_discovery.sh
-├── science_summary.Rmd             # Full analysis report (53 chunks)
-├── science_summary.html            # Rendered HTML report (3.8 MB)
+├── science_summary.Rmd             # Full analysis report (57 chunks)
+├── science_summary.html            # Rendered HTML report (4.4 MB)
 ├── PROJECT_LOG_HISTORY.md          # Session-by-session change log
 ├── DATA_SOURCE_INVENTORY.md        # Annotated 23-source inventory
 ├── ECOLOGICAL_QUALITY_ADVISORY.md  # Tier quality ratings
@@ -259,12 +284,14 @@ Rscript scripts/discover_body_mass_datasets.R \
 
 ## Current Data Inventory
 
-As of 2026-05-10:
+As of 2026-05-11:
 
 | Statistic | Value |
 |---|---|
-| Total rows (all providers merged) | 40,475 |
-| Providers completed | 9 (8 vertebrate + AnimalTraits as Phase 2 invertebrate seed) |
+| Total rows — mass table (tier1_combined.csv) | 47,108 |
+| Total rows — linear size table (tier1_linear_size_combined.csv) | 183,142+ (MOBS only; others pending) |
+| Providers completed (mass) | 10 |
+| Providers with scripts ready but not yet run | 3 (ReptTraits, SeaLifeBase, DISPERSE) |
 | GBIF EXACT match rate | 97.7% |
 | Body size range | ~0.07 g (amphibians) to ~150,000,000 g (blue whale) |
 | Range in orders of magnitude | ~9.3 log₁₀ decades |
@@ -362,14 +389,18 @@ rmarkdown::render("science_summary.Rmd", output_file = "science_summary.html")
 | 0 | Add LICENSE file (CC BY 4.0 recommended) and CITATION.cff | None |
 | 0 | Run `renv::snapshot()` to pin R package versions | None |
 | 1 | ~~Complete NEON small mammal intake~~ | ✅ Done (800 rows, 2026-05-10) |
-| 2 | ~~Add AnimalTraits (invertebrate scope expansion)~~ | ✅ Done (2,856 rows — 9 groups incl. insects/arachnids, 2026-05-11) |
-| 3 | Re-run GBIF reconciliation on full 40,475-row file | None |
-| 4 | Deduplicate species across providers (mammals/birds triple-counted) | Requires reconciliation first |
-| 5 | Add reptile body mass source (Meiri et al. or Reptile Database) | Requires download |
-| 6 | Retry Zenodo discovery with `--min-score=3` | API stability |
-| 7 | Populate DwC `measurementID` | Design decision needed |
-| 8 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
-| 9 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
+| 2 | ~~Add AnimalTraits (invertebrate scope expansion)~~ | ✅ Done (2,856 rows, 2026-05-11) |
+| 3 | ~~Add Lizard Traits of the World (Meiri 2018)~~ | ✅ Done (6,633 spp, allometric LW-modeled, 2026-05-11) |
+| 4 | ~~Add MOBS 1.0 marine linear size (McClain et al. 2025)~~ | ✅ Done (183,175 rows, 2026-05-11) |
+| 5 | Run ReptTraits intake (Meiri et al. 2024, Sci Data, 12,060 reptile spp) | Script ready (`providers/repttraits/load_repttraits.R`) |
+| 6 | Run SeaLifeBase intake (rfishbase) | Script ready (`providers/sealifebase/load_sealifebase.R`) |
+| 7 | Run DISPERSE intake (Sarremejane et al. 2020, aquatic macroinvertebrates) | Script ready (`providers/disperse/load_disperse.R`) |
+| 8 | Re-run GBIF reconciliation on full 47,108-row mass table | None |
+| 9 | Deduplicate species across providers (mammals/birds multi-counted) | Requires reconciliation first |
+| 10 | Retry Zenodo discovery with `--min-score=3` | API stability |
+| 11 | Populate DwC `measurementID` | Design decision needed |
+| 12 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
+| 13 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
 
 ---
 
@@ -391,6 +422,7 @@ To cite this database compilation once archived:
 - Blackburn, T. M., Gaston, K. J., & Loder, N. (1999). Geographic gradients in body size: a clarification of Bergmann's rule. *Diversity and Distributions* 5(4):165–174. DOI: 10.1046/j.1472-4642.1999.00046.x
 - Bromham, L., & Cardillo, M. (2003). Testing the link between the latitudinal gradient in species richness and rates of molecular evolution. *Journal of Evolutionary Biology* 16(2):200–207. DOI: 10.1046/j.1420-9101.2003.00526.x
 - Brown, J. H., & Maurer, B. A. (1989). Macroecology: The Division of Food and Space Among Species on Continents. *Science* 243(4895):1145–1150. DOI: 10.1126/science.243.4895.1145
+- Cejp, B., & Griebeler, E. M. (2024). Body mass shapes most life history traits and a fast-slow continuum in amphibians. *Ecology and Evolution* 14(10):e70377. DOI: 10.1002/ece3.70377
 - Cope, E. D. (1887). *The Origin of the Fittest*. Appleton, New York.
 - de Magalhães, J. P., & Costa, J. (2009). A database of vertebrate longevity records and their relation to other life-history traits. *Journal of Evolutionary Biology* 22(8):1770–1774. DOI: 10.1111/j.1420-9101.2009.01783.x
 - Dodds, P. S., Rothman, D. H., & Weitz, J. S. (2001). Re-examination of the "3/4-law" of metabolism. *Journal of Theoretical Biology* 209(1):9–27. DOI: 10.1006/jtbi.2000.2238
@@ -399,11 +431,14 @@ To cite this database compilation once archived:
 - Harvey, P. H., & Pagel, M. D. (1991). *The Comparative Method in Evolutionary Biology*. Oxford University Press.
 - Hutchinson, G. E., & MacArthur, R. H. (1959). A theoretical ecological model of size distributions among species of animals. *American Naturalist* 93(869):117–125. DOI: 10.1086/282063
 - Jones, K. E., et al. (2009). PanTHERIA: a species-level database of life history, ecology, and geography of extant and recently extinct mammals. *Ecology* 90(9):2648. DOI: 10.1890/08-1494.1
+- Feldman, A., et al. (2016). Body sizes and diversification rates of lizards, snakes, amphisbaenians and the tuatara. *Global Ecology and Biogeography* 25(2):187–197. DOI: 10.1111/geb.12398
 - Kleiber, M. (1932). Body size and metabolism. *Hilgardia* 6(11):315–353.
 - Lomolino, M. V. (2005). Body size evolution in insular vertebrates: generality of the island rule. *Journal of Biogeography* 32(10):1683–1699. DOI: 10.1111/j.1365-2699.2005.01314.x
 - May, R. M. (1978). The dynamics and diversity of insect faunas. In L. A. Mound & N. Waloff (Eds.), *Diversity of Insect Faunas*, pp. 188–204. Blackwell, Oxford.
 - May, R. M. (1986). The search for patterns in the balance of nature: advances and retreats. *Ecology* 67(5):1115–1126. DOI: 10.2307/1938668
 - May, R. M. (1988). How many species are there on Earth? *Science* 241(4872):1441–1449. DOI: 10.1126/science.241.4872.1441
+- Meiri, S. (2018). Traits of lizards of the world: Variation around a successful evolutionary design. *Global Ecology and Biogeography* 27(10):1144–1155. DOI: 10.1111/geb.12773. Data: https://doi.org/10.5061/dryad.f6t39kj
+- Meiri, S., et al. (2024). ReptTraits: a comprehensive dataset of reptile traits. *Scientific Data* 11:386. DOI: 10.1038/s41597-024-03079-5
 - Oliveira, B. F., et al. (2017). AmphiBIO, a global database for amphibian ecological traits. *Scientific Data* 4:170123. DOI: 10.1038/sdata.2017.123
 - Peters, R. H. (1983). *The Ecological Implications of Body Size*. Cambridge University Press.
 - Stanley, S. M. (1973). An explanation for Cope's Rule. *Evolution* 27(1):1–26. DOI: 10.1111/j.1558-5646.1973.tb05912.x
