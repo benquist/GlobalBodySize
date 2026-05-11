@@ -2170,3 +2170,17 @@ Action: Root cause was .hero-photo using width:100vw which is wider than the vis
 **Project**: Animal_scaling_data
 **Prompt**: "the Hatton et al. data should be grey to black and the new data should be in color. that way the new data added will stand out. Please redo the plots"
 **Action**: Redesigned Animal_scaling_data/hatton_figures_reconstruction.Rmd Part 2 Extended Synthesis plots (ext-fig1-metab-prep/plot, ext-fig2-growth-prep/plot, ext-fig3-mort-prep/plot) as two-layer ggplot2 calls. Layer 1: Hatton 2019 grey points (#CCCCCC, alpha=0.2) + black OLS line + grey CI ribbon (behind). Layer 2: new datasets in colour (alpha=0.6-0.65) + coloured OLS ribbons (on top). ds_pal["Hatton 2019"] → "#BBBBBB"; added ds_pal_new/ds_pal_gr_new/ds_pal_mort_new subsets for legend. Re-rendered to hatton_figures_reconstruction.html (12 MB, clean). chat_provenance_log.md updated.
+
+---
+**Date**: 2026-05-11
+**Project**: GlobalBodySize
+**Session**: Session 7 Part 2 — @M agent
+**Prompt**: "First, add this to the project report so that we can follow where we are in the project. Second, please go ahead and start with step 1 and 2"
+**Action**: Steps 1 and 2 of Phase 2 expansion plan.
+1. `GlobalBodySize/R/body_mass_schema.R`: added `"literature_maximum"` and `"SVL_allometric"` to `globalsize_mass_type_vocab()`.
+2. `GlobalBodySize/providers/repttraits/load_repttraits.R`: corrected `mass_type = "wet"` → `"literature_maximum"` and `measurement_method = "literature_mean"` → `"literature_maximum"`; updated `qa_note`.
+3. `GlobalBodySize/PROJECT_LOG_HISTORY.md`: appended Phase 2 expansion plan section.
+4. `GlobalBodySize/chat_provenance_log.md`: provenance entry appended.
+5. Ran `load_repttraits.R` → 10,469 mass rows (Squamata 10,131; Testudines 313; Crocodilia 24; Rhynchocephalia 1). All `mass_type = "literature_maximum"` confirmed.
+6. Re-ran `scripts/merge_tier1.R` → 57,925 rows, 12 providers.
+7. Committed as `9c85439` on master branch. Always gate: PASS.
