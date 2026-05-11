@@ -1,0 +1,37 @@
+[Stage 1] Querying BIEN_list_all() ...
+  This may take 1-5 minutes depending on server load.
+Getting page 1 of records
+Getting page 2 of records
+Getting page 3 of records
+Getting page 4 of records
+Getting page 5 of records
+Getting page 6 of records
+Getting page 7 of records
+Getting page 8 of records
+Getting page 9 of records
+Getting page 10 of records
+Getting page 11 of records
+Getting page 12 of records
+Getting page 13 of records
+Getting page 14 of records
+Getting page 15 of records
+Getting page 16 of records
+Getting page 17 of records
+Getting page 18 of records
+Getting page 19 of records
+Getting page 20 of records
+Getting page 21 of records
+Getting page 22 of records
+Getting page 23 of records
+Getting page 24 of records
+Getting page 25 of records
+Getting page 26 of records
+Getting page 27 of records
+Getting page 28 of records
+Getting page 29 of records
+Getting page 30 of records
+Getting page 31 of records
+Getting page 32 of records
+Getting page 33 of records
+Getting page 34 of records
+[Stage 1] Done. 333778 species written to: output/bien_species_list.csv

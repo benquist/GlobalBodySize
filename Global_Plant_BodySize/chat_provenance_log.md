@@ -2,6 +2,22 @@
 
 ---
 
+## 2026-05-11 — Stages 2 and 3 Complete
+
+**Stage 2 results (scripts/02_trait_query.R):**
+- `whole plant height`: 10,167,913 records → `output/bien_height_raw.csv` (5.2 GB, 1,447 BIEN pages)
+- `maximum whole plant height`: 3,722 records → `output/bien_max_height_raw.csv` (1.9 MB, 34 pages; literature-compiled, sparse)
+- `diameter at breast height (1.3 m)`: 14,929,488 records → `output/bien_dbh_raw.csv` (7.8 GB, 1,493 pages)
+- Total Stage 2: ~25 million records, ~13 GB — all individual plot/stem observations
+
+**Stage 3 results (scripts/03_growth_form_query.R):**
+- `whole plant growth form`: 330,047 records → `output/bien_growth_form_raw.csv` (34 pages)
+- Good coverage relative to 333,778 species; freetext values require Stage 5 canonical mapping
+
+**Next:** Stages 4–8 (taxonomy reconcile → growth form reconcile → QA → summarize → finalize). Stages 4–8 are computationally intensive on these file sizes; `data.table` is used throughout.
+
+---
+
 ## 2026-05-11 — Stage 1 Run + API Corrections + PROJECT_LOG.md Creation
 
 **Prompt:** Write a project log with all main summaries, evaluations, and decisions. Run Stage 1, then Stages 2 and 3.

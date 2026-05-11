@@ -128,10 +128,10 @@ where the numerator is the water potential difference (~1.3 MPa) and the denomin
 | Stage | Script | Function | Output | Status |
 |-------|--------|----------|--------|--------|
 | 1 | `scripts/01_species_list.R` | `BIEN_list_all()` | `output/bien_species_list.csv` | **COMPLETE** — 333,778 species |
-| 2a | `scripts/02_trait_query.R` | `BIEN_trait_trait("whole plant height")` | `output/bien_height_raw.csv` | **IN PROGRESS** |
-| 2b | `scripts/02_trait_query.R` | `BIEN_trait_trait("maximum whole plant height")` | `output/bien_max_height_raw.csv` | pending 2a |
-| 2c | `scripts/02_trait_query.R` | `BIEN_trait_trait("diameter at breast height (1.3 m)")` | `output/bien_dbh_raw.csv` | pending 2b |
-| 3 | `scripts/03_growth_form_query.R` | `BIEN_trait_trait("whole plant growth form")` | `output/bien_growth_form_raw.csv` | NOT RUN |
+| 2a | `scripts/02_trait_query.R` | `BIEN_trait_trait("whole plant height")` | `output/bien_height_raw.csv` | **COMPLETE** — 10,167,913 records |
+| 2b | `scripts/02_trait_query.R` | `BIEN_trait_trait("maximum whole plant height")` | `output/bien_max_height_raw.csv` | **COMPLETE** — 3,722 records |
+| 2c | `scripts/02_trait_query.R` | `BIEN_trait_trait("diameter at breast height (1.3 m)")` | `output/bien_dbh_raw.csv` | **COMPLETE** — 14,929,488 records |
+| 3 | `scripts/03_growth_form_query.R` | `BIEN_trait_trait("whole plant growth form")` | `output/bien_growth_form_raw.csv` | **COMPLETE** — 330,047 records |
 | 4 | `scripts/04_taxonomy_reconcile.R` | `run_taxonomy_reconcile()` | `output/bien_taxonomy_reconciled.csv` | NOT RUN |
 | 5 | `scripts/05_reconcile_growth_form.R` | `run_growth_form_reconcile()` | `output/species_growth_form.csv` | NOT RUN |
 | 6 | `scripts/06_qa_checks.R` | `run_qa_checks()` | `output/bien_height_qa.csv`, `output/bien_dbh_qa.csv` | NOT RUN |
@@ -163,6 +163,38 @@ where the numerator is the water potential difference (~1.3 MPa) and the denomin
 - Updated `scripts/02_trait_query.R` and `scripts/03_growth_form_query.R` with corrected trait name strings.
 
 **Note on species count:** 333,778 species exceeds the expected ~150,000 vascular plants. BIEN_list_all() likely includes all distinct name strings in the BIEN database, including synonyms, varieties, hybrids, and non-vascular occurrences. Stage 4 (taxonomy reconciliation) will filter to accepted species names and scrubbed binomials.
+
+---
+
+### Stage 2 — 2026-05-11 COMPLETE
+
+**Script:** `scripts/02_trait_query.R`  
+**BIEN version:** 1.2.8  
+**Log:** `output/stage2_run_log.txt`
+
+| Sub-stage | Trait | Pages | Records | File size | Output |
+|-----------|-------|-------|---------|-----------|--------|
+| 2a | `whole plant height` | 1,447 | 10,167,913 | 5.2 GB | `output/bien_height_raw.csv` |
+| 2b | `maximum whole plant height` | 34 | 3,722 | 1.9 MB | `output/bien_max_height_raw.csv` |
+| 2c | `diameter at breast height (1.3 m)` | 1,493 | 14,929,488 | 7.8 GB | `output/bien_dbh_raw.csv` |
+
+**Note:** `whole plant height` and `diameter at breast height` are extremely large traits — both draw from BIEN's plot-based vegetation survey database (individual stem measurements). Total Stage 2 output: ~25 million records, ~13 GB. These are observation-level records; species-level aggregation happens in Stage 7.
+
+**Note on max height:** Only 3,722 records for `maximum whole plant height` — this is a literature-compiled trait, much sparser than the plot-based measurements. It provides maximum attainable heights, complementing the plot-based mean heights in Stage 2a.
+
+---
+
+### Stage 3 — 2026-05-11 COMPLETE
+
+**Script:** `scripts/03_growth_form_query.R`  
+**Trait:** `whole plant growth form`  
+**Pages fetched:** 34  
+**Records:** 330,047  
+**File size:** ~several MB  
+**Output:** `output/bien_growth_form_raw.csv`  
+**Log:** `output/stage3_run_log.txt`
+
+**Note:** Growth form coverage (330k records for 333k species) is better than expected — close to one record per species. However, many species likely have a single freetext growth form entry; conflict detection and canonical mapping (Stage 5) will be critical.
 
 ---
 
