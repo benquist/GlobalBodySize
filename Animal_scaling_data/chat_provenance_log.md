@@ -64,6 +64,18 @@
 - `hatton_figures_reconstruction.html` — rendered successfully (11 MB, 45/45 chunks, 2026-05-11 15:27)
 
 ---
+
+## 2026-05-11 (slope summary statistics and filtered analyses)
+
+**Prompt:** "For the Animal_scaling_data I had this previous prompt [For Animal Allometric Scaling: Metabolism and Growth Across Taxa — please include statistics for 95%CI for the mean and median slope value for the order, family, genus, and intraspecific level. Also do the analyses with a sample cut off of 10 observations and a size range that spans at least 3 orders of magnitude. Include all existing analyses but then add publication quality plots with those filters. Exclude all non-animal data in the later analyses (no plants, microbes, etc.)]"
+
+**Changes:**
+- `animal_allometric_scaling.Rmd` — two new top-level sections appended before # References (lines 2064–2755):
+  - **Section: "Summary Statistics for Slope Distributions Across Taxonomic Levels"**: helper functions `boot_median_ci` (5000-resample percentile bootstrap), `mean_ci` (t-distribution CI), `slope_summary_row`; per-level kable tables for order, family, genus (if column exists), and intraspecific slopes; combined comparison table and forest-style ggplot comparing mean (t-CI) vs median (bootstrap CI) slopes with WBE β=0.75 reference across all four levels.
+  - **Section: "Filtered Analyses: Animals Only, N ≥ 10, Size Range ≥ 3 Orders of Magnitude"**: `met_animals` dataset filtered by case-insensitive exclusion of plant/microbe/bacteria/archaea/fungi/algae/phyto/protist groups; `fit_log_lm_filtered` helper enforcing max/min(body_mass_g) ≥ 1000 per group; order, family, genus (guarded), and intraspecific subsections with kable tables and coord_flip forest plots; filtered intraspecific histogram + forest plot; faceted unfiltered vs filtered comparison plot.
+- `animal_allometric_scaling.html` — re-rendered successfully (187/187 chunks, no errors, 2026-05-11)
+
+---
 ## 2026-05-11 — Extended Synthesis plots redesigned for dataset visibility
 
 Replaced all six prep+plot chunks and three reg-table chunks in `hatton_figures_reconstruction.Rmd`:

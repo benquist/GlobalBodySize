@@ -637,21 +637,33 @@ if (has_patchwork) {
 
 # Part 2 — Extended Synthesis (Adding Non-Hatton Data)
 
-The following plots augment the Hatton originals with additional datasets. Hatton data appear as the **primary foreground layer** (alpha = 0.5, size = 1.5); non-Hatton data appear as the **background layer** (alpha = 0.25, size = 1). OLS fit lines are shown separately for each dataset using different linetypes.
+The following plots augment the Hatton originals with additional datasets. All sources are shown at **equal visual weight** (alpha = 0.45, size = 1.5, filled circles), coloured by **dataset source**. Regression ribbons (OLS ± 95% CI) span only the actual data range of each source, making contributions from new datasets immediately visible.
 
 ---
 
 ## Extended Fig 1: Metabolic Rate vs. Body Mass (all sources) {#ext-fig1}
 
 ```{r ext-fig1-metab-prep}
-# --- Hatton 2019 metabolic layer ---
+# Dataset colour palette (distinct, colorblind-friendly) — reused in Ext Figs 2 & 3
+ds_pal <- c(
+  "Hatton 2019"                    = "#BBBBBB",   # grey — shown as reference
+  "Hoehler 2023 (PNAS)"            = "#d73027",
+  "AnimalTraits"                   = "#4dac26",
+  "Chown 2007"                     = "#f1a340",
+  "Grady 2014 (extant)"            = "#7b3294",
+  "Grady 2014 (extinct/mesotherm)" = "#e66101"
+)
+
+# Non-Hatton colours only — used in colour/fill scales so Hatton stays grey
+ds_pal_new <- ds_pal[names(ds_pal) != "Hatton 2019"]
+
+# --- Per-source data preparation ---
 h19_metab_ext <- h19_metab[, .(
   body_mass_g, metabolic_rate_value,
   input_taxonomic_group,
   dataset_label = "Hatton 2019"
 )]
 
-# --- Hoehler 2023 ---
 hoeh_metab <- hoehler2023[
   !is.na(body_mass_g) & body_mass_g > 0 &
   !is.na(metabolic_rate_value) & metabolic_rate_value > 0,
@@ -659,7 +671,6 @@ hoeh_metab <- hoehler2023[
     dataset_label = "Hoehler 2023 (PNAS)")
 ]
 
-# --- AnimalTraits ---
 at_metab <- animaltr[
   !is.na(body_mass_g) & body_mass_g > 0 &
   !is.na(metabolic_rate_value) & metabolic_rate_value > 0,
@@ -667,7 +678,6 @@ at_metab <- animaltr[
     dataset_label = "AnimalTraits")
 ]
 
-# --- Chown 2007 ---
 ch_metab <- chown2007[
   !is.na(body_mass_g) & body_mass_g > 0 &
   !is.na(metabolic_rate_value) & metabolic_rate_value > 0,
@@ -675,13 +685,11 @@ ch_metab <- chown2007[
     dataset_label = "Chown 2007")
 ]
 
-# --- Grady 2014 extant vs. extinct/mesotherm ---
 grady_ext_metab  <- NULL
 grady_meso_metab <- NULL
 if (nrow(grady2014) > 0 &&
     all(c("metabolic_mass_g","metabolic_rate_W","input_taxonomic_group",
           "is_extinct","is_mesotherm") %in% names(grady2014))) {
-
   grady_clean_m <- grady2014[
     !is.na(metabolic_mass_g) & metabolic_mass_g > 0 &
     !is.na(metabolic_rate_W)  & metabolic_rate_W  > 0
@@ -698,126 +706,142 @@ if (nrow(grady2014) > 0 &&
   ]
 }
 
-# Combine background layers (non-Hatton)
-bg_layers <- rbindlist(Filter(function(x) !is.null(x) && nrow(x) > 0,
-  list(hoeh_metab, at_metab, ch_metab, grady_ext_metab, grady_meso_metab)
-))
-
-# Dataset shape mapping
-ds_shapes <- c(
-  "Hatton 2019"                = 16,
-  "Hoehler 2023 (PNAS)"        = 17,
-  "AnimalTraits"               = 15,
-  "Chown 2007"                 = 18,
-  "Grady 2014 (extant)"        = 1,
-  "Grady 2014 (extinct/mesotherm)" = 2
+# Combined dataset — all sources, coloured by dataset
+metab_all <- rbindlist(
+  Filter(function(x) !is.null(x) && nrow(x) > 0,
+    list(h19_metab_ext, hoeh_metab, at_metab, ch_metab,
+         grady_ext_metab, grady_meso_metab)),
+  fill = TRUE
 )
+metab_all[, dataset_label := factor(dataset_label, levels = names(ds_pal))]
 
-# Per-dataset OLS fits for regression lines
-fit_ext_list <- list()
-for (ds_name in unique(c(h19_metab_ext$dataset_label, bg_layers$dataset_label))) {
-  ds_data <- rbind(
-    h19_metab_ext[dataset_label == ds_name],
-    bg_layers[dataset_label == ds_name]
-  )
-  if (nrow(ds_data) >= 5) {
-    f <- fit_ols_log(ds_data, "body_mass_g", "metabolic_rate_value")
-    if (nrow(f) > 0) {
-      f[, dataset_label := ds_name]
-      fit_ext_list[[ds_name]] <- f
-    }
-  }
-}
-fit_ext_metab <- rbindlist(fit_ext_list)
+# Per-dataset OLS fits (for regression table)
+fit_ext_metab <- rbindlist(lapply(levels(metab_all$dataset_label), function(ds_name) {
+  d <- metab_all[dataset_label == ds_name]
+  if (nrow(d) < 5) return(NULL)
+  f <- fit_ols_log(d, "body_mass_g", "metabolic_rate_value")
+  if (nrow(f) > 0) f[, dataset_label := ds_name]
+  f
+}), fill = TRUE)
+fit_ext_metab <- fit_ext_metab[!is.na(group)]
 
-# Line types per dataset
-ds_linetypes <- c(
-  "Hatton 2019"                = "solid",
-  "Hoehler 2023 (PNAS)"        = "dashed",
-  "AnimalTraits"               = "dotdash",
-  "Chown 2007"                 = "dotted",
-  "Grady 2014 (extant)"        = "longdash",
-  "Grady 2014 (extinct/mesotherm)" = "twodash"
-)
-
-# Dataset colours for OLS lines (distinct from taxon palette)
-ds_line_cols <- c(
-  "Hatton 2019"                = "black",
-  "Hoehler 2023 (PNAS)"        = "#1b7837",
-  "AnimalTraits"               = "#762a83",
-  "Chown 2007"                 = "#d6604d",
-  "Grady 2014 (extant)"        = "#4393c3",
-  "Grady 2014 (extinct/mesotherm)" = "#f4a582"
-)
+# n per dataset (for subtitle annotation)
+n_labels_metab <- metab_all[
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(metabolic_rate_value) & metabolic_rate_value > 0,
+  .(n = .N), by = dataset_label
+]
 ```
 
-```{r ext-fig1-metab-plot, fig.width=11, fig.height=7, fig.cap="**Extended Fig 1.** Metabolic rate vs. body mass — all sources. Hatton et al. 2019 data shown as primary foreground layer (filled circles, alpha = 0.5). Non-Hatton sources in background (alpha = 0.25). Grady et al. 2014 extinct/mesotherm taxa shown as open triangles. OLS fit lines per dataset: Hatton 2019 (solid black); Hoehler 2023 (dashed green); AnimalTraits (dot-dash purple); Chown 2007 (dotted red); Grady 2014 extant (long-dash blue). Metabolic rates in Hatton 2019 are temperature-standardised (Arrhenius, Q10 ≈ 2.81). Note: Chown 2007 applies per-observation temperature corrections following Riveros & Enquist (2011)."}
+```{r ext-fig1-metab-plot, fig.width=11, fig.height=8, fig.cap="**Extended Fig 1a.** Metabolic rate vs. body mass — all sources coloured by dataset. Ribbons show OLS ± 95% CI spanning the actual data range of each source. **Extended Fig 1b.** Faceted coverage view: each panel shows that source's data (coloured) against Hatton 2019 reference points (grey). Hatton 2019 metabolic rates temperature-standardised (Arrhenius, Q10 ≈ 2.81). Chown 2007: per-observation temperature corrections (Riveros & Enquist 2011)."}
 
-p_ext1 <- ggplot() +
-  # Background: non-Hatton data
-  geom_point(
-    data = bg_layers,
-    aes(x = body_mass_g, y = metabolic_rate_value,
-        colour = input_taxonomic_group, shape = dataset_label),
-    alpha = 0.25, size = 1
+# n= subtitle
+n_sub_metab <- paste(
+  sprintf("%s n=%d", as.character(n_labels_metab$dataset_label), n_labels_metab$n),
+  collapse = "  |  "
+)
+
+# ── Primary plot: all datasets, coloured by dataset ──────────────────────────
+p_ext1 <- ggplot(
+  metab_all[!is.na(body_mass_g) & body_mass_g > 0 &
+            !is.na(metabolic_rate_value) & metabolic_rate_value > 0],
+  aes(x = body_mass_g, y = metabolic_rate_value, colour = dataset_label)
+) +
+  geom_point(alpha = 0.45, size = 1.5, shape = 16) +
+  geom_smooth(
+    aes(fill = dataset_label),
+    method = "lm", formula = y ~ x, se = TRUE, alpha = 0.15, linewidth = 1.0
   ) +
-  # Foreground: Hatton 2019
-  geom_point(
-    data = h19_metab_ext,
-    aes(x = body_mass_g, y = metabolic_rate_value,
-        colour = input_taxonomic_group, shape = dataset_label),
-    alpha = 0.5, size = 1.5
-  ) +
-  # OLS lines per dataset
-  {
-    line_layers <- list()
-    for (i in seq_len(nrow(fit_ext_metab))) {
-      row <- fit_ext_metab[i]
-      ds  <- row$dataset_label
-      line_layers[[i]] <- geom_abline(
-        slope     = row$slope,
-        intercept = row$intercept,
-        colour    = ds_line_cols[ds],
-        linewidth = 1.0,
-        linetype  = ds_linetypes[ds]
-      )
-    }
-    line_layers
-  } +
   scale_x_log10(labels = label_log(base = 10), breaks = 10^seq(-15, 9, by = 3)) +
   scale_y_log10(labels = label_log(base = 10), breaks = 10^seq(-18, 6, by = 3)) +
-  scale_colour_manual(values = taxon_pal, name = "Taxonomic group",
-                      na.value = "#AAAAAA") +
-  scale_shape_manual(values = ds_shapes, name = "Dataset") +
+  scale_colour_manual(values = ds_pal, name = "Dataset") +
+  scale_fill_manual(  values = ds_pal, name = "Dataset") +
   annotation_logticks(sides = "bl", size = 0.3) +
   labs(
-    x       = "Body mass (g)",
-    y       = "Metabolic rate (W)",
-    title   = "Extended Fig 1 — Metabolic rate scaling: all sources",
-    caption = paste0(
+    x        = "Body mass (g)",
+    y        = "Metabolic rate (W)",
+    title    = "Extended Fig 1a — Metabolic rate scaling: all sources",
+    subtitle = n_sub_metab,
+    caption  = paste0(
       "Hatton et al. 2019 (PNAS 116:21616); Hoehler et al. 2023 (PNAS 120:e2303764120); ",
-      "AnimalTraits (Herberstein et al. 2022); Chown et al. 2007 (Funct. Ecol.); ",
-      "Grady et al. 2014 (Science 344:1268). OLS lines fitted independently per dataset."
+      "AnimalTraits (Herberstein et al. 2022); Chown et al. 2007; Grady et al. 2014 (Science 344:1268). ",
+      "Ribbons: OLS \u00b1 95% CI spanning actual data range per source."
     )
   ) +
   guides(
-    colour = guide_legend(override.aes = list(size = 2.5, alpha = 0.9)),
-    shape  = guide_legend(override.aes = list(size = 2.5, alpha = 0.9))
+    colour = guide_legend(override.aes = list(size = 2.5, alpha = 1)),
+    fill   = guide_legend(override.aes = list(alpha = 0.3))
   )
 
 print(p_ext1)
+
+# ── Faceted reference plot: one facet per non-Hatton source ──────────────────
+non_hatton_levels <- setdiff(levels(metab_all$dataset_label), "Hatton 2019")
+non_hatton_levels <- non_hatton_levels[non_hatton_levels %in%
+  as.character(metab_all$dataset_label)]
+
+metab_non_hatton <- metab_all[
+  dataset_label %in% non_hatton_levels &
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(metabolic_rate_value) & metabolic_rate_value > 0
+]
+metab_non_hatton[, dataset_label := factor(
+  as.character(dataset_label), levels = non_hatton_levels
+)]
+
+hatton_ref_m <- h19_metab_ext[
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(metabolic_rate_value) & metabolic_rate_value > 0,
+  .(body_mass_g, metabolic_rate_value)
+]
+ref_facets_m <- rbindlist(lapply(non_hatton_levels, function(ds) {
+  cbind(hatton_ref_m, dataset_label = ds)
+}))
+ref_facets_m[, dataset_label := factor(dataset_label, levels = non_hatton_levels)]
+
+if (nrow(metab_non_hatton) > 0) {
+  p_ext1b <- ggplot() +
+    geom_point(
+      data = ref_facets_m,
+      aes(x = body_mass_g, y = metabolic_rate_value),
+      colour = "grey70", alpha = 0.25, size = 0.8, shape = 16
+    ) +
+    geom_point(
+      data = metab_non_hatton,
+      aes(x = body_mass_g, y = metabolic_rate_value, colour = dataset_label),
+      alpha = 0.55, size = 1.5, shape = 16
+    ) +
+    facet_wrap(~ dataset_label, ncol = 3, scales = "fixed") +
+    scale_x_log10(labels = label_log(base = 10)) +
+    scale_y_log10(labels = label_log(base = 10)) +
+    scale_colour_manual(values = ds_pal, name = "Dataset") +
+    annotation_logticks(sides = "bl", size = 0.25) +
+    labs(
+      x       = "Body mass (g)",
+      y       = "Metabolic rate (W)",
+      title   = "Extended Fig 1b — Coverage by source (grey = Hatton 2019 reference)",
+      caption = "Each panel: grey = Hatton 2019 reference; coloured = source-specific data. No regression lines shown."
+    ) +
+    theme(legend.position = "none")
+  print(p_ext1b)
+}
 ```
 
 **Regression table — Extended Fig 1:**
 
 ```{r ext-fig1-reg-table}
-if (requireNamespace("kableExtra", quietly = TRUE)) {
-  fmt_reg_table(fit_ext_metab[, .(group = dataset_label, n, slope, slope_se,
-                                   ci_lo, ci_hi, intercept, r2)],
-    caption = "OLS log-log regressions: metabolic rate ~ body mass (all sources, All taxa combined)")
+if (nrow(fit_ext_metab) > 0) {
+  if (requireNamespace("kableExtra", quietly = TRUE)) {
+    fmt_reg_table(fit_ext_metab[, .(group = dataset_label, n, slope, slope_se,
+                                     ci_lo, ci_hi, intercept, r2)],
+      caption = "OLS log-log regressions: metabolic rate ~ body mass (per dataset, all taxa combined)")
+  } else {
+    knitr::kable(fit_ext_metab[, .(group = dataset_label, n, slope, slope_se,
+                                    ci_lo, ci_hi, intercept, r2)], digits = 3,
+      caption = "OLS log-log regressions: metabolic rate ~ body mass (all sources)")
+  }
 } else {
-  knitr::kable(fit_ext_metab, digits = 3,
-    caption = "OLS log-log regressions: metabolic rate ~ body mass (all sources)")
+  cat("No OLS fits available for Extended Fig 1.\n")
 }
 ```
 
@@ -828,11 +852,6 @@ if (requireNamespace("kableExtra", quietly = TRUE)) {
 > **Mesothermy note:** Grady et al. (2014, Science 344:1268) tested whether dinosaur growth rates fall between living ectotherms and endotherms. Their analysis identified 8 mesothermic extinct taxa (dinosaurs/marine reptiles) whose growth rate scaling is intermediate between living ectotherms and endotherms, providing evidence for mesothermy in non-avian dinosaurs. In the plot below, extinct mesothermic taxa are shown as open triangles.
 
 ```{r ext-fig2-growth-prep}
-# Part 1 (Fig 2) already uses growth_rate_value from hatton2019 compiled CSV.
-# Extended Fig 2 uses:
-#   (a) raw Growth.csv (Productivity_g_yr and Mass_g per observation)
-#   (b) Grady 2014 (final_adult_mass_g, gmax_g_per_day * 365)
-
 # --- Layer A: raw Hatton 2019 Growth.csv ---
 gr_raw <- growth_raw[
   !is.na(Mass_g) & Mass_g > 0 &
@@ -840,10 +859,10 @@ gr_raw <- growth_raw[
   .(body_mass_g = Mass_g,
     growth_value = Productivity_g_yr,
     input_taxonomic_group = tolower(Major_taxa),
-    dataset_label = "Hatton 2019 (raw obs)")
+    dataset_label = "Hatton 2019")
 ]
 
-# --- Layer B: Grady 2014 extant ---
+# --- Layer B: Grady 2014 ---
 grady_gr_ext  <- NULL
 grady_gr_meso <- NULL
 if (nrow(grady2014) > 0 &&
@@ -865,98 +884,74 @@ if (nrow(grady2014) > 0 &&
   ]
 }
 
-# Combine: foreground is Hatton raw obs; background is Grady
-bg_gr <- rbindlist(Filter(function(x) !is.null(x) && nrow(x) > 0,
-  list(grady_gr_ext, grady_gr_meso)))
-fg_gr <- gr_raw
+# Growth ds_pal — subset of ds_pal defined in ext-fig1-metab-prep
+ds_pal_gr <- ds_pal[intersect(names(ds_pal),
+  c("Hatton 2019", "Grady 2014 (extant)", "Grady 2014 (extinct/mesotherm)"))]
 
-gr_shapes <- c(
-  "Hatton 2019 (raw obs)"          = 16,
-  "Grady 2014 (extant)"            = 1,
-  "Grady 2014 (extinct/mesotherm)" = 2
+# Combined dataset
+growth_all <- rbindlist(
+  Filter(function(x) !is.null(x) && nrow(x) > 0,
+    list(gr_raw, grady_gr_ext, grady_gr_meso)),
+  fill = TRUE
 )
+growth_all[, dataset_label := factor(dataset_label, levels = names(ds_pal_gr))]
 
-# Per-dataset OLS
-fit_gr_ext_list <- list()
-for (ds_name in unique(c(fg_gr$dataset_label,
-                          if (!is.null(bg_gr) && nrow(bg_gr) > 0) bg_gr$dataset_label else NULL))) {
-  ds_data <- rbind(
-    fg_gr[dataset_label == ds_name],
-    if (!is.null(bg_gr) && nrow(bg_gr) > 0) bg_gr[dataset_label == ds_name] else data.table()
-  )
-  if (nrow(ds_data) >= 5) {
-    f <- fit_ols_log(ds_data, "body_mass_g", "growth_value")
-    if (nrow(f) > 0) {
-      f[, dataset_label := ds_name]
-      fit_gr_ext_list[[ds_name]] <- f
-    }
-  }
-}
-fit_gr_ext <- rbindlist(fit_gr_ext_list)
+# Per-dataset OLS fits (for regression table)
+fit_gr_ext <- rbindlist(lapply(levels(growth_all$dataset_label), function(ds_name) {
+  d <- growth_all[dataset_label == ds_name]
+  if (nrow(d) < 5) return(NULL)
+  f <- fit_ols_log(d, "body_mass_g", "growth_value")
+  if (nrow(f) > 0) f[, dataset_label := ds_name]
+  f
+}), fill = TRUE)
+fit_gr_ext <- fit_gr_ext[!is.na(group)]
 
-gr_line_cols <- c(
-  "Hatton 2019 (raw obs)"          = "black",
-  "Grady 2014 (extant)"            = "#4393c3",
-  "Grady 2014 (extinct/mesotherm)" = "#f4a582"
-)
-gr_linetypes <- c(
-  "Hatton 2019 (raw obs)"          = "solid",
-  "Grady 2014 (extant)"            = "dashed",
-  "Grady 2014 (extinct/mesotherm)" = "dotted"
-)
+# n per dataset (for subtitle)
+n_labels_gr <- growth_all[
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(growth_value) & growth_value > 0,
+  .(n = .N), by = dataset_label
+]
 ```
 
-```{r ext-fig2-growth-plot, fig.width=10, fig.height=7, fig.cap="**Extended Fig 2.** Growth rate (g/yr) vs. body mass (g) — all sources. Foreground: Hatton 2019 raw Growth.csv per-observation productivity (g/yr) vs. body mass. Background: Grady et al. 2014 maximum somatic growth rate (gmax × 365 g/yr) vs. final adult body mass. Extinct mesothermic taxa (open triangles) include dinosaurs and Mesozoic marine reptiles assigned to intermediate metabolic grade by Grady et al. (2014). OLS lines fitted per dataset."}
+```{r ext-fig2-growth-plot, fig.width=10, fig.height=7, fig.cap="**Extended Fig 2.** Growth rate (g/yr) vs. body mass (g) — Hatton 2019 raw Growth.csv and Grady et al. 2014, all sources at equal visual weight coloured by dataset. Ribbons show OLS ± 95% CI spanning the actual data range of each source. Grady 2014 extinct/mesotherm taxa include dinosaurs and Mesozoic marine reptiles."}
 
-p_ext2 <- ggplot() +
-  {
-    if (!is.null(bg_gr) && nrow(bg_gr) > 0)
-      geom_point(
-        data = bg_gr,
-        aes(x = body_mass_g, y = growth_value,
-            colour = input_taxonomic_group, shape = dataset_label),
-        alpha = 0.3, size = 1.2
-      )
-  } +
-  geom_point(
-    data = fg_gr,
-    aes(x = body_mass_g, y = growth_value,
-        colour = input_taxonomic_group, shape = dataset_label),
-    alpha = 0.5, size = 1.5
+n_sub_gr <- paste(
+  sprintf("%s n=%d", as.character(n_labels_gr$dataset_label), n_labels_gr$n),
+  collapse = "  |  "
+)
+
+p_ext2 <- ggplot(
+  growth_all[!is.na(body_mass_g) & body_mass_g > 0 &
+             !is.na(growth_value) & growth_value > 0],
+  aes(x = body_mass_g, y = growth_value, colour = dataset_label)
+) +
+  geom_point(alpha = 0.45, size = 1.5, shape = 16) +
+  geom_smooth(
+    aes(fill = dataset_label),
+    method = "lm", formula = y ~ x, se = TRUE, alpha = 0.15, linewidth = 1.0
   ) +
-  {
-    line_layers <- list()
-    for (i in seq_len(nrow(fit_gr_ext))) {
-      row <- fit_gr_ext[i]
-      ds  <- row$dataset_label
-      line_layers[[i]] <- geom_abline(
-        slope = row$slope, intercept = row$intercept,
-        colour = gr_line_cols[ds], linewidth = 1.0,
-        linetype = gr_linetypes[ds]
-      )
-    }
-    line_layers
-  } +
   scale_x_log10(labels = label_log(base = 10), breaks = 10^seq(-3, 9, by = 3)) +
   scale_y_log10(labels = label_log(base = 10)) +
-  scale_colour_manual(values = taxon_pal, name = "Taxonomic group",
-                      na.value = "#AAAAAA") +
-  scale_shape_manual(values = gr_shapes, name = "Dataset") +
+  scale_colour_manual(values = ds_pal_gr, name = "Dataset") +
+  scale_fill_manual(  values = ds_pal_gr, name = "Dataset") +
   annotation_logticks(sides = "bl", size = 0.3) +
   labs(
-    x       = "Body mass (g)",
-    y       = "Growth rate (g yr⁻¹)",
-    title   = "Extended Fig 2 — Growth rate scaling: Hatton 2019 + Grady 2014",
-    caption = paste0(
-      "Hatton 2019 raw Growth.csv: Productivity_g_yr per observation. ",
+    x        = "Body mass (g)",
+    y        = "Growth rate (g yr⁻¹)",
+    title    = "Extended Fig 2 — Growth rate scaling: Hatton 2019 + Grady 2014",
+    subtitle = n_sub_gr,
+    caption  = paste0(
+      "Hatton 2019: Productivity_g_yr per observation (raw Growth.csv). ",
       "Grady et al. 2014: gmax × 365 g/yr vs. final adult body mass. ",
-      "Extinct mesotherms shown as open triangles. ",
+      "Extinct/mesotherm taxa include dinosaurs and Mesozoic marine reptiles. ",
+      "Ribbons: OLS ± 95% CI spanning actual data range per source. ",
       "Grady 2014 DOI: 10.1126/science.1253143."
     )
   ) +
   guides(
-    colour = guide_legend(override.aes = list(size = 2.5, alpha = 0.9)),
-    shape  = guide_legend(override.aes = list(size = 2.5, alpha = 0.9))
+    colour = guide_legend(override.aes = list(size = 2.5, alpha = 1)),
+    fill   = guide_legend(override.aes = list(alpha = 0.3))
   )
 
 print(p_ext2)
@@ -969,9 +964,10 @@ if (nrow(fit_gr_ext) > 0) {
   if (requireNamespace("kableExtra", quietly = TRUE)) {
     fmt_reg_table(fit_gr_ext[, .(group = dataset_label, n, slope, slope_se,
                                   ci_lo, ci_hi, intercept, r2)],
-      caption = "OLS log-log regressions: growth rate ~ body mass (all sources, All taxa combined)")
+      caption = "OLS log-log regressions: growth rate ~ body mass (per dataset, all taxa combined)")
   } else {
-    knitr::kable(fit_gr_ext, digits = 3,
+    knitr::kable(fit_gr_ext[, .(group = dataset_label, n, slope, slope_se,
+                                 ci_lo, ci_hi, intercept, r2)], digits = 3,
       caption = "OLS log-log regressions: growth rate ~ body mass")
   }
 } else {
@@ -986,10 +982,10 @@ if (nrow(fit_gr_ext) > 0) {
 ```{r ext-fig3-mort-prep}
 # Hatton 2019 raw Mortality.csv (already prepared as `mort`)
 mort_fg <- mort[, .(
-  body_mass_g = Mass_g,
+  body_mass_g      = Mass_g,
   mortality_per_yr = Mortality_per_yr,
   input_taxonomic_group = taxon_lc,
-  dataset_label = "Hatton 2019"
+  dataset_label    = "Hatton 2019"
 )]
 
 # AnimalTraits: mortality from 1/lifespan_max_years
@@ -1002,99 +998,78 @@ if ("lifespan_max_years" %in% names(animaltr)) {
   if (nrow(at_mort_raw) > 0) {
     at_mort <- at_mort_raw[, .(
       body_mass_g,
-      mortality_per_yr = 1 / lifespan_max_years,
+      mortality_per_yr     = 1 / lifespan_max_years,
       input_taxonomic_group,
-      dataset_label = "AnimalTraits (1/lifespan)"
+      dataset_label        = "AnimalTraits"
     )]
   }
 }
 
-bg_mort <- if (!is.null(at_mort) && nrow(at_mort) > 0) at_mort else data.table()
+# Mortality ds_pal — subset of ds_pal defined in ext-fig1-metab-prep
+ds_pal_mort <- ds_pal[intersect(names(ds_pal), c("Hatton 2019", "AnimalTraits"))]
 
-mort_shapes <- c(
-  "Hatton 2019"           = 16,
-  "AnimalTraits (1/lifespan)" = 17
+# Combined dataset
+mortality_all <- rbindlist(
+  Filter(function(x) !is.null(x) && nrow(x) > 0,
+    list(mort_fg, at_mort)),
+  fill = TRUE
 )
+mortality_all[, dataset_label := factor(dataset_label, levels = names(ds_pal_mort))]
 
-# Per-dataset OLS
-fit_mort_ext_list <- list()
-for (ds_name in unique(c(mort_fg$dataset_label,
-                          if (nrow(bg_mort) > 0) bg_mort$dataset_label else NULL))) {
-  ds_data <- rbind(
-    mort_fg[dataset_label == ds_name, .(body_mass_g, mortality_per_yr)],
-    if (nrow(bg_mort) > 0) bg_mort[dataset_label == ds_name, .(body_mass_g, mortality_per_yr)]
-    else data.table()
-  )
-  if (nrow(ds_data) >= 5) {
-    f <- fit_ols_log(ds_data, "body_mass_g", "mortality_per_yr")
-    if (nrow(f) > 0) {
-      f[, dataset_label := ds_name]
-      fit_mort_ext_list[[ds_name]] <- f
-    }
-  }
-}
-fit_mort_ext <- rbindlist(fit_mort_ext_list)
+# Per-dataset OLS fits (for regression table)
+fit_mort_ext <- rbindlist(lapply(levels(mortality_all$dataset_label), function(ds_name) {
+  d <- mortality_all[dataset_label == ds_name]
+  if (nrow(d) < 5) return(NULL)
+  f <- fit_ols_log(d, "body_mass_g", "mortality_per_yr")
+  if (nrow(f) > 0) f[, dataset_label := ds_name]
+  f
+}), fill = TRUE)
+fit_mort_ext <- fit_mort_ext[!is.na(group)]
 
-mort_line_cols <- c(
-  "Hatton 2019"               = "black",
-  "AnimalTraits (1/lifespan)" = "#762a83"
-)
-mort_linetypes <- c(
-  "Hatton 2019"               = "solid",
-  "AnimalTraits (1/lifespan)" = "dashed"
-)
+# n per dataset (for subtitle)
+n_labels_mort <- mortality_all[
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(mortality_per_yr) & mortality_per_yr > 0,
+  .(n = .N), by = dataset_label
+]
 ```
 
-```{r ext-fig3-mort-plot, fig.width=10, fig.height=7, fig.cap="**Extended Fig 3.** Mortality rate vs. body mass. Foreground: Hatton et al. 2019 raw Mortality.csv data. Background: AnimalTraits lifespan data converted to mortality rate (1 / max lifespan yr). Note: 1/max-lifespan underestimates true mortality rate relative to age-structured estimates; the two datasets are not fully comparable. OLS lines fitted per dataset."}
+```{r ext-fig3-mort-plot, fig.width=10, fig.height=7, fig.cap="**Extended Fig 3.** Mortality rate vs. body mass — Hatton et al. 2019 and AnimalTraits (1/max lifespan), all sources at equal visual weight coloured by dataset. Ribbons show OLS ± 95% CI spanning the actual data range of each source. Note: 1/max-lifespan underestimates true mortality relative to age-structured estimates; the two datasets are not fully comparable."}
 
-p_ext3 <- ggplot() +
-  {
-    if (nrow(bg_mort) > 0)
-      geom_point(
-        data = bg_mort,
-        aes(x = body_mass_g, y = mortality_per_yr,
-            colour = input_taxonomic_group, shape = dataset_label),
-        alpha = 0.2, size = 1
-      )
-  } +
-  geom_point(
-    data = mort_fg,
-    aes(x = body_mass_g, y = mortality_per_yr,
-        colour = input_taxonomic_group, shape = dataset_label),
-    alpha = 0.5, size = 1.5
+n_sub_mort <- paste(
+  sprintf("%s n=%d", as.character(n_labels_mort$dataset_label), n_labels_mort$n),
+  collapse = "  |  "
+)
+
+p_ext3 <- ggplot(
+  mortality_all[!is.na(body_mass_g) & body_mass_g > 0 &
+                !is.na(mortality_per_yr) & mortality_per_yr > 0],
+  aes(x = body_mass_g, y = mortality_per_yr, colour = dataset_label)
+) +
+  geom_point(alpha = 0.45, size = 1.5, shape = 16) +
+  geom_smooth(
+    aes(fill = dataset_label),
+    method = "lm", formula = y ~ x, se = TRUE, alpha = 0.15, linewidth = 1.0
   ) +
-  {
-    line_layers <- list()
-    for (i in seq_len(nrow(fit_mort_ext))) {
-      row <- fit_mort_ext[i]
-      ds  <- row$dataset_label
-      line_layers[[i]] <- geom_abline(
-        slope = row$slope, intercept = row$intercept,
-        colour = mort_line_cols[ds], linewidth = 1.0,
-        linetype = mort_linetypes[ds]
-      )
-    }
-    line_layers
-  } +
   scale_x_log10(labels = label_log(base = 10), breaks = 10^seq(-3, 9, by = 3)) +
   scale_y_log10(labels = label_log(base = 10)) +
-  scale_colour_manual(values = taxon_pal, name = "Taxonomic group",
-                      na.value = "#AAAAAA") +
-  scale_shape_manual(values = mort_shapes, name = "Dataset") +
+  scale_colour_manual(values = ds_pal_mort, name = "Dataset") +
+  scale_fill_manual(  values = ds_pal_mort, name = "Dataset") +
   annotation_logticks(sides = "bl", size = 0.3) +
   labs(
-    x       = "Body mass (g)",
-    y       = expression("Mortality rate (yr"^{-1}*")"),
-    title   = "Extended Fig 3 — Mortality rate scaling: Hatton 2019 + AnimalTraits",
-    caption = paste0(
+    x        = "Body mass (g)",
+    y        = expression("Mortality rate (yr"^{-1}*")"),
+    title    = "Extended Fig 3 — Mortality rate scaling: Hatton 2019 + AnimalTraits",
+    subtitle = n_sub_mort,
+    caption  = paste0(
       "Hatton 2019: direct mortality estimates (raw Mortality.csv). ",
-      "AnimalTraits: mortality inferred as 1/max_lifespan_yr (underestimates true mortality). ",
-      "OLS lines fitted independently per dataset."
+      "AnimalTraits: mortality inferred as 1/max_lifespan_yr (note: underestimates true mortality). ",
+      "Ribbons: OLS ± 95% CI spanning actual data range per source."
     )
   ) +
   guides(
-    colour = guide_legend(override.aes = list(size = 2.5, alpha = 0.9)),
-    shape  = guide_legend(override.aes = list(size = 2.5, alpha = 0.9))
+    colour = guide_legend(override.aes = list(size = 2.5, alpha = 1)),
+    fill   = guide_legend(override.aes = list(alpha = 0.3))
   )
 
 print(p_ext3)
@@ -1107,11 +1082,14 @@ if (nrow(fit_mort_ext) > 0) {
   if (requireNamespace("kableExtra", quietly = TRUE)) {
     fmt_reg_table(fit_mort_ext[, .(group = dataset_label, n, slope, slope_se,
                                     ci_lo, ci_hi, intercept, r2)],
-      caption = "OLS log-log regressions: mortality rate ~ body mass")
+      caption = "OLS log-log regressions: mortality rate ~ body mass (per dataset, all taxa combined)")
   } else {
-    knitr::kable(fit_mort_ext, digits = 3,
+    knitr::kable(fit_mort_ext[, .(group = dataset_label, n, slope, slope_se,
+                                   ci_lo, ci_hi, intercept, r2)], digits = 3,
       caption = "OLS log-log regressions: mortality rate ~ body mass")
   }
+} else {
+  cat("Insufficient data for mortality regression.\n")
 }
 ```
 
