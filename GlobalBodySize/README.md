@@ -225,14 +225,14 @@ GlobalBodySize/
 │   └── sealifebase/load_sealifebase.R  # NEW — marine non-fish
 ├── scripts/                        # Pipeline orchestration
 │   ├── discover_body_mass_datasets.R
-│   ├── merge_tier1.R                   # Mass merge (10 providers)
+│   ├── merge_tier1.R                   # Mass merge (11 providers)
 │   ├── merge_linear_size.R             # Linear size merge (NEW)
 │   ├── run_taxon_reconciliation.R
 │   ├── run_fishbase_intake.sh
 │   ├── run_neon_intake.sh
 │   └── run_zenodo_discovery.sh
 ├── science_summary.Rmd             # Full analysis report (57 chunks)
-├── science_summary.html            # Rendered HTML report (4.4 MB)
+├── science_summary.html            # Rendered HTML report (4.7 MB, re-rendered 2026-05-11)
 ├── PROJECT_LOG_HISTORY.md          # Session-by-session change log
 ├── DATA_SOURCE_INVENTORY.md        # Annotated 23-source inventory
 ├── ECOLOGICAL_QUALITY_ADVISORY.md  # Tier quality ratings
