@@ -3,7 +3,7 @@
 **A reproducible, provenance-rich, cross-taxon animal body mass database.**
 
 [![Phase](https://img.shields.io/badge/Phase-1%20Tier--1%20Intake-blue)]()
-[![Rows](https://img.shields.io/badge/Rows-47%2C108%20%2B%20Grady2014%20pending-green)]()
+[![Rows](https://img.shields.io/badge/Rows-47%2C456-green)]()
 [![Groups](https://img.shields.io/badge/Taxa-mammals%20%7C%20birds%20%7C%20fish%20%7C%20amphibians%20%7C%20reptiles-orange)]()
 
 Body mass is the central ecological trait — it determines metabolic rate, population density, home range, generation time, and extinction risk across all animal life. This project assembles a unified, Darwin Core-compatible body mass database from authoritative curated sources, designed for macroecological synthesis, scaling law tests, and trait-based biodiversity analyses.
@@ -115,7 +115,7 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 | NEON DP1.10072.001 | Mammals | 800 | field trapping max weight | 10.48443/s4ph-2z37 **(UNVERIFIED)** | ✅ COMPLETE |
 | AnimalTraits (Herberstein et al. 2022) | Vertebrates + Invertebrates | 2,856 | wet / literature mean | [10.1038/s41597-022-01364-9](https://doi.org/10.1038/s41597-022-01364-9); data [10.5281/zenodo.6468938](https://doi.org/10.5281/zenodo.6468938) | ✅ COMPLETE |
 | Lizard Traits of the World (Meiri 2018) | Lizards (Squamata) | 6,633 | **LW-modeled** (allometric; Feldman et al. 2016) | [10.1111/geb.12773](https://doi.org/10.1111/geb.12773); data [10.5061/dryad.f6t39kj](https://doi.org/10.5061/dryad.f6t39kj) | ✅ COMPLETE |
-| Grady et al. 2014 (Science 344:1268) | Vertebrates + Sharks (cross-taxon) | 348 extant mass rows; 381 growth rows | wet / literature asymptote (final adult mass from growth curves) | PDF supplement only — no open deposit; [10.1126/science.1253143](https://doi.org/10.1126/science.1253143) | ⚠️ Intake run; **merge into tier1 pending** |
+| Grady et al. 2014 (Science 344:1268) | Vertebrates + Sharks (cross-taxon) | 348 extant mass rows; 381 growth rows | wet / literature asymptote (final adult mass from growth curves) | PDF supplement only — no open deposit; [10.1126/science.1253143](https://doi.org/10.1126/science.1253143) | ✅ COMPLETE |
 
 > **Note:** The NEON DOI `10.48443/s4ph-2z37` is used internally but has not been independently verified. Confirm before citing in any publication.
 
@@ -127,16 +127,16 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 
 > **Grady et al. 2014 mass:** `final_adult_mass_g` from the growth curve asymptote (von Bertalanffy or logistic fits to mass-at-age data), flagged `mass_measurement_type = "literature_asymptote"`. Covers 348 extant species from 11 groups (Crocodylia, Placental Mammals, Marsupials, Monotremata, Neornithes, Sharks, Squamata, Teleost Fish, Testudines). Data extracted from Table S1 of the PDF supplement — no open deposit. Full growth (Gmax g/d) and metabolic rate (W) columns are in `output/grady2014_growth_compiled.csv` for use in scaling law analyses.
 
-**Phase 1 + AnimalTraits + LizardTraits total (as of 2026-05-11): 47,108 rows across 10 completed providers. Grady 2014 (348 extant mass rows) pending merge.**
+**Phase 1 + AnimalTraits + LizardTraits + Grady 2014 total (as of 2026-05-11): 47,456 rows across 11 completed providers.**
 
 ### Taxonomic Group Breakdown
 
 | Group | Rows | Sources |
 |---|---|---|
-| Birds | 22,058 | EltonTraits (Birds), AVONET, AnimalTraits |
-| Mammals | 11,099 | PanTHERIA, EltonTraits (Mammals), AnAge, NEON, AnimalTraits |
-| Reptiles (lizards) | 6,741 | Lizard Traits of the World (Meiri 2018), AnAge, AnimalTraits |
-| Fish | 5,657 | FishBase |
+| Birds | 22,121 | EltonTraits (Birds), AVONET, AnimalTraits, Grady 2014 |
+| Mammals | 11,270 | PanTHERIA, EltonTraits (Mammals), AnAge, NEON, AnimalTraits, Grady 2014 |
+| Reptiles | 6,773 | Lizard Traits of the World (Meiri 2018), AnAge, AnimalTraits, Grady 2014 |
+| Fish | 5,739 | FishBase, AnimalTraits, Grady 2014 |
 | Insects | 772 | AnimalTraits |
 | Arachnids | 131 | AnimalTraits |
 | Amphibians | 619 | AmphiBIO, AnAge, AnimalTraits |
@@ -192,7 +192,7 @@ GlobalBodySize/
 │   ├── taxon_reconciliation.R
 │   └── zenodo_api.R
 ├── data/compiled/
-│   ├── tier1_combined.csv          # Merged Tier 1 mass (47,108 rows)
+│   ├── tier1_combined.csv          # Merged Tier 1 mass (47,456 rows, 11 providers)
 │   ├── tier1_linear_size_combined.csv  # Merged linear size (183k+ rows, NEW)
 │   ├── tier1_reconciled.csv        # + GBIF reconciliation columns
 │   └── taxon_match_cache.csv       # GBIF match cache (21,696 rows)
@@ -294,10 +294,9 @@ As of 2026-05-11:
 
 | Statistic | Value |
 |---|---|
-| Total rows — mass table (tier1_combined.csv) | 47,108 |
+| Total rows — mass table (tier1_combined.csv) | 47,456 |
 | Total rows — linear size table (tier1_linear_size_combined.csv) | 183,142+ (MOBS only; others pending) |
-| Providers completed (mass) | 10 |
-| Providers intake run, merge pending | 1 (Grady 2014 — 348 extant mass rows) |
+| Providers completed (mass) | 11 |
 | Providers with scripts ready but not yet run | 3 (ReptTraits, SeaLifeBase, DISPERSE) |
 | GBIF EXACT match rate | 97.7% |
 | Body size range | ~0.07 g (amphibians) to ~150,000,000 g (blue whale) |
@@ -400,7 +399,7 @@ rmarkdown::render("science_summary.Rmd", output_file = "science_summary.html")
 | 3 | ~~Add Lizard Traits of the World (Meiri 2018)~~ | ✅ Done (6,633 spp, allometric LW-modeled, 2026-05-11) |
 | 4 | ~~Add MOBS 1.0 marine linear size (McClain et al. 2025)~~ | ✅ Done (183,175 rows, 2026-05-11) |
 | 4b | ~~Extract Grady et al. 2014 Table S1 from PDF~~ | ✅ Done (381 taxa parsed; 348 extant mass rows + 381 growth rows; 2026-05-11) |
-| 5 | Merge Grady 2014 mass into tier1_combined.csv and re-run GBIF reconciliation | Run `scripts/merge_tier1.R` after merging |
+| 5 | ~~Merge Grady 2014 mass into tier1_combined.csv~~ | ✅ Done (47,456 rows, 11 providers, 2026-05-11) |
 | 6 | Run ReptTraits intake (Meiri et al. 2024, Sci Data, 12,060 reptile spp) | Script ready (`providers/repttraits/load_repttraits.R`) |
 | 7 | Run SeaLifeBase intake (rfishbase) | Script ready (`providers/sealifebase/load_sealifebase.R`) |
 | 8 | Run DISPERSE intake (Sarremejane et al. 2020, aquatic macroinvertebrates) | Script ready (`providers/disperse/load_disperse.R`) |
