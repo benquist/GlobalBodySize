@@ -12,6 +12,8 @@
 ##   - NEON            (mammalia, field trapping — optional; include if file exists)
 ##   - AnimalTraits    (vertebrates + invertebrates: insect, arachnid, crustacean,
 ##                      myriapod, annelid, gastropod; optional; include if present)
+##   - ReptTraits v1-2 (reptiles, maximum body mass; optional; include if present)
+##   - SeaLifeBase     (marine non-fish, maximum weight; optional; include if present)
 
 suppressPackageStartupMessages(library(data.table))
 
@@ -31,7 +33,10 @@ PROVIDERS <- c(
 
 OPTIONAL_PROVIDERS <- c(
   "output/neon_compiled.csv",
-  "output/animaltraits_compiled.csv"
+  "output/animaltraits_compiled.csv",
+  "output/repttraits_mass_compiled.csv",
+  "output/sealifebase_mass_compiled.csv",
+  "output/lizardtraits_mass_compiled.csv"
 )
 
 ## Log helper
