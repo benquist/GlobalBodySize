@@ -36,7 +36,8 @@ OPTIONAL_PROVIDERS <- c(
   "output/animaltraits_compiled.csv",
   "output/repttraits_mass_compiled.csv",
   "output/sealifebase_mass_compiled.csv",
-  "output/lizardtraits_mass_compiled.csv"
+  "output/lizardtraits_mass_compiled.csv",
+  "output/grady2014_mass_compiled.csv"
 )
 
 ## Log helper
