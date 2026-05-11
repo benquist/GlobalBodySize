@@ -102,3 +102,22 @@ Replaced all six prep+plot chunks and three reg-table chunks in `hatton_figures_
 - Re-rendered `hatton_figures_reconstruction.html` (12 MB, 45 chunks, clean)
 
 **Agent**: @m (supervisor) + coder sub-agent
+
+## 2026-05-12 — Grady 2014 growth rate allometry section
+
+**Prompt:** "update" + "are we analyzing the John Grady et al. allometric scaling of growth data too?"
+
+**Work done:**
+- Confirmed 95% CI summaries and filtered-analyses sections were already present in Rmd from prior session
+- Identified that Growth Rate Scaling section used only Hatton 2019 — Grady data missing
+- Found grady2014_growth_compiled.csv in GlobalBodySize/output/ (381 rows: 174 mammals, 83 fish, 63 birds, 61 reptiles, 28 extinct/dinosaurs)
+- Added new section: **# Grady et al. 2014 — Growth Rate Allometry in Vertebrates and Dinosaurs**
+  - Data loaded via relative path `../GlobalBodySize/output/grady2014_growth_compiled.csv`
+  - Metabolic strategy labels: endotherm / ectotherm / mesotherm / extinct
+  - Scatter plot with per-strategy OLS CI bands + WBE β = 0.75 reference
+  - OLS slope table by metabolic strategy
+  - Mesothermy diagnostic plot: dinosaur growth rates vs. endotherm/ectotherm bounding lines (ggrepel labels)
+  - Metabolic rate subset scatter (n = 122)
+- Added `LABEL_GR` and `HAS_GGREPEL` to setup chunk
+- Added Grady 2014 citation to References section
+- Rendered clean: 199/199 chunks; 3057-line Rmd

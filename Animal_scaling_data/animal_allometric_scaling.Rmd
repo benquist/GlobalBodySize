@@ -40,6 +40,9 @@ LABEL_PN  <- "Hoehler 2023 (PNAS)"
 LABEL_H19 <- "Hatton 2019 (PNAS)"
 LABEL_H15 <- "Hatton 2015 (Science)"
 LABEL_CH  <- "Chown 2007 (FuncEcol, corrected)"
+LABEL_GR  <- "Grady et al. 2014 (Science)"
+
+HAS_GGREPEL <- requireNamespace("ggrepel", quietly = TRUE)
 
 # ── Load helper ──────────────────────────────────────────────────────────────
 load_csv <- function(path, label) {
@@ -1761,6 +1764,302 @@ if (HAS_SMATR && nrow(grow_dat) >= 10) {
 
 ---
 
+# Grady et al. 2014 — Growth Rate Allometry in Vertebrates and Dinosaurs
+
+Grady et al. (2014, *Science* 344:1268–1272) assembled maximum growth rates ($G_\text{max}$, g day⁻¹) and resting metabolic rates for 381 extant vertebrate species plus 28 extinct taxa (non-avian dinosaurs, stem birds, stem mammals), to test the metabolic strategy (ectothermy, endothermy, or **mesothermy**) of dinosaurs.
+
+WBE predicts $G_\text{max} \propto M^{3/4}$, the same exponent as whole-organism metabolic rate. Endotherms (mammals, birds) lie above ectotherms (fish, reptiles) on the growth-rate–body-mass relationship because they sustain higher absolute production rates at the same body mass. **Mesotherms** are predicted to fall between these two scaling lines — the key test for dinosaurs.
+
+> **Data source:** Grady et al. Table S1, compiled at `GlobalBodySize/output/grady2014_growth_compiled.csv`. Body mass = final adult mass (g). Growth rate = $G_\text{max}$ (g day⁻¹). Metabolic rate (W) available for a subset.
+
+```{r grady-load}
+grady_path <- "../GlobalBodySize/output/grady2014_growth_compiled.csv"
+if (!file.exists(grady_path)) {
+  message("Grady 2014 data not found at: ", grady_path,
+          "\nSkipping Grady sections. Copy from GlobalBodySize/output/ if available.")
+  HAS_GRADY <- FALSE
+  gr <- data.table()
+} else {
+  gr <- fread(grady_path)
+  HAS_GRADY <- TRUE
+  cat(sprintf("Grady 2014: %d total rows\n", nrow(gr)))
+}
+
+if (HAS_GRADY) {
+  ## Working dataset: both mass and gmax available
+  gr_ok <- gr[!is.na(final_adult_mass_g) & final_adult_mass_g > 0 &
+              !is.na(gmax_g_per_day) & gmax_g_per_day > 0 &
+              data_quality_flag %in% c("ok", "", NA_character_)]
+
+  ## Metabolic strategy label
+  gr_ok[, strategy := fcase(
+    is_extinct == TRUE,                          "Extinct (dinosaurs/stem lineages)",
+    is_mesotherm == TRUE,                        "Mesotherm (extant)",
+    input_taxonomic_group %in% c("mammal","bird"), "Endotherm (mammal/bird)",
+    input_taxonomic_group %in% c("fish","reptile"), "Ectotherm (fish/reptile)",
+    default = "Other"
+  )]
+
+  cat(sprintf("Records with mass + gmax: n = %d\n", nrow(gr_ok)))
+  cat("\nBy strategy:\n")
+  print(gr_ok[, list(n=.N,
+                     mass_range_g = paste0(round(min(final_adult_mass_g),3)," – ",
+                                           round(max(final_adult_mass_g),0)),
+                     gmax_range = paste0(round(min(gmax_g_per_day),4)," – ",
+                                         round(max(gmax_g_per_day),1))),
+              by=strategy][order(-n)])
+}
+```
+
+## Gmax vs. body mass — all taxa {#grady-scatter}
+
+```{r grady-scatter, fig.width=10, fig.height=7}
+if (HAS_GRADY && nrow(gr_ok) >= 10) {
+  pal_strat <- c(
+    "Endotherm (mammal/bird)"            = pal8[2],
+    "Ectotherm (fish/reptile)"           = pal8[4],
+    "Mesotherm (extant)"                 = pal8[3],
+    "Extinct (dinosaurs/stem lineages)"  = "darkorange2",
+    "Other"                              = "grey50"
+  )
+  shape_strat <- c(
+    "Endotherm (mammal/bird)"            = 16,
+    "Ectotherm (fish/reptile)"           = 17,
+    "Mesotherm (extant)"                 = 15,
+    "Extinct (dinosaurs/stem lineages)"  = 18,
+    "Other"                              = 1
+  )
+
+  ## Overall OLS
+  fit_gr_all <- lm(log10(gmax_g_per_day) ~ log10(final_adult_mass_g), data = gr_ok)
+  slp_gr_all <- coef(fit_gr_all)[2]
+  int_gr_all <- coef(fit_gr_all)[1]
+  xrg_gr     <- range(log10(gr_ok$final_adult_mass_g), na.rm = TRUE)
+  ref_gr     <- data.frame(lx = xrg_gr, ly = int_gr_all + 0.75 * xrg_gr)
+
+  ggplot(gr_ok, aes(x = log10(final_adult_mass_g), y = log10(gmax_g_per_day),
+                    colour = strategy, shape = strategy)) +
+    geom_point(aes(size = ifelse(is_extinct, 3, 1.6)), alpha = 0.75) +
+    scale_size_identity() +
+    geom_smooth(data = gr_ok[strategy == "Endotherm (mammal/bird)"],
+                mapping = aes(x = log10(final_adult_mass_g), y = log10(gmax_g_per_day), group = 1),
+                method = "lm", se = TRUE,
+                colour = pal8[2], fill = pal8[2], alpha = 0.15, linewidth = 1.0,
+                inherit.aes = FALSE) +
+    geom_smooth(data = gr_ok[strategy == "Ectotherm (fish/reptile)"],
+                mapping = aes(x = log10(final_adult_mass_g), y = log10(gmax_g_per_day), group = 1),
+                method = "lm", se = TRUE,
+                colour = pal8[4], fill = pal8[4], alpha = 0.15, linewidth = 1.0,
+                inherit.aes = FALSE) +
+    geom_line(data = ref_gr, aes(x = lx, y = ly),
+              inherit.aes = FALSE, linetype = "dashed", colour = "black",
+              linewidth = 0.9) +
+    scale_colour_manual(values = pal_strat, name = "Metabolic strategy") +
+    scale_shape_manual(values  = shape_strat, name = "Metabolic strategy") +
+    annotate("text", x = xrg_gr[2] - 0.5,
+             y = int_gr_all + slp_gr_all * (xrg_gr[2] - 0.5) + 0.8,
+             label = sprintf("Overall OLS β = %.3f", slp_gr_all),
+             size = 3.5, hjust = 1) +
+    annotate("text", x = xrg_gr[1] + 0.3,
+             y = int_gr_all + 0.75 * (xrg_gr[1] + 0.3) - 0.8,
+             label = "WBE β = 0.75", colour = "grey30", size = 3.5, hjust = 0) +
+    labs(
+      title    = expression(paste("Growth rate allometry: ", italic(G)[max], " ∝ ", italic(M)^{beta})),
+      subtitle = "Grady et al. 2014 (Science). Shaded bands = per-strategy OLS 95% CI. Dashed = WBE β = 0.75.",
+      x        = expression(log[10] ~ "Adult body mass (g)"),
+      y        = expression(log[10] ~ italic(G)[max] ~ "(g day"^{-1}*")")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom",
+          legend.text = element_text(size = 10))
+}
+```
+
+## OLS regression by metabolic strategy {#grady-ols-table}
+
+```{r grady-ols-table}
+if (HAS_GRADY && nrow(gr_ok) >= 10) {
+  ## Fit OLS per strategy + overall
+  fit_grady_strat <- function(dt, label) {
+    if (nrow(dt) < 5) return(NULL)
+    dt2 <- dt[!is.na(final_adult_mass_g) & final_adult_mass_g > 0 &
+              !is.na(gmax_g_per_day) & gmax_g_per_day > 0]
+    if (nrow(dt2) < 5 || length(unique(log10(dt2$final_adult_mass_g))) < 2) return(NULL)
+    fit  <- lm(log10(gmax_g_per_day) ~ log10(final_adult_mass_g), data = dt2)
+    cf   <- coef(summary(fit))
+    ci   <- confint(fit)
+    data.table(
+      Strategy  = label,
+      n         = nrow(dt2),
+      Intercept = round(coef(fit)[1], 3),
+      Slope     = round(coef(fit)[2], 3),
+      Slope_SE  = round(cf[2, 2], 3),
+      CI_95_lo  = round(ci[2, 1], 3),
+      CI_95_hi  = round(ci[2, 2], 3),
+      R2        = round(summary(fit)$r.squared, 3),
+      p_value   = signif(cf[2, 4], 3)
+    )
+  }
+
+  strat_levels <- c("Endotherm (mammal/bird)", "Ectotherm (fish/reptile)",
+                    "Mesotherm (extant)", "Extinct (dinosaurs/stem lineages)")
+  reg_grady <- rbindlist(c(
+    list(fit_grady_strat(gr_ok, "All taxa combined")),
+    lapply(strat_levels, function(s) fit_grady_strat(gr_ok[strategy == s], s))
+  ), fill = TRUE)
+
+  if (!is.null(reg_grady) && nrow(reg_grady) > 0) {
+    kable(reg_grady,
+          col.names = c("Metabolic strategy", "n", "log₁₀ Intercept", "Slope (β)",
+                        "SE", "95% CI lo", "95% CI hi", "R²", "p-value"),
+          caption = paste(
+            "OLS log-log regressions of maximum growth rate (g day⁻¹) on adult body mass (g)",
+            "by metabolic strategy. Grady et al. 2014 (Science 344:1268).",
+            "Dinosaurs (extinct) falling between endotherm and ectotherm intercepts",
+            "support the mesothermy hypothesis. WBE predicted slope: β = 0.75."
+          )) %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+      row_spec(1, bold = TRUE, background = "#dce8ff") %>%
+      row_spec(which(reg_grady$Strategy == "Extinct (dinosaurs/stem lineages)"),
+               bold = TRUE, background = "#fff3cd")
+  }
+}
+```
+
+## Extinct (dinosaur) growth rates relative to extant vertebrates {#grady-extinct}
+
+```{r grady-extinct-plot, fig.width=10, fig.height=7}
+if (HAS_GRADY && nrow(gr_ok[is_extinct == TRUE]) >= 3) {
+  ## Separate endo / ecto regression lines for background
+  gr_endo <- gr_ok[strategy == "Endotherm (mammal/bird)"]
+  gr_ecto <- gr_ok[strategy == "Ectotherm (fish/reptile)"]
+  xrg2    <- range(log10(gr_ok$final_adult_mass_g), na.rm = TRUE)
+
+  ## Compute bounding lines
+  fit_endo <- lm(log10(gmax_g_per_day) ~ log10(final_adult_mass_g), data = gr_endo)
+  fit_ecto <- lm(log10(gmax_g_per_day) ~ log10(final_adult_mass_g), data = gr_ecto)
+  df_endo  <- data.frame(lx = xrg2, ly = coef(fit_endo)[1] + coef(fit_endo)[2] * xrg2)
+  df_ecto  <- data.frame(lx = xrg2, ly = coef(fit_ecto)[1] + coef(fit_ecto)[2] * xrg2)
+
+  gr_extinct <- gr_ok[is_extinct == TRUE]
+
+  ggplot() +
+    ## Grey ribbon between endo and ecto lines
+    geom_ribbon(
+      data = data.frame(
+        lx    = xrg2,
+        ymin  = coef(fit_ecto)[1] + coef(fit_ecto)[2] * xrg2,
+        ymax  = coef(fit_endo)[1] + coef(fit_endo)[2] * xrg2
+      ),
+      aes(x = lx, ymin = ymin, ymax = ymax),
+      fill = "grey85", alpha = 0.6, inherit.aes = FALSE
+    ) +
+    ## Extant background points
+    geom_point(data = gr_ok[is_extinct == FALSE],
+               aes(x = log10(final_adult_mass_g), y = log10(gmax_g_per_day),
+                   colour = strategy),
+               alpha = 0.35, size = 1.4, shape = 16) +
+    ## Endo/ecto regression lines
+    geom_line(data = df_endo, aes(x = lx, y = ly),
+              colour = pal8[2], linewidth = 1.1, linetype = "solid") +
+    geom_line(data = df_ecto, aes(x = lx, y = ly),
+              colour = pal8[4], linewidth = 1.1, linetype = "solid") +
+    ## Extinct taxa (large points, labelled)
+    geom_point(data = gr_extinct,
+               aes(x = log10(final_adult_mass_g), y = log10(gmax_g_per_day)),
+               colour = "darkorange2", size = 3.5, shape = 18) +
+    ggrepel::geom_text_repel(
+      data = gr_extinct,
+      aes(x = log10(final_adult_mass_g), y = log10(gmax_g_per_day),
+          label = verbatim_taxon_name),
+      size = 2.8, colour = "darkorange4", max.overlaps = 20, segment.alpha = 0.4
+    ) +
+    scale_colour_manual(
+      values = c("Endotherm (mammal/bird)"   = pal8[2],
+                 "Ectotherm (fish/reptile)"  = pal8[4],
+                 "Mesotherm (extant)"        = pal8[3]),
+      name = "Extant taxa") +
+    labs(
+      title    = "Dinosaur and stem-lineage growth rates vs. extant vertebrates",
+      subtitle = paste(
+        "Orange diamonds = extinct taxa. Shaded band = mesotherm zone between endo-",
+        "and ectotherm scaling lines. Blue = endotherm OLS; green = ectotherm OLS."
+      ),
+      x = expression(log[10] ~ "Adult body mass (g)"),
+      y = expression(log[10] ~ italic(G)[max] ~ "(g day"^{-1}*")")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+## Metabolic rate vs. body mass (Grady subset) {#grady-metabolic}
+
+```{r grady-metabolic-plot, fig.width=9, fig.height=6}
+if (HAS_GRADY) {
+  gr_met <- gr_ok[!is.na(metabolic_rate_W) & metabolic_rate_W > 0]
+  cat(sprintf("Grady subset with metabolic rate: n = %d\n", nrow(gr_met)))
+
+  if (nrow(gr_met) >= 10) {
+    fit_grmet <- lm(log10(metabolic_rate_W) ~ log10(final_adult_mass_g), data = gr_met)
+    xrg_met   <- range(log10(gr_met$final_adult_mass_g), na.rm = TRUE)
+    ref_met   <- data.frame(lx = xrg_met,
+                            ly = coef(fit_grmet)[1] + 0.75 * xrg_met)
+
+    ggplot(gr_met, aes(x = log10(final_adult_mass_g), y = log10(metabolic_rate_W),
+                       colour = strategy, shape = strategy)) +
+      geom_point(alpha = 0.7, size = 2) +
+      geom_smooth(data = gr_met[strategy %in% c("Endotherm (mammal/bird)",
+                                                 "Ectotherm (fish/reptile)")],
+                  mapping = aes(x = log10(final_adult_mass_g), y = log10(metabolic_rate_W),
+                                group = strategy, colour = strategy),
+                  method = "lm", se = FALSE,
+                  linewidth = 1.0, inherit.aes = FALSE) +
+      geom_line(data = ref_met, aes(x = lx, y = ly),
+                inherit.aes = FALSE, linetype = "dashed", colour = "black",
+                linewidth = 0.9) +
+      scale_colour_manual(values = pal_strat, name = "Metabolic strategy") +
+      scale_shape_manual(values  = shape_strat, name = "Metabolic strategy") +
+      annotate("text", x = xrg_met[2] - 0.5,
+               y = coef(fit_grmet)[1] + 0.75 * (xrg_met[2] - 0.5) - 1.0,
+               label = "WBE β = 0.75", colour = "grey30", size = 3.5, hjust = 1) +
+      labs(
+        title    = expression(paste("Metabolic rate scaling (Grady 2014 subset): ", italic(B), " ∝ ", italic(M)^{beta})),
+        subtitle = sprintf("n = %d with metabolic rate. OLS β = %.3f. Dashed = WBE β = 0.75.",
+                           nrow(gr_met), coef(fit_grmet)[2]),
+        x        = expression(log[10] ~ "Adult body mass (g)"),
+        y        = expression(log[10] ~ "Metabolic rate (W)")
+      ) +
+      theme_bw(base_size = 13) +
+      theme(legend.position = "bottom")
+  }
+}
+```
+
+## Grady OLS summary table {#grady-met-table}
+
+```{r grady-met-ols-table}
+if (HAS_GRADY) {
+  gr_met2 <- gr_ok[!is.na(metabolic_rate_W) & metabolic_rate_W > 0]
+  if (nrow(gr_met2) >= 10) {
+    reg_grmet <- rbindlist(c(
+      list(fit_grady_strat(gr_met2, "All taxa combined (metabolic rate)")),
+      lapply(strat_levels, function(s)
+        fit_grady_strat(gr_met2[strategy == s], paste0(s, " (metabolic rate)")))
+    ), fill = TRUE)
+    if (!is.null(reg_grmet) && nrow(reg_grmet) > 0) {
+      kable(reg_grmet,
+            col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                          "95% CI lo", "95% CI hi", "R²", "p-value"),
+            caption = "OLS metabolic rate (W) vs. adult body mass (g) from the Grady 2014 subset with both variables. WBE predicted slope: β = 0.75.") %>%
+        kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = TRUE)
+    }
+  }
+}
+```
+
+---
+
 # Lifespan Scaling
 
 WBE theory predicts maximum lifespan $L \propto M^{1/4}$ because lifespan scales inversely with mass-specific metabolic rate ($B/M \propto M^{-1/4}$). This pattern is well-documented in mammals and birds but more variable in ectotherms and unicellular organisms, where extrinsic mortality dominates. We use the Hatton 2019 dataset, which provides lifespan data spanning prokaryotes to large vertebrates.
@@ -2753,3 +3052,6 @@ Warton DI, Duursma RA, Falster DS, Taskinen S. 2012. smatr 3 — an R package fo
 Chown SL, Marais E, Terblanche JS, Klok CJ, Lighton JRB, Blackburn TM. 2007. Scaling of insect metabolic rate is inconsistent with the nutrient supply network model. *Functional Ecology* 21(2):282–290. DOI: [10.1111/j.1365-2435.2007.01245.x](https://doi.org/10.1111/j.1365-2435.2007.01245.x)
 
 Riveros AJ, Enquist BJ. 2011. Metabolic scaling in insects supports the predictions of the WBE model. *Journal of Insect Physiology* 57:688–693. DOI: [10.1016/j.jinsphys.2011.01.011](https://doi.org/10.1016/j.jinsphys.2011.01.011)
+
+Grady JM, Enquist BJ, Dettweiler-Robinson E, Wright NA, Smith FA. 2014. Evidence for mesothermy in dinosaurs. *Science* 344(6189):1268–1272. DOI: [10.1126/science.1253143](https://doi.org/10.1126/science.1253143)
+
