@@ -1726,21 +1726,27 @@ time, extinction risk, trophic position, and biogeographic distribution
 (Peters 1983; Brown &amp; Maurer 1989; West, Brown &amp; Enquist
 1997).</p>
 <p>This document summarises the <strong>Phase 1 Tier-1 intake</strong>:
-eight provider databases merged into a single flat file (37,619 rows),
-covering mammals, birds, fish, and amphibians, with GBIF Backbone
-taxonomic reconciliation applied to all names. All eight providers are
-now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge, AmphiBIO,
-FishBase, AVONET, and NEON.</p>
+nine provider databases merged into a single flat file (47,108 rows),
+covering mammals, birds, fish, amphibians, and lizards, with GBIF
+Backbone taxonomic reconciliation applied to all names. Nine providers
+are now complete: PanTHERIA, EltonTraits (birds + mammals), AnAge,
+AmphiBIO, FishBase, AVONET, NEON, and Lizard Traits of the World (Meiri
+2018). Body mass is not only a determinant of metabolic rate and
+life-history pace (Peters 1983; West, Brown &amp; Enquist 1997), but
+also a primary driver of the fast-slow life-history continuum across
+vertebrate classes — including amphibians, where body mass explains a
+dominant share of trait variance (Cejp &amp; Griebeler 2024).</p>
 <p><strong>Data file used for this summary:</strong>
 <code>data/compiled/tier1_reconciled.csv</code></p>
 <blockquote>
 <p><strong>Honest uncertainty notice (Telford standard):</strong>
 Statistics in this document are descriptive summaries of the current
-intake. The dataset is incomplete (reptiles critically underrepresented;
-amphibians sparse; mammals triple-counted across PanTHERIA, EltonTraits,
-and AnAge — deduplication pending). No inferential claims should be
-drawn from provider-level comparisons without accounting for the
-different taxonomic scopes and mass methodologies of each source.</p>
+intake. The dataset is incomplete (amphibians sparse; mammals
+triple-counted across PanTHERIA, EltonTraits, and AnAge — deduplication
+pending; lizard mass values are allometric estimates, not direct
+measurements). No inferential claims should be drawn from provider-level
+comparisons without accounting for the different taxonomic scopes and
+mass methodologies of each source.</p>
 </blockquote>
 <hr />
 </div>
@@ -1781,7 +1787,7 @@ different taxonomic scopes and mass methodologies of each source.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Using reconciled taxonomy: %s</span><span class="sc">\n</span><span class="st">&quot;</span>, using_reconciled))</span></code></pre></div>
 <pre><code>## Using reconciled taxonomy: TRUE</code></pre>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">&quot;Rendered: %s</span><span class="sc">\n</span><span class="st">&quot;</span>, session_render_time))</span></code></pre></div>
-<pre><code>## Rendered: 2026-05-11 08:20:34 UTC</code></pre>
+<pre><code>## Rendered: 2026-05-11 09:44:49 UTC</code></pre>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="do">## Provider-level summary</span></span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>prov_summary <span class="ot">&lt;-</span> dat <span class="sc">|&gt;</span></span>
 <span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(mass_g) <span class="sc">&amp;</span> mass_g <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">|&gt;</span></span>
@@ -3392,13 +3398,20 @@ analysis)</h2>
 mass</strong> without explicit stratification or sensitivity analysis.
 Always filter on <code>mass_type</code> before cross-taxon
 comparisons.</p></li>
-<li><p><strong>Reptile coverage is essentially absent</strong> (16 rows,
-all from AnAge). Do not include Reptilia in any scaling analysis without
-adding a dedicated reptile source (Meiri et al., Reptile
-Database).</p></li>
-<li><p><strong>Amphibian mass is sparse</strong> (591 of ~8,500
-species). This coverage is sufficient for macroecological pattern
-analyses but not for species-level applications.</p></li>
+<li><p><strong>Lizard mass values are allometric estimates (LW-modeled),
+not direct measurements.</strong> The 6,633 lizard species from Meiri
+(2018) use log-log equations from Feldman et al. (2016). These are
+flagged as <code>mass_measurement_type = &quot;lw_modeled&quot;</code> and
+<code>data_quality_flag = &quot;allometric_modeled&quot;</code>. Always stratify
+on <code>mass_measurement_type</code> before cross-taxon comparisons.
+Note: ReptTraits (Meiri et al. 2024) is pending intake and will add
+directly measured reptile maximum body masses.</p></li>
+<li><p><strong>Amphibian mass is sparse</strong> (591 of ~8,500 species
+covered by AmphiBIO). This gap limits analyses such as those in Cejp
+&amp; Griebeler (2024), who demonstrate that body mass is the primary
+driver of the fast-slow life-history continuum in amphibians — analyses
+that require broad species representation. Adding further amphibian
+trait databases remains a high priority.</p></li>
 <li><p><strong>AVONET bird data (11,009 rows) is included</strong> in
 tier1_combined.csv. Bird coverage: 21,173 rows (EltonTraits 9,993 +
 AVONET 11,009). Overlap deduplication across these two bird sources has
@@ -3442,36 +3455,52 @@ currently reflects Dryad + Figshare only.</p></li>
 </tr>
 <tr class="odd">
 <td>3</td>
-<td>Deduplicate species across providers by GBIF accepted_name</td>
-<td>No</td>
+<td><del>Add Lizard Traits of the World (Meiri 2018)</del></td>
+<td>✅ Done (6,633 spp, allometric LW-modeled, 2026-05-11)</td>
 </tr>
 <tr class="even">
 <td>4</td>
-<td>Add Reptile Database / Meiri reptile traits</td>
-<td>Requires download</td>
+<td>Run ReptTraits intake (Meiri et al. 2024, Sci Data)</td>
+<td>Script ready — run pending</td>
 </tr>
 <tr class="odd">
 <td>5</td>
-<td>Add VertNet museum specimens</td>
-<td>Requires spocc API</td>
+<td>Run SeaLifeBase intake (rfishbase)</td>
+<td>Script ready — run pending</td>
 </tr>
 <tr class="even">
 <td>6</td>
-<td>Re-run GBIF reconciliation on full 37,619-row file</td>
-<td>No</td>
+<td>Run DISPERSE intake (Sarremejane et al. 2020)</td>
+<td>Script ready — run pending</td>
 </tr>
 <tr class="odd">
 <td>7</td>
-<td>Populate measurementID for DwC compliance</td>
-<td>Design decision needed</td>
+<td>Add amphibian body mass database (Cejp &amp; Griebeler 2024
+motivates this; no open deposit found yet)</td>
+<td>Data unavailable</td>
 </tr>
 <tr class="even">
 <td>8</td>
-<td>Run renv::snapshot() to pin R environment</td>
+<td>Deduplicate species across providers by GBIF accepted_name</td>
 <td>No</td>
 </tr>
 <tr class="odd">
 <td>9</td>
+<td>Re-run GBIF reconciliation on full 47,108-row file</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Populate measurementID for DwC compliance</td>
+<td>Design decision needed</td>
+</tr>
+<tr class="odd">
+<td>11</td>
+<td>Run renv::snapshot() to pin R environment</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td>12</td>
 <td>Submit to GBIF IPT or Zenodo for public archiving</td>
 <td>After DwC compliance</td>
 </tr>
@@ -3483,7 +3512,7 @@ currently reflects Dryad + Figshare only.</p></li>
 <div id="session-information-reproducibility" class="section level1">
 <h1>11. Session Information (Reproducibility)</h1>
 <div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Rendered at:&quot;</span>, session_render_time, <span class="st">&quot;</span><span class="sc">\n\n</span><span class="st">&quot;</span>)</span></code></pre></div>
-<pre><code>## Rendered at: 2026-05-11 08:20:34 UTC</code></pre>
+<pre><code>## Rendered at: 2026-05-11 09:44:49 UTC</code></pre>
 <div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Data file:&quot;</span>, <span class="fu">ifelse</span>(using_reconciled, rec_file, base_file), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code></pre></div>
 <pre><code>## Data file: data/compiled/tier1_reconciled.csv</code></pre>
 <div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;GBIF Backbone version:&quot;</span>, </span>
@@ -3532,6 +3561,9 @@ currently reflects Dryad + Figshare only.</p></li>
 <li><p>Brown JH, Maurer BA. 1989. Macroecology: The Division of Food and
 Space Among Species on Continents. <em>Science</em> 243(4895):1145–1150.
 DOI: 10.1126/science.243.4895.1145</p></li>
+<li><p>Cejp B, Griebeler EM. 2024. Body Mass Shapes Most Life History
+Traits and a Fast-Slow Continuum in Amphibians. <em>Ecology and
+Evolution</em> 14(10):e70377. DOI: 10.1002/ece3.70377</p></li>
 <li><p>Clarke A, Johnston NM. 1999. Scaling of metabolic rate with body
 mass and temperature in teleost fish. <em>Journal of Animal Ecology</em>
 68(5):893–905. DOI: 10.1046/j.1365-2656.1999.00337.x</p></li>
@@ -3559,6 +3591,9 @@ DOI: 10.1111/ele.13898</p></li>
 <li><p>West GB, Brown JH, Enquist BJ. 1997. A general model for the
 origin of allometric scaling laws in biology. <em>Science</em>
 276(5309):122–126. DOI: 10.1126/science.276.5309.122</p></li>
+<li><p>Meiri S. 2018. Traits of lizards of the world: Variation around a
+successful evolutionary design. <em>Global Ecology and Biogeography</em>
+27(10):1144–1155. DOI: 10.1111/geb.12773. Data: <a href="https://doi.org/10.5061/dryad.f6t39kj" class="uri">https://doi.org/10.5061/dryad.f6t39kj</a></p></li>
 <li><p>Wilman H et al. 2014. EltonTraits 1.0: Species-level foraging
 attributes of the world’s birds and mammals. <em>Ecology</em>
 95(7):2027. DOI: 10.1890/13-1917.1</p></li>
