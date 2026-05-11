@@ -39,6 +39,7 @@ LABEL_AT  <- "AnimalTraits (Herberstein 2022)"
 LABEL_PN  <- "Hoehler 2023 (PNAS)"
 LABEL_H19 <- "Hatton 2019 (PNAS)"
 LABEL_H15 <- "Hatton 2015 (Science)"
+LABEL_CH  <- "Chown 2007 (FuncEcol, corrected)"
 
 # ── Load helper ──────────────────────────────────────────────────────────────
 load_csv <- function(path, label) {
@@ -63,12 +64,14 @@ if (is.null(pnas))
   pnas <- load_csv("output/pnas_2303764120_compiled.csv", LABEL_PN)
 h19  <- load_csv("output/hatton2019_compiled.csv",       LABEL_H19)
 h15  <- load_csv("output/hatton2015_compiled.csv",       LABEL_H15)
+ch07 <- load_csv("output/chown2007_compiled.csv",        LABEL_CH)
 
-all_list   <- list(at = at, pnas = pnas, h19 = h19, h15 = h15)
+all_list   <- list(at = at, pnas = pnas, h19 = h19, h15 = h15, ch07 = ch07)
 labels_vec <- c(at   = LABEL_AT,
                 pnas = LABEL_PN,
                 h19  = LABEL_H19,
-                h15  = LABEL_H15)
+                h15  = LABEL_H15,
+                ch07 = LABEL_CH)
 
 # ── Slope plausibility bound ─────────────────────────────────────────────────
 # Slopes with |β| > SLOPE_MAX are biologically implausible (likely caused by
@@ -375,7 +378,7 @@ bar_dat <- all_bound[!is.na(input_taxonomic_group) & input_taxonomic_group != ""
 ggplot(bar_dat,
        aes(x = reorder(input_taxonomic_group, -N), y = N, fill = dataset_label)) +
   geom_col() +
-  scale_fill_manual(values = pal8[1:4], name = "Dataset") +
+  scale_fill_manual(values = pal8[1:5], name = "Dataset") +
   facet_wrap(~ dataset_label, scales = "free", ncol = 2) +
   labs(
     title = "Record count by taxonomic group and dataset",
@@ -396,7 +399,7 @@ ds_totals <- rbindlist(lapply(names(all_list), function(nm) {
 ggplot(ds_totals, aes(x = reorder(Dataset, -N), y = N, fill = Dataset)) +
   geom_col(width = 0.6) +
   geom_text(aes(label = scales::comma(N)), vjust = -0.4, size = 3.5) +
-  scale_fill_manual(values = pal8[1:4]) +
+  scale_fill_manual(values = pal8[1:5]) +
   labs(title = "Total record count per dataset", x = NULL, y = "N records") +
   theme_bw(base_size = 12) +
   theme(legend.position = "none", axis.text.x = element_text(angle = 20, hjust = 1))
@@ -430,7 +433,7 @@ if (nrow(met_type_tab) > 0) {
 
 # Cross-Study Metabolic Scaling — All Taxa
 
-Metabolic theory (WBE; Kleiber 1932) predicts $B \propto M^{3/4}$. We test this across all three datasets that include metabolic rate measurements in Watts: AnimalTraits, Hoehler 2023, and Hatton 2019.
+Metabolic theory (WBE; Kleiber 1932) predicts $B \propto M^{3/4}$. We test this across all datasets that include metabolic rate measurements in Watts: AnimalTraits, Hoehler 2023, Hatton 2019, and Chown 2007 (insect-focused, with Riveros & Enquist 2011 corrections).
 
 > **Temperature caveat:** Hoehler et al. (2023) standardized all metabolic rates to 25°C using the Arrhenius equation, making them directly comparable across taxa. AnimalTraits rates are **not** temperature-standardized; measurement temperatures vary by species and study. Hatton et al. (2019) applied Q10-based temperature corrections. The "all combined" slope reflects both biological variation and methodological heterogeneity between datasets.
 
@@ -440,7 +443,7 @@ Metabolic theory (WBE; Kleiber 1932) predicts $B \propto M^{3/4}$. We test this 
 
 ```{r met-prep}
 met_sources <- rbindlist(
-  lapply(list(qa_ok(at), qa_ok(pnas), qa_ok(h19)), function(d) {
+  lapply(list(qa_ok(at), qa_ok(pnas), qa_ok(h19), qa_ok(ch07)), function(d) {
     if (is.null(d)) return(NULL)
     d[!is.na(body_mass_g) & body_mass_g > 0 &
       !is.na(metabolic_rate_value) & metabolic_rate_value > 0 &
@@ -482,7 +485,7 @@ if (nrow(met_sources) >= 10) {
               colour = "black", linewidth = 1.0) +
     geom_line(data = ols_df, aes(x = lx, y = ly),
               inherit.aes = FALSE, colour = "black", linewidth = 1.3) +
-    scale_colour_manual(values = pal8[1:3], name = "Dataset") +
+    scale_colour_manual(values = pal8[1:4], name = "Dataset") +
     annotate("text",
              x = x_rng[1] + 0.5,
              y = int_ov + slp_ov * (x_rng[1] + 0.5) + 1.2,
@@ -549,7 +552,7 @@ if (nrow(met_sources) >= 10 && HAS_SMATR) {
                 colour = "black", linewidth = 1.0) +
       geom_line(data = sma_line, aes(x = lx, y = ly),
                 inherit.aes = FALSE, colour = "firebrick", linewidth = 1.3) +
-      scale_colour_manual(values = pal8[1:3], name = "Dataset") +
+      scale_colour_manual(values = pal8[1:4], name = "Dataset") +
       annotate("text",
                x = x_rng2[1] + 0.5,
                y = sma_int + sma_slp * (x_rng2[1] + 0.5) + 1.0,
@@ -737,7 +740,7 @@ if (nrow(met_sources) >= 10) {
     geom_smooth(method = "lm", se = FALSE, colour = "black", linewidth = 1.0,
                 aes(group = input_taxonomic_group)) +
     facet_wrap(~ input_taxonomic_group, scales = "free", ncol = 3) +
-    scale_colour_manual(values = pal8[1:3], name = "Dataset") +
+    scale_colour_manual(values = pal8[1:4], name = "Dataset") +
     labs(
       title = "Metabolic scaling by taxonomic group (across all datasets)",
       subtitle = "Black line = per-group OLS; groups with N < 10 excluded",
@@ -1086,6 +1089,341 @@ if (nrow(rfp_plot) >= 5) {
       y        = "Number of families"
     ) +
     theme_bw(base_size = 12)
+}
+```
+
+---
+
+# Insect Metabolic Scaling (Chown 2007, corrected)
+
+The Chown et al. (2007) dataset provides a focused, flow-through respirometry compilation of 346 insect species across 16 orders, supplemented with unit-conversion corrections from Riveros & Enquist (2011) for three Coleoptera. This section analyses insect metabolic scaling as a stand-alone dataset and in relation to the broader cross-taxa compilation.
+
+> **Key predictions:** WBE theory predicts β = 0.75 for whole-organism metabolic rate. Riveros & Enquist (2011) reported that insects broadly support β = 0.74 (95% CI: 0.71–0.77, n = 367) after excluding Termitidae. Wing status (winged vs. wingless) significantly affects the intercept but not the slope.
+
+```{r insect-prep}
+ins <- qa_ok(ch07)
+ins <- ins[!is.na(body_mass_g) & body_mass_g > 0 &
+           !is.na(metabolic_rate_value) & metabolic_rate_value > 0 &
+           metabolic_rate_unit == "W"]
+
+cat(sprintf("Insect records (QA-pass, unit = W): n = %d\n", nrow(ins)))
+cat(sprintf("Orders:   %d\n", length(unique(ins$order))))
+cat(sprintf("Families: %d\n", length(unique(ins$family[ins$family != ""]))))
+cat(sprintf("Winged (1): %d   Wingless (0): %d\n",
+            sum(ins$wing_status == 1, na.rm = TRUE),
+            sum(ins$wing_status == 0, na.rm = TRUE)))
+cat("\nRecords by order:\n")
+print(ins[, .N, by = order][order(-N)])
+```
+
+## Overall insect metabolic scaling {#insect-overall}
+
+```{r insect-overall-plot, fig.width=9, fig.height=6}
+if (nrow(ins) >= 10) {
+  fit_ins <- lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data = ins)
+  slp_ins <- coef(fit_ins)[2]
+  int_ins <- coef(fit_ins)[1]
+  r2_ins  <- summary(fit_ins)$r.squared
+  x_rng_ins <- range(log10(ins$body_mass_g), na.rm = TRUE)
+  ref_ins   <- data.frame(lx = x_rng_ins, ly = int_ins + 0.75 * x_rng_ins)
+  ols_ins   <- data.frame(lx = x_rng_ins, ly = int_ins + slp_ins * x_rng_ins)
+
+  ggplot(ins, aes(x = log10(body_mass_g), y = log10(metabolic_rate_value),
+                  colour = order)) +
+    geom_point(alpha = 0.55, size = 1.5, shape = 16) +
+    geom_line(data = ols_ins, aes(x = lx, y = ly),
+              inherit.aes = FALSE, colour = "black", linewidth = 1.3) +
+    geom_line(data = ref_ins, aes(x = lx, y = ly),
+              inherit.aes = FALSE, linetype = "dashed", colour = "firebrick",
+              linewidth = 0.9) +
+    scale_colour_brewer(palette = "Set3", name = "Order") +
+    annotate("text", x = x_rng_ins[1] + 0.3,
+             y = int_ins + slp_ins * (x_rng_ins[1] + 0.3) + 1.2,
+             label = sprintf("OLS  β = %.3f  R² = %.2f", slp_ins, r2_ins),
+             size = 4, hjust = 0) +
+    annotate("text", x = x_rng_ins[2] - 0.3,
+             y = int_ins + 0.75 * (x_rng_ins[2] - 0.3) - 1.0,
+             label = "WBE β = 0.75", colour = "firebrick", size = 3.5, hjust = 1) +
+    labs(
+      title    = expression(paste("Insect metabolic scaling: ", italic(B), " ∝ ", italic(M)^{beta})),
+      subtitle = "Chown et al. 2007 (corrected per Riveros & Enquist 2011). Black = OLS; dashed red = WBE β = 0.75.",
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "right")
+}
+```
+
+```{r insect-overall-table}
+reg_ins_overall <- fit_log_lm(ins, "body_mass_g", "metabolic_rate_value", min_n = 10)
+if (!is.null(reg_ins_overall) && nrow(reg_ins_overall) > 0) {
+  kable(reg_ins_overall,
+        col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regression of metabolic rate (W) on body mass (g) for all insects combined.",
+          "WBE predicted slope: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+}
+```
+
+```{r insect-sma}
+if (HAS_SMATR) {
+  reg_ins_sma <- fit_sma(ins, "body_mass_g", "metabolic_rate_value", min_n = 10)
+  if (!is.null(reg_ins_sma) && nrow(reg_ins_sma) > 0) {
+    kable(reg_ins_sma,
+          col.names = c("Group", "n", "Method", "log₁₀ Intercept", "SMA Slope (β)",
+                        "95% CI lo", "95% CI hi", "R²"),
+          caption = "SMA regression of metabolic rate (W) on body mass (g) — all insects combined.") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+  }
+}
+```
+
+## Scaling by insect order {#insect-by-order}
+
+```{r insect-order-table}
+reg_ins_ord_raw <- fit_log_lm(ins, "body_mass_g", "metabolic_rate_value",
+                               group_col = "order", min_n = 10)
+reg_ins_ord_raw <- reg_ins_ord_raw[Group != "All taxa combined"]
+n_ins_ord_excl <- sum(abs(reg_ins_ord_raw$Slope) > SLOPE_MAX, na.rm = TRUE)
+if (n_ins_ord_excl > 0)
+  cat(sprintf("Excluded %d order(s) with |β| > %g:\n", n_ins_ord_excl, SLOPE_MAX),
+      paste(reg_ins_ord_raw[abs(Slope) > SLOPE_MAX]$Group, collapse = ", "), "\n")
+reg_ins_ord <- reg_ins_ord_raw[is.na(Slope) | abs(Slope) <= SLOPE_MAX]
+
+if (!is.null(reg_ins_ord) && nrow(reg_ins_ord) > 0) {
+  kable(reg_ins_ord[order(-n)],
+        col.names = c("Order", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS within-order metabolic scaling for insects (N ≥ 10 per order).",
+          "WBE predicted slope: β = 0.75.",
+          "Isoptera (termites) are expected to deviate toward β ≈ 1 (see Riveros & Enquist 2011)."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r insect-order-plot, fig.width=9, fig.height=6}
+if (!is.null(reg_ins_ord) && nrow(reg_ins_ord) > 0) {
+  ggplot(reg_ins_ord[!is.na(Slope)],
+         aes(x = reorder(Group, Slope), y = Slope,
+             ymin = CI_95_lo, ymax = CI_95_hi,
+             colour = Group == "Isoptera")) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick", linewidth = 1.0) +
+    geom_hline(yintercept = 0,    colour = "grey70",   linewidth = 0.5) +
+    geom_errorbar(width = 0.3) +
+    geom_point(size = 3) +
+    scale_colour_manual(values = c("FALSE" = pal8[1], "TRUE" = "darkorange2"),
+                        labels = c("FALSE" = "Other orders", "TRUE" = "Isoptera (termites)"),
+                        name = NULL) +
+    coord_flip() +
+    labs(
+      title    = "Within-order insect metabolic scaling exponents (OLS)",
+      subtitle = "Dashed = WBE β = 0.75. Orange = Isoptera (Termitidae deviation noted by Riveros & Enquist 2011).",
+      x        = NULL, y = "OLS slope (β)"
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+```{r insect-order-scatter, fig.width=12, fig.height=9}
+ord_n10 <- ins[order %in% reg_ins_ord$Group]
+if (nrow(ord_n10) > 0) {
+  ggplot(ord_n10, aes(x = log10(body_mass_g), y = log10(metabolic_rate_value))) +
+    geom_point(aes(colour = order), alpha = 0.6, size = 1.4, shape = 16) +
+    geom_smooth(method = "lm", se = TRUE, colour = "black", linewidth = 0.9,
+                fill = "grey85", alpha = 0.4) +
+    facet_wrap(~ order, scales = "free", ncol = 3) +
+    scale_colour_brewer(palette = "Dark2", guide = "none") +
+    labs(
+      title    = "Insect metabolic scaling within each order",
+      subtitle = "Black line = OLS fit with 95% CI ribbon; orders with N ≥ 10 shown.",
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 11) +
+    theme(strip.text = element_text(face = "bold", size = 10))
+}
+```
+
+## Wing status effect {#insect-wing}
+
+Wing status (0 = wingless / workers / secondary wingless; 1 = winged) is recorded in the Chown dataset. Winged insects generally have larger flight muscle mass and higher mass-specific metabolic rates, so winged individuals are expected to show higher metabolic rates at the same body mass (intercept shift) while the scaling exponent may be conserved.
+
+```{r insect-wing-prep}
+ins_wing <- ins[!is.na(wing_status)]
+ins_wing[, wing_label := ifelse(wing_status == 1, "Winged (1)", "Wingless (0)")]
+cat(sprintf("Records with wing status: n = %d\n", nrow(ins_wing)))
+print(ins_wing[, .N, by = wing_label])
+```
+
+```{r insect-wing-plot, fig.width=9, fig.height=6}
+if (nrow(ins_wing) >= 20) {
+  ggplot(ins_wing, aes(x = log10(body_mass_g), y = log10(metabolic_rate_value),
+                       colour = wing_label)) +
+    geom_point(alpha = 0.5, size = 1.5, shape = 16) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1.1,
+                aes(group = wing_label)) +
+    scale_colour_manual(values = c("Winged (1)" = pal8[2], "Wingless (0)" = pal8[4]),
+                        name = "Wing status") +
+    labs(
+      title    = "Insect metabolic scaling by wing status",
+      subtitle = "Wing status 1 = winged; 0 = wingless/worker. Lines = per-group OLS.",
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+```{r insect-wing-table}
+reg_ins_wing <- fit_log_lm(ins_wing, "body_mass_g", "metabolic_rate_value",
+                            group_col = "wing_label", min_n = 10)
+if (!is.null(reg_ins_wing) && nrow(reg_ins_wing) > 0) {
+  kable(reg_ins_wing,
+        col.names = c("Wing status", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS regressions by wing status.",
+          "Intercept differences reflect mass-specific metabolic rate offsets between winged and wingless insects.",
+          "WBE predicted slope: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+}
+```
+
+## Termitidae deviation {#insect-termitidae}
+
+Termitidae (true termites) were identified by Riveros & Enquist (2011) as the sole significant outlier from WBE metabolic scaling among insects. Their metabolic rates are lower than predicted at a given mass, and the order-level (Isoptera) slope approaches isometry (β ≈ 1). Two potential explanations are: (1) CH₄-based respirometry used for many termite measurements may systematically underestimate CO₂-equivalent metabolic rates; (2) colonial living and eusociality impose metabolic suppression on workers measured in isolation.
+
+```{r insect-termitidae}
+ins_termit <- ins[family == "Termitidae"]
+ins_other  <- ins[family != "Termitidae" | family == ""]
+
+cat(sprintf("Termitidae: n = %d\n",    nrow(ins_termit)))
+cat(sprintf("Non-Termitidae: n = %d\n", nrow(ins_other)))
+
+if (nrow(ins_termit) >= 5 && nrow(ins_other) >= 10) {
+  fit_t  <- lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data = ins_termit)
+  fit_nt <- lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data = ins_other)
+
+  termit_comp <- data.table(
+    Group       = c("Termitidae only", "All insects excl. Termitidae", "All insects"),
+    n           = c(nrow(ins_termit), nrow(ins_other), nrow(ins)),
+    Intercept   = round(c(coef(fit_t)[1], coef(fit_nt)[1],
+                          coef(lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data=ins))[1]), 3),
+    Slope_beta  = round(c(coef(fit_t)[2], coef(fit_nt)[2],
+                          coef(lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data=ins))[2]), 3),
+    R2          = round(c(summary(fit_t)$r.squared,
+                          summary(fit_nt)$r.squared,
+                          summary(lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data=ins))$r.squared), 3)
+  )
+
+  kable(termit_comp,
+        col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "R²"),
+        caption = paste(
+          "Comparison of metabolic scaling slopes with and without Termitidae.",
+          "Termitidae show a near-isometric slope (β ≈ 1) and a depressed intercept,",
+          "consistent with the Riveros & Enquist (2011) finding that termites are the principal insect outlier from WBE."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+}
+```
+
+```{r insect-termitidae-plot, fig.width=9, fig.height=6}
+if (nrow(ins_termit) >= 5) {
+  ins_plot <- copy(ins)
+  ins_plot[, taxon_grp := ifelse(family == "Termitidae", "Termitidae",
+                          ifelse(order == "Hymenoptera", "Hymenoptera (other)",
+                                 "All other insects"))]
+  x_rng2 <- range(log10(ins_plot$body_mass_g), na.rm = TRUE)
+  ref_df2 <- data.frame(lx = x_rng2,
+                        ly = coef(lm(log10(metabolic_rate_value) ~ log10(body_mass_g),
+                                     data = ins))[1] + 0.75 * x_rng2)
+
+  ggplot(ins_plot, aes(x = log10(body_mass_g), y = log10(metabolic_rate_value),
+                       colour = taxon_grp)) +
+    geom_point(alpha = 0.55, size = 1.8, shape = 16) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1.1,
+                aes(group = taxon_grp)) +
+    geom_line(data = ref_df2, aes(x = lx, y = ly),
+              inherit.aes = FALSE, linetype = "dashed", colour = "firebrick",
+              linewidth = 1.0) +
+    scale_colour_manual(values = c("Termitidae" = "darkorange2",
+                                   "Hymenoptera (other)" = pal8[3],
+                                   "All other insects" = "grey60"),
+                        name = NULL) +
+    labs(
+      title    = "Termitidae vs. other insects: metabolic scaling",
+      subtitle = "Dashed red = WBE β = 0.75. Termitidae deviate toward near-isometric scaling.",
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+## Insect metabolic scaling within family {#insect-family}
+
+```{r insect-family-table}
+reg_ins_fam_raw <- fit_log_lm(ins, "body_mass_g", "metabolic_rate_value",
+                               group_col = "family", min_n = 10)
+reg_ins_fam_raw <- reg_ins_fam_raw[Group != "All taxa combined"]
+n_ins_fam_excl  <- sum(abs(reg_ins_fam_raw$Slope) > SLOPE_MAX, na.rm = TRUE)
+if (n_ins_fam_excl > 0)
+  cat(sprintf("Excluded %d family/ies with |β| > %g:\n", n_ins_fam_excl, SLOPE_MAX),
+      paste(reg_ins_fam_raw[abs(Slope) > SLOPE_MAX]$Group, collapse = ", "), "\n")
+reg_ins_fam <- reg_ins_fam_raw[is.na(Slope) | abs(Slope) <= SLOPE_MAX]
+
+if (!is.null(reg_ins_fam) && nrow(reg_ins_fam) > 0) {
+  kable(reg_ins_fam[order(-n)],
+        col.names = c("Family", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS within-family metabolic scaling for insects (N ≥ 10 per family).",
+          "WBE predicted slope: β = 0.75.",
+          "Formicidae (ants) and Termitidae (termites) are highlighted in interpretation."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r insect-family-plot, fig.width=9, fig.height=5}
+if (!is.null(reg_ins_fam) && nrow(reg_ins_fam) > 0) {
+  reg_ins_fam_plot <- copy(reg_ins_fam)
+  reg_ins_fam_plot[, highlight := fcase(
+    Group == "Termitidae",  "Termitidae",
+    Group == "Formicidae",  "Formicidae (ants)",
+    default = "Other family"
+  )]
+
+  ggplot(reg_ins_fam_plot[!is.na(Slope)],
+         aes(x = reorder(Group, Slope), y = Slope,
+             ymin = CI_95_lo, ymax = CI_95_hi,
+             colour = highlight)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick", linewidth = 1.0) +
+    geom_hline(yintercept = 0,    colour = "grey70",   linewidth = 0.5) +
+    geom_errorbar(width = 0.3) +
+    geom_point(size = 3) +
+    scale_colour_manual(values = c("Termitidae"         = "darkorange2",
+                                   "Formicidae (ants)"  = pal8[3],
+                                   "Other family"       = pal8[1]),
+                        name = NULL) +
+    coord_flip() +
+    labs(
+      title    = "Within-family insect metabolic scaling exponents (OLS)",
+      subtitle = "Dashed = WBE β = 0.75. Orange = Termitidae; green = Formicidae.",
+      x = NULL, y = "OLS slope (β)"
+    ) +
+    theme_bw(base_size = 12) +
+    theme(legend.position = "bottom")
 }
 ```
 
@@ -1628,6 +1966,18 @@ if (nrow(met_sources) > 0 && "metabolic_rate_type" %in% names(met_sources)) {
 
 **Implications:** Active or field metabolic rates are 2–10× higher than basal rates for endotherms, and the relationship between basal and active rates varies systematically across taxa (endotherms vs. ectotherms). Including mixed rate types elevates the residual variance around the allometric line and may produce a composite slope that does not reflect any single physiological state. Where sample sizes permit, basal-only analyses are preferred for testing WBE theory.
 
+## Chown 2007 insect dataset: data corrections
+
+The Chown et al. 2007 Functional Ecology dataset (Appendix S2; 346 species across 16 insect orders) was ingested from the original supplementary Word document. Three Coleoptera species from Strømme et al. (1986) contained unit-conversion errors in Chown et al. and were corrected using the values reported in Riveros & Enquist (2011, Table 1):
+
+| Species | Reported BMR (µW) | Corrected BMR (µW) | Source |
+|---|---|---|---|
+| *Amara quenseli* | 1.4 | 346.5 | Riveros & Enquist 2011 |
+| *Simplocaria metallica* | 0.5 | 32.7 | Riveros & Enquist 2011 |
+| *Rhynchaenus flagellum* | 0.2 | 9.1 | Riveros & Enquist 2011 |
+
+Riveros & Enquist (2011) also reported that when Termitidae are excluded, the overall insect metabolic scaling slope (OLS) is approximately 0.74 (95% CI: 0.71–0.77, n = 367), consistent with WBE predictions. Termitidae deviate toward near-isometric scaling (~β ≈ 1), potentially due to measurement artefacts (CH₄-based respirometry) or life-history differences. Wing status (winged vs. wingless) significantly affects metabolic rate intercepts but not slopes.
+
 ## Temperature standardization
 
 No universal temperature correction was applied in this document. The datasets differ in their handling of temperature:
@@ -1684,6 +2034,7 @@ kable(qa_methods,
 | Hoehler 2023 | Hoehler et al. 2023, PNAS | 10.1073/pnas.2303764120 | `r if (!is.null(pnas)) nrow(pnas) else "N/A"` |
 | Hatton 2019 | Hatton et al. 2019, PNAS | 10.1073/pnas.1907703116 | `r if (!is.null(h19)) nrow(h19) else "N/A"` |
 | Hatton 2015 | Hatton et al. 2015, Science | 10.1126/science.aac6284 | `r if (!is.null(h15)) nrow(h15) else "N/A"` |
+| Chown 2007 (corrected) | Chown et al. 2007, Funct Ecol; corrections: Riveros & Enquist 2011 | 10.1111/j.1365-2435.2007.01245.x | `r if (!is.null(ch07)) nrow(ch07) else "N/A"` |
 
 All data were loaded from local CSV files in `output/` compiled by the `Animal_scaling_data` ingestion pipeline. Column harmonization, QA flagging, and unit assignment were performed during ingestion; see individual provider scripts for details.
 
@@ -1706,3 +2057,7 @@ Herberstein ME, Wignall AE, Nessler SH, Harmer AMT, Wesner JS, Fagan WF, Mirth C
 Hoehler TM, Mankel DJ, Girguis PR, McCollom TM, Kiang NY, Bebout BM. 2023. The metabolic rate of the biosphere and its components. *PNAS* 120(25):e2303764120. DOI: [10.1073/pnas.2303764120](https://doi.org/10.1073/pnas.2303764120)
 
 Warton DI, Duursma RA, Falster DS, Taskinen S. 2012. smatr 3 — an R package for estimation and inference about allometric lines. *Methods in Ecology and Evolution* 3:257–259. DOI: [10.1111/j.2041-210X.2011.00153.x](https://doi.org/10.1111/j.2041-210X.2011.00153.x)
+
+Chown SL, Marais E, Terblanche JS, Klok CJ, Lighton JRB, Blackburn TM. 2007. Scaling of insect metabolic rate is inconsistent with the nutrient supply network model. *Functional Ecology* 21(2):282–290. DOI: [10.1111/j.1365-2435.2007.01245.x](https://doi.org/10.1111/j.1365-2435.2007.01245.x)
+
+Riveros AJ, Enquist BJ. 2011. Metabolic scaling in insects supports the predictions of the WBE model. *Journal of Insect Physiology* 57:688–693. DOI: [10.1016/j.jinsphys.2011.01.011](https://doi.org/10.1016/j.jinsphys.2011.01.011)
