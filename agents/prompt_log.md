@@ -2163,3 +2163,10 @@ Action: Root cause was .hero-photo using width:100vw which is wider than the vis
 - Extended Fig 2: renamed Hatton growth dataset_label to "Hatton 2019" for palette consistency
 - Extended Fig 3: renamed AnimalTraits lifespan label to "AnimalTraits" for palette consistency
 - File rendered cleanly to HTML with no errors
+
+## 2026-05-11 — Hatton grey/black reference, new data in color
+
+**Date**: 2026-05-11
+**Project**: Animal_scaling_data
+**Prompt**: "the Hatton et al. data should be grey to black and the new data should be in color. that way the new data added will stand out. Please redo the plots"
+**Action**: Redesigned Animal_scaling_data/hatton_figures_reconstruction.Rmd Part 2 Extended Synthesis plots (ext-fig1-metab-prep/plot, ext-fig2-growth-prep/plot, ext-fig3-mort-prep/plot) as two-layer ggplot2 calls. Layer 1: Hatton 2019 grey points (#CCCCCC, alpha=0.2) + black OLS line + grey CI ribbon (behind). Layer 2: new datasets in colour (alpha=0.6-0.65) + coloured OLS ribbons (on top). ds_pal["Hatton 2019"] → "#BBBBBB"; added ds_pal_new/ds_pal_gr_new/ds_pal_mort_new subsets for legend. Re-rendered to hatton_figures_reconstruction.html (12 MB, clean). chat_provenance_log.md updated.

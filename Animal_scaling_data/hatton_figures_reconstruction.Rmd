@@ -735,35 +735,59 @@ n_labels_metab <- metab_all[
 
 ```{r ext-fig1-metab-plot, fig.width=11, fig.height=8, fig.cap="**Extended Fig 1a.** Metabolic rate vs. body mass — all sources coloured by dataset. Ribbons show OLS ± 95% CI spanning the actual data range of each source. **Extended Fig 1b.** Faceted coverage view: each panel shows that source's data (coloured) against Hatton 2019 reference points (grey). Hatton 2019 metabolic rates temperature-standardised (Arrhenius, Q10 ≈ 2.81). Chown 2007: per-observation temperature corrections (Riveros & Enquist 2011)."}
 
-# n= subtitle
-n_sub_metab <- paste(
-  sprintf("%s n=%d", as.character(n_labels_metab$dataset_label), n_labels_metab$n),
+# ── Split into Hatton reference layer vs. new-data layer ──────────────────────
+h19_clean_m <- metab_all[
+  dataset_label == "Hatton 2019" &
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(metabolic_rate_value) & metabolic_rate_value > 0
+]
+new_clean_m <- metab_all[
+  dataset_label != "Hatton 2019" &
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(metabolic_rate_value) & metabolic_rate_value > 0
+]
+
+new_n_sub_metab <- paste(
+  sprintf("%s n=%d",
+    as.character(n_labels_metab$dataset_label)[
+      as.character(n_labels_metab$dataset_label) != "Hatton 2019"],
+    n_labels_metab$n[
+      as.character(n_labels_metab$dataset_label) != "Hatton 2019"]),
   collapse = "  |  "
 )
 
-# ── Primary plot: all datasets, coloured by dataset ──────────────────────────
-p_ext1 <- ggplot(
-  metab_all[!is.na(body_mass_g) & body_mass_g > 0 &
-            !is.na(metabolic_rate_value) & metabolic_rate_value > 0],
-  aes(x = body_mass_g, y = metabolic_rate_value, colour = dataset_label)
-) +
-  geom_point(alpha = 0.45, size = 1.5, shape = 16) +
-  geom_smooth(
-    aes(fill = dataset_label),
-    method = "lm", formula = y ~ x, se = TRUE, alpha = 0.15, linewidth = 1.0
-  ) +
+# ── Primary plot: Hatton grey reference + new data in colour ──────────────────
+p_ext1 <- ggplot(mapping = aes(x = body_mass_g, y = metabolic_rate_value)) +
+  # Layer 1: Hatton 2019 — grey reference, rendered first (behind)
+  geom_point(data = h19_clean_m,
+             color = "#CCCCCC", alpha = 0.2, size = 1.0, shape = 16) +
+  geom_smooth(data = h19_clean_m,
+              method = "lm", formula = y ~ x, se = TRUE,
+              color = "black", fill = "grey60", alpha = 0.12,
+              linewidth = 1.1, show.legend = FALSE) +
+  # Layer 2: New datasets — coloured, on top
+  geom_point(data = new_clean_m,
+             aes(colour = dataset_label),
+             alpha = 0.6, size = 1.8, shape = 16) +
+  geom_smooth(data = new_clean_m,
+              aes(colour = dataset_label, fill = dataset_label),
+              method = "lm", formula = y ~ x, se = TRUE,
+              alpha = 0.15, linewidth = 1.0) +
   scale_x_log10(labels = label_log(base = 10), breaks = 10^seq(-15, 9, by = 3)) +
   scale_y_log10(labels = label_log(base = 10), breaks = 10^seq(-18, 6, by = 3)) +
-  scale_colour_manual(values = ds_pal, name = "Dataset") +
-  scale_fill_manual(  values = ds_pal, name = "Dataset") +
+  scale_colour_manual(values = ds_pal_new, name = "New data source") +
+  scale_fill_manual(  values = ds_pal_new, name = "New data source") +
   annotation_logticks(sides = "bl", size = 0.3) +
   labs(
     x        = "Body mass (g)",
     y        = "Metabolic rate (W)",
     title    = "Extended Fig 1a — Metabolic rate scaling: all sources",
-    subtitle = n_sub_metab,
+    subtitle = paste0("Hatton 2019 (grey reference, n=", nrow(h19_clean_m),
+                      ")  |  ", new_n_sub_metab),
     caption  = paste0(
-      "Hatton et al. 2019 (PNAS 116:21616); Hoehler et al. 2023 (PNAS 120:e2303764120); ",
+      "Hatton et al. 2019 shown as grey points (black OLS line + grey CI ribbon). ",
+      "New sources shown in colour: ",
+      "Hoehler et al. 2023 (PNAS 120:e2303764120); ",
       "AnimalTraits (Herberstein et al. 2022); Chown et al. 2007; Grady et al. 2014 (Science 344:1268). ",
       "Ribbons: OLS \u00b1 95% CI spanning actual data range per source."
     )
@@ -888,6 +912,9 @@ if (nrow(grady2014) > 0 &&
 ds_pal_gr <- ds_pal[intersect(names(ds_pal),
   c("Hatton 2019", "Grady 2014 (extant)", "Grady 2014 (extinct/mesotherm)"))]
 
+# Non-Hatton growth colours (for colour/fill scales)
+ds_pal_gr_new <- ds_pal_gr[names(ds_pal_gr) != "Hatton 2019"]
+
 # Combined dataset
 growth_all <- rbindlist(
   Filter(function(x) !is.null(x) && nrow(x) > 0,
@@ -916,36 +943,58 @@ n_labels_gr <- growth_all[
 
 ```{r ext-fig2-growth-plot, fig.width=10, fig.height=7, fig.cap="**Extended Fig 2.** Growth rate (g/yr) vs. body mass (g) — Hatton 2019 raw Growth.csv and Grady et al. 2014, all sources at equal visual weight coloured by dataset. Ribbons show OLS ± 95% CI spanning the actual data range of each source. Grady 2014 extinct/mesotherm taxa include dinosaurs and Mesozoic marine reptiles."}
 
-n_sub_gr <- paste(
-  sprintf("%s n=%d", as.character(n_labels_gr$dataset_label), n_labels_gr$n),
+h19_clean_gr <- growth_all[
+  dataset_label == "Hatton 2019" &
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(growth_value) & growth_value > 0
+]
+new_clean_gr <- growth_all[
+  dataset_label != "Hatton 2019" &
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(growth_value) & growth_value > 0
+]
+
+new_n_sub_gr <- paste(
+  sprintf("%s n=%d",
+    as.character(n_labels_gr$dataset_label)[
+      as.character(n_labels_gr$dataset_label) != "Hatton 2019"],
+    n_labels_gr$n[
+      as.character(n_labels_gr$dataset_label) != "Hatton 2019"]),
   collapse = "  |  "
 )
 
-p_ext2 <- ggplot(
-  growth_all[!is.na(body_mass_g) & body_mass_g > 0 &
-             !is.na(growth_value) & growth_value > 0],
-  aes(x = body_mass_g, y = growth_value, colour = dataset_label)
-) +
-  geom_point(alpha = 0.45, size = 1.5, shape = 16) +
-  geom_smooth(
-    aes(fill = dataset_label),
-    method = "lm", formula = y ~ x, se = TRUE, alpha = 0.15, linewidth = 1.0
-  ) +
+p_ext2 <- ggplot(mapping = aes(x = body_mass_g, y = growth_value)) +
+  # Hatton 2019 — grey reference (behind)
+  geom_point(data = h19_clean_gr,
+             color = "#CCCCCC", alpha = 0.2, size = 1.0, shape = 16) +
+  geom_smooth(data = h19_clean_gr,
+              method = "lm", formula = y ~ x, se = TRUE,
+              color = "black", fill = "grey60", alpha = 0.12,
+              linewidth = 1.1, show.legend = FALSE) +
+  # New datasets — coloured, on top
+  geom_point(data = new_clean_gr,
+             aes(colour = dataset_label),
+             alpha = 0.65, size = 2.0, shape = 16) +
+  geom_smooth(data = new_clean_gr,
+              aes(colour = dataset_label, fill = dataset_label),
+              method = "lm", formula = y ~ x, se = TRUE,
+              alpha = 0.15, linewidth = 1.0) +
   scale_x_log10(labels = label_log(base = 10), breaks = 10^seq(-3, 9, by = 3)) +
   scale_y_log10(labels = label_log(base = 10)) +
-  scale_colour_manual(values = ds_pal_gr, name = "Dataset") +
-  scale_fill_manual(  values = ds_pal_gr, name = "Dataset") +
+  scale_colour_manual(values = ds_pal_gr_new, name = "New data source") +
+  scale_fill_manual(  values = ds_pal_gr_new, name = "New data source") +
   annotation_logticks(sides = "bl", size = 0.3) +
   labs(
     x        = "Body mass (g)",
-    y        = "Growth rate (g yr⁻¹)",
+    y        = expression("Growth rate (g yr"^{-1}*")"),
     title    = "Extended Fig 2 — Growth rate scaling: Hatton 2019 + Grady 2014",
-    subtitle = n_sub_gr,
+    subtitle = paste0("Hatton 2019 (grey reference, n=", nrow(h19_clean_gr),
+                      ")  |  ", new_n_sub_gr),
     caption  = paste0(
-      "Hatton 2019: Productivity_g_yr per observation (raw Growth.csv). ",
-      "Grady et al. 2014: gmax × 365 g/yr vs. final adult body mass. ",
+      "Hatton 2019 shown as grey points (black OLS line). ",
+      "Grady et al. 2014 shown in colour: gmax \u00d7 365 g/yr vs. final adult body mass. ",
       "Extinct/mesotherm taxa include dinosaurs and Mesozoic marine reptiles. ",
-      "Ribbons: OLS ± 95% CI spanning actual data range per source. ",
+      "Ribbons: OLS \u00b1 95% CI spanning actual data range per source. ",
       "Grady 2014 DOI: 10.1126/science.1253143."
     )
   ) +
@@ -1008,6 +1057,9 @@ if ("lifespan_max_years" %in% names(animaltr)) {
 # Mortality ds_pal — subset of ds_pal defined in ext-fig1-metab-prep
 ds_pal_mort <- ds_pal[intersect(names(ds_pal), c("Hatton 2019", "AnimalTraits"))]
 
+# Non-Hatton mortality colours (for colour/fill scales)
+ds_pal_mort_new <- ds_pal_mort[names(ds_pal_mort) != "Hatton 2019"]
+
 # Combined dataset
 mortality_all <- rbindlist(
   Filter(function(x) !is.null(x) && nrow(x) > 0,
@@ -1036,35 +1088,58 @@ n_labels_mort <- mortality_all[
 
 ```{r ext-fig3-mort-plot, fig.width=10, fig.height=7, fig.cap="**Extended Fig 3.** Mortality rate vs. body mass — Hatton et al. 2019 and AnimalTraits (1/max lifespan), all sources at equal visual weight coloured by dataset. Ribbons show OLS ± 95% CI spanning the actual data range of each source. Note: 1/max-lifespan underestimates true mortality relative to age-structured estimates; the two datasets are not fully comparable."}
 
-n_sub_mort <- paste(
-  sprintf("%s n=%d", as.character(n_labels_mort$dataset_label), n_labels_mort$n),
+h19_clean_mort <- mortality_all[
+  dataset_label == "Hatton 2019" &
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(mortality_per_yr) & mortality_per_yr > 0
+]
+new_clean_mort <- mortality_all[
+  dataset_label != "Hatton 2019" &
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(mortality_per_yr) & mortality_per_yr > 0
+]
+
+new_n_sub_mort <- paste(
+  sprintf("%s n=%d",
+    as.character(n_labels_mort$dataset_label)[
+      as.character(n_labels_mort$dataset_label) != "Hatton 2019"],
+    n_labels_mort$n[
+      as.character(n_labels_mort$dataset_label) != "Hatton 2019"]),
   collapse = "  |  "
 )
 
-p_ext3 <- ggplot(
-  mortality_all[!is.na(body_mass_g) & body_mass_g > 0 &
-                !is.na(mortality_per_yr) & mortality_per_yr > 0],
-  aes(x = body_mass_g, y = mortality_per_yr, colour = dataset_label)
-) +
-  geom_point(alpha = 0.45, size = 1.5, shape = 16) +
-  geom_smooth(
-    aes(fill = dataset_label),
-    method = "lm", formula = y ~ x, se = TRUE, alpha = 0.15, linewidth = 1.0
-  ) +
+p_ext3 <- ggplot(mapping = aes(x = body_mass_g, y = mortality_per_yr)) +
+  # Hatton 2019 — grey reference (behind)
+  geom_point(data = h19_clean_mort,
+             color = "#CCCCCC", alpha = 0.2, size = 1.0, shape = 16) +
+  geom_smooth(data = h19_clean_mort,
+              method = "lm", formula = y ~ x, se = TRUE,
+              color = "black", fill = "grey60", alpha = 0.12,
+              linewidth = 1.1, show.legend = FALSE) +
+  # New datasets — coloured, on top
+  geom_point(data = new_clean_mort,
+             aes(colour = dataset_label),
+             alpha = 0.65, size = 2.0, shape = 16) +
+  geom_smooth(data = new_clean_mort,
+              aes(colour = dataset_label, fill = dataset_label),
+              method = "lm", formula = y ~ x, se = TRUE,
+              alpha = 0.15, linewidth = 1.0) +
   scale_x_log10(labels = label_log(base = 10), breaks = 10^seq(-3, 9, by = 3)) +
   scale_y_log10(labels = label_log(base = 10)) +
-  scale_colour_manual(values = ds_pal_mort, name = "Dataset") +
-  scale_fill_manual(  values = ds_pal_mort, name = "Dataset") +
+  scale_colour_manual(values = ds_pal_mort_new, name = "New data source") +
+  scale_fill_manual(  values = ds_pal_mort_new, name = "New data source") +
   annotation_logticks(sides = "bl", size = 0.3) +
   labs(
     x        = "Body mass (g)",
     y        = expression("Mortality rate (yr"^{-1}*")"),
     title    = "Extended Fig 3 — Mortality rate scaling: Hatton 2019 + AnimalTraits",
-    subtitle = n_sub_mort,
+    subtitle = paste0("Hatton 2019 (grey reference, n=", nrow(h19_clean_mort),
+                      ")  |  ", new_n_sub_mort),
     caption  = paste0(
-      "Hatton 2019: direct mortality estimates (raw Mortality.csv). ",
-      "AnimalTraits: mortality inferred as 1/max_lifespan_yr (note: underestimates true mortality). ",
-      "Ribbons: OLS ± 95% CI spanning actual data range per source."
+      "Hatton 2019 shown as grey points (black OLS line). ",
+      "AnimalTraits shown in colour: mortality inferred as 1/max_lifespan_yr ",
+      "(note: underestimates true mortality relative to age-structured estimates). ",
+      "Ribbons: OLS \u00b1 95% CI spanning actual data range per source."
     )
   ) +
   guides(

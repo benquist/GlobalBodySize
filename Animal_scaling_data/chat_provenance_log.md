@@ -85,3 +85,20 @@ Replaced all six prep+plot chunks and three reg-table chunks in `hatton_figures_
 - n= count subtitle added to each extended figure
 - Extended Fig 1 gains a faceted reference panel (Ext Fig 1b): each non-Hatton source facet shows its data colored against grey Hatton 2019 reference
 - Rendered cleanly with no errors
+
+## 2025-05-11 — Part 2 colour hierarchy redesign
+
+**Prompt**: "the Hatton et al. data should be grey to black and the new data should be in color. that way the new data added will stand out. Please redo the plots"
+
+**Changes**:
+- `ds_pal["Hatton 2019"]` changed from `"#2166ac"` (blue) to `"#BBBBBB"` (grey) in `ext-fig1-metab-prep`
+- Added `ds_pal_new`, `ds_pal_gr_new`, `ds_pal_mort_new` (non-Hatton subsets for colour/fill scales)
+- Extended Figs 1a, 2, 3: restructured as two-layer ggplot2 calls:
+  - Layer 1: Hatton 2019 grey points (#CCCCCC, alpha=0.2) + black OLS line + grey CI ribbon (rendered behind)
+  - Layer 2: New datasets coloured points (alpha=0.6–0.65) + coloured OLS ribbons (rendered on top)
+  - `scale_colour_manual` / `scale_fill_manual` use `ds_pal_*_new` (excludes Hatton) so legend reflects only new sources
+- Extended Fig 1b faceted view already had grey Hatton reference — unchanged
+- Subtitle updated per plot: "Hatton 2019 (grey reference, n=X)  |  SourceA n=Y  |  ..."
+- Re-rendered `hatton_figures_reconstruction.html` (12 MB, 45 chunks, clean)
+
+**Agent**: @m (supervisor) + coder sub-agent
