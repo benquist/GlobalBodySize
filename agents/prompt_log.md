@@ -2184,3 +2184,16 @@ Action: Root cause was .hero-photo using width:100vw which is wider than the vis
 5. Ran `load_repttraits.R` → 10,469 mass rows (Squamata 10,131; Testudines 313; Crocodilia 24; Rhynchocephalia 1). All `mass_type = "literature_maximum"` confirmed.
 6. Re-ran `scripts/merge_tier1.R` → 57,925 rows, 12 providers.
 7. Committed as `9c85439` on master branch. Always gate: PASS.
+
+---
+**Date**: 2026-05-11
+**Project**: GlobalBodySize
+**Session**: Session 7 Part 3 — @M agent
+**Prompt**: "Ok, lets do the next steps"
+**Action**: Steps = SeaLifeBase intake (A2) + DISPERSE intake (A3) + AmphiBIO audit.
+1. Fixed `GlobalBodySize/providers/sealifebase/load_sealifebase.R`: removed non-existent 'Species' field from rfishbase::species() fields list; added load_taxa() join on SpecCode for full binomial + taxonomy (Family, Order, Class, Phylum, Kingdom). Fixed verbatim_taxon_name construction.
+2. Ran SeaLifeBase intake → 616 mass rows, 13,498 linear rows. Unit check: Octopus vulgaris = 10,000 g ✅; blue whale = 160,000 kg ✅. Units confirmed grams.
+3. Ran DISPERSE intake (`providers/disperse/load_disperse.R`) → 823 linear rows (473 body_length_max + 350 wing_length_female). Linear size only — NOT in body mass table. Taxonomy columns NA (merged-header XLSX structure); flagged needs_review.
+4. AmphiBIO audit: 6,776 species total, 591 with Body_mass_g (8.7%). CONFIRMED correct — not a bug, reflects true data sparsity in AmphiBIO.
+5. Re-ran `scripts/merge_tier1.R` → 58,541 rows, 13 providers.
+6. Committed as b7caedf on master branch. Always gate: PASS.
