@@ -1,0 +1,1449 @@
+---
+title: "Animal Allometric Scaling: Metabolism and Growth Across Taxa"
+author: "Animal_scaling_data Project"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    number_sections: true
+    code_folding: hide
+---
+
+```{r setup, warning=FALSE, message=FALSE}
+set.seed(42)
+
+library(data.table)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(RColorBrewer)
+
+HAS_SMATR <- requireNamespace("smatr", quietly = TRUE)
+if (HAS_SMATR) {
+  library(smatr)
+} else {
+  message("Package 'smatr' not installed. SMA regressions will be skipped. ",
+          "Install with: install.packages('smatr')")
+}
+
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 10, fig.height = 6)
+
+# ── Color palette (Dark2, 8 colors) ─────────────────────────────────────────
+pal8 <- brewer.pal(8, "Dark2")
+
+# ── Dataset display labels ───────────────────────────────────────────────────
+LABEL_AT  <- "AnimalTraits (Herberstein 2022)"
+LABEL_PN  <- "Hoehler 2023 (PNAS)"
+LABEL_H19 <- "Hatton 2019 (PNAS)"
+LABEL_H15 <- "Hatton 2015 (Science)"
+
+# ── Load helper ──────────────────────────────────────────────────────────────
+load_csv <- function(path, label) {
+  if (!file.exists(path)) {
+    message("File not found: ", path)
+    return(NULL)
+  }
+  dt <- fread(path, colClasses = list(character = "qa_flag"))
+  dt[, dataset_label := label]
+  for (col in c("body_mass_g", "metabolic_rate_value", "lifespan_max_years",
+                "growth_rate_value", "predator_mass_g_paired",
+                "metabolic_rate_at_T_W", "dry_mass_g", "carbon_mass_g")) {
+    if (col %in% names(dt))
+      dt[, (col) := suppressWarnings(as.numeric(get(col)))]
+  }
+  dt
+}
+
+at   <- load_csv("output/animaltraits_compiled.csv",     LABEL_AT)
+pnas <- load_csv("output/pnas_hoehler2023_compiled.csv", LABEL_PN)
+if (is.null(pnas))
+  pnas <- load_csv("output/pnas_2303764120_compiled.csv", LABEL_PN)
+h19  <- load_csv("output/hatton2019_compiled.csv",       LABEL_H19)
+h15  <- load_csv("output/hatton2015_compiled.csv",       LABEL_H15)
+
+all_list   <- list(at = at, pnas = pnas, h19 = h19, h15 = h15)
+labels_vec <- c(at   = LABEL_AT,
+                pnas = LABEL_PN,
+                h19  = LABEL_H19,
+                h15  = LABEL_H15)
+
+# ── QA filter ────────────────────────────────────────────────────────────────
+qa_ok <- function(dt) {
+  if (is.null(dt)) return(NULL)
+  dt[qa_flag %in% c("ok", "")]
+}
+
+# ── OLS log-log regression helper ────────────────────────────────────────────
+# Returns data.table with one row per group (plus "All taxa combined").
+fit_log_lm <- function(dt, x_col, y_col, group_col = NULL, min_n = 10) {
+  if (is.null(dt) || nrow(dt) == 0) return(data.table())
+  if (!all(c(x_col, y_col) %in% names(dt))) return(data.table())
+
+  sub <- dt[!is.na(get(x_col)) & get(x_col) > 0 &
+            !is.na(get(y_col)) & get(y_col) > 0]
+  if (nrow(sub) == 0) return(data.table())
+
+  sub <- copy(sub)
+  sub[, lx := log10(get(x_col))]
+  sub[, ly := log10(get(y_col))]
+
+  fit_one <- function(d, label) {
+    if (nrow(d) < min_n) return(NULL)
+    if (length(unique(d$lx)) < 2) return(NULL)   # no x variance; skip
+    fit <- tryCatch(lm(ly ~ lx, data = d), error = function(e) NULL)
+    if (is.null(fit)) return(NULL)
+    s  <- coef(summary(fit))
+    if (nrow(s) < 2) return(NULL)                 # singular fit; skip
+    ci <- tryCatch(confint(fit), error = function(e) matrix(NA_real_, 2, 2))
+    data.table(
+      Group    = label,
+      n        = nrow(d),
+      Intercept = round(s[1, 1], 3),
+      Slope    = round(s[2, 1], 3),
+      Slope_SE = round(s[2, 2], 3),
+      CI_95_lo = round(ci[2, 1], 3),
+      CI_95_hi = round(ci[2, 2], 3),
+      R2       = round(summary(fit)$r.squared, 3),
+      p_value  = signif(s[2, 4], 3)
+    )
+  }
+
+  res_all <- fit_one(sub, "All taxa combined")
+
+  if (!is.null(group_col) && group_col %in% names(sub)) {
+    grps    <- sort(unique(sub[[group_col]]))
+    res_grp <- rbindlist(
+      lapply(grps, function(g) fit_one(sub[get(group_col) == g], g)),
+      fill = TRUE
+    )
+    res_all <- rbind(res_all, res_grp, fill = TRUE)
+  }
+  res_all
+}
+
+# ── SMA regression helper ────────────────────────────────────────────────────
+# Uses smatr::sma(). Returns data.table of results; skipped if smatr absent.
+# smatr 4.x coef[[1]] structure: row 1 = slope, row 2 = elevation (intercept);
+# columns: coef, lower CI, upper CI, Pval
+fit_sma <- function(dt, x_col, y_col, group_col = NULL, min_n = 10) {
+  if (!HAS_SMATR) return(data.table())
+  if (is.null(dt) || nrow(dt) == 0) return(data.table())
+  if (!all(c(x_col, y_col) %in% names(dt))) return(data.table())
+
+  sub <- dt[!is.na(get(x_col)) & get(x_col) > 0 &
+            !is.na(get(y_col)) & get(y_col) > 0]
+  if (nrow(sub) == 0) return(data.table())
+
+  sub <- copy(sub)
+  sub[, lx := log10(get(x_col))]
+  sub[, ly := log10(get(y_col))]
+
+  fit_one_sma <- function(d, label) {
+    if (nrow(d) < min_n) return(NULL)
+    fit <- tryCatch(
+      smatr::sma(ly ~ lx, data = as.data.frame(d[, .(lx, ly)])),
+      error = function(e) NULL
+    )
+    if (is.null(fit)) return(NULL)
+    cf  <- tryCatch(fit$coef[[1]], error = function(e) NULL)
+    if (is.null(cf) || nrow(cf) < 2) return(NULL)
+    r2v <- tryCatch(as.numeric(fit$r2[[1]]), error = function(e) NA_real_)
+    data.table(
+      Group     = label,
+      n         = nrow(d),
+      Method    = "SMA",
+      Intercept = round(as.numeric(cf[2, 1]), 3),
+      Slope     = round(as.numeric(cf[1, 1]), 3),
+      CI_95_lo  = round(as.numeric(cf[1, 2]), 3),
+      CI_95_hi  = round(as.numeric(cf[1, 3]), 3),
+      R2        = round(r2v, 3)
+    )
+  }
+
+  res_all <- fit_one_sma(sub, "All taxa combined")
+
+  if (!is.null(group_col) && group_col %in% names(sub)) {
+    grps <- sort(unique(sub[[group_col]]))
+    res_grp <- rbindlist(
+      lapply(grps, function(g) fit_one_sma(sub[get(group_col) == g], g)),
+      fill = TRUE
+    )
+    res_all <- rbind(res_all, res_grp, fill = TRUE)
+  }
+  res_all
+}
+
+# ── Safe column-subset for rbinding heterogeneous tables ─────────────────────
+bind_common <- function(dt, cols) {
+  if (is.null(dt)) return(NULL)
+  avail <- intersect(cols, names(dt))
+  out   <- dt[, avail, with = FALSE]
+  for (mc in setdiff(cols, names(out))) out[, (mc) := NA]
+  out
+}
+```
+
+---
+
+# Introduction & Theoretical Background
+
+One of the most robust quantitative patterns in biology is that metabolic rate ($B$), growth rate ($G$), and maximum lifespan ($L$) all scale with body mass ($M$) as power laws with **quarter-power exponents**:
+
+$$B \propto M^{3/4}, \qquad G \propto M^{3/4}, \qquad L \propto M^{1/4}$$
+
+The **West–Brown–Enquist (WBE) metabolic theory** attributes these scaling laws to the geometry of hierarchical fractal-like resource-distribution networks (West et al. 1997, 1999). The Metabolic Theory of Ecology (MTE; Brown et al. 2004) extends these predictions to population- and ecosystem-level patterns.
+
+| Relationship | Predicted exponent ($\beta$) | Interpretation | Reference |
+|---|---|---|---|
+| Metabolic rate $B \propto M^\beta$ | **0.75** | Kleiber's law; ectotherms may differ | West et al. 1997 |
+| Growth rate $G \propto M^\beta$ | **0.75** | Absolute anabolic production; mass-specific scales as $M^{-0.25}$ | West et al. 1997 |
+| Maximum lifespan $L \propto M^\beta$ | **0.25** | Inverse of mass-specific metabolic rate | West et al. 1997 |
+| Predator mass $M_\text{pred} \propto M_\text{prey}^\beta$ | **~1.0** | Predators are typically 10–1000× heavier than prey | Hatton et al. 2015 |
+
+**Key theoretical nuances:**
+
+- WBE predicts $\beta = 3/4$ for whole-organism metabolic rate. Empirical estimates in mammals and birds are close to 3/4; ectotherms may show slopes closer to 2/3 or higher.
+- Unicellular organisms and prokaryotes often show $\beta > 1$ (superlinear scaling), possibly driven by different metabolic architectures. The Hoehler 2023 dataset spans ~40 orders of magnitude in mass (bacteria to whales), constituting the broadest empirical test assembled to date.
+- Mixing endotherms, ectotherms, and unicellular organisms in a single regression produces a composite slope that reflects taxonomic composition rather than a universal exponent. All slopes in this document must be interpreted within their sampling context.
+- The WBE growth rate prediction ($G \propto M^{3/4}$) refers to **absolute** anabolic production; per-unit-mass turnover (specific growth rate) scales as $M^{-1/4}$, so larger animals grow more slowly relative to body mass.
+- Predator–prey mass ratios (Hatton et al. 2015) test body mass co-scaling across trophic levels, not metabolic allometry.
+
+This document synthesizes four complementary published datasets spanning bacteria to whales to evaluate these predictions at multiple scales of taxonomic aggregation.
+
+```{r theory-table, echo=FALSE}
+theory_tab <- data.table(
+  Relationship = c("Metabolic rate (B ~ M^β)",
+                   "Growth rate (G ~ M^β)",
+                   "Max lifespan (L ~ M^β)",
+                   "Predator mass (M_pred ~ M_prey^β)"),
+  Predicted_beta = c(0.75, 0.75, 0.25, 1.00),
+  Dataset_tested = c("AnimalTraits, Hoehler 2023, Hatton 2019",
+                     "Hatton 2019",
+                     "Hatton 2019",
+                     "Hatton 2015"),
+  Section = c("3–8", "9", "10", "11")
+)
+
+kable(theory_tab,
+      col.names = c("Relationship", "Predicted β (WBE)", "Dataset(s) tested", "Section"),
+      caption = "Summary of WBE theoretical predictions and corresponding document sections.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+```
+
+```{r qa-pass-rates}
+qa_tab <- rbindlist(lapply(names(all_list), function(nm) {
+  dt <- all_list[[nm]]
+  if (is.null(dt)) return(NULL)
+  n_total <- nrow(dt)
+  n_ok    <- sum(dt$qa_flag == "ok",  na.rm = TRUE)
+  n_blank <- sum(dt$qa_flag == "",    na.rm = TRUE)
+  n_pass  <- n_ok + n_blank
+  n_fail  <- n_total - n_pass
+  pct_pass <- round(100 * n_pass / n_total, 1)
+  flag_warn <- if (n_fail / n_total > 0.20) "⚠ >20% failed" else "ok"
+  data.table(
+    Dataset      = labels_vec[nm],
+    N_total      = n_total,
+    N_pass_qa    = n_pass,
+    N_fail_qa    = n_fail,
+    Pct_pass     = pct_pass,
+    Flag_warning = flag_warn
+  )
+}))
+
+kable(qa_tab,
+      col.names = c("Dataset", "N total", "N pass QA", "N fail QA", "% pass", "Warning"),
+      caption = paste("QA flag pass rates per dataset.",
+                      "Records with qa_flag == 'ok' or qa_flag == '' (blank) are treated as QA-pass.",
+                      "A warning is flagged when >20% of records fail.")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+```
+
+---
+
+# Data Coverage & Quality
+
+```{r coverage-summary-table}
+dois_vec <- c(
+  at   = "10.1038/s41597-022-01364-9",
+  pnas = "10.1073/pnas.2303764120",
+  h19  = "10.1073/pnas.1907703116",
+  h15  = "10.1126/science.aac6284"
+)
+
+summ_tab <- rbindlist(lapply(names(all_list), function(nm) {
+  dt <- all_list[[nm]]
+  if (is.null(dt)) return(NULL)
+  grps <- paste(sort(unique(
+    dt$input_taxonomic_group[!is.na(dt$input_taxonomic_group) & dt$input_taxonomic_group != ""]
+  )), collapse = ", ")
+
+  has_mass <- sum(!is.na(dt$body_mass_g) & dt$body_mass_g > 0) > 0
+  has_met  <- "metabolic_rate_value" %in% names(dt) &&
+              sum(!is.na(dt$metabolic_rate_value) & dt$metabolic_rate_value > 0) > 0
+  has_lisp <- "lifespan_max_years" %in% names(dt) &&
+              sum(!is.na(dt$lifespan_max_years) & dt$lifespan_max_years > 0) > 0
+  has_grow <- "growth_rate_value" %in% names(dt) &&
+              sum(!is.na(dt$growth_rate_value) & dt$growth_rate_value > 0) > 0
+  has_pred <- "predator_mass_g_paired" %in% names(dt) &&
+              sum(!is.na(dt$predator_mass_g_paired) & dt$predator_mass_g_paired > 0) > 0
+
+  traits <- paste(c(
+    if (has_mass) "body mass",
+    if (has_met)  "metabolic rate",
+    if (has_lisp) "lifespan",
+    if (has_grow) "growth rate",
+    if (has_pred) "predator mass"
+  ), collapse = ", ")
+
+  data.table(
+    Dataset          = labels_vec[nm],
+    DOI              = dois_vec[nm],
+    N_rows           = nrow(dt),
+    Taxa_covered     = grps,
+    Traits_available = traits
+  )
+}))
+
+kable(summ_tab,
+      col.names = c("Dataset", "DOI", "N rows", "Taxa covered", "Traits available"),
+      caption = "Summary of the four datasets. Taxa covered lists verbatim taxonomic group labels as supplied by each source.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+```
+
+```{r coverage-trait-counts}
+cov_tab <- rbindlist(lapply(names(all_list), function(nm) {
+  dt <- all_list[[nm]]
+  if (is.null(dt)) return(NULL)
+  mass_ok <- !is.na(dt$body_mass_g) & dt$body_mass_g > 0
+  met_ok  <- if ("metabolic_rate_value" %in% names(dt))
+               !is.na(dt$metabolic_rate_value) & dt$metabolic_rate_value > 0
+             else rep(FALSE, nrow(dt))
+  lisp_ok <- if ("lifespan_max_years" %in% names(dt))
+               !is.na(dt$lifespan_max_years) & dt$lifespan_max_years > 0
+             else rep(FALSE, nrow(dt))
+  grow_ok <- if ("growth_rate_value" %in% names(dt))
+               !is.na(dt$growth_rate_value) & dt$growth_rate_value > 0
+             else rep(FALSE, nrow(dt))
+  pred_ok <- if ("predator_mass_g_paired" %in% names(dt))
+               !is.na(dt$predator_mass_g_paired) & dt$predator_mass_g_paired > 0
+             else rep(FALSE, nrow(dt))
+  m_vals   <- dt$body_mass_g[mass_ok]
+  mass_rng <- if (length(m_vals) > 0)
+                sprintf("%.2e – %.2e", min(m_vals), max(m_vals))
+              else "—"
+  data.table(
+    Dataset  = labels_vec[nm],
+    N_total  = nrow(dt),
+    N_mass   = sum(mass_ok),
+    N_met    = sum(met_ok),
+    N_lisp   = sum(lisp_ok),
+    N_grow   = sum(grow_ok),
+    N_pred   = sum(pred_ok),
+    Mass_rng = mass_rng
+  )
+}))
+
+kable(cov_tab,
+      col.names = c("Dataset", "N total", "N body mass", "N metabolic rate",
+                    "N lifespan", "N growth rate", "N predator mass", "Body mass range (g)"),
+      caption = "Trait availability by dataset (all rows, pre-QA filter). N values reflect rows with positive, non-NA values for each trait.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+```
+
+```{r coverage-bar, fig.width=11, fig.height=6}
+common_cols <- c("dataset_label", "input_taxonomic_group", "body_mass_g",
+                 "metabolic_rate_value", "lifespan_max_years", "growth_rate_value", "qa_flag")
+
+all_bound <- rbindlist(
+  lapply(all_list, bind_common, cols = common_cols),
+  fill = TRUE
+)
+
+bar_dat <- all_bound[!is.na(input_taxonomic_group) & input_taxonomic_group != "",
+                     .N, by = .(dataset_label, input_taxonomic_group)]
+
+ggplot(bar_dat,
+       aes(x = reorder(input_taxonomic_group, -N), y = N, fill = dataset_label)) +
+  geom_col() +
+  scale_fill_manual(values = pal8[1:4], name = "Dataset") +
+  facet_wrap(~ dataset_label, scales = "free", ncol = 2) +
+  labs(
+    title = "Record count by taxonomic group and dataset",
+    x     = "Taxonomic group (verbatim label from source)",
+    y     = "Number of records"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+```
+
+```{r dataset-bar-total, fig.width=7, fig.height=4}
+ds_totals <- rbindlist(lapply(names(all_list), function(nm) {
+  dt <- all_list[[nm]]
+  if (is.null(dt)) return(NULL)
+  data.table(Dataset = labels_vec[nm], N = nrow(dt))
+}))
+
+ggplot(ds_totals, aes(x = reorder(Dataset, -N), y = N, fill = Dataset)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = scales::comma(N)), vjust = -0.4, size = 3.5) +
+  scale_fill_manual(values = pal8[1:4]) +
+  labs(title = "Total record count per dataset", x = NULL, y = "N records") +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 20, hjust = 1))
+```
+
+```{r met-type-distribution}
+met_type_list <- lapply(names(all_list), function(nm) {
+  dt <- all_list[[nm]]
+  if (is.null(dt) || !"metabolic_rate_type" %in% names(dt)) return(NULL)
+  if (!any(!is.na(dt$metabolic_rate_type) & dt$metabolic_rate_type != "")) return(NULL)
+  tab <- dt[!is.na(metabolic_rate_value) & metabolic_rate_value > 0,
+            .N, by = metabolic_rate_type][order(-N)]
+  tab[, Dataset := labels_vec[nm]]
+  tab
+})
+met_type_tab <- rbindlist(Filter(Negate(is.null), met_type_list), fill = TRUE)
+
+if (nrow(met_type_tab) > 0) {
+  kable(met_type_tab[, .(Dataset, metabolic_rate_type, N)],
+        col.names = c("Dataset", "Metabolic rate type", "N records"),
+        caption = paste("Distribution of metabolic rate measurement types across datasets.",
+                        "Mixing basal, resting, active, and field rates inflates variance",
+                        "and may bias slope estimates. See Section 3.4 for basal-only analysis.")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+> **Caveat — unreconciled taxonomy:** Taxonomic group labels (`input_taxonomic_group`) are verbatim as supplied by each source and have **not** been harmonized across datasets. The same organism may appear under different labels in different sources (e.g., "invertebrate" vs. "crustacean"). Cross-source comparisons of taxonomic groups should be interpreted with caution until formal taxonomic reconciliation is performed.
+
+---
+
+# Cross-Study Metabolic Scaling — All Taxa
+
+Metabolic theory (WBE; Kleiber 1932) predicts $B \propto M^{3/4}$. We test this across all three datasets that include metabolic rate measurements in Watts: AnimalTraits, Hoehler 2023, and Hatton 2019.
+
+> **Temperature caveat:** Hoehler et al. (2023) standardized all metabolic rates to 25°C using the Arrhenius equation, making them directly comparable across taxa. AnimalTraits rates are **not** temperature-standardized; measurement temperatures vary by species and study. Hatton et al. (2019) applied Q10-based temperature corrections. The "all combined" slope reflects both biological variation and methodological heterogeneity between datasets.
+
+> **Metabolic rate type caveat:** This section combines all metabolic rate types (basal, resting, active, field). Mixing types inflates variance and may bias slope estimates downward. Section 3.4 presents basal- and resting-only analyses.
+
+## Combined metabolic data preparation {#met-prep}
+
+```{r met-prep}
+met_sources <- rbindlist(
+  lapply(list(qa_ok(at), qa_ok(pnas), qa_ok(h19)), function(d) {
+    if (is.null(d)) return(NULL)
+    d[!is.na(body_mass_g) & body_mass_g > 0 &
+      !is.na(metabolic_rate_value) & metabolic_rate_value > 0 &
+      metabolic_rate_unit == "W"]
+  }),
+  fill = TRUE
+)
+met_basal <- met_sources[metabolic_rate_type %in% c("basal", "resting")]
+
+cat(sprintf("Metabolic data (all types, unit = W):  n = %d\n", nrow(met_sources)))
+cat(sprintf("Metabolic data (basal + resting only): n = %d\n", nrow(met_basal)))
+cat("\nRecords per dataset:\n")
+print(met_sources[, .N, by = dataset_label])
+cat("\nMetabolic rate types:\n")
+print(table(met_sources$metabolic_rate_type, useNA = "ifany"))
+```
+
+## Scatter plot — all taxa combined {#met-scatter}
+
+```{r met-all-taxa-plot, fig.width=10, fig.height=7}
+if (nrow(met_sources) >= 10) {
+  fit_ov <- lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data = met_sources)
+  int_ov <- coef(fit_ov)[1]
+  slp_ov <- coef(fit_ov)[2]
+  x_rng  <- range(log10(met_sources$body_mass_g), na.rm = TRUE)
+
+  ref_df <- data.frame(lx = x_rng, ly = int_ov + 0.75 * x_rng)
+  ols_df <- data.frame(lx = x_rng, ly = int_ov + slp_ov * x_rng)
+
+  ggplot(met_sources,
+         aes(x = log10(body_mass_g),
+             y = log10(metabolic_rate_value),
+             colour = dataset_label)) +
+    geom_point(alpha = 0.18, size = 0.7, shape = 16) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 0.9,
+                aes(group = dataset_label)) +
+    geom_line(data = ref_df, aes(x = lx, y = ly),
+              inherit.aes = FALSE, linetype = "dashed",
+              colour = "black", linewidth = 1.0) +
+    geom_line(data = ols_df, aes(x = lx, y = ly),
+              inherit.aes = FALSE, colour = "black", linewidth = 1.3) +
+    scale_colour_manual(values = pal8[1:3], name = "Dataset") +
+    annotate("text",
+             x = x_rng[1] + 0.5,
+             y = int_ov + slp_ov * (x_rng[1] + 0.5) + 1.2,
+             label = sprintf("Overall OLS  β = %.3f", slp_ov),
+             size = 4, hjust = 0) +
+    annotate("text",
+             x = x_rng[1] + 0.5,
+             y = int_ov + 0.75 * (x_rng[1] + 0.5) - 0.8,
+             label = "WBE reference  β = 0.75",
+             size = 3.5, hjust = 0, colour = "grey30") +
+    labs(
+      title    = expression(paste("Cross-study metabolic scaling: ", italic(B), " ∝ ", italic(M)^{beta})),
+      subtitle = "Solid black = overall OLS; dashed = WBE reference β = 0.75; colored lines = per-dataset OLS",
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+## OLS regression table — all taxa {#met-ols-table}
+
+```{r met-ols-table}
+reg_met_overall <- fit_log_lm(met_sources, "body_mass_g", "metabolic_rate_value", min_n = 10)
+
+if (!is.null(reg_met_overall) && nrow(reg_met_overall) > 0) {
+  kable(reg_met_overall,
+        col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regression of metabolic rate (W) on body mass (g) — all taxa and studies combined.",
+          "All metabolic rate types included; unit = W.",
+          "WBE predicted slope: β = 0.75.",
+          "OLS assumes no measurement error in body mass; slopes may be attenuated relative to the true relationship.",
+          "The combined row mixes datasets with different temperature normalizations."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+    row_spec(1, bold = TRUE, background = "#dce8ff")
+} else {
+  cat("No regression results available for the all-taxa metabolic scaling table.\n")
+}
+```
+
+## SMA regression — all taxa {#met-sma}
+
+```{r met-sma-plot, fig.width=10, fig.height=7}
+if (nrow(met_sources) >= 10 && HAS_SMATR) {
+  sma_all <- fit_sma(met_sources, "body_mass_g", "metabolic_rate_value", min_n = 10)
+
+  if (!is.null(sma_all) && nrow(sma_all) > 0) {
+    sma_slp <- sma_all$Slope[1]
+    sma_int <- sma_all$Intercept[1]
+    x_rng2  <- range(log10(met_sources$body_mass_g), na.rm = TRUE)
+    sma_line <- data.frame(lx = x_rng2, ly = sma_int + sma_slp * x_rng2)
+    ref_df2  <- data.frame(lx = x_rng2, ly = sma_int + 0.75 * x_rng2)
+
+    ggplot(met_sources,
+           aes(x = log10(body_mass_g), y = log10(metabolic_rate_value),
+               colour = dataset_label)) +
+      geom_point(alpha = 0.15, size = 0.6, shape = 16) +
+      geom_line(data = ref_df2, aes(x = lx, y = ly),
+                inherit.aes = FALSE, linetype = "dashed",
+                colour = "black", linewidth = 1.0) +
+      geom_line(data = sma_line, aes(x = lx, y = ly),
+                inherit.aes = FALSE, colour = "firebrick", linewidth = 1.3) +
+      scale_colour_manual(values = pal8[1:3], name = "Dataset") +
+      annotate("text",
+               x = x_rng2[1] + 0.5,
+               y = sma_int + sma_slp * (x_rng2[1] + 0.5) + 1.0,
+               label = sprintf("Overall SMA  β = %.3f", sma_slp),
+               colour = "firebrick", size = 4, hjust = 0) +
+      labs(
+        title    = expression(paste("Metabolic scaling — SMA: ", italic(B), " ∝ ", italic(M)^{beta})),
+        subtitle = "Red = overall SMA line; dashed = WBE reference β = 0.75",
+        x        = expression(log[10] ~ "Body mass (g)"),
+        y        = expression(log[10] ~ "Metabolic rate (W)")
+      ) +
+      theme_bw(base_size = 13) +
+      theme(legend.position = "bottom")
+  }
+}
+```
+
+```{r met-sma-table}
+if (HAS_SMATR && nrow(met_sources) >= 10) {
+  reg_sma_all <- fit_sma(met_sources, "body_mass_g", "metabolic_rate_value", min_n = 10)
+  if (!is.null(reg_sma_all) && nrow(reg_sma_all) > 0) {
+    kable(reg_sma_all,
+          col.names = c("Group", "n", "Method", "log₁₀ Intercept", "Slope (β)",
+                        "95% CI lo", "95% CI hi", "R²"),
+          caption = paste(
+            "SMA log-log regression of metabolic rate (W) on body mass (g) — all taxa combined.",
+            "SMA (standardised major axis) corrects for measurement error in both axes;",
+            "SMA slopes are ≥ OLS slopes when R² < 1.",
+            "WBE predicted slope: β = 0.75."
+          )) %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+      row_spec(1, bold = TRUE, background = "#ffe8dc")
+  }
+}
+```
+
+## Basal and resting metabolic rates only {#met-basal}
+
+```{r met-basal-analysis, fig.width=10, fig.height=6}
+if (nrow(met_basal) >= 10) {
+  cat(sprintf("Basal + resting metabolic data: n = %d\n", nrow(met_basal)))
+  cat("By dataset:\n")
+  print(met_basal[, .N, by = dataset_label])
+
+  reg_basal <- fit_log_lm(met_basal, "body_mass_g", "metabolic_rate_value",
+                           group_col = "input_taxonomic_group", min_n = 10)
+
+  fit_bov <- lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data = met_basal)
+  int_bov <- coef(fit_bov)[1]
+  slp_bov <- coef(fit_bov)[2]
+  xrb     <- range(log10(met_basal$body_mass_g), na.rm = TRUE)
+
+  p_basal <- ggplot(met_basal,
+         aes(x = log10(body_mass_g), y = log10(metabolic_rate_value),
+             colour = input_taxonomic_group)) +
+    geom_point(alpha = 0.4, size = 1.2, shape = 16) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 0.8,
+                aes(group = input_taxonomic_group)) +
+    geom_abline(intercept = int_bov, slope = slp_bov,
+                colour = "black", linewidth = 1.2) +
+    geom_abline(intercept = int_bov, slope = 0.75,
+                linetype = "dashed", colour = "grey30", linewidth = 1.0) +
+    scale_colour_viridis_d(option = "turbo", name = "Taxonomic group") +
+    labs(
+      title    = "Basal and resting metabolic rate scaling",
+      subtitle = sprintf("Solid black = overall OLS β = %.3f; dashed = WBE reference β = 0.75",
+                         slp_bov),
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+  print(p_basal)
+
+  kable(reg_basal,
+        col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = "OLS log-log regression — basal and resting metabolic rates only. Reduced type heterogeneity yields more interpretable slopes.") %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+    row_spec(1, bold = TRUE, background = "#dce8ff")
+} else {
+  cat("Fewer than 10 records classified as basal or resting; basal-only analysis skipped.\n")
+}
+```
+
+---
+
+# Metabolic Scaling by Study
+
+Per-dataset regressions allow direct comparison with each paper's published estimates and avoid conflating temperature-normalization differences.
+
+```{r met-by-study-plot, fig.width=11, fig.height=8}
+if (nrow(met_sources) >= 10) {
+  ggplot(met_sources,
+         aes(x = log10(body_mass_g), y = log10(metabolic_rate_value),
+             colour = input_taxonomic_group)) +
+    geom_point(alpha = 0.25, size = 0.8, shape = 16) +
+    geom_smooth(method = "lm", se = TRUE, colour = "black", fill = "grey70",
+                linewidth = 1.0, aes(group = dataset_label)) +
+    geom_abline(
+      data = met_sources[!is.na(body_mass_g) & body_mass_g > 0 &
+                          !is.na(metabolic_rate_value) & metabolic_rate_value > 0,
+                         .(ref_int = mean(log10(metabolic_rate_value), na.rm = TRUE) -
+                                     0.75 * mean(log10(body_mass_g), na.rm = TRUE)),
+                         by = dataset_label],
+      aes(intercept = ref_int, slope = 0.75),
+      colour = "firebrick", linetype = "dashed", linewidth = 0.9,
+      inherit.aes = FALSE) +
+    scale_colour_viridis_d(option = "turbo", name = "Taxonomic group") +
+    facet_wrap(~ dataset_label, scales = "free", ncol = 2) +
+    labs(
+      title    = "Metabolic scaling by dataset",
+      subtitle = "Black = per-dataset OLS (one line per dataset) with 95% CI; red dashed = WBE β = 0.75 (anchored at per-dataset mean)",
+      caption  = "WBE reference line intercept is anchored at each dataset's empirical mean — vertical position reflects data, not theory.",
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 12) +
+    theme(legend.position = "bottom",
+          axis.text.x = element_text(angle = 20, hjust = 1))
+}
+```
+
+```{r met-by-study-table}
+reg_by_ds <- rbindlist(lapply(c(LABEL_AT, LABEL_PN, LABEL_H19), function(lbl) {
+  sub <- met_sources[dataset_label == lbl]
+  if (nrow(sub) < 10) return(NULL)
+  res <- fit_log_lm(sub, "body_mass_g", "metabolic_rate_value", min_n = 10)
+  if (!is.null(res) && nrow(res) > 0) res[, Group := lbl]
+  res
+}), fill = TRUE)
+
+if (!is.null(reg_by_ds) && nrow(reg_by_ds) > 0) {
+  kable(reg_by_ds,
+        col.names = c("Dataset", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "Per-dataset OLS log-log regressions of metabolic rate (W) on body mass (g).",
+          "All metabolic rate types combined within each dataset.",
+          "Datasets differ in temperature normalization, taxonomic scope, and rate type distribution.",
+          "WBE predicted slope: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r met-by-study-sma}
+if (HAS_SMATR) {
+  sma_by_ds <- rbindlist(lapply(c(LABEL_AT, LABEL_PN, LABEL_H19), function(lbl) {
+    sub <- met_sources[dataset_label == lbl]
+    if (nrow(sub) < 10) return(NULL)
+    res <- fit_sma(sub, "body_mass_g", "metabolic_rate_value", min_n = 10)
+    if (!is.null(res) && nrow(res) > 0) res[, Group := lbl]
+    res
+  }), fill = TRUE)
+
+  if (!is.null(sma_by_ds) && nrow(sma_by_ds) > 0) {
+    kable(sma_by_ds,
+          col.names = c("Dataset", "n", "Method", "log₁₀ Intercept", "Slope (β)",
+                        "95% CI lo", "95% CI hi", "R²"),
+          caption = "SMA log-log regressions of metabolic rate (W) on body mass (g) per dataset.") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+  }
+}
+```
+
+---
+
+# Metabolic Scaling by Taxonomic Group
+
+Grouping by `input_taxonomic_group` across all datasets reveals whether the slope differs among major clades and life forms.
+
+```{r met-by-group-plot, fig.width=11, fig.height=9}
+if (nrow(met_sources) >= 10) {
+  grp_counts <- met_sources[!is.na(input_taxonomic_group) & input_taxonomic_group != "",
+                             .N, by = input_taxonomic_group]
+  eligible_grps <- grp_counts[N >= 10]$input_taxonomic_group
+
+  met_grp <- met_sources[input_taxonomic_group %in% eligible_grps]
+
+  ggplot(met_grp,
+         aes(x = log10(body_mass_g), y = log10(metabolic_rate_value),
+             colour = dataset_label)) +
+    geom_point(alpha = 0.25, size = 0.8, shape = 16) +
+    geom_smooth(method = "lm", se = FALSE, colour = "black", linewidth = 1.0,
+                aes(group = input_taxonomic_group)) +
+    facet_wrap(~ input_taxonomic_group, scales = "free", ncol = 3) +
+    scale_colour_manual(values = pal8[1:3], name = "Dataset") +
+    labs(
+      title = "Metabolic scaling by taxonomic group (across all datasets)",
+      subtitle = "Black line = per-group OLS; groups with N < 10 excluded",
+      x = expression(log[10] ~ "Body mass (g)"),
+      y = expression(log[10] ~ "Metabolic rate (W)")
+    ) +
+    theme_bw(base_size = 11) +
+    theme(legend.position = "bottom",
+          strip.text = element_text(size = 9))
+}
+```
+
+```{r met-by-group-table}
+reg_by_grp <- fit_log_lm(met_sources, "body_mass_g", "metabolic_rate_value",
+                          group_col = "input_taxonomic_group", min_n = 10)
+reg_by_grp_only <- reg_by_grp[Group != "All taxa combined"]
+
+if (!is.null(reg_by_grp_only) && nrow(reg_by_grp_only) > 0) {
+  kable(reg_by_grp_only[order(-n)],
+        col.names = c("Taxonomic group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regressions of metabolic rate (W) on body mass (g) by taxonomic group.",
+          "Groups with N < 10 are excluded.",
+          "Taxonomic group labels are verbatim from source; cross-dataset harmonization was not performed.",
+          "WBE predicted slope: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+```{r met-slope-comparison-plot, fig.width=9, fig.height=5}
+if (!is.null(reg_by_grp_only) && nrow(reg_by_grp_only) > 0 &&
+    all(c("Slope", "CI_95_lo", "CI_95_hi") %in% names(reg_by_grp_only))) {
+  ggplot(reg_by_grp_only[!is.na(Slope)],
+         aes(x = reorder(Group, Slope), y = Slope,
+             ymin = CI_95_lo, ymax = CI_95_hi)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick", linewidth = 0.9) +
+    geom_errorbar(width = 0.25, colour = "grey50") +
+    geom_point(size = 3, colour = pal8[1]) +
+    coord_flip() +
+    labs(
+      title    = "Metabolic scaling slope by taxonomic group (OLS)",
+      subtitle = "Error bars = 95% CI; dashed = WBE prediction (β = 0.75)",
+      x        = NULL,
+      y        = "OLS slope (β)"
+    ) +
+    theme_bw(base_size = 12)
+}
+```
+
+---
+
+# Metabolic Scaling Within Order
+
+Within each order, OLS is fit across all records to estimate how metabolic rate scales with body mass among members of that order. This analysis uses records from datasets where the `order` column is populated (primarily Hatton 2019 and AnimalTraits).
+
+```{r met-within-order-prep}
+order_met <- met_sources[!is.na(order) & order != "" &
+                          !is.na(body_mass_g) & body_mass_g > 0 &
+                          !is.na(metabolic_rate_value) & metabolic_rate_value > 0]
+
+cat(sprintf("Records with non-blank order and metabolic rate: n = %d\n", nrow(order_met)))
+cat(sprintf("Number of orders represented: %d\n", length(unique(order_met$order))))
+cat("\nOrders with N >= 10 records:\n")
+print(order_met[, .N, by = order][N >= 10][order(-N)])
+```
+
+```{r met-within-order-table}
+reg_order_all <- fit_log_lm(order_met, "body_mass_g", "metabolic_rate_value",
+                             group_col = "order", min_n = 10)
+reg_order <- reg_order_all[Group != "All taxa combined"]
+
+if (!is.null(reg_order) && nrow(reg_order) > 0) {
+  kable(reg_order[order(-n)],
+        col.names = c("Order", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regressions of metabolic rate (W) on body mass (g) within each order.",
+          "Orders with fewer than 10 records excluded.",
+          "Slopes describe how metabolic rate scales with mass across species (and repeated measures) within each order.",
+          "OLS is not phylogenetically corrected; slopes are descriptive, not PCM estimates.",
+          "WBE predicted slope: β = 0.75."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+} else {
+  cat("No orders met the minimum sample size threshold (N >= 10).\n")
+}
+```
+
+```{r met-within-order-plot, fig.width=9, fig.height=5}
+if (!is.null(reg_order) && nrow(reg_order) > 0) {
+  ggplot(reg_order[!is.na(Slope)],
+         aes(x = reorder(Group, Slope), y = Slope,
+             ymin = CI_95_lo, ymax = CI_95_hi, colour = R2)) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick", linewidth = 0.9) +
+    geom_hline(yintercept = 0, colour = "grey70", linewidth = 0.5) +
+    geom_errorbar(width = 0.3) +
+    geom_point(size = 2.5) +
+    scale_colour_gradient(low = "grey60", high = pal8[3], name = "R²") +
+    coord_flip() +
+    labs(
+      title    = "Within-order metabolic scaling slopes (OLS)",
+      subtitle = "Error bars = 95% CI; dashed = WBE β = 0.75",
+      x        = NULL,
+      y        = "OLS slope (β)"
+    ) +
+    theme_bw(base_size = 11)
+}
+```
+
+---
+
+# Metabolic Scaling Within Family
+
+Within each family (N ≥ 10 records), OLS is fit across all records to estimate how metabolic rate scales with body mass among members of that family. This is primarily enabled by AnimalTraits (~372 families) and Hatton 2019.
+
+> **Interpretation note:** Family-level slopes describe the relationship across species (and repeated measurements) within a family. When body mass variation within a family is limited, slope estimates become unreliable regardless of N. R² values can help diagnose this: low R² at small mass ranges suggests poor leverage.
+
+```{r met-within-family-prep}
+fam_met <- met_sources[!is.na(family) & family != "" &
+                        !is.na(body_mass_g) & body_mass_g > 0 &
+                        !is.na(metabolic_rate_value) & metabolic_rate_value > 0]
+
+cat(sprintf("Records with non-blank family and metabolic rate: n = %d\n", nrow(fam_met)))
+cat(sprintf("Number of families represented: %d\n", length(unique(fam_met$family))))
+
+fam_counts <- fam_met[, .N, by = family][N >= 10][order(-N)]
+cat(sprintf("Families with N >= 10 records: %d\n", nrow(fam_counts)))
+print(head(fam_counts, 20))
+```
+
+```{r met-within-family-table}
+reg_fam_all <- fit_log_lm(fam_met, "body_mass_g", "metabolic_rate_value",
+                           group_col = "family", min_n = 10)
+reg_fam <- reg_fam_all[Group != "All taxa combined"]
+
+if (!is.null(reg_fam) && nrow(reg_fam) > 0) {
+  kable(reg_fam[order(-n)],
+        col.names = c("Family", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regressions of metabolic rate (W) on body mass (g) within each family.",
+          "Families with N < 10 records excluded.",
+          "WBE predicted slope: β = 0.75.",
+          "OLS is not phylogenetically corrected."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+} else {
+  cat("No families met the minimum sample size threshold (N >= 10).\n")
+}
+```
+
+```{r met-within-family-histogram, fig.width=10, fig.height=5}
+if (!is.null(reg_fam) && nrow(reg_fam) > 0 && sum(!is.na(reg_fam$Slope)) > 5) {
+  med_slope <- median(reg_fam$Slope, na.rm = TRUE)
+  ggplot(reg_fam[!is.na(Slope)], aes(x = Slope)) +
+    geom_histogram(binwidth = 0.1, fill = pal8[2], colour = "white", alpha = 0.85) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_vline(xintercept = med_slope, linetype = "solid", colour = pal8[1],
+               linewidth = 1.0) +
+    annotate("text", x = 0.75 + 0.05, y = Inf, label = "WBE β = 0.75",
+             colour = "firebrick", vjust = 1.5, hjust = 0, size = 3.5) +
+    annotate("text", x = med_slope - 0.05, y = Inf,
+             label = sprintf("Median β = %.3f", med_slope),
+             colour = pal8[1], vjust = 3, hjust = 1, size = 3.5) +
+    labs(
+      title    = "Distribution of family-level metabolic scaling slopes (OLS)",
+      subtitle = sprintf("N = %d families with ≥ 10 records; dashed = WBE 0.75; solid = observed median",
+                         sum(!is.na(reg_fam$Slope))),
+      x        = "OLS slope (β)",
+      y        = "Number of families"
+    ) +
+    theme_bw(base_size = 13)
+}
+```
+
+```{r met-within-family-boxplot, fig.width=6, fig.height=5}
+if (!is.null(reg_fam) && nrow(reg_fam) > 0 && sum(!is.na(reg_fam$Slope)) > 5) {
+  ggplot(reg_fam[!is.na(Slope)], aes(x = "Family-level OLS", y = Slope)) +
+    geom_boxplot(fill = pal8[2], alpha = 0.7, outlier.shape = 1) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    labs(
+      title = "Family-level slope distribution",
+      x     = NULL,
+      y     = "OLS slope (β)"
+    ) +
+    annotate("text", x = 1.45, y = 0.75, label = "WBE β = 0.75",
+             colour = "firebrick", hjust = 0, size = 3.5) +
+    theme_bw(base_size = 13)
+}
+```
+
+---
+
+# Intraspecific Metabolic Scaling
+
+For species with N ≥ 5 metabolic rate records, OLS is fit within each species to estimate the intraspecific slope. This analysis addresses whether metabolic rate scales with body mass within individual species, reflecting ontogenetic or individual variation rather than cross-species allometry.
+
+> **Key caveat:** Most allometric databases report one representative value per species. Intraspecific scaling requires multiple measurements on individuals or populations of the same species spanning a range of body masses. If all observations within a species have identical or nearly identical body masses, the regression slope is unreliable regardless of N. Species where the body mass coefficient of variation (CV) is very low are flagged below.
+
+```{r intraspecific-prep}
+# Identify species column: prefer resolved_taxon_name
+has_resolved <- "resolved_taxon_name" %in% names(met_sources) &&
+  sum(!is.na(met_sources$resolved_taxon_name) & met_sources$resolved_taxon_name != "") > 0
+sp_col <- if (has_resolved) "resolved_taxon_name" else "verbatim_taxon_name"
+
+cat("Using species column:", sp_col, "\n")
+
+# Count records per species
+sp_counts <- met_sources[
+  !is.na(body_mass_g) & body_mass_g > 0 &
+  !is.na(metabolic_rate_value) & metabolic_rate_value > 0 &
+  !is.na(get(sp_col)) & get(sp_col) != "",
+  .(N = .N,
+    mass_cv   = sd(body_mass_g, na.rm = TRUE) / mean(body_mass_g, na.rm = TRUE),
+    mass_range = diff(range(body_mass_g, na.rm = TRUE))),
+  by = .(species = get(sp_col))
+]
+
+intra_eligible <- sp_counts[N >= 5]
+cat(sprintf("Species with N >= 5 metabolic records: %d\n", nrow(intra_eligible)))
+if (nrow(intra_eligible) > 0) {
+  cat(sprintf("Body mass CV > 0.01 (meaningful variation): %d\n",
+              sum(intra_eligible$mass_cv > 0.01, na.rm = TRUE)))
+  print(intra_eligible[order(-N)])
+}
+```
+
+```{r intraspecific-slopes}
+if (nrow(intra_eligible) >= 1) {
+  intra_spp <- intra_eligible$species
+
+  intra_slopes <- rbindlist(lapply(intra_spp, function(sp) {
+    d <- met_sources[get(sp_col) == sp &
+                     !is.na(body_mass_g) & body_mass_g > 0 &
+                     !is.na(metabolic_rate_value) & metabolic_rate_value > 0]
+    if (nrow(d) < 5) return(NULL)
+    fit <- tryCatch(
+      lm(log10(metabolic_rate_value) ~ log10(body_mass_g), data = d),
+      error = function(e) NULL
+    )
+    if (is.null(fit)) return(NULL)
+    s <- coef(summary(fit))
+    if (nrow(s) < 2) return(NULL)
+    mass_cv <- sd(d$body_mass_g, na.rm = TRUE) / mean(d$body_mass_g, na.rm = TRUE)
+    data.table(
+      species   = sp,
+      n         = nrow(d),
+      slope     = round(s[2, 1], 3),
+      slope_se  = round(s[2, 2], 3),
+      r2        = round(summary(fit)$r.squared, 3),
+      p_value   = signif(s[2, 4], 3),
+      mass_cv   = round(mass_cv, 3),
+      flag_low_cv = mass_cv < 0.01
+    )
+  }), fill = TRUE)
+
+  if (!is.null(intra_slopes) && nrow(intra_slopes) > 0) {
+    cat(sprintf("Species with fitted intraspecific slopes: %d\n", nrow(intra_slopes)))
+    cat(sprintf("Median slope: %.3f\n", median(intra_slopes$slope, na.rm = TRUE)))
+    cat(sprintf("IQR: %.3f – %.3f\n",
+                quantile(intra_slopes$slope, 0.25, na.rm = TRUE),
+                quantile(intra_slopes$slope, 0.75, na.rm = TRUE)))
+
+    kable(intra_slopes[order(-n)],
+          col.names = c("Species", "n", "Slope (β)", "SE", "R²", "p-value",
+                        "Mass CV", "Flag: low CV"),
+          caption = paste(
+            "Intraspecific OLS log-log regressions of metabolic rate (W) on body mass (g).",
+            "Species with N >= 5 metabolic records.",
+            "Mass CV = coefficient of variation of body mass within species;",
+            "Flag low CV indicates CV < 0.01, meaning body mass variation is minimal",
+            "and the slope estimate is unreliable.",
+            "WBE predicted slope: β = 0.75."
+          )) %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+  }
+} else {
+  cat("No species met the N >= 5 threshold for intraspecific analysis.\n",
+      "This is expected for databases that store one representative value per species.\n")
+  intra_slopes <- data.table()
+}
+```
+
+```{r intraspecific-histogram, fig.width=10, fig.height=5}
+if (exists("intra_slopes") && !is.null(intra_slopes) && nrow(intra_slopes) >= 5) {
+  med_intra <- median(intra_slopes$slope, na.rm = TRUE)
+  p_hist <- ggplot(intra_slopes[!is.na(slope)], aes(x = slope)) +
+    geom_histogram(binwidth = 0.15, fill = pal8[4], colour = "white", alpha = 0.85) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.2) +
+    geom_vline(xintercept = med_intra, linetype = "solid", colour = pal8[1],
+               linewidth = 1.0) +
+    annotate("text", x = 0.75 + 0.06, y = Inf, label = "WBE β = 0.75",
+             colour = "firebrick", vjust = 1.5, hjust = 0, size = 3.5) +
+    annotate("text", x = med_intra - 0.06, y = Inf,
+             label = sprintf("Median β = %.3f", med_intra),
+             colour = pal8[1], vjust = 3, hjust = 1, size = 3.5) +
+    labs(
+      title    = "Distribution of intraspecific metabolic scaling slopes (OLS)",
+      subtitle = sprintf("N = %d species with ≥ 5 records; dashed = WBE 0.75",
+                         sum(!is.na(intra_slopes$slope))),
+      x        = "OLS slope (β) per species",
+      y        = "Number of species"
+    ) +
+    theme_bw(base_size = 13)
+  print(p_hist)
+
+  p_box <- ggplot(intra_slopes[!is.na(slope)], aes(x = "Intraspecific slopes", y = slope)) +
+    geom_boxplot(fill = pal8[4], alpha = 0.7, outlier.shape = 16, outlier.size = 2) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    labs(
+      title = "Intraspecific slope distribution",
+      x     = NULL,
+      y     = "OLS slope (β)"
+    ) +
+    annotate("text", x = 1.45, y = 0.75, label = "WBE β = 0.75",
+             colour = "firebrick", hjust = 0, size = 3.5) +
+    theme_bw(base_size = 13)
+  print(p_box)
+
+  # Flag outliers
+  q1 <- quantile(intra_slopes$slope, 0.25, na.rm = TRUE)
+  q3 <- quantile(intra_slopes$slope, 0.75, na.rm = TRUE)
+  iqr <- q3 - q1
+  outliers <- intra_slopes[!is.na(slope) & (slope < q1 - 1.5 * iqr | slope > q3 + 1.5 * iqr)]
+  if (nrow(outliers) > 0) {
+    cat(sprintf("\nOutlier species by IQR rule (slope < %.2f or > %.2f):\n",
+                q1 - 1.5 * iqr, q3 + 1.5 * iqr))
+    print(outliers[, .(species, n, slope, r2, mass_cv)])
+  }
+} else if (!exists("intra_slopes") || nrow(intra_slopes) < 5) {
+  cat("Fewer than 5 species with intraspecific slopes; distribution plots skipped.\n")
+}
+```
+
+---
+
+# Growth Rate Scaling
+
+WBE predicts that absolute anabolic production (growth rate $G$) scales as $G \propto M^{3/4}$, the same exponent as whole-organism metabolic rate. This analysis uses Hatton et al. (2019), the only dataset in this compilation with growth rate data.
+
+> **Unit note:** The growth rate column (`growth_rate_value`) from Hatton 2019 is expressed in units indicated by `growth_rate_unit`. Check the column carefully before interpreting the sign and magnitude of the slope. If rates are **mass-specific** (per gram per year), the WBE expectation is a negative slope (~−0.25). If rates are **absolute** (grams per year), the expected slope is **+0.75**.
+
+```{r growth-prep}
+grow_dat <- qa_ok(h19)[!is.na(growth_rate_value) & growth_rate_value > 0 &
+                        !is.na(body_mass_g) & body_mass_g > 0]
+
+cat(sprintf("Growth rate data (Hatton 2019, QA-pass): n = %d\n", nrow(grow_dat)))
+cat("\nGrowth rate unit(s):\n")
+print(table(grow_dat$growth_rate_unit, useNA = "ifany"))
+cat("\nBy taxonomic group:\n")
+print(grow_dat[, .N, by = input_taxonomic_group][order(-N)])
+```
+
+```{r growth-plot, fig.width=10, fig.height=6}
+if (nrow(grow_dat) >= 10) {
+  fit_grow <- lm(log10(growth_rate_value) ~ log10(body_mass_g), data = grow_dat)
+  int_grow <- coef(fit_grow)[1]
+  slp_grow <- coef(fit_grow)[2]
+  xrg      <- range(log10(grow_dat$body_mass_g), na.rm = TRUE)
+
+  # Reference slope depends on unit type; use 0.75 per WBE for absolute production
+  ref_grow <- data.frame(lx = xrg, ly = int_grow + 0.75 * xrg)
+
+  ggplot(grow_dat,
+         aes(x = log10(body_mass_g), y = log10(growth_rate_value),
+             colour = input_taxonomic_group)) +
+    geom_point(alpha = 0.5, size = 1.8) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 0.8,
+                aes(group = input_taxonomic_group)) +
+    geom_abline(intercept = int_grow, slope = slp_grow,
+                colour = "black", linewidth = 1.2) +
+    geom_line(data = ref_grow, aes(x = lx, y = ly),
+              inherit.aes = FALSE, linetype = "dashed",
+              colour = "firebrick", linewidth = 1.0) +
+    scale_colour_viridis_d(option = "turbo", name = "Taxonomic group") +
+    labs(
+      title    = expression(paste("Growth rate scaling: ", italic(G), " ∝ ", italic(M)^{beta})),
+      subtitle = sprintf(
+        "Solid black = overall OLS β = %.3f; dashed red = WBE reference β = 0.75 (absolute production)",
+        slp_grow),
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = bquote(log[10] ~ paste("Growth rate (", .(
+                    if (nrow(grow_dat) > 0) unique(grow_dat$growth_rate_unit)[1] else "value"
+                  ), ")"))
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+```{r growth-ols-table}
+reg_grow <- fit_log_lm(grow_dat, "body_mass_g", "growth_rate_value",
+                        group_col = "input_taxonomic_group", min_n = 10)
+
+if (!is.null(reg_grow) && nrow(reg_grow) > 0) {
+  kable(reg_grow,
+        col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regressions of growth rate on body mass (g).",
+          "Data: Hatton et al. 2019 (PNAS).",
+          "WBE predicted slope for absolute production: β = 0.75.",
+          "Interpretation depends on whether growth_rate_unit reflects mass-specific or absolute rates."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+    row_spec(1, bold = TRUE, background = "#dce8ff")
+}
+```
+
+```{r growth-sma-table}
+if (HAS_SMATR && nrow(grow_dat) >= 10) {
+  reg_grow_sma <- fit_sma(grow_dat, "body_mass_g", "growth_rate_value",
+                           group_col = "input_taxonomic_group", min_n = 10)
+  if (!is.null(reg_grow_sma) && nrow(reg_grow_sma) > 0) {
+    kable(reg_grow_sma,
+          col.names = c("Group", "n", "Method", "log₁₀ Intercept", "Slope (β)",
+                        "95% CI lo", "95% CI hi", "R²"),
+          caption = "SMA log-log regressions of growth rate on body mass. WBE predicted slope: β = 0.75.") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+      row_spec(1, bold = TRUE, background = "#ffe8dc")
+  }
+}
+```
+
+---
+
+# Lifespan Scaling
+
+WBE theory predicts maximum lifespan $L \propto M^{1/4}$ because lifespan scales inversely with mass-specific metabolic rate ($B/M \propto M^{-1/4}$). This pattern is well-documented in mammals and birds but more variable in ectotherms and unicellular organisms, where extrinsic mortality dominates. We use the Hatton 2019 dataset, which provides lifespan data spanning prokaryotes to large vertebrates.
+
+```{r lifespan-prep}
+lisp_dat <- qa_ok(h19)[!is.na(lifespan_max_years) & lifespan_max_years > 0 &
+                        !is.na(body_mass_g) & body_mass_g > 0]
+
+cat(sprintf("Lifespan data (Hatton 2019, QA-pass): n = %d\n", nrow(lisp_dat)))
+cat("\nBy taxonomic group:\n")
+print(lisp_dat[, .N, by = input_taxonomic_group][order(-N)])
+```
+
+```{r lifespan-plot, fig.width=10, fig.height=6}
+if (nrow(lisp_dat) >= 10) {
+  fit_lisp <- lm(log10(lifespan_max_years) ~ log10(body_mass_g), data = lisp_dat)
+  int_lisp <- coef(fit_lisp)[1]
+  slp_lisp <- coef(fit_lisp)[2]
+  xrl      <- range(log10(lisp_dat$body_mass_g), na.rm = TRUE)
+  ref_lisp <- data.frame(lx = xrl, ly = int_lisp + 0.25 * xrl)
+
+  ggplot(lisp_dat,
+         aes(x = log10(body_mass_g), y = log10(lifespan_max_years),
+             colour = input_taxonomic_group)) +
+    geom_point(alpha = 0.5, size = 1.8) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 0.8,
+                aes(group = input_taxonomic_group)) +
+    geom_abline(intercept = int_lisp, slope = slp_lisp,
+                colour = "black", linewidth = 1.2) +
+    geom_line(data = ref_lisp, aes(x = lx, y = ly),
+              inherit.aes = FALSE, linetype = "dashed",
+              colour = "firebrick", linewidth = 1.0) +
+    scale_colour_viridis_d(option = "turbo", name = "Taxonomic group") +
+    labs(
+      title    = expression(paste("Lifespan scaling: ", italic(L), " ∝ ", italic(M)^{1/4})),
+      subtitle = sprintf(
+        "Solid black = overall OLS β = %.3f; dashed red = WBE reference β = 0.25",
+        slp_lisp),
+      x        = expression(log[10] ~ "Body mass (g)"),
+      y        = expression(log[10] ~ "Maximum lifespan (years)")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+```{r lifespan-ols-table}
+reg_lisp <- fit_log_lm(lisp_dat, "body_mass_g", "lifespan_max_years",
+                        group_col = "input_taxonomic_group", min_n = 10)
+
+if (!is.null(reg_lisp) && nrow(reg_lisp) > 0) {
+  kable(reg_lisp,
+        col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regressions of maximum lifespan (years) on body mass (g).",
+          "Data: Hatton et al. 2019 (PNAS).",
+          "WBE predicted slope: β = 0.25."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+    row_spec(1, bold = TRUE, background = "#dce8ff")
+}
+```
+
+```{r lifespan-sma-table}
+if (HAS_SMATR && nrow(lisp_dat) >= 10) {
+  reg_lisp_sma <- fit_sma(lisp_dat, "body_mass_g", "lifespan_max_years",
+                           group_col = "input_taxonomic_group", min_n = 10)
+  if (!is.null(reg_lisp_sma) && nrow(reg_lisp_sma) > 0) {
+    kable(reg_lisp_sma,
+          col.names = c("Group", "n", "Method", "log₁₀ Intercept", "Slope (β)",
+                        "95% CI lo", "95% CI hi", "R²"),
+          caption = "SMA log-log regressions of maximum lifespan (years) on body mass (g). WBE predicted slope: β = 0.25.") %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+      row_spec(1, bold = TRUE, background = "#ffe8dc")
+  }
+}
+```
+
+---
+
+# Predator–Prey Mass Scaling
+
+Hatton et al. (2015) compiled a global database of predator and prey body masses across trophic levels. The theoretical expectation from optimal foraging and energetic constraints is $M_\text{pred} \propto M_\text{prey}^{1.0}$, i.e., predator and prey masses co-scale approximately isometrically, though predators are typically 10–1000× heavier than prey.
+
+```{r predprey-prep}
+pp_dat <- qa_ok(h15)[!is.na(predator_mass_g_paired) & predator_mass_g_paired > 0 &
+                      !is.na(body_mass_g) & body_mass_g > 0]
+
+cat(sprintf("Predator-prey mass data (Hatton 2015, QA-pass): n = %d\n", nrow(pp_dat)))
+cat("\nBy taxonomic group:\n")
+print(pp_dat[, .N, by = input_taxonomic_group][order(-N)])
+cat("\nPrey mass range (g):\n")
+cat(sprintf("  %.2e – %.2e\n", min(pp_dat$body_mass_g), max(pp_dat$body_mass_g)))
+cat("Predator mass range (g):\n")
+cat(sprintf("  %.2e – %.2e\n", min(pp_dat$predator_mass_g_paired),
+            max(pp_dat$predator_mass_g_paired)))
+```
+
+```{r predprey-plot, fig.width=10, fig.height=7}
+if (nrow(pp_dat) >= 10) {
+  fit_pp  <- lm(log10(predator_mass_g_paired) ~ log10(body_mass_g), data = pp_dat)
+  int_pp  <- coef(fit_pp)[1]
+  slp_pp  <- coef(fit_pp)[2]
+  xrp     <- range(log10(pp_dat$body_mass_g), na.rm = TRUE)
+  ref_pp  <- data.frame(lx = xrp, ly = int_pp + 1.0 * xrp)
+
+  ggplot(pp_dat,
+         aes(x = log10(body_mass_g), y = log10(predator_mass_g_paired),
+             colour = input_taxonomic_group)) +
+    geom_point(alpha = 0.35, size = 1.5) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 0.8,
+                aes(group = input_taxonomic_group)) +
+    geom_abline(intercept = int_pp, slope = slp_pp,
+                colour = "black", linewidth = 1.2) +
+    geom_line(data = ref_pp, aes(x = lx, y = ly),
+              inherit.aes = FALSE, linetype = "dashed",
+              colour = "firebrick", linewidth = 1.0) +
+    scale_colour_viridis_d(option = "turbo", name = "Taxonomic group") +
+    labs(
+      title    = expression(paste("Predator–prey mass scaling: ", italic(M)[pred], " ∝ ", italic(M)[prey]^{beta})),
+      subtitle = sprintf(
+        "Solid black = overall OLS β = %.3f; dashed red = isometric reference β = 1.0",
+        slp_pp),
+      x        = expression(log[10] ~ "Prey body mass (g)"),
+      y        = expression(log[10] ~ "Predator body mass (g)")
+    ) +
+    theme_bw(base_size = 13) +
+    theme(legend.position = "bottom")
+}
+```
+
+```{r predprey-ols-table}
+reg_pp <- fit_log_lm(pp_dat, "body_mass_g", "predator_mass_g_paired",
+                     group_col = "input_taxonomic_group", min_n = 10)
+
+if (!is.null(reg_pp) && nrow(reg_pp) > 0) {
+  kable(reg_pp,
+        col.names = c("Group", "n", "log₁₀ Intercept", "Slope (β)", "SE",
+                      "95% CI lo", "95% CI hi", "R²", "p-value"),
+        caption = paste(
+          "OLS log-log regressions of predator body mass (g) on prey body mass (g).",
+          "Data: Hatton et al. 2015 (Science).",
+          "Theoretical reference: β ≈ 1.0 (isometric predator–prey mass co-scaling).",
+          "Intercept reflects log₁₀ of the predator:prey mass ratio at unit prey mass."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+    row_spec(1, bold = TRUE, background = "#dce8ff")
+}
+```
+
+```{r predprey-sma-table}
+if (HAS_SMATR && nrow(pp_dat) >= 10) {
+  reg_pp_sma <- fit_sma(pp_dat, "body_mass_g", "predator_mass_g_paired",
+                        group_col = "input_taxonomic_group", min_n = 10)
+  if (!is.null(reg_pp_sma) && nrow(reg_pp_sma) > 0) {
+    kable(reg_pp_sma,
+          col.names = c("Group", "n", "Method", "log₁₀ Intercept", "Slope (β)",
+                        "95% CI lo", "95% CI hi", "R²"),
+          caption = paste(
+            "SMA log-log regressions of predator body mass on prey body mass.",
+            "SMA appropriate here since both predator and prey masses carry measurement uncertainty.",
+            "Theoretical reference: β ≈ 1.0."
+          )) %>%
+      kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
+      row_spec(1, bold = TRUE, background = "#ffe8dc")
+  }
+}
+```
+
+---
+
+# Methods & Caveats
+
+## Regression methods
+
+**Ordinary Least Squares (OLS)** minimizes vertical (y-axis) residuals and is used throughout as the primary regression method. OLS is appropriate when the x-variable (log₁₀ body mass) is measured without error. When both variables carry substantial measurement error — e.g., predator vs. prey mass in field surveys — OLS underestimates the true slope. OLS slopes should be interpreted as lower bounds on the true allometric exponent.
+
+**Standardised Major Axis (SMA)**, implemented via the `smatr` package (Warton et al. 2012), minimizes residuals perpendicular to the line and provides unbiased slope estimates when both axes have comparable error. SMA slopes are always ≥ OLS slopes (equality holds only when R² = 1). SMA is presented as a secondary analysis for comparison.
+
+Both methods fit regressions in log₁₀–log₁₀ space. A fitted slope of $\beta$ corresponds to the power-law exponent in $Y \propto M^\beta$.
+
+**Minimum sample sizes:**  
+- Cross-taxa regressions: N ≥ 10  
+- Within-family OLS: N ≥ 10  
+- Intraspecific OLS: N ≥ 5
+
+## Metabolic rate type heterogeneity
+
+```{r met-type-summary}
+if (nrow(met_sources) > 0 && "metabolic_rate_type" %in% names(met_sources)) {
+  type_tab <- met_sources[, .N, by = .(dataset_label, metabolic_rate_type)][order(dataset_label, -N)]
+  kable(type_tab,
+        col.names = c("Dataset", "Metabolic rate type", "N"),
+        caption = paste(
+          "Metabolic rate measurement type distribution in the combined metabolic dataset (QA-pass, unit = W).",
+          "Mixing basal, resting, active, and field metabolic rates inflates residual variance",
+          "and may bias cross-taxa slope estimates. Basal-only analyses are presented in Section 3.4."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+}
+```
+
+**Implications:** Active or field metabolic rates are 2–10× higher than basal rates for endotherms, and the relationship between basal and active rates varies systematically across taxa (endotherms vs. ectotherms). Including mixed rate types elevates the residual variance around the allometric line and may produce a composite slope that does not reflect any single physiological state. Where sample sizes permit, basal-only analyses are preferred for testing WBE theory.
+
+## Temperature standardization
+
+No universal temperature correction was applied in this document. The datasets differ in their handling of temperature:
+
+- **Hoehler 2023** standardized all metabolic rates to 25°C using the Arrhenius equation with an activation energy of 0.65 eV, making rates comparable across taxa and environments.
+- **Hatton 2019** applied Q10-based temperature corrections to a reference temperature.
+- **AnimalTraits** reports metabolic rates at the measurement temperature, which varies by species and study. No standardization was applied in our analysis.
+
+Because metabolic rates scale with temperature according to the Boltzmann-Arrhenius factor ($e^{-E_a/kT}$), differences in measurement temperature introduce systematic offsets. Cross-dataset slope comparisons that ignore temperature may conflate thermal effects with mass effects. Users requiring temperature-corrected comparisons should apply the MTE temperature correction (Brown et al. 2004) before combining datasets.
+
+## Phylogenetic non-independence
+
+OLS regressions do not account for phylogenetic relatedness among species. Closely related species tend to share body mass and metabolic rate values due to common ancestry, violating the OLS assumption of independent residuals. This inflates effective sample sizes and can bias confidence intervals. The slopes and R² values reported here are statistical descriptors of the data and should not be interpreted as phylogenetically corrected partial regression coefficients. Readers requiring phylogenetically corrected estimates should use PGLS (phylogenetic generalized least squares) or related methods (e.g., BayesTraits, ape::pgls).
+
+## QA flag pass rates
+
+```{r methods-qa-summary}
+qa_methods <- rbindlist(lapply(names(all_list), function(nm) {
+  dt <- all_list[[nm]]
+  if (is.null(dt)) return(NULL)
+  n_total <- nrow(dt)
+  n_pass  <- sum(dt$qa_flag %in% c("ok", ""), na.rm = TRUE)
+  n_blank <- sum(dt$qa_flag == "", na.rm = TRUE)
+  n_explicit_ok <- sum(dt$qa_flag == "ok", na.rm = TRUE)
+  pct_pass <- round(100 * n_pass / n_total, 1)
+  data.table(
+    Dataset         = labels_vec[nm],
+    N_total         = n_total,
+    N_explicit_ok   = n_explicit_ok,
+    N_blank_pass    = n_blank,
+    N_total_pass    = n_pass,
+    Pct_pass        = pct_pass,
+    Flag            = if ((n_total - n_pass) / n_total > 0.20) "⚠ >20% fail" else "ok"
+  )
+}))
+
+kable(qa_methods,
+      col.names = c("Dataset", "N total", "N explicit 'ok'", "N blank (pass)",
+                    "N total pass", "% pass", "Warning"),
+      caption = paste(
+        "QA flag pass rate analysis.",
+        "'Explicit ok': qa_flag == 'ok' (actively audited).",
+        "'Blank pass': qa_flag == '' (no flag set; treated as pass by convention).",
+        "Datasets where >20% of records fail QA are flagged."
+      )) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+```
+
+## Data provenance
+
+| Dataset | Source | Primary DOI | N rows |
+|---|---|---|---|
+| AnimalTraits | Herberstein et al. 2022, Sci Data | 10.1038/s41597-022-01364-9 | `r if (!is.null(at)) nrow(at) else "N/A"` |
+| Hoehler 2023 | Hoehler et al. 2023, PNAS | 10.1073/pnas.2303764120 | `r if (!is.null(pnas)) nrow(pnas) else "N/A"` |
+| Hatton 2019 | Hatton et al. 2019, PNAS | 10.1073/pnas.1907703116 | `r if (!is.null(h19)) nrow(h19) else "N/A"` |
+| Hatton 2015 | Hatton et al. 2015, Science | 10.1126/science.aac6284 | `r if (!is.null(h15)) nrow(h15) else "N/A"` |
+
+All data were loaded from local CSV files in `output/` compiled by the `Animal_scaling_data` ingestion pipeline. Column harmonization, QA flagging, and unit assignment were performed during ingestion; see individual provider scripts for details.
+
+---
+
+# References
+
+West GB, Brown JH, Enquist BJ. 1997. A general model for the origin of allometric scaling laws in biology. *Science* 276:122–126. DOI: [10.1126/science.276.5309.122](https://doi.org/10.1126/science.276.5309.122)
+
+West GB, Brown JH, Enquist BJ. 1999. The fourth dimension of life: Fractal geometry and allometric scaling of organisms. *Science* 284:1677–1679. DOI: [10.1126/science.284.5420.1677](https://doi.org/10.1126/science.284.5420.1677)
+
+Brown JH, Gillooly JF, Allen AP, Savage VM, West GB. 2004. Toward a metabolic theory of ecology. *Ecology* 85:1771–1789. DOI: [10.1890/03-9000](https://doi.org/10.1890/03-9000)
+
+Hatton IA, McCann KS, Fryxell JM, Davies TJ, Smerlak M, Sinclair ARE, Loreau M. 2015. The predator-prey power law: Biomass scaling across terrestrial and aquatic biomes. *Science* 349(6252):aac6284. DOI: [10.1126/science.aac6284](https://doi.org/10.1126/science.aac6284)
+
+Hatton IA, Dobson AP, Storch D, Galbraith ED, Loreau M. 2019. Linking scaling laws across eukaryotes. *PNAS* 116(43):21616–21622. DOI: [10.1073/pnas.1907703116](https://doi.org/10.1073/pnas.1907703116)
+
+Herberstein ME, Wignall AE, Nessler SH, Harmer AMT, Wesner JS, Fagan WF, Mirth CK, Seebacher F, Wright CM, Chung AYC, et al. 2022. AnimalTraits — a curated animal trait database for body mass, metabolic rate and brain size. *Scientific Data* 9:483. DOI: [10.1038/s41597-022-01364-9](https://doi.org/10.1038/s41597-022-01364-9)
+
+Hoehler TM, Mankel DJ, Girguis PR, McCollom TM, Kiang NY, Bebout BM. 2023. The metabolic rate of the biosphere and its components. *PNAS* 120(25):e2303764120. DOI: [10.1073/pnas.2303764120](https://doi.org/10.1073/pnas.2303764120)
+
+Warton DI, Duursma RA, Falster DS, Taskinen S. 2012. smatr 3 — an R package for estimation and inference about allometric lines. *Methods in Ecology and Evolution* 3:257–259. DOI: [10.1111/j.2041-210X.2011.00153.x](https://doi.org/10.1111/j.2041-210X.2011.00153.x)

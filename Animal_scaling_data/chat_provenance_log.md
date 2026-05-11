@@ -21,3 +21,13 @@
 - `scripts/merge_providers.R` — updated OPTIONAL_PROVIDERS to include hatton2019 and hatton2015 outputs
 - `animal_scaling_summary.Rmd` + `animal_scaling_summary.html` — 8-section scientific summary: WBE theory background, data coverage QA, metabolic scaling (B ∝ M^3/4), lifespan scaling (L ∝ M^1/4), growth rate scaling, predator-prey mass scaling, cross-dataset synthesis, and provenance/citations. Reviewed by biodiversity-science-guard; 6 fixes applied (QA transparency, temperature normalization caveat, Kleiber claim precision, DOIs, min_n standardized to 10, phylogenetic non-independence caveat).
 - Hatton 2021 (ocean size spectrum): data repository not resolved during session — Science Advances supplement requires institutional access; placeholder provider directory created at `providers/hatton2021/data/raw/`
+
+---
+
+## 2026-05-11 (allometric scaling analysis)
+
+**Prompt:** "For the Animal Scaling Data project - I would like to use these data sets to assess the allometric scaling of metabolism and growth rate with body size. Within and across taxa. I would like to see the analyses broken down by study, all taxa, within family, within species (intraspecific). Provide a separate .rmd and .html files. Use similar methodologies as was done in the other project plant_scaling_data summaries."
+
+**Changes:**
+- `animal_allometric_scaling.Rmd` — new 89-chunk R Markdown document with 13 sections: Introduction (WBE theory), Data Coverage, Cross-Study Metabolic Scaling, By Study, By Taxonomic Group, Within Order, Within Family, Intraspecific Scaling, Growth Rate Scaling, Lifespan Scaling, Predator-Prey Mass Scaling, Methods & Caveats, References. Implements OLS + SMA regressions; within-order, within-family, and intraspecific panels; min_n filters; color-blind-safe palettes (viridis/ColorBrewer); kableExtra tables with slope, SE, 95% CI, R². All four compiled datasets used (AnimalTraits, Hoehler 2023 PNAS, Hatton 2019 PNAS, Hatton 2015 Science).
+- `animal_allometric_scaling.html` — rendered output (7.3 MB; HTML gitignored).
