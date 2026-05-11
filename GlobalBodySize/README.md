@@ -112,22 +112,31 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 | AnAge Build 14 (de Magalhães & Costa 2009) | Multi-taxon | 627 | literature mean | [10.1111/j.1420-9101.2009.01783.x](https://doi.org/10.1111/j.1420-9101.2009.01783.x) | ✅ COMPLETE |
 | AmphiBIO v1 (Oliveira et al. 2017) | Amphibians | 591 | literature mean | [10.1038/sdata.2017.123](https://doi.org/10.1038/sdata.2017.123) | ✅ COMPLETE |
 | NEON DP1.10072.001 | Mammals | 800 | field trapping max weight | 10.48443/s4ph-2z37 **(UNVERIFIED)** | ✅ COMPLETE |
+| AnimalTraits (Herberstein et al. 2022) | Vertebrates + Invertebrates | 2,856 | wet / literature mean | [10.1038/s41597-022-01364-9](https://doi.org/10.1038/s41597-022-01364-9); data [10.5281/zenodo.6468938](https://doi.org/10.5281/zenodo.6468938) | ✅ COMPLETE |
 
 > **Note:** The NEON DOI `10.48443/s4ph-2z37` is used internally but has not been independently verified. Confirm before citing in any publication.
 
+> **AnimalTraits invertebrates:** AnimalTraits is the first provider to add invertebrate body mass to GlobalBodySize (Insecta 772 rows / 296 spp, Arachnida 131 / 65 spp, Malacostraca 28 / 2 spp, Myriapoda, Annelida, Gastropoda). AnimalTraits vertebrate rows (Mammalia, Aves, Reptilia, Amphibia) overlap with existing providers and will require deduplication. All body mass values converted from kg to g at intake.
+
 > **LW-modeled mass (FishBase):** Mass estimated via FishBase length-weight regression W = a × L^b (species-specific a, b coefficients from FishBase literature). Input length = maximum recorded length. Not directly equivalent to mean adult mass; tends toward maximum adult mass. Never pool `wet` and `LW_modeled` without filtering on `mass_type`. See `providers/fishbase/load_fishbase.R` for exact fields used.
 
-**Phase 1 total (as of 2026-05-10): 37,619 rows across 8 completed providers.**
+**Phase 1 + AnimalTraits total (as of 2026-05-11): 40,475 rows across 9 completed providers.**
 
 ### Taxonomic Group Breakdown
 
 | Group | Rows | Sources |
 |---|---|---|
-| Birds | 21,173 | EltonTraits (Birds), AVONET |
-| Mammals | 10,164 | PanTHERIA, EltonTraits (Mammals), AnAge, NEON |
+| Birds | 22,058 | EltonTraits (Birds), AVONET, AnimalTraits |
+| Mammals | 11,099 | PanTHERIA, EltonTraits (Mammals), AnAge, NEON, AnimalTraits |
 | Fish | 5,657 | FishBase |
-| Amphibians | 609 | AmphiBIO, AnAge |
-| Reptiles | 16 | AnAge only — **critically sparse; do not use for richness estimates** |
+| Insects | 772 | AnimalTraits |
+| Arachnids | 131 | AnimalTraits |
+| Amphibians | 619 | AmphiBIO, AnAge, AnimalTraits |
+| Reptiles | 108 | AnAge, AnimalTraits |
+| Crustaceans | 28 | AnimalTraits |
+| Myriapods / Annelids / Gastropods | 3 | AnimalTraits |
+
+> **Deduplication note:** Mammals, birds, reptiles, and amphibians are now multi-provider and require GBIF-reconciled deduplication before species richness or coverage estimates are made. Invertebrate groups (insect, arachnid, crustacean, myriapod, annelid, gastropod) are sourced from AnimalTraits only — no deduplication required yet.
 
 ### GBIF Taxonomic Reconciliation
 
@@ -254,8 +263,8 @@ As of 2026-05-10:
 
 | Statistic | Value |
 |---|---|
-| Total rows (all providers merged) | 37,619 |
-| Providers completed | 8 of 8 planned |
+| Total rows (all providers merged) | 40,475 |
+| Providers completed | 9 (8 vertebrate + AnimalTraits as Phase 2 invertebrate seed) |
 | GBIF EXACT match rate | 97.7% |
 | Body size range | ~0.07 g (amphibians) to ~150,000,000 g (blue whale) |
 | Range in orders of magnitude | ~9.3 log₁₀ decades |
@@ -353,13 +362,14 @@ rmarkdown::render("science_summary.Rmd", output_file = "science_summary.html")
 | 0 | Add LICENSE file (CC BY 4.0 recommended) and CITATION.cff | None |
 | 0 | Run `renv::snapshot()` to pin R package versions | None |
 | 1 | ~~Complete NEON small mammal intake~~ | ✅ Done (800 rows, 2026-05-10) |
-| 2 | Re-run GBIF reconciliation on updated 36,819-row file | None |
-| 3 | Deduplicate species across providers (mammals triple-counted) | None |
-| 4 | Add reptile body mass source (Meiri et al. or Reptile Database) | Requires download |
-| 5 | Retry Zenodo discovery with `--min-score=3` | API stability |
-| 6 | Populate DwC `measurementID` | Design decision needed |
-| 7 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
-| 8 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
+| 2 | ~~Add AnimalTraits (invertebrate scope expansion)~~ | ✅ Done (2,856 rows — 9 groups incl. insects/arachnids, 2026-05-11) |
+| 3 | Re-run GBIF reconciliation on full 40,475-row file | None |
+| 4 | Deduplicate species across providers (mammals/birds triple-counted) | Requires reconciliation first |
+| 5 | Add reptile body mass source (Meiri et al. or Reptile Database) | Requires download |
+| 6 | Retry Zenodo discovery with `--min-score=3` | API stability |
+| 7 | Populate DwC `measurementID` | Design decision needed |
+| 8 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
+| 9 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
 
 ---
 

@@ -10,6 +10,8 @@
 ##   - FishBase        (actinopterygii, direct + LW-modeled)
 ##   - AVONET          (aves, morphology + mass)
 ##   - NEON            (mammalia, field trapping — optional; include if file exists)
+##   - AnimalTraits    (vertebrates + invertebrates: insect, arachnid, crustacean,
+##                      myriapod, annelid, gastropod; optional; include if present)
 
 suppressPackageStartupMessages(library(data.table))
 
@@ -28,7 +30,8 @@ PROVIDERS <- c(
 )
 
 OPTIONAL_PROVIDERS <- c(
-  "output/neon_compiled.csv"
+  "output/neon_compiled.csv",
+  "output/animaltraits_compiled.csv"
 )
 
 ## Log helper
