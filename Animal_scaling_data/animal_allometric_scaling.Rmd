@@ -70,6 +70,12 @@ labels_vec <- c(at   = LABEL_AT,
                 h19  = LABEL_H19,
                 h15  = LABEL_H15)
 
+# ── Slope plausibility bound ─────────────────────────────────────────────────
+# Slopes with |β| > SLOPE_MAX are biologically implausible (likely caused by
+# near-zero body-mass variance within a group, producing degenerate regressions).
+# Applied consistently to order-, family-, and species-level slope tables.
+SLOPE_MAX <- 10
+
 # ── QA filter ────────────────────────────────────────────────────────────────
 qa_ok <- function(dt) {
   if (is.null(dt)) return(NULL)
@@ -803,7 +809,13 @@ print(order_met[, .N, by = order][N >= 10][order(-N)])
 ```{r met-within-order-table}
 reg_order_all <- fit_log_lm(order_met, "body_mass_g", "metabolic_rate_value",
                              group_col = "order", min_n = 10)
-reg_order <- reg_order_all[Group != "All taxa combined"]
+reg_order_raw <- reg_order_all[Group != "All taxa combined"]
+n_ord_excl <- sum(abs(reg_order_raw$Slope) > SLOPE_MAX, na.rm = TRUE)
+if (n_ord_excl > 0)
+  cat(sprintf("Excluded %d order(s) with |β| > %g (biologically implausible; near-zero mass variance):\n",
+              n_ord_excl, SLOPE_MAX),
+      paste(reg_order_raw[abs(Slope) > SLOPE_MAX]$Group, collapse = ", "), "\n")
+reg_order <- reg_order_raw[is.na(Slope) | abs(Slope) <= SLOPE_MAX]
 
 if (!is.null(reg_order) && nrow(reg_order) > 0) {
   kable(reg_order[order(-n)],
@@ -843,6 +855,91 @@ if (!is.null(reg_order) && nrow(reg_order) > 0) {
 }
 ```
 
+## Full slope frequency distribution — within order {#order-slope-dist}
+
+```{r met-within-order-histogram, fig.width=10, fig.height=5}
+if (!is.null(reg_order) && nrow(reg_order) >= 5 && sum(!is.na(reg_order$Slope)) >= 5) {
+  med_ord <- median(reg_order$Slope, na.rm = TRUE)
+  ggplot(reg_order[!is.na(Slope)], aes(x = Slope)) +
+    geom_histogram(binwidth = 0.1, fill = pal8[3], colour = "white", alpha = 0.85) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "firebrick", linewidth = 1.1) +
+    geom_vline(xintercept = med_ord, linetype = "solid", colour = pal8[1], linewidth = 1.0) +
+    annotate("text", x = 0.75 + 0.05, y = Inf, label = "WBE β = 0.75",
+             colour = "firebrick", vjust = 1.5, hjust = 0, size = 3.5) +
+    annotate("text", x = med_ord - 0.05, y = Inf,
+             label = sprintf("Median β = %.3f", med_ord),
+             colour = pal8[1], vjust = 3.2, hjust = 1, size = 3.5) +
+    labs(
+      title    = "Frequency distribution of within-order metabolic scaling slopes",
+      subtitle = sprintf("N = %d orders with ≥ 10 records; dashed = WBE β = 0.75; solid = observed median",
+                         sum(!is.na(reg_order$Slope))),
+      x        = "OLS slope (β) within order",
+      y        = "Number of orders"
+    ) +
+    theme_bw(base_size = 13)
+}
+```
+
+## Slope distribution by major clade — within order {#order-slope-by-clade}
+
+```{r met-within-order-clade-prep}
+# Attach the dominant taxonomic group to each order using the raw records
+order_clade <- order_met[!is.na(order) & order != "" &
+                          !is.na(input_taxonomic_group) & input_taxonomic_group != "",
+                         .(clade = {
+                             tb <- sort(table(input_taxonomic_group), decreasing = TRUE)
+                             names(tb)[1]
+                           }),
+                         by = order]
+
+reg_order_clade <- merge(reg_order, order_clade, by.x = "Group", by.y = "order", all.x = TRUE)
+
+# Keep only clades with >= 3 orders so boxplots are meaningful
+clade_order_counts <- reg_order_clade[!is.na(clade) & !is.na(Slope),
+                                      .N, by = clade][N >= 3]
+rod_plot <- reg_order_clade[clade %in% clade_order_counts$clade & !is.na(Slope)]
+cat("Orders available for clade breakdown:", nrow(rod_plot), "\n")
+print(rod_plot[, .N, by = clade][order(-N)])
+```
+
+```{r met-within-order-clade-boxplot, fig.width=11, fig.height=6}
+if (nrow(rod_plot) >= 5) {
+  ggplot(rod_plot, aes(x = reorder(clade, Slope, FUN = median), y = Slope,
+                        fill = clade)) +
+    geom_boxplot(alpha = 0.75, outlier.shape = 16, outlier.size = 1.8) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_jitter(width = 0.18, size = 1.5, alpha = 0.6, colour = "grey30") +
+    scale_fill_brewer(palette = "Dark2", guide = "none") +
+    coord_flip() +
+    labs(
+      title    = "Within-order metabolic scaling slopes by major clade",
+      subtitle = "Each point = one order; box = median ± IQR; dashed = WBE β = 0.75",
+      x        = "Major clade (dominant taxonomic group in order)",
+      y        = "OLS slope (β) within order"
+    ) +
+    theme_bw(base_size = 13)
+}
+```
+
+```{r met-within-order-clade-histogram, fig.width=12, fig.height=7}
+if (nrow(rod_plot) >= 5) {
+  ggplot(rod_plot, aes(x = Slope, fill = clade)) +
+    geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.85) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 0.9) +
+    scale_fill_brewer(palette = "Dark2", guide = "none") +
+    facet_wrap(~ clade, scales = "free_y", ncol = 3) +
+    labs(
+      title    = "Frequency distribution of within-order slopes by major clade",
+      subtitle = "Dashed = WBE β = 0.75; each panel = one major clade",
+      x        = "OLS slope (β) within order",
+      y        = "Number of orders"
+    ) +
+    theme_bw(base_size = 12)
+}
+```
+
 ---
 
 # Metabolic Scaling Within Family
@@ -867,7 +964,13 @@ print(head(fam_counts, 20))
 ```{r met-within-family-table}
 reg_fam_all <- fit_log_lm(fam_met, "body_mass_g", "metabolic_rate_value",
                            group_col = "family", min_n = 10)
-reg_fam <- reg_fam_all[Group != "All taxa combined"]
+reg_fam_raw <- reg_fam_all[Group != "All taxa combined"]
+n_fam_excl <- sum(abs(reg_fam_raw$Slope) > SLOPE_MAX, na.rm = TRUE)
+if (n_fam_excl > 0)
+  cat(sprintf("Excluded %d family/families with |β| > %g (biologically implausible; near-zero mass variance):\n",
+              n_fam_excl, SLOPE_MAX),
+      paste(reg_fam_raw[abs(Slope) > SLOPE_MAX]$Group, collapse = ", "), "\n")
+reg_fam <- reg_fam_raw[is.na(Slope) | abs(Slope) <= SLOPE_MAX]
 
 if (!is.null(reg_fam) && nrow(reg_fam) > 0) {
   kable(reg_fam[order(-n)],
@@ -924,6 +1027,65 @@ if (!is.null(reg_fam) && nrow(reg_fam) > 0 && sum(!is.na(reg_fam$Slope)) > 5) {
     annotate("text", x = 1.45, y = 0.75, label = "WBE β = 0.75",
              colour = "firebrick", hjust = 0, size = 3.5) +
     theme_bw(base_size = 13)
+}
+```
+
+## Slope distribution by major clade — within family {#family-slope-by-clade}
+
+```{r met-within-family-clade-prep}
+# Attach dominant clade to each family
+fam_clade <- fam_met[!is.na(family) & family != "" &
+                      !is.na(input_taxonomic_group) & input_taxonomic_group != "",
+                     .(clade = {
+                         tb <- sort(table(input_taxonomic_group), decreasing = TRUE)
+                         names(tb)[1]
+                       }),
+                     by = family]
+
+reg_fam_clade <- merge(reg_fam, fam_clade, by.x = "Group", by.y = "family", all.x = TRUE)
+
+# Keep clades with >= 3 families
+clade_fam_counts <- reg_fam_clade[!is.na(clade) & !is.na(Slope), .N, by = clade][N >= 3]
+rfp_plot <- reg_fam_clade[clade %in% clade_fam_counts$clade & !is.na(Slope)]
+cat("Families available for clade breakdown:", nrow(rfp_plot), "\n")
+print(rfp_plot[, .N, by = clade][order(-N)])
+```
+
+```{r met-within-family-clade-boxplot, fig.width=11, fig.height=6}
+if (nrow(rfp_plot) >= 5) {
+  ggplot(rfp_plot, aes(x = reorder(clade, Slope, FUN = median), y = Slope,
+                        fill = clade)) +
+    geom_boxplot(alpha = 0.75, outlier.shape = 16, outlier.size = 1.5) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_jitter(width = 0.18, size = 1.2, alpha = 0.5, colour = "grey30") +
+    scale_fill_brewer(palette = "Dark2", guide = "none") +
+    coord_flip() +
+    labs(
+      title    = "Within-family metabolic scaling slopes by major clade",
+      subtitle = "Each point = one family; box = median ± IQR; dashed = WBE β = 0.75",
+      x        = "Major clade (dominant taxonomic group in family)",
+      y        = "OLS slope (β) within family"
+    ) +
+    theme_bw(base_size = 13)
+}
+```
+
+```{r met-within-family-clade-histogram, fig.width=13, fig.height=8}
+if (nrow(rfp_plot) >= 5) {
+  ggplot(rfp_plot, aes(x = Slope, fill = clade)) +
+    geom_histogram(binwidth = 0.1, colour = "white", alpha = 0.85) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 0.9) +
+    scale_fill_brewer(palette = "Dark2", guide = "none") +
+    facet_wrap(~ clade, scales = "free_y", ncol = 3) +
+    labs(
+      title    = "Frequency distribution of within-family slopes by major clade",
+      subtitle = "Dashed = WBE β = 0.75; each panel = one major clade",
+      x        = "OLS slope (β) within family",
+      y        = "Number of families"
+    ) +
+    theme_bw(base_size = 12)
 }
 ```
 
@@ -991,6 +1153,14 @@ if (nrow(intra_eligible) >= 1) {
       flag_low_cv = mass_cv < 0.01
     )
   }), fill = TRUE)
+
+  # Remove biologically implausible slopes
+  n_intra_excl <- sum(abs(intra_slopes$slope) > SLOPE_MAX, na.rm = TRUE)
+  if (n_intra_excl > 0)
+    cat(sprintf("Excluded %d species with |β| > %g (biologically implausible; near-zero mass variance):\n",
+                n_intra_excl, SLOPE_MAX),
+        paste(intra_slopes[abs(slope) > SLOPE_MAX]$species, collapse = ", "), "\n")
+  intra_slopes <- intra_slopes[is.na(slope) | abs(slope) <= SLOPE_MAX]
 
   if (!is.null(intra_slopes) && nrow(intra_slopes) > 0) {
     cat(sprintf("Species with fitted intraspecific slopes: %d\n", nrow(intra_slopes)))
@@ -1069,6 +1239,95 @@ if (exists("intra_slopes") && !is.null(intra_slopes) && nrow(intra_slopes) >= 5)
   }
 } else if (!exists("intra_slopes") || nrow(intra_slopes) < 5) {
   cat("Fewer than 5 species with intraspecific slopes; distribution plots skipped.\n")
+}
+```
+
+## Intraspecific slopes by major clade {#intraspecific-by-clade}
+
+```{r intraspecific-clade-prep}
+if (exists("intra_slopes") && !is.null(intra_slopes) && nrow(intra_slopes) >= 5) {
+  # Attach dominant clade to each species from met_sources
+  sp_clade <- met_sources[!is.na(get(sp_col)) & get(sp_col) != "" &
+                           !is.na(input_taxonomic_group) & input_taxonomic_group != "",
+                          .(clade = {
+                              tb <- sort(table(input_taxonomic_group), decreasing = TRUE)
+                              names(tb)[1]
+                            }),
+                          by = .(species = get(sp_col))]
+
+  intra_slopes_clade <- merge(intra_slopes, sp_clade, by = "species", all.x = TRUE)
+
+  clade_sp_counts <- intra_slopes_clade[!is.na(clade) & !is.na(slope),
+                                         .N, by = clade][N >= 3]
+  isc_plot <- intra_slopes_clade[clade %in% clade_sp_counts$clade & !is.na(slope)]
+  cat("Species available for clade breakdown:", nrow(isc_plot), "\n")
+  print(isc_plot[, .N, by = clade][order(-N)])
+} else {
+  isc_plot <- data.table()
+  cat("Insufficient intraspecific data for clade breakdown.\n")
+}
+```
+
+```{r intraspecific-clade-boxplot, fig.width=11, fig.height=6}
+if (nrow(isc_plot) >= 5) {
+  ggplot(isc_plot, aes(x = reorder(clade, slope, FUN = median), y = slope,
+                        fill = clade)) +
+    geom_boxplot(alpha = 0.75, outlier.shape = 16, outlier.size = 1.8) +
+    geom_hline(yintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 1.0) +
+    geom_jitter(width = 0.18, size = 1.5, alpha = 0.6, colour = "grey30") +
+    scale_fill_brewer(palette = "Dark2", guide = "none") +
+    coord_flip() +
+    labs(
+      title    = "Intraspecific metabolic scaling slopes by major clade",
+      subtitle = "Each point = one species (N ≥ 5); box = median ± IQR; dashed = WBE β = 0.75",
+      x        = "Major clade",
+      y        = "Intraspecific OLS slope (β)"
+    ) +
+    theme_bw(base_size = 13)
+}
+```
+
+```{r intraspecific-clade-histogram, fig.width=13, fig.height=8}
+if (nrow(isc_plot) >= 5) {
+  ggplot(isc_plot, aes(x = slope, fill = clade)) +
+    geom_histogram(binwidth = 0.15, colour = "white", alpha = 0.85) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "firebrick",
+               linewidth = 0.9) +
+    scale_fill_brewer(palette = "Dark2", guide = "none") +
+    facet_wrap(~ clade, scales = "free_y", ncol = 3) +
+    labs(
+      title    = "Frequency distribution of intraspecific slopes by major clade",
+      subtitle = "Dashed = WBE β = 0.75; each panel = one major clade; species with N ≥ 5 records",
+      x        = "Intraspecific OLS slope (β) per species",
+      y        = "Number of species"
+    ) +
+    theme_bw(base_size = 12)
+}
+```
+
+```{r intraspecific-clade-summary-table}
+if (nrow(isc_plot) >= 5) {
+  clade_summ <- isc_plot[!is.na(slope),
+    .(N_species     = .N,
+      Median_slope  = round(median(slope), 3),
+      IQR_lo        = round(quantile(slope, 0.25), 3),
+      IQR_hi        = round(quantile(slope, 0.75), 3),
+      Mean_slope    = round(mean(slope), 3),
+      SD_slope      = round(sd(slope), 3),
+      Pct_above_WBE = round(100 * mean(slope > 0.75), 1)),
+    by = clade][order(-N_species)]
+
+  kable(clade_summ,
+        col.names = c("Clade", "N species", "Median β", "IQR lo", "IQR hi",
+                      "Mean β", "SD β", "% slopes > WBE 0.75"),
+        caption = paste(
+          "Summary statistics for intraspecific OLS slopes by major clade.",
+          "Species with N ≥ 5 metabolic rate records.",
+          "WBE reference: β = 0.75.",
+          "IQR = interquartile range of slope distribution."
+        )) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
 }
 ```
 
