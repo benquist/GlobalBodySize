@@ -31,3 +31,15 @@
 **Changes:**
 - `animal_allometric_scaling.Rmd` — new 89-chunk R Markdown document with 13 sections: Introduction (WBE theory), Data Coverage, Cross-Study Metabolic Scaling, By Study, By Taxonomic Group, Within Order, Within Family, Intraspecific Scaling, Growth Rate Scaling, Lifespan Scaling, Predator-Prey Mass Scaling, Methods & Caveats, References. Implements OLS + SMA regressions; within-order, within-family, and intraspecific panels; min_n filters; color-blind-safe palettes (viridis/ColorBrewer); kableExtra tables with slope, SE, 95% CI, R². All four compiled datasets used (AnimalTraits, Hoehler 2023 PNAS, Hatton 2019 PNAS, Hatton 2015 Science).
 - `animal_allometric_scaling.html` — rendered output (7.3 MB; HTML gitignored).
+
+---
+
+## 2026-05-11 (insect metabolic scaling — Chown 2007)
+
+**Prompt:** "Lets now update the .rmd and .html files associated with this project as well as the analyses in 'Animal Allometric Scaling: Metabolism and Growth Across Taxa'. Include now the insect metabolic scaling relationships"
+
+**Changes:**
+- `providers/chown2007/load_chown2007.R` — new provider; parses Appendix S2 of fec1245_supmat.doc (Chown et al. 2007, Funct. Ecol. 21:1023–1033); strips multi-line EndNoteXML citation blobs before field parsing; outputs 346 insect species across 16 orders with columns: species, order, family, wing_status, body_mass_g, metabolic_rate_mW, temperature_C, source; applies Riveros & Enquist 2011 corrections to 3 Coleoptera entries
+- `animal_allometric_scaling.Rmd` — ch07 added to `all_list` and `met_sources`; new section "# Insect Metabolic Scaling (Chown 2007, corrected)" with subsections: overall OLS + SMA with WBE 3/4 reference line; within-order scaling (9 orders N≥10, Isoptera highlighted); wing status intercept comparison (winged vs. wingless ANCOVA); Termitidae deviation analysis (scaling with and without Termitidae); within-family OLS (11 families N≥10, Formicidae and Termitidae highlighted); fixed palette size mismatches in scale_colour/fill_manual calls throughout document
+- `animal_allometric_scaling.html` — re-rendered successfully (11 MB); HTML timestamp 2026-05-11 14:34
+- Committed as 91f8e00 and pushed to origin/master
