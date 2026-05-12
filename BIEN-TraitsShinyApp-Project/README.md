@@ -364,7 +364,17 @@ The **BIEN Traits Shiny App** is an interactive tool for trait lookup and synthe
 Primary deployment URL:
 
 > ### [▶ https://benquist.shinyapps.io/bien-traits-shinyapp/](https://benquist.shinyapps.io/bien-traits-shinyapp/)
+---
 
+## Code Structure
+
+| File | Purpose |
+|------|---------|
+| `app.R` | Main Shiny app entry point; sources `R/ui.R` and `R/server.R` |
+| `R/ui.R` | UI layout and widget definitions |
+| `R/server.R` | Server logic, BIEN queries, reactive computation |
+| `R/helpers.R` | Shared helper functions (data formatting, export, map utilities) |
+| `deploy.R` | Deployment script for shinyapps.io via `rsconnect::deployApp()` |
 ---
 
 ## Practical Use Cases
@@ -506,6 +516,12 @@ Export bundle includes:
 shiny::runApp(".")
 ```
 
+> **BIEN data version note:** This app queries the BIEN database live over a remote connection. Results depend on the current BIEN database state and are not guaranteed to be reproducible across sessions. Record the BIEN database version after each important session:
+> ```r
+> BIEN::BIEN_metadata_database_version()
+> ```
+> The app was developed against BIEN package version ≥ 2.2.5.
+
 Required R packages:
 
 - shiny
@@ -516,6 +532,8 @@ Required R packages:
 - leaflet
 - DT
 - jsonlite
+
+> **Network required:** The BIEN package queries a remote PostgreSQL database. An active internet connection is required. If queries return errors, check your connection with `BIEN::BIEN_metadata_database_version()`.
 
 ---
 

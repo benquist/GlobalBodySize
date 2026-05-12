@@ -737,6 +737,22 @@ The label "Conservative default profile" with tooltip "keeps native and non-intr
 
 6. **The `is_cultivated` column has the same NULL-permissiveness trap.** `is_cultivated = 0` does not catch escapes flagged `IS NULL`. A future issue should consider applying the same strict/permissive split to the cultivated filter.
 
+### FOLLOW-UP FIXES (2026-05-10 round 2)
+
+After the multi-agent re-review (informatics-checker, science-guard, taxonomy-reconciliation, merow-ecology, coder, optimizer), nine follow-up fixes were applied to app.R:
+
+- F1 — bien_query_strategy now distinguishes "strict" vs "strict_no_unknown"; new column `bien_native_filter_mode` ∈ {native_only, native_or_unknown, all_records}.
+- F2 — `count_occurrence_records()` and `count_occurrence_source_mix()` accept and thread `strict_no_unknown` so the Load BIEN counts diagnostics agree with the displayed records.
+- F3 — `build_occurrence_repro_script()` and `build_plot_repro_script()` now emit a post-fetch `is_introduced == 0 & !is.na()` filter when `res$strict_native_no_unknown` is TRUE; downloaded R scripts now reproduce the strict-native semantics.
+- F4 — Parallel "Strict wild (exclude unevaluated cultivation)" opt-in: emits `AND is_cultivated = 0`, closing the IS-NULL trap on the cultivation axis. Threaded through resolve_filter_profile, query_occurrence_randomized, and the count helpers.
+- F5 — Strict plan capped at 500 rows when strict-only profile is on; eliminates the ORDER BY random() trigger that caused 60–610 s timeouts for Eucalyptus globulus and Tamarix ramosissima.
+- F6 — Strict-native and strict-wild checkboxes now visible under both strict-only and granular profiles.
+- F7 — Banner emits three distinct failure messages (backend_timeout_error, none, fallback_*) and a STRONG warning for fallback_allow_centroids.
+- F8 — Tooltip and inline comment prose corrected: removed the overstated "no NSR coverage for Old World" claim; added Maitner et al. 2018 reference.
+- F9 — Filter Provenance & Citations section added to About & Help (Maitner et al. 2018, Boyle et al. 2013, POWO).
+
+Outstanding (not addressed this round): homonym-authorship guard, server-side statement_timeout, name_unresolved diagnostic probe, COUNT-then-decide TABLESAMPLE for strict-only mode (currently mitigated by F5's 500-row cap).
+
 ---
 
 ## Issue 15 — [Future issues documented here]

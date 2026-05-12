@@ -47,8 +47,10 @@ dat <- dat %>%
   )
 
 # ── Subset: records with m.to AND (m.lf or a.lf) ─────────────────────────────
-d_lf <- dat %>% filter(m.to > 0, m.lf > 0)   # AGB + leaf mass
-d_al <- dat %>% filter(m.to > 0, a.lf > 0)   # AGB + leaf area
+d_lf    <- dat %>% filter(m.to > 0, m.lf > 0)   # AGB + leaf mass
+d_al    <- dat %>% filter(m.to > 0, a.lf > 0)   # AGB + leaf area
+d_st_lf <- dat %>% filter(!is.na(m.st), m.st > 0, m.lf > 0)  # stem biomass + leaf mass
+d_st_al <- dat %>% filter(!is.na(m.st), m.st > 0, a.lf > 0)  # stem biomass + leaf area
 
 # Helper: run sma() safely and return a tidy 1-row data.frame
 sma_tidy <- function(df, response, predictor, group_label = "all") {
@@ -842,6 +844,7 @@ intra_lf <- d_lf %>%
         slope     = cm[2, 1],
         slope_lo  = cm[2, 2],
         slope_hi  = cm[2, 3],
+        ols_slope = unname(coef(lm(ly ~ lx))[2]),
         r2        = cor(lx, ly)^2,
         agb_range = diff(range(lx))
       )
@@ -851,18 +854,33 @@ intra_lf <- d_lf %>%
 
 cat("Species with ≥", MIN_N_INTRA, "records (m.lf + m.to):", nrow(intra_lf), "\n")
 
-ggplot(intra_lf, aes(x = slope, fill = clade)) +
+# Pivot to long format so OLS and SMA histograms appear side by side
+intra_lf_long <- intra_lf %>%
+  tidyr::pivot_longer(cols = c(slope, ols_slope),
+                      names_to = "method", values_to = "est_slope") %>%
+  dplyr::mutate(method = dplyr::recode(method, slope = "SMA", ols_slope = "OLS")) %>%
+  dplyr::filter(is.finite(est_slope))
+
+# Per-method interspecific reference lines (match facet panels)
+vline_lf <- data.frame(
+  method  = c("SMA", "OLS"),
+  xint_sp = c(sl_lf, ols_sl_lf)
+)
+
+ggplot(intra_lf_long, aes(x = est_slope, fill = clade)) +
   geom_histogram(binwidth = 0.05, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = sl_lf,  linetype = "solid",  colour = "black", linewidth = 1) +
-  geom_vline(xintercept = 0.75,   linetype = "dashed", colour = "grey40", linewidth = 0.9) +
-  geom_vline(xintercept = 1.00,   linetype = "dotted", colour = "grey60", linewidth = 0.7) +
+  geom_vline(data = vline_lf, aes(xintercept = xint_sp),
+             linetype = "solid", colour = "steelblue4", linewidth = 1) +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40", linewidth = 0.9) +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60", linewidth = 0.7) +
   scale_fill_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
                     na.value = "grey60", name = "Clade") +
+  facet_wrap(~ method, ncol = 2, scales = "free_y") +
   labs(
-    x = "Intraspecific SMA slope",
+    x = "Intraspecific slope",
     y = "Number of species",
     title = paste0("Distribution of intraspecific slopes — leaf mass ~ AGB  (≥ ", MIN_N_INTRA, " records/species)"),
-    subtitle = paste0("Solid = interspecific SMA slope (", sl_lf, "); dashed = 3/4; dotted = 1.0")
+    subtitle = "Blue vertical line = interspecific slope for each method; dashed = 3/4; dotted = 1.0"
   )
 ```
 
@@ -934,6 +952,7 @@ intra_al <- d_al %>%
         slope     = cm[2, 1],
         slope_lo  = cm[2, 2],
         slope_hi  = cm[2, 3],
+        ols_slope = unname(coef(lm(ly ~ lx))[2]),
         r2        = cor(lx, ly)^2,
         agb_range = diff(range(lx))
       )
@@ -943,18 +962,32 @@ intra_al <- d_al %>%
 
 cat("Species with ≥", MIN_N_INTRA, "records (a.lf + m.to):", nrow(intra_al), "\n")
 
-ggplot(intra_al, aes(x = slope, fill = clade)) +
+# Pivot to long format so OLS and SMA histograms appear side by side
+intra_al_long <- intra_al %>%
+  tidyr::pivot_longer(cols = c(slope, ols_slope),
+                      names_to = "method", values_to = "est_slope") %>%
+  dplyr::mutate(method = dplyr::recode(method, slope = "SMA", ols_slope = "OLS")) %>%
+  dplyr::filter(is.finite(est_slope))
+
+vline_al <- data.frame(
+  method  = c("SMA", "OLS"),
+  xint_sp = c(sl_al, ols_sl_al)
+)
+
+ggplot(intra_al_long, aes(x = est_slope, fill = clade)) +
   geom_histogram(binwidth = 0.05, colour = "white", alpha = 0.75, position = "stack") +
-  geom_vline(xintercept = sl_al,  linetype = "solid",  colour = "black", linewidth = 1) +
-  geom_vline(xintercept = 0.75,   linetype = "dashed", colour = "grey40", linewidth = 0.9) +
-  geom_vline(xintercept = 1.00,   linetype = "dotted", colour = "grey60", linewidth = 0.7) +
+  geom_vline(data = vline_al, aes(xintercept = xint_sp),
+             linetype = "solid", colour = "steelblue4", linewidth = 1) +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "grey40", linewidth = 0.9) +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60", linewidth = 0.7) +
   scale_fill_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
                     na.value = "grey60", name = "Clade") +
+  facet_wrap(~ method, ncol = 2, scales = "free_y") +
   labs(
-    x = "Intraspecific SMA slope",
+    x = "Intraspecific slope",
     y = "Number of species",
     title = paste0("Distribution of intraspecific slopes — leaf area ~ AGB  (≥ ", MIN_N_INTRA, " records/species)"),
-    subtitle = paste0("Solid = interspecific SMA slope (", sl_al, "); dashed = 3/4; dotted = 1.0")
+    subtitle = "Blue vertical line = interspecific slope for each method; dashed = 3/4; dotted = 1.0"
   )
 ```
 
@@ -1109,6 +1142,218 @@ kable(data.frame(
 col.names = c("Relationship", "N records", "SMA slope", "SMA CI lo", "SMA CI hi",
               "OLS slope", "PGLS slope", "R²"),
 caption = "Summary of interspecific slopes by method (all and by clade); PGLS on species means only")
+```
+
+---
+
+# Stem biomass vs. leaf mass and leaf area
+
+Stem biomass (`m.st`, kg) is the woody stem mass recorded in BAAD, excluding
+leaves and typically representing the main structural axis. Using `m.st` rather
+than total above-ground biomass (`m.to`) as the predictor removes the circular
+dependency between leaf investment and the response variable — `m.to` includes
+`m.lf`, so any regression of `m.lf ~ m.to` is partly self-referential. Stem
+biomass is a cleaner structural predictor.
+
+```{r stem-data-summary}
+kable(data.frame(
+  Dataset    = c("m.lf ~ m.st", "a.lf ~ m.st"),
+  N_records  = c(nrow(d_st_lf), nrow(d_st_al)),
+  N_species  = c(n_distinct(d_st_lf$speciesMatched), n_distinct(d_st_al$speciesMatched)),
+  N_families = c(n_distinct(d_st_lf$family[!is.na(d_st_lf$family)]),
+                 n_distinct(d_st_al$family[!is.na(d_st_al$family)]))
+), caption = "Record counts for stem biomass scaling analyses")
+```
+
+## Leaf mass ~ stem biomass
+
+```{r stem-leaf-mass, fig.height=6}
+fit_st_lf     <- sma(log10(m.lf) ~ log10(m.st), data = d_st_lf)
+sl_st_lf      <- round(coef(fit_st_lf)[2], 3)
+int_st_lf     <- round(coef(fit_st_lf)[1], 3)
+r2_st_lf      <- round(cor(log10(d_st_lf$m.lf), log10(d_st_lf$m.st))^2, 3)
+
+lm_st_lf      <- lm(log10(m.lf) ~ log10(m.st), data = d_st_lf)
+ols_sl_st_lf  <- round(coef(lm_st_lf)[2], 3)
+ols_int_st_lf <- round(coef(lm_st_lf)[1], 3)
+ols_ci_st_lf  <- round(confint(lm_st_lf)[2, ], 3)
+ols_r2_st_lf  <- round(summary(lm_st_lf)$r.squared, 3)
+
+ggplot(d_st_lf, aes(x = m.st, y = m.lf, colour = pft)) +
+  geom_point(alpha = 0.25, size = 0.7) +
+  geom_abline(intercept = int_st_lf, slope = sl_st_lf,
+              colour = "black", linewidth = 1.2) +
+  geom_abline(intercept = ols_int_st_lf, slope = ols_sl_st_lf,
+              colour = "firebrick", linewidth = 1.0) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_brewer(palette = "Dark2", na.value = "grey70") +
+  annotation_logticks() +
+  labs(
+    x = "Stem biomass, m.st (kg)",
+    y = "Leaf mass, m.lf (kg)",
+    colour = "PFT",
+    title = paste0("Leaf mass ~ stem biomass  |  SMA \u03b2 = ", sl_st_lf,
+                   "  OLS \u03b2 = ", ols_sl_st_lf,
+                   "  |  n = ", format(nrow(d_st_lf), big.mark = ",")),
+    subtitle = "Black: SMA.  Red: OLS."
+  )
+```
+
+```{r stem-leaf-mass-compare}
+kable(data.frame(
+  Method = c("OLS", "SMA"),
+  Slope  = c(ols_sl_st_lf, sl_st_lf),
+  CI_lo  = c(ols_ci_st_lf[1], round(fit_st_lf$coef[[1]][2, 2], 3)),
+  CI_hi  = c(ols_ci_st_lf[2], round(fit_st_lf$coef[[1]][2, 3], 3)),
+  R2     = c(ols_r2_st_lf, r2_st_lf)
+),
+col.names = c("Method", "Slope", "95% CI lo", "95% CI hi", "R\u00b2"),
+caption = "OLS vs. SMA \u2014 leaf mass ~ stem biomass")
+```
+
+## Leaf area ~ stem biomass
+
+```{r stem-leaf-area, fig.height=6}
+fit_st_al     <- sma(log10(a.lf) ~ log10(m.st), data = d_st_al)
+sl_st_al      <- round(coef(fit_st_al)[2], 3)
+int_st_al     <- round(coef(fit_st_al)[1], 3)
+r2_st_al      <- round(cor(log10(d_st_al$a.lf), log10(d_st_al$m.st))^2, 3)
+
+lm_st_al      <- lm(log10(a.lf) ~ log10(m.st), data = d_st_al)
+ols_sl_st_al  <- round(coef(lm_st_al)[2], 3)
+ols_int_st_al <- round(coef(lm_st_al)[1], 3)
+ols_ci_st_al  <- round(confint(lm_st_al)[2, ], 3)
+ols_r2_st_al  <- round(summary(lm_st_al)$r.squared, 3)
+
+ggplot(d_st_al, aes(x = m.st, y = a.lf, colour = pft)) +
+  geom_point(alpha = 0.25, size = 0.7) +
+  geom_abline(intercept = int_st_al, slope = sl_st_al,
+              colour = "black", linewidth = 1.2) +
+  geom_abline(intercept = ols_int_st_al, slope = ols_sl_st_al,
+              colour = "firebrick", linewidth = 1.0) +
+  scale_x_log10(labels = comma) +
+  scale_y_log10(labels = comma) +
+  scale_colour_brewer(palette = "Dark2", na.value = "grey70") +
+  annotation_logticks() +
+  labs(
+    x = "Stem biomass, m.st (kg)",
+    y = "Leaf area, a.lf (m\u00b2)",
+    colour = "PFT",
+    title = paste0("Leaf area ~ stem biomass  |  SMA \u03b2 = ", sl_st_al,
+                   "  OLS \u03b2 = ", ols_sl_st_al,
+                   "  |  n = ", format(nrow(d_st_al), big.mark = ",")),
+    subtitle = "Black: SMA.  Red: OLS."
+  )
+```
+
+```{r stem-leaf-area-compare}
+kable(data.frame(
+  Method = c("OLS", "SMA"),
+  Slope  = c(ols_sl_st_al, sl_st_al),
+  CI_lo  = c(ols_ci_st_al[1], round(fit_st_al$coef[[1]][2, 2], 3)),
+  CI_hi  = c(ols_ci_st_al[2], round(fit_st_al$coef[[1]][2, 3], 3)),
+  R2     = c(ols_r2_st_al, r2_st_al)
+),
+col.names = c("Method", "Slope", "95% CI lo", "95% CI hi", "R\u00b2"),
+caption = "OLS vs. SMA \u2014 leaf area ~ stem biomass")
+```
+
+## Angiosperm vs. Gymnosperm — stem biomass scaling
+
+```{r stem-clade, fig.height=5}
+stem_clade_results <- bind_rows(lapply(c("Angiosperm", "Gymnosperm"), function(cl) {
+  bind_rows(lapply(list(
+    list(df = d_st_lf, ycol = "m.lf", ylabel = "Leaf mass"),
+    list(df = d_st_al, ycol = "a.lf", ylabel = "Leaf area")
+  ), function(item) {
+    sub_df <- item$df %>% filter(!is.na(clade), clade == cl)
+    if (nrow(sub_df) < 5) return(NULL)
+    tryCatch({
+      lx  <- log10(sub_df$m.st)
+      ly  <- log10(sub_df[[item$ycol]])
+      fit <- sma(ly ~ lx)
+      lmf <- lm(ly ~ lx)
+      data.frame(
+        Clade     = cl,
+        Response  = item$ylabel,
+        N         = nrow(sub_df),
+        SMA_slope = round(fit$coef[[1]][2, 1], 3),
+        OLS_slope = round(coef(lmf)[2], 3),
+        R2        = round(cor(lx, ly)^2, 3)
+      )
+    }, error = function(e) NULL)
+  }))
+}))
+
+kable(stem_clade_results,
+      col.names = c("Clade", "Response", "N", "SMA slope", "OLS slope", "R\u00b2"),
+      caption = "SMA and OLS slopes for leaf traits ~ stem biomass by clade")
+```
+
+## Intraspecific slopes — stem biomass scaling
+
+```{r stem-intra, fig.height=5, fig.width=11}
+MIN_N_ST <- 8
+
+make_stem_intra <- function(df, ycol) {
+  df %>%
+    filter(!is.na(speciesMatched)) %>%
+    group_by(speciesMatched) %>%
+    group_modify(~ {
+      if (nrow(.x) < MIN_N_ST) return(data.frame())
+      tryCatch({
+        lx  <- log10(.x$m.st)
+        ly  <- log10(.x[[ycol]])
+        fit <- sma(ly ~ lx)
+        cm  <- fit$coef[[1]]
+        data.frame(
+          n         = nrow(.x),
+          clade     = .x$clade[1],
+          slope     = cm[2, 1],
+          ols_slope = unname(coef(lm(ly ~ lx))[2]),
+          st_range  = diff(range(lx))
+        )
+      }, error = function(e) data.frame())
+    }) %>%
+    ungroup()
+}
+
+intra_st_lf <- make_stem_intra(d_st_lf, "m.lf")
+intra_st_al <- make_stem_intra(d_st_al, "a.lf")
+
+cat("Leaf mass ~ stem: species with \u2265", MIN_N_ST, "records:", nrow(intra_st_lf), "\n")
+cat("Leaf area ~ stem: species with \u2265", MIN_N_ST, "records:", nrow(intra_st_al), "\n")
+
+plot_stem_hist <- function(intra_df, ref_sma, ref_ols, trait_label) {
+  if (nrow(intra_df) == 0) { cat("No eligible species for", trait_label, "\n"); return(invisible(NULL)) }
+  long <- intra_df %>%
+    tidyr::pivot_longer(cols = c(slope, ols_slope),
+                        names_to = "method", values_to = "est_slope") %>%
+    dplyr::mutate(method = dplyr::recode(method, slope = "SMA", ols_slope = "OLS")) %>%
+    dplyr::filter(is.finite(est_slope))
+  vlines <- data.frame(method = c("SMA","OLS"), xint_sp = c(ref_sma, ref_ols))
+  ggplot(long, aes(x = est_slope, fill = clade)) +
+    geom_histogram(binwidth = 0.05, colour = "white", alpha = 0.75, position = "stack") +
+    geom_vline(data = vlines, aes(xintercept = xint_sp),
+               linetype = "solid", colour = "steelblue4", linewidth = 1) +
+    geom_vline(xintercept = 1.00, linetype = "dotted", colour = "grey60", linewidth = 0.7) +
+    scale_fill_manual(values = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+                      na.value = "grey60", name = "Clade") +
+    facet_wrap(~ method, ncol = 2, scales = "free_y") +
+    labs(
+      x = "Intraspecific slope",
+      y = "Number of species",
+      title = paste0("Intraspecific slopes \u2014 ", trait_label, " ~ stem biomass (\u2265 ", MIN_N_ST, " records/species)"),
+      subtitle = "Blue line = overall interspecific slope; dotted = isometry"
+    )
+}
+
+print(plot_stem_hist(intra_st_lf, sl_st_lf, ols_sl_st_lf, "leaf mass"))
+```
+
+```{r stem-intra-area, fig.height=5, fig.width=11}
+print(plot_stem_hist(intra_st_al, sl_st_al, ols_sl_st_al, "leaf area"))
 ```
 
 ---

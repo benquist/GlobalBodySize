@@ -2,6 +2,36 @@
 
 Tracks prompts that created or changed work under this project folder.
 
+## 2026-05-10 — Issue 14 follow-up fixes (F1–F9)
+
+**Prompt:** "Actually, all of these recommendations look important. Please proceed in making these changes" (after multi-agent re-review of Issue 14 fix surfaced 4 CRITICAL + 7 HIGH/WARNING items).
+
+**Agents invoked:** @m (supervisor), @coder (two passes), @code-checker (caught FIX-A banner regression and FIX-B missing UI checkboxes).
+
+**Fixes applied to app.R:**
+- F1 — `bien_query_strategy` now distinguishes `"strict"` vs `"strict_no_unknown"`; new column `bien_native_filter_mode` ∈ {native_only, native_or_unknown, all_records}.
+- F2 — `count_occurrence_records()` and `count_occurrence_source_mix()` thread `strict_no_unknown` and `strict_wild_no_unknown`; the Load BIEN counts diagnostics now agree with displayed records.
+- F3 — `build_occurrence_repro_script()` and `build_plot_repro_script()` emit a type-tolerant post-fetch native filter when `res$strict_native_no_unknown` is TRUE; downloaded R scripts now reproduce strict-native semantics.
+- F4 — Parallel "Strict wild (exclude unevaluated cultivation)" opt-in: emits `AND is_cultivated = 0`, closing the IS-NULL trap on the cultivation axis. Threaded through resolve_filter_profile, query_occurrence_randomized, and the count helpers.
+- F5 — Strict plan capped at 500 rows when strict-only profile is on; eliminates the ORDER BY random() trigger that caused 60–610s timeouts for *Eucalyptus globulus* and *Tamarix ramosissima*. Re-validation: both now return in seconds.
+- F6 — `strict_native_no_unknown` and `strict_wild_no_unknown` checkboxInputs added to the sidebar with conditionalPanel visibility under both `data_profile == "strict"` and the corresponding custom-profile origin/cultivation radio selections. `resolve_filter_profile()` now reads `input$strict_wild_no_unknown` under the strict profile.
+- F7 — Banner emits three distinct failure messages (`backend_timeout_error`, `none`, `fallback_*`); STRONG warning prepended for `fallback_allow_centroids`; "Not suitable for SDM/ENM calibration" footer on every fallback strategy. Banner suppression updated to short-circuit `"strict_no_unknown"` as well as `"strict"`.
+- F8 — Inline comment + tooltip prose updated; removed overstated "no NSR coverage for Old World" claim; added Maitner et al. 2018 reference.
+- F9 — "Filter Provenance & Citations" card added to About & Help (Maitner et al. 2018 doi:10.1111/2041-210X.12861, Boyle et al. 2013 doi:10.1186/1471-2105-14-16, POWO https://powo.science.kew.org/) with a "confirm DOIs and URLs before citing in publications" disclaimer.
+
+**Code-checker findings remediated:**
+- FIX-A: Banner suppression now matches `"strict_no_unknown"` (was rendering "non-strict" warning for the user-requested strict-no-unknown path).
+- FIX-B: Two real `checkboxInput()` calls were added (the previous round had only conditionalPanel scaffolding); exactly two `checkboxInput("strict_..."` matches confirmed.
+- FIX-C: `count_*` helpers now accept `strict_wild_no_unknown` and build a parallel `cult_clause`.
+- FIX-D: Repro-script post-fetch filter uses type-tolerant `tolower(trimws(as.character(...)))` coercion mirroring the app's internal handling.
+- FIX-E: `isFALSE(cultivated)` → `!isTRUE(cultivated)` for symmetry.
+
+**Validation:** Re-ran `tests/validate_filter_fix.R`. *Markhamia lutea* M1 still returns 397 records (regression test passes). *Eucalyptus globulus* M1 now returns 1000 in seconds (was 610s timeout). *Tamarix ramosissima* M1 now returns 221 in seconds (was 62s timeout). Parse OK. Refreshed log at `tests/validate_filter_fix_log.txt`.
+
+**Outstanding (deferred, not addressed this round):** homonym-authorship guard on `WHERE scrubbed_species_binomial IN (...)`; server-side PostgreSQL `statement_timeout` (current `setTimeLimit` cannot interrupt blocking DBI calls); pre-flight TNRS resolution probe to distinguish `name_unresolved` from `none`/`backend_timeout`; COUNT-then-decide TABLESAMPLE for strict-only mode (currently mitigated by F5's 500-row cap).
+
+**Files changed:** `app.R`, `KNOWN_ISSUES_AND_LESSONS.md`, `tests/validate_filter_fix_log.txt`.
+
 ## 2026-05-09 — Multi-agent UX/design redesign
 
 **Prompt:** "@M orchestrate design proposal from @scandinavian-design, @design-atelier, @biodiversity-informatics-checker, @ecology-user for the BIEN Species Shiny app"

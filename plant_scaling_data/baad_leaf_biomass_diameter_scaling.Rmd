@@ -437,15 +437,41 @@ kable(inter_fit, digits = 3, caption = "Interspecific (species means) OLS and RM
 ```
 
 ```{r interspecific-plot, fig.height=6}
-ggplot(species_means, aes(log_d_mean, log_mlf_mean)) +
+# Fit SMA for the interspecific scatter overlay
+if (HAS_SMATR) {
+  sma_inter_sp <- tryCatch(
+    smatr::sma(log_mlf_mean ~ log_d_mean, data = species_means),
+    error = function(e) NULL
+  )
+  sma_inter_int <- if (!is.null(sma_inter_sp)) sma_inter_sp$coef[[1]][1, 1] else NA_real_
+  sma_inter_sl  <- if (!is.null(sma_inter_sp)) sma_inter_sp$coef[[1]][2, 1] else NA_real_
+} else {
+  sma_inter_int <- NA_real_; sma_inter_sl <- NA_real_
+}
+
+ols_inter_sp  <- lm(log_mlf_mean ~ log_d_mean, data = species_means)
+ols_inter_int <- coef(ols_inter_sp)[1]
+ols_inter_sl  <- coef(ols_inter_sp)[2]
+
+p_inter <- ggplot(species_means, aes(log_d_mean, log_mlf_mean)) +
   geom_point(alpha = 0.6, color = "#2c7fb8") +
-  geom_smooth(method = "lm", se = TRUE, color = "#d95f0e", linewidth = 1) +
+  geom_abline(intercept = ols_inter_int, slope = ols_inter_sl,
+              colour = "#d95f0e", linewidth = 1) +
   labs(
     x = "Species mean log10(d.bh [m])",
     y = "Species mean log10(m.lf [kg])",
     title = "Primary interspecific scaling (species means)",
-    subtitle = paste0("n species = ", comma(nrow(species_means)))
+    subtitle = paste0("n species = ", comma(nrow(species_means)),
+                      "  |  Orange: OLS",
+                      if (!is.na(sma_inter_sl)) "  Black: SMA" else "")
   )
+
+if (!is.na(sma_inter_sl)) {
+  p_inter <- p_inter +
+    geom_abline(intercept = sma_inter_int, slope = sma_inter_sl,
+                colour = "black", linewidth = 1)
+}
+print(p_inter)
 ```
 
 ```{r pseudo-replication-comparison}
@@ -477,13 +503,31 @@ kable(pft_ind, digits = 3, caption = "Angiosperm vs gymnosperm fits: individual-
 ```
 
 ```{r pft-individual-plot, fig.height=6}
+# SMA lines per pft_group
+pft_ind_sma <- analysis_dat %>%
+  filter(!is.na(pft_group)) %>%
+  group_by(pft_group) %>%
+  group_modify(~ {
+    tryCatch({
+      fit <- if (HAS_SMATR) smatr::sma(log_mlf ~ log_d, data = .x) else NULL
+      if (is.null(fit)) return(data.frame())
+      data.frame(intercept = fit$coef[[1]][1, 1], slope = fit$coef[[1]][2, 1])
+    }, error = function(e) data.frame())
+  }) %>% ungroup()
+
+group_colours <- c(Angiosperm = "#F8766D", Gymnosperm = "#00BFC4")
+
 ggplot(analysis_dat %>% filter(!is.na(pft_group)), aes(log_d, log_mlf, color = pft_group)) +
   geom_point(alpha = 0.35) +
-  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1, linetype = "dashed") +
+  geom_abline(data = pft_ind_sma,
+              aes(intercept = intercept, slope = slope, colour = pft_group),
+              linewidth = 1, linetype = "solid") +
   labs(
     x = "log10(d.bh [m])",
     y = "log10(m.lf [kg])",
     title = "Individual-level scaling by major functional group",
+    subtitle = "Dashed: OLS.  Solid: SMA.",
     color = "Group"
   )
 ```
@@ -505,13 +549,29 @@ kable(pft_species, digits = 3, caption = "Angiosperm vs gymnosperm fits: species
 ```
 
 ```{r pft-species-plot, fig.height=6}
+# SMA lines per pft_group on species means
+pft_sp_sma <- species_means %>%
+  filter(!is.na(pft_group)) %>%
+  group_by(pft_group) %>%
+  group_modify(~ {
+    tryCatch({
+      fit <- if (HAS_SMATR) smatr::sma(log_mlf_mean ~ log_d_mean, data = .x) else NULL
+      if (is.null(fit)) return(data.frame())
+      data.frame(intercept = fit$coef[[1]][1, 1], slope = fit$coef[[1]][2, 1])
+    }, error = function(e) data.frame())
+  }) %>% ungroup()
+
 ggplot(species_means %>% filter(!is.na(pft_group)), aes(log_d_mean, log_mlf_mean, color = pft_group)) +
   geom_point(alpha = 0.6) +
-  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1, linetype = "dashed") +
+  geom_abline(data = pft_sp_sma,
+              aes(intercept = intercept, slope = slope, colour = pft_group),
+              linewidth = 1, linetype = "solid") +
   labs(
     x = "Species mean log10(d.bh [m])",
     y = "Species mean log10(m.lf [kg])",
     title = "Species-mean scaling by major functional group",
+    subtitle = "Dashed: OLS.  Solid: SMA.",
     color = "Group"
   )
 ```
@@ -737,31 +797,46 @@ kable(intra_ag_counts, caption = "Eligible intraspecific species per major group
 ```
 
 ```{r intraspecific-slope-dist, fig.height=6}
+# Include both OLS and RMA slopes side by side
+intra_fits_both <- intra_fits %>%
+  filter(is.finite(slope)) %>%
+  mutate(
+    ag_group = case_when(
+      !is.na(pft_group) & pft_group == "Gymnosperm" ~ "Gymnosperm",
+      family %in% gymno_families ~ "Gymnosperm",
+      TRUE ~ "Angiosperm"
+    )
+  ) %>%
+  select(species, model, slope, ag_group) %>%
+  # Rename model labels for clarity in facets
+  mutate(model = dplyr::recode(model, OLS = "OLS", RMA = "SMA/RMA"))
+
 n_gymno_intra <- sum(intra_fits_ag$ag_group == "Gymnosperm", na.rm = TRUE)
 
 if (n_gymno_intra >= 3) {
-  ggplot(intra_fits_ag, aes(x = slope, fill = ag_group)) +
+  ggplot(intra_fits_both, aes(x = slope, fill = ag_group)) +
     geom_histogram(bins = 20, color = "white", alpha = 0.85, position = "identity") +
     geom_vline(xintercept = 2, linetype = "dashed", color = "gray30") +
-    facet_wrap(~ ag_group, ncol = 1, scales = "free_y") +
+    facet_grid(ag_group ~ model, scales = "free_y") +
     scale_fill_manual(values = c("Angiosperm" = "#2171b5", "Gymnosperm" = "#238b45")) +
     labs(
-      x = expression("Intraspecific OLS slope " * (beta)),
+      x = expression("Intraspecific slope " * (beta)),
       y = "Number of species",
-      title = "Intraspecific OLS slope distributions: Angiosperm vs Gymnosperm",
-      subtitle = "Species with n >= 11 and log10(d.bh) range >= 0.7. Dashed line: beta = 2."
+      title = "Intraspecific OLS and SMA/RMA slope distributions: Angiosperm vs Gymnosperm",
+      subtitle = "Species with n \u2265 11 and log10(d.bh) range \u2265 0.7. Dashed line: \u03b2 = 2."
     ) +
     theme(legend.position = "none")
 } else {
-  ggplot(intra_fits_ag, aes(x = slope, fill = ag_group)) +
+  ggplot(intra_fits_both, aes(x = slope, fill = ag_group)) +
     geom_histogram(bins = 20, color = "white", alpha = 0.85) +
     geom_vline(xintercept = 2, linetype = "dashed", color = "gray30") +
     scale_fill_manual(values = c("Angiosperm" = "#2171b5", "Gymnosperm" = "#238b45")) +
+    facet_wrap(~ model, ncol = 2) +
     labs(
-      x = expression("Intraspecific OLS slope " * (beta)),
+      x = expression("Intraspecific slope " * (beta)),
       y = "Number of species",
-      title = "Intraspecific OLS slope distribution (all groups pooled; too few gymno species)",
-      subtitle = "Dashed line: beta = 2"
+      title = "Intraspecific OLS and SMA/RMA slope distributions (pooled; too few gymno species)",
+      subtitle = "Dashed line: \u03b2 = 2"
     )
 }
 ```

@@ -12,3 +12,4 @@ ingest_fred_manifest <- function(manifest_path, output_dir, candidate_score_defa
     candidate_keep_default = candidate_keep_default
   )
 }
+
