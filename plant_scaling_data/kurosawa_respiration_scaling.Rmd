@@ -1154,7 +1154,7 @@ cat(sprintf("\nSMA one-sample t-test, H0: mean = 0.75 -> p = %.4f\n", sma_t_vs_0
 cat(sprintf("SMA one-sample t-test, H0: mean = 1.00 -> p = %.4f\n", sma_t_vs_100$p.value))
 ```
 
-```{r intraspecific-histogram, fig.width=12, fig.height=8, fig.cap="Frequency distributions of per-species intraspecific scaling exponents. Rows: OLS (top) and SMA (bottom). Columns: life form. Fill colour distinguishes plant part (Shoot = green, Root = amber). Vertical lines at WBE 3/4 (red dashed) and isometric 1.0 (blue dotted). Each bar = one species (n\u22653 individuals). SMA exponents are systematically larger than OLS when within-species R\u00b2 < 1 because SMA minimises residuals in both axes."}
+```{r intraspecific-histogram, fig.width=12, fig.height=8, fig.cap="Frequency distributions of per-species intraspecific scaling exponents. Rows: OLS (top) and SMA (bottom). Columns: life form. Fill colour distinguishes plant part (Shoot = green, Root = amber). Vertical red dashed line = WBE 3/4; blue dotted line = isometric 1.0; grey solid line = per-panel median. Each bar = one species (n\u22653 individuals). SMA exponents are systematically larger than OLS when within-species R\u00b2 < 1 because SMA minimises residuals in both axes."}
 sp_long <- sp_intra |>
   select(species, family, life_form, plant_part,
          OLS = slope, SMA = sma_slope) |>
@@ -1163,36 +1163,77 @@ sp_long <- sp_intra |>
   filter(!is.na(exponent)) |>
   mutate(method = factor(method, levels = c("OLS", "SMA")))
 
+# Per-panel summary: median and N for annotation
+panel_stats <- sp_long |>
+  group_by(method, life_form) |>
+  summarise(
+    median_exp = median(exponent, na.rm = TRUE),
+    n_sp       = n(),
+    .groups    = "drop"
+  )
+
 ggplot(sp_long, aes(x = exponent, fill = plant_part)) +
   geom_histogram(bins = 25, alpha = 0.75, colour = "white") +
   geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
              linewidth = 1) +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
              linewidth = 1) +
-  annotate("text", x = 0.75, y = Inf, label = "  WBE 3/4", vjust = 2,
-           colour = "#d6604d", size = 3.5, hjust = 0) +
-  annotate("text", x = 1.00, y = Inf, label = "  Isometric 1.0", vjust = 2,
-           colour = "#2166ac", size = 3.5, hjust = 0) +
+  geom_vline(data = panel_stats,
+             aes(xintercept = median_exp),
+             linetype = "solid", colour = "grey30", linewidth = 0.9,
+             inherit.aes = FALSE) +
+  geom_label(data = panel_stats,
+             aes(x = median_exp, y = Inf,
+                 label = sprintf("med=%.2f\nn=%d", median_exp, n_sp)),
+             vjust = 1.4, hjust = -0.08, size = 3.0, colour = "grey20",
+             fill = "white", label.size = 0.2, inherit.aes = FALSE) +
   facet_grid(method ~ life_form, scales = "free_y") +
   scale_fill_manual(values = c(Shoot = "#4dac26", Root = "#b8860b")) +
   labs(x = "Scaling exponent (log R ~ log Mass, within species)",
        y = "Count",
        fill = "Plant part",
        title = "Distribution of intraspecific scaling exponents: OLS vs SMA",
-       subtitle = "Each bar = one species (n\u22653 individuals)") +
+       subtitle = "Each bar = one species (n\u22653 individuals). Grey line = per-panel median.") +
   theme(legend.position = "bottom")
+```
+
+```{r intraspecific-distrib-summary}
+# ── Distributional summary table: OLS and SMA per life-form × plant-part ──────
+distrib_summary <- sp_long |>
+  group_by(Method = method, `Life form` = life_form, `Plant part` = plant_part) |>
+  summarise(
+    N         = n(),
+    Mean      = round(mean(exponent, na.rm = TRUE), 3),
+    SD        = round(sd(exponent, na.rm = TRUE), 3),
+    Median    = round(median(exponent, na.rm = TRUE), 3),
+    IQR       = round(IQR(exponent, na.rm = TRUE), 3),
+    Min       = round(min(exponent, na.rm = TRUE), 3),
+    Max       = round(max(exponent, na.rm = TRUE), 3),
+    `% > 0.75` = round(100 * mean(exponent > 0.75, na.rm = TRUE), 1),
+    `% > 1.00` = round(100 * mean(exponent > 1.00, na.rm = TRUE), 1),
+    .groups = "drop"
+  )
+
+kable(
+  distrib_summary,
+  caption = "Summary statistics of intraspecific scaling exponent distributions by method, life form, and plant part. '% > 0.75': fraction of species exceeding the WBE 3/4 prediction. '% > 1.00': fraction exceeding isometry."
+)
 ```
 
 ```{r intraspecific-table}
 kable(
   sp_intra |>
     arrange(family, species) |>
-    select(species, family, life_form, plant_part, n, slope, ci_lo, ci_hi, r2) |>
-    mutate(across(c(slope, ci_lo, ci_hi, r2), ~ round(.x, 3))) |>
+    select(species, family, life_form, plant_part, n,
+           slope, ci_lo, ci_hi, r2,
+           sma_slope, sma_ci_lo, sma_ci_hi) |>
+    mutate(across(c(slope, ci_lo, ci_hi, r2,
+                    sma_slope, sma_ci_lo, sma_ci_hi), ~ round(.x, 3))) |>
     rename(Species = species, Family = family, `Life form` = life_form,
            `Plant part` = plant_part, N = n,
-           `Intra slope` = slope, `CI low` = ci_lo, `CI high` = ci_hi, `R²` = r2),
-  caption = "Per-species intraspecific OLS slopes (n\u22653 individuals required)"
+           `OLS slope` = slope, `OLS CI lo` = ci_lo, `OLS CI hi` = ci_hi, `R²` = r2,
+           `SMA slope` = sma_slope, `SMA CI lo` = sma_ci_lo, `SMA CI hi` = sma_ci_hi),
+  caption = "Per-species intraspecific OLS and SMA scaling exponents (n\u22653 individuals required). OLS 95% CI from lm(); SMA 95% CI from smatr::sma()."
 )
 ```
 
