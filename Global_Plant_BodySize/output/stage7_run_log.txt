@@ -1,0 +1,21 @@
+
+Attaching package: ‘data.table’
+
+The following object is masked from ‘package:base’:
+
+    %notin%
+
+[Stage 7] Loaded: output/bien_height_qa.csv (10167913 records)
+  Outlier exclusion: OFF (outlier-flagged records included in summary)
+  Records after QA filter: 10054146
+[Stage 7] Loaded: output/bien_dbh_qa.csv (14929488 records)
+  Outlier exclusion: OFF (outlier-flagged records included in summary)
+  Records after QA filter: 14873080
+[Stage 7] Summary table: 83580 species
+  With height data:       5229
+  With DBH data:          8928
+  Allometric-ready:       1985
+  Graminoid species:      0
+  Bamboo species:         363
+[Stage 7] Summary written to: output/plant_size_summary.csv
+=== Stage 7 complete ===

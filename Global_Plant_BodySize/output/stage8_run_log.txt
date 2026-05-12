@@ -1,0 +1,22 @@
+
+Attaching package: ‘data.table’
+
+The following object is masked from ‘package:base’:
+
+    %notin%
+
+[Stage 8] Species roster: 333778 species
+[Stage 8] Size summary: 83580 species with trait data
+[Stage 8] Final database: 333778 species
+  With any trait data:    78110 (23.4%)
+  No trait data (no-data rows): 255668
+[Stage 8] Coverage by higher_plant_group:
+data frame with 0 columns and 0 rows
+[Stage 8] Final database written to: output/plant_bodysize_final.csv
+=== Stage 8 complete — pipeline finished ===
+
+NEXT STEPS:
+  1. Verify BIEN citation DOI before publication
+  2. Check bamboo genus assignments for Chusquea and Guadua (New World bamboos)
+  3. Cross-validate a random sample of height records against TRY database
+  4. Review coverage_by_group.csv for data-poor groups (pteridophytes, gymnosperms)
