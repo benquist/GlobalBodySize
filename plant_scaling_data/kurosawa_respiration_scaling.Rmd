@@ -1199,17 +1199,44 @@ kable(
 ## Inter- vs. intraspecific: Glazier comparison
 
 ```{r glazier-comparison}
-# Summarise intraspecific slopes vs interspecific (PGLS) for each group
+# ── Helper: mean + 95% CI via t-distribution ─────────────────────────────────
+mean_ci <- function(x) {
+  x  <- x[is.finite(x)]
+  n  <- length(x)
+  if (n < 2) return(list(mean = mean(x), ci_lo = NA_real_, ci_hi = NA_real_))
+  mn <- mean(x)
+  se <- sd(x) / sqrt(n)
+  tc <- qt(0.975, df = n - 1)
+  list(n = n, mean = mn, ci_lo = mn - tc * se, ci_hi = mn + tc * se)
+}
+
+# ── Per-group OLS and SMA summaries ──────────────────────────────────────────
 glazier_tbl <- sp_intra |>
   mutate(group = paste(life_form, "\u2014", plant_part)) |>
-  group_by(group) |>
+  group_by(group, life_form, plant_part) |>
   summarise(
-    n_species_intra  = n(),
-    median_intra     = median(slope, na.rm = TRUE),
-    iqr_intra        = IQR(slope, na.rm = TRUE),
+    n_species        = n(),
+    # OLS
+    ols_mean         = mean_ci(slope)$mean,
+    ols_ci_lo        = mean_ci(slope)$ci_lo,
+    ols_ci_hi        = mean_ci(slope)$ci_hi,
+    ols_median       = median(slope, na.rm = TRUE),
+    ols_iqr          = IQR(slope, na.rm = TRUE),
+    # OLS one-sample t-tests
+    ols_p_075        = t.test(slope[is.finite(slope)], mu = 0.75)$p.value,
+    ols_p_100        = t.test(slope[is.finite(slope)], mu = 1.00)$p.value,
+    # SMA
+    sma_mean         = mean_ci(sma_slope)$mean,
+    sma_ci_lo        = mean_ci(sma_slope)$ci_lo,
+    sma_ci_hi        = mean_ci(sma_slope)$ci_hi,
+    sma_median       = median(sma_slope, na.rm = TRUE),
+    sma_iqr          = IQR(sma_slope, na.rm = TRUE),
+    sma_p_075        = t.test(sma_slope[is.finite(sma_slope)], mu = 0.75)$p.value,
+    sma_p_100        = t.test(sma_slope[is.finite(sma_slope)], mu = 1.00)$p.value,
     .groups = "drop"
   )
 
+# Attach PGLS interspecific slopes for comparison
 if (nrow(pgls_results) > 0) {
   pgls_inter <- pgls_results |>
     filter(method == "PGLS") |>
@@ -1219,16 +1246,87 @@ if (nrow(pgls_results) > 0) {
   glazier_tbl$inter_slope_pgls <- NA_real_
 }
 
+# ── Print per-group t-test results ───────────────────────────────────────────
+cat("=== OLS mean exponent: one-sample t-tests per group ===\n")
+for (i in seq_len(nrow(glazier_tbl))) {
+  g <- glazier_tbl$group[i]
+  cat(sprintf("\n%s  (n=%d)\n", g, glazier_tbl$n_species[i]))
+  cat(sprintf("  OLS mean = %.3f  [%.3f, %.3f]\n",
+              glazier_tbl$ols_mean[i], glazier_tbl$ols_ci_lo[i], glazier_tbl$ols_ci_hi[i]))
+  cat(sprintf("  H0: mean = 0.75 -> p = %.4f  |  H0: mean = 1.00 -> p = %.4f\n",
+              glazier_tbl$ols_p_075[i], glazier_tbl$ols_p_100[i]))
+  cat(sprintf("  SMA mean = %.3f  [%.3f, %.3f]\n",
+              glazier_tbl$sma_mean[i], glazier_tbl$sma_ci_lo[i], glazier_tbl$sma_ci_hi[i]))
+  cat(sprintf("  H0: mean = 0.75 -> p = %.4f  |  H0: mean = 1.00 -> p = %.4f\n",
+              glazier_tbl$sma_p_075[i], glazier_tbl$sma_p_100[i]))
+}
+
+# ── Summary table ─────────────────────────────────────────────────────────────
 kable(
   glazier_tbl |>
-    mutate(across(where(is.numeric), ~ round(.x, 3))) |>
-    rename(Group = group,
-           `N species (intra)` = n_species_intra,
-           `Median β_intra` = median_intra,
-           `IQR β_intra` = iqr_intra,
-           `β_inter (PGLS)` = inter_slope_pgls),
-  caption = "Inter- vs. intraspecific scaling exponents. Glazier (2005) predicts β_intra > β_inter for many species, especially small-bodied organisms."
+    select(Group = group, N = n_species,
+           `OLS mean` = ols_mean, `OLS CI lo` = ols_ci_lo, `OLS CI hi` = ols_ci_hi,
+           `OLS median` = ols_median, `OLS IQR` = ols_iqr,
+           `p(=0.75)` = ols_p_075, `p(=1.00)` = ols_p_100,
+           `SMA mean` = sma_mean, `SMA CI lo` = sma_ci_lo, `SMA CI hi` = sma_ci_hi,
+           `SMA median` = sma_median, `SMA IQR` = sma_iqr,
+           `β_inter PGLS` = inter_slope_pgls) |>
+    mutate(across(where(is.numeric), ~ round(.x, 3))),
+  caption = "Per-group mean intraspecific scaling exponents (OLS and SMA) with 95% CIs of the mean (t-distribution). p(=0.75): H₀ mean = WBE 3/4; p(=1.00): H₀ mean = isometry. Glazier (2005) predicts β_intra > β_inter."
 )
+```
+
+```{r glazier-forest, fig.width=9, fig.height=5, fig.cap="Mean intraspecific scaling exponent ± 95% CI for each life-form × plant-part group, by estimator (OLS = circle, SMA = triangle). Red dashed line = WBE 3/4; blue dotted line = isometric 1.0. Points are offset vertically for clarity. 95% CIs are of the mean across species (t-distribution), not individual-species CIs."}
+# Build long-format for forest plot
+glaz_long <- glazier_tbl |>
+  select(group, life_form, plant_part,
+         OLS_mean   = ols_mean,  OLS_lo  = ols_ci_lo,  OLS_hi  = ols_ci_hi,
+         SMA_mean   = sma_mean,  SMA_lo  = sma_ci_lo,  SMA_hi  = sma_ci_hi) |>
+  pivot_longer(
+    cols      = c(OLS_mean, SMA_mean),
+    names_to  = "method",
+    values_to = "mean_exp"
+  ) |>
+  mutate(
+    ci_lo  = if_else(method == "OLS_mean", OLS_lo, SMA_lo),
+    ci_hi  = if_else(method == "OLS_mean", OLS_hi, SMA_hi),
+    method = sub("_mean", "", method),
+    # Vertical dodge offset
+    y_pos  = as.numeric(factor(group)) +
+              if_else(method == "OLS", 0.15, -0.15)
+  )
+
+ggplot(glaz_long,
+       aes(x = mean_exp, y = y_pos, colour = life_form, shape = method)) +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
+             linewidth = 0.9) +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
+             linewidth = 0.9) +
+  annotate("text", x = 0.75, y = Inf, label = " WBE\n 3/4",
+           vjust = 1.3, colour = "#d6604d", size = 3.2, hjust = 0) +
+  annotate("text", x = 1.00, y = Inf, label = " Iso\n 1.0",
+           vjust = 1.3, colour = "#2166ac", size = 3.2, hjust = 0) +
+  geom_errorbarh(aes(xmin = ci_lo, xmax = ci_hi),
+                 height = 0.12, linewidth = 0.7) +
+  geom_point(size = 4) +
+  scale_y_continuous(
+    breaks = seq_len(nrow(glazier_tbl)),
+    labels = glazier_tbl$group,
+    expand = expansion(add = 0.6)
+  ) +
+  scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
+  scale_shape_manual(values = c(OLS = 16, SMA = 17)) +
+  labs(
+    x      = "Mean scaling exponent (log R ~ log Mass)",
+    y      = NULL,
+    colour = "Life form",
+    shape  = "Estimator",
+    title  = "Inter- vs. intraspecific scaling: mean exponent ± 95% CI",
+    subtitle = "OLS \u25CF and SMA \u25B2 shown; 95% CI of the mean across species"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank())
 ```
 
 ---
