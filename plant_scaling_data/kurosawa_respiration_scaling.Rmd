@@ -443,42 +443,75 @@ ggplot(dat, aes(x = log_resp, fill = life_form)) +
 
 ## Overall scaling: R ~ Mass (pooled)
 
-```{r sma-pooled, fig.cap="Pooled SMA regression of log respiration vs. log fresh mass. Dashed line shows WBE 3/4 prediction."}
-fit_pooled <- sma(log_resp ~ log_mass, data = dat, method = "SMA")
-pooled_summ <- summary(fit_pooled)
+```{r sma-pooled}
+# ── OLS ───────────────────────────────────────────────────────────────────────
+fit_ols_pooled <- lm(log_resp ~ log_mass, data = dat)
+ols_cf_p       <- coef(fit_ols_pooled)
+ols_ci_p       <- confint(fit_ols_pooled)
+ols_r2_p       <- summary(fit_ols_pooled)$r.squared
+ols_se_p       <- summary(fit_ols_pooled)$coefficients[2, 2]
+ols_n_p        <- nrow(model.frame(fit_ols_pooled))
+ols_p075_p     <- 2 * pt(abs((ols_cf_p[2] - 0.75) / ols_se_p), ols_n_p - 2, lower.tail = FALSE)
+ols_p100_p     <- 2 * pt(abs((ols_cf_p[2] - 1.00) / ols_se_p), ols_n_p - 2, lower.tail = FALSE)
+
+# ── SMA ───────────────────────────────────────────────────────────────────────
+fit_pooled  <- sma(log_resp ~ log_mass, data = dat, method = "SMA")
 cf_pooled   <- coef(fit_pooled)
-
-cat(sprintf("Pooled SMA:  slope = %.3f (95%% CI: %.3f – %.3f)\n",
-            cf_pooled[2],
-            fit_pooled$coef[[1]][2,2],
-            fit_pooled$coef[[1]][2,3]))
-
-# Test slope vs 3/4  (slope.test requires vector interface in smatr >= 3.4)
+sma_r2_p    <- fit_pooled$r2[[1]]
 test_pooled <- slope.test(dat$log_resp, dat$log_mass, test.value = 0.75, method = "SMA")
-cat(sprintf("  H0: slope = 0.75 → p = %.4f\n", test_pooled$p))
-test_1 <- slope.test(dat$log_resp, dat$log_mass, test.value = 1.0, method = "SMA")
-cat(sprintf("  H0: slope = 1.00 → p = %.4f\n", test_1$p))
+test_1      <- slope.test(dat$log_resp, dat$log_mass, test.value = 1.0,  method = "SMA")
 
+# ── Print comparison ──────────────────────────────────────────────────────────
+cat(sprintf("=== Pooled scaling: R ~ Mass (N = %d individuals) ===\n", ols_n_p))
+cat(sprintf("OLS:  slope = %.3f  95%% CI [%.3f, %.3f]  R2 = %.3f\n",
+            ols_cf_p[2], ols_ci_p[2,1], ols_ci_p[2,2], ols_r2_p))
+cat(sprintf("  p (slope = 0.75) = %.4f  |  p (slope = 1.00) = %.4f\n",
+            ols_p075_p, ols_p100_p))
+cat(sprintf("SMA:  slope = %.3f  95%% CI [%.3f, %.3f]  R2 = %.3f\n",
+            cf_pooled[2], fit_pooled$coef[[1]][2,2], fit_pooled$coef[[1]][2,3], sma_r2_p))
+cat(sprintf("  p (slope = 0.75) = %.4f  |  p (slope = 1.00) = %.4f\n",
+            test_pooled$p, test_1$p))
+
+# ── Summary table ─────────────────────────────────────────────────────────────
+kable(
+  tibble(
+    Method       = c("OLS", "SMA"),
+    N            = ols_n_p,
+    Slope        = round(c(ols_cf_p[2],           cf_pooled[2]),              3),
+    `CI lo`      = round(c(ols_ci_p[2,1],         fit_pooled$coef[[1]][2,2]), 3),
+    `CI hi`      = round(c(ols_ci_p[2,2],         fit_pooled$coef[[1]][2,3]), 3),
+    R2           = round(c(ols_r2_p,              sma_r2_p),                  3),
+    `p(b=0.75)`  = signif(c(ols_p075_p,           test_pooled$p),             3),
+    `p(b=1.00)`  = signif(c(ols_p100_p,           test_1$p),                  3)
+  ),
+  caption = "Pooled respiration scaling exponents: OLS vs SMA (all individuals, log R ~ log M). p values are two-tailed tests against WBE 3/4 and isometric 1.0."
+)
+```
+
+```{r sma-pooled-plot, fig.cap="Pooled OLS (blue dashed) and SMA (black solid) regressions of log respiration vs. log fresh mass. Grey dashed = WBE 3/4 reference."}
 ggplot(dat, aes(x = log_mass, y = log_resp, colour = life_form)) +
   geom_point(alpha = 0.25, size = 1.2) +
+  geom_abline(intercept = ols_cf_p[1], slope = ols_cf_p[2],
+              linewidth = 1.0, colour = "#2166ac", linetype = "dashed") +
   geom_abline(intercept = cf_pooled[1], slope = cf_pooled[2],
               linewidth = 1.1, colour = "black") +
-  geom_abline(intercept = mean(dat$log_resp) - 0.75 * mean(dat$log_mass),
+  geom_abline(intercept = mean(dat$log_resp, na.rm = TRUE) - 0.75 * mean(dat$log_mass, na.rm = TRUE),
               slope = 0.75, linetype = "dashed", colour = "grey40", linewidth = 0.9) +
+  annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.8, size = 3.5,
+           label = sprintf("SMA slope = %.3f\nOLS slope = %.3f", cf_pooled[2], ols_cf_p[2])) +
   scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                  unknown = "grey60")) +
   labs(x = expression(log[10]~"Fresh mass (g)"),
-       y = expression(log[10]~"Respiration (u03bcmol CO"[2]~"s"^{-1}~")"),
+       y = expression(log[10]~"Respiration"),
        colour = "Life form",
-       title = "Overall SMA scaling: R ~ Mass",
-       subtitle = sprintf("Pooled slope = %.3f  [WBE 3/4 reference = dashed]",
-                           cf_pooled[2])) +
+       title = "Pooled respiration scaling: OLS (blue dashed) vs SMA (black solid)",
+       subtitle = "Grey dashed = WBE 3/4 reference") +
   theme(legend.position = "bottom")
 ```
 
 ## By life form and plant part
 
-```{r sma-by-group, fig.cap="SMA regression lines by life form and plant part. Dashed = WBE 3/4."}
+```{r sma-by-group}
 groups <- dat |>
   filter(life_form != "unknown", plant_part != "unknown") |>
   mutate(group = paste(life_form, plant_part, sep = " — "))
@@ -487,68 +520,133 @@ group_fits <- groups |>
   group_by(group, life_form, plant_part) |>
   nest() |>
   mutate(
-    fit      = map(data, ~ sma(log_resp ~ log_mass, data = .x, method = "SMA")),
-    slope    = map_dbl(fit, ~ coef(.x)[2]),
-    intercept= map_dbl(fit, ~ coef(.x)[1]),
-    ci_lo    = map_dbl(fit, ~ .x$coef[[1]][2,2]),
-    ci_hi    = map_dbl(fit, ~ .x$coef[[1]][2,3]),
-    n        = map_int(data, nrow),
-    r2       = map_dbl(fit, ~ .x$r2[[1]]),
-    p_vs_075 = map_dbl(data, ~ {
-      tryCatch(
-        slope.test(.x$log_resp, .x$log_mass, test.value = 0.75, method = "SMA")$p,
-        error = function(e) NA_real_
-      )
+    # SMA
+    sma_fit   = map(data, ~ sma(log_resp ~ log_mass, data = .x, method = "SMA")),
+    sma_slope = map_dbl(sma_fit, ~ coef(.x)[2]),
+    intercept = map_dbl(sma_fit, ~ coef(.x)[1]),
+    sma_ci_lo = map_dbl(sma_fit, ~ .x$coef[[1]][2,2]),
+    sma_ci_hi = map_dbl(sma_fit, ~ .x$coef[[1]][2,3]),
+    sma_r2    = map_dbl(sma_fit, ~ .x$r2[[1]]),
+    sma_p_075 = map_dbl(data, ~ tryCatch(
+      slope.test(.x$log_resp, .x$log_mass, test.value = 0.75, method = "SMA")$p,
+      error = function(e) NA_real_)),
+    sma_p_100 = map_dbl(data, ~ tryCatch(
+      slope.test(.x$log_resp, .x$log_mass, test.value = 1.00, method = "SMA")$p,
+      error = function(e) NA_real_)),
+    # OLS
+    ols_fit   = map(data, ~ lm(log_resp ~ log_mass, data = .x)),
+    ols_slope = map_dbl(ols_fit, ~ coef(.x)[2]),
+    ols_ci_lo = map_dbl(ols_fit, ~ tryCatch(confint(.x)[2,1], error=function(e) NA_real_)),
+    ols_ci_hi = map_dbl(ols_fit, ~ tryCatch(confint(.x)[2,2], error=function(e) NA_real_)),
+    ols_r2    = map_dbl(ols_fit, ~ summary(.x)$r.squared),
+    ols_se    = map_dbl(ols_fit, ~ summary(.x)$coefficients[2,2]),
+    n         = map_int(data, nrow),
+    ols_p_075 = map_dbl(ols_fit, ~ {
+      s <- summary(.x)$coefficients[2, ]
+      2 * pt(abs((s[1] - 0.75) / s[2]), df = .x$df.residual, lower.tail = FALSE)
+    }),
+    ols_p_100 = map_dbl(ols_fit, ~ {
+      s <- summary(.x)$coefficients[2, ]
+      2 * pt(abs((s[1] - 1.00) / s[2]), df = .x$df.residual, lower.tail = FALSE)
     })
   )
 
+# ── Print per-group results ───────────────────────────────────────────────────
+for (i in seq_len(nrow(group_fits))) {
+  g <- group_fits$group[i]
+  cat(sprintf("\n--- %s  (N=%d) ---\n", g, group_fits$n[i]))
+  cat(sprintf("  OLS:  slope = %.3f [%.3f, %.3f]  R\u00b2 = %.3f  p(\u03b2=0.75) = %.4f  p(\u03b2=1.00) = %.4f\n",
+              group_fits$ols_slope[i], group_fits$ols_ci_lo[i], group_fits$ols_ci_hi[i],
+              group_fits$ols_r2[i], group_fits$ols_p_075[i], group_fits$ols_p_100[i]))
+  cat(sprintf("  SMA:  slope = %.3f [%.3f, %.3f]  R\u00b2 = %.3f  p(\u03b2=0.75) = %.4f  p(\u03b2=1.00) = %.4f\n",
+              group_fits$sma_slope[i], group_fits$sma_ci_lo[i], group_fits$sma_ci_hi[i],
+              group_fits$sma_r2[i], group_fits$sma_p_075[i], group_fits$sma_p_100[i]))
+}
+
+# ── Summary table ─────────────────────────────────────────────────────────────
 kable(
   group_fits |>
-    select(group, n, slope, ci_lo, ci_hi, r2, p_vs_075) |>
-    rename(Group = group, N = n, Slope = slope,
-           `CI low` = ci_lo, `CI high` = ci_hi,
-           `R²` = r2, `p (slope ≠ 0.75)` = p_vs_075) |>
+    select(group, n,
+           ols_slope, ols_ci_lo, ols_ci_hi, ols_r2, ols_p_075, ols_p_100,
+           sma_slope, sma_ci_lo, sma_ci_hi, sma_r2, sma_p_075, sma_p_100) |>
+    rename(Group = group, N = n,
+           `OLS slope` = ols_slope, `OLS CI lo` = ols_ci_lo, `OLS CI hi` = ols_ci_hi,
+           `OLS R2` = ols_r2, `OLS p(b=.75)` = ols_p_075, `OLS p(b=1)` = ols_p_100,
+           `SMA slope` = sma_slope, `SMA CI lo` = sma_ci_lo, `SMA CI hi` = sma_ci_hi,
+           `SMA R2` = sma_r2, `SMA p(b=.75)` = sma_p_075, `SMA p(b=1)` = sma_p_100) |>
     mutate(across(where(is.numeric), ~ round(.x, 3))),
-  caption = "SMA scaling exponents by life form and plant part"
+  caption = "OLS and SMA scaling exponents by life form and plant part (individual-level data, log R ~ log M). SMA slopes are always >= OLS slopes when R-squared < 1."
 )
 ```
 
-```{r sma-by-group-plot, fig.cap="Observed scaling and fitted SMA lines per group."}
+```{r sma-by-group-plot, fig.cap="Observed data with OLS (blue dashed) and SMA (solid) regression lines per group. Grey dashed = WBE 3/4 reference."}
 ablines_df <- group_fits |>
-  select(group, intercept, slope, life_form, plant_part)
+  select(group, intercept, sma_slope, ols_slope, life_form, plant_part)
 
 ggplot(groups, aes(x = log_mass, y = log_resp, colour = life_form)) +
   geom_point(alpha = 0.20, size = 1.1) +
   geom_abline(data = ablines_df,
-              aes(intercept = intercept, slope = slope, colour = life_form),
+              aes(intercept = intercept, slope = ols_slope, colour = life_form),
+              linewidth = 0.9, linetype = "dashed") +
+  geom_abline(data = ablines_df,
+              aes(intercept = intercept, slope = sma_slope, colour = life_form),
               linewidth = 1.2) +
-  geom_abline(data = ablines_df |>
-                group_by(plant_part) |>
-                summarise(int_ref = mean(log10(10^mean(groups$log_resp[groups$plant_part == plant_part[1]])) -
-                                          0.75 * mean(groups$log_mass[groups$plant_part == plant_part[1]])),
-                          .groups = "drop"),
-              aes(intercept = int_ref, slope = 0.75),
-              linetype = "dashed", colour = "grey40", linewidth = 0.7,
-              inherit.aes = FALSE) +
   facet_grid(plant_part ~ life_form, scales = "free") +
   scale_colour_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d",
                                  unknown = "grey60")) +
   labs(x = expression(log[10]~"Fresh mass (g)"),
-       y = expression(log[10]~"Respiration (u03bcmol CO"[2]~"s"^{-1}~")"),
+       y = expression(log[10]~"Respiration (\u03bcmol CO"[2]~"s"^{-1}~")"),
        colour = "Life form",
-       title = "SMA scaling by life form and plant part",
-       subtitle = "Grey dashed = WBE 3/4 reference") +
-  theme(legend.position = "none")
+       title = "Respiration scaling by life form and plant part",
+       subtitle = "Solid = SMA; dashed = OLS") +
+  theme(legend.position = "bottom")
 ```
 
 ## Slope comparison: woody vs. herbaceous
 
 ```{r slope-comparison-lf}
-fit_lf <- sma(log_resp ~ log_mass * life_form,
-              data = filter(dat, life_form %in% c("Woody", "Herbaceous")),
-              method = "SMA")
+dat_lf <- filter(dat, life_form %in% c("Woody", "Herbaceous"))
+
+# ── OLS: slope comparison via interaction model ───────────────────────────────
+ols_lf_int  <- lm(log_resp ~ log_mass * life_form, data = dat_lf)
+ols_lf_summ <- summary(ols_lf_int)
+cat("=== OLS slope comparison: Woody vs. Herbaceous ===\n")
+cat("Interaction model: log_resp ~ log_mass * life_form\n")
+print(round(ols_lf_summ$coefficients, 4))
+ols_lf_p <- ols_lf_summ$coefficients["log_mass:life_formWoody", "Pr(>|t|)"]
+if (is.na(ols_lf_p)) {
+  # try the other level
+  coef_names <- rownames(ols_lf_summ$coefficients)
+  int_name   <- coef_names[grepl("log_mass:life_form", coef_names)]
+  ols_lf_p   <- if (length(int_name)) ols_lf_summ$coefficients[int_name, "Pr(>|t|)"] else NA_real_
+}
+cat(sprintf("\nOLS interaction p (different slopes?) = %.4f\n", ols_lf_p))
+
+# Per-group OLS slopes for reporting
+ols_lf_grp <- dat_lf |>
+  group_by(life_form) |>
+  nest() |>
+  mutate(
+    fit     = map(data, ~ lm(log_resp ~ log_mass, data = .x)),
+    slope   = map_dbl(fit, ~ coef(.x)[2]),
+    ci_lo   = map_dbl(fit, ~ confint(.x)[2,1]),
+    ci_hi   = map_dbl(fit, ~ confint(.x)[2,2]),
+    r2      = map_dbl(fit, ~ summary(.x)$r.squared),
+    n       = map_int(data, nrow)
+  )
+cat("\nPer-group OLS slopes:\n")
+for (i in seq_len(nrow(ols_lf_grp))) {
+  cat(sprintf("  %s: slope = %.3f [%.3f, %.3f]  R\u00b2 = %.3f  n = %d\n",
+              ols_lf_grp$life_form[i], ols_lf_grp$slope[i],
+              ols_lf_grp$ci_lo[i], ols_lf_grp$ci_hi[i],
+              ols_lf_grp$r2[i], ols_lf_grp$n[i]))
+}
+
+# ── SMA: slope comparison ─────────────────────────────────────────────────────
+cat("\n=== SMA slope comparison: Woody vs. Herbaceous ===\n")
+fit_lf  <- sma(log_resp ~ log_mass * life_form, data = dat_lf, method = "SMA")
 comp_lf <- summary(fit_lf)
-cat("Woody vs. Herbaceous slope comparison:\n")
+cat("Slope heterogeneity test (SMA):\n")
 print(comp_lf$coef)
 ```
 
@@ -1049,6 +1147,22 @@ if (nrow(pgls_results) > 0) {
 ```
 
 ## OLS / SMA / PGLS comparison forest plot
+
+> **What this plot shows:**
+> The forest plot below compares three estimators of the scaling exponent $\beta$ in
+> **log respiration ~ log fresh mass** for each of six life-form × plant-part groups
+> (Woody Shoot, Woody Root, Woody Whole, Herbaceous Shoot, Herbaceous Root, Herbaceous Whole).
+> All fits are on **species means** (geometric mean of log-transformed individual records per species),
+> not on raw individuals — this removes within-species pseudoreplication.
+>
+> | Estimator | Data used | Interpretation |
+> |-----------|----------|----------------|
+> | **OLS** | Species means | Minimises vertical (response-axis) residuals; underestimates true slope when x-axis (log mass) has measurement error |
+> | **SMA** | Species means | Minimises residuals in both axes; preferred when both variables are measured with error |
+> | **PGLS** | Species means, phylogenetically structured | Corrects for shared evolutionary history; Pagel's λ estimated by ML; slope reflects the relationship after accounting for phylogenetic covariance |
+>
+> OLS slopes are systematically lower than SMA slopes; PGLS slopes may differ from both
+> depending on the estimated λ (λ = 0 → OLS, λ = 1 → fully Brownian-motion-corrected).
 
 > **Competing scaling predictions (reference lines in plot below):**
 >
@@ -1588,13 +1702,24 @@ mechanistic interpretation:
 | WBE / MST prediction | $3/4$ | WBE/MST | Derived from fractal vascular network optimality (see Theory section): area-preserving branching + space-filling + size-invariant terminal units yield $B \propto M^{3/4}$ (West et al. 1997; Enquist et al. 1998; Mori et al. 2010). |
 | Isometric | $1$ | Isometric | Constant mass-specific respiration, $r = R/M = \text{const}$; implies metabolic rate is simply proportional to cytoplasmic volume. Observed within some ontogenetic series and for unicellular organisms; also a common OLS artefact under restricted mass ranges. |
 
-```{r forest-plot, fig.height=5, fig.cap="Forest plot of SMA slope estimates with 95% CI. Reference lines: dotted green = Rubner 2/3, dashed red = WBE 3/4, dotted blue = isometric 1."}
+```{r forest-plot, fig.height=5, fig.cap="Forest plot of SMA and OLS slope estimates with 95% CI by group. Reference lines: dotted green = Rubner 2/3, dashed red = WBE 3/4, dotted blue = isometric 1."}
 forest_df <- group_fits |>
-  select(group, slope, ci_lo, ci_hi, n) |>
-  mutate(label = paste0(group, " (n=", n, ")"))
+  select(group, sma_slope, sma_ci_lo, sma_ci_hi, ols_slope, ols_ci_lo, ols_ci_hi, n) |>
+  mutate(label = paste0(group, " (n=", n, ")")) |>
+  pivot_longer(
+    cols      = c(sma_slope, ols_slope),
+    names_to  = "method",
+    values_to = "slope"
+  ) |>
+  mutate(
+    ci_lo  = if_else(method == "sma_slope", sma_ci_lo, ols_ci_lo),
+    ci_hi  = if_else(method == "sma_slope", sma_ci_hi, ols_ci_hi),
+    method = recode(method, sma_slope = "SMA", ols_slope = "OLS"),
+    y_pos  = as.numeric(factor(label)) + if_else(method == "SMA", 0.15, -0.15)
+  )
 
-ggplot(forest_df, aes(y = reorder(label, slope), x = slope,
-                      xmin = ci_lo, xmax = ci_hi)) +
+ggplot(forest_df, aes(y = y_pos, x = slope, xmin = ci_lo, xmax = ci_hi,
+                      colour = method, shape = method)) +
   geom_pointrange(size = 0.7) +
   geom_vline(xintercept = 2/3,  linetype = "dotted", colour = "#4dac26",
              linewidth = 0.9) +
@@ -1602,17 +1727,21 @@ ggplot(forest_df, aes(y = reorder(label, slope), x = slope,
              linewidth = 0.9) +
   geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
              linewidth = 0.9) +
-  annotate("text", x = 2/3,  y = Inf, label = "  Rubner 2/3", vjust = 2,
-           colour = "#4dac26", size = 3.2, hjust = 0) +
-  annotate("text", x = 0.75, y = Inf, label = "  WBE 3/4",   vjust = 2,
-           colour = "#d6604d", size = 3.2, hjust = 0) +
-  annotate("text", x = 1.00, y = Inf, label = "  Isometric 1", vjust = 2,
-           colour = "#2166ac", size = 3.2, hjust = 0) +
-  labs(x = "SMA slope  (log R ~ log Fresh mass)",
+  scale_y_continuous(
+    breaks = seq_len(length(unique(forest_df$label))),
+    labels = unique(forest_df$label[order(as.numeric(factor(forest_df$label)))]),
+    expand = expansion(add = 0.6)
+  ) +
+  scale_colour_manual(values = c(OLS = "steelblue", SMA = "darkorange")) +
+  scale_shape_manual(values = c(OLS = 16, SMA = 17)) +
+  labs(x = "Slope  (log R ~ log Fresh mass)",
        y = NULL,
+       colour = "Estimator", shape = "Estimator",
        title = "Forest plot: respiration scaling exponents",
-       subtitle = "95% CI from SMA regression (smatr). Reference lines: Rubner 2/3 (green), WBE 3/4 (red), isometric 1 (blue).") +
-  theme(axis.text.y = element_text(size = 11))
+       subtitle = "OLS (circle, blue) and SMA (triangle, orange) with 95% CI. Reference lines: Rubner 2/3 (green), WBE 3/4 (red), isometric 1 (blue).") +
+  theme_bw(base_size = 11) +
+  theme(axis.text.y = element_text(size = 10),
+        legend.position = "bottom")
 ```
 
 ---
@@ -1792,17 +1921,15 @@ if (nrow(rs_wide) >= 5) {
 kable(
   group_fits |>
     ungroup() |>
-    select(group, n, slope, ci_lo, ci_hi, r2, p_vs_075) |>
-    rename(`Group` = group, N = n, `SMA slope` = slope,
-           `95% CI low` = ci_lo, `95% CI high` = ci_hi,
-           `R²` = r2, `p (slope ≠ 0.75)` = p_vs_075) |>
-    mutate(
-      across(c(`SMA slope`, `95% CI low`, `95% CI high`, `R²`), ~ round(.x, 3)),
-      `p (slope ≠ 0.75)` = ifelse(is.na(`p (slope ≠ 0.75)`), "—",
-                                   ifelse(`p (slope ≠ 0.75)` < 0.001, "<0.001",
-                                          as.character(round(`p (slope ≠ 0.75)`, 3))))
-    ),
-  caption = "Summary: SMA scaling exponents for respiration ~ fresh mass"
+    select(group, n, ols_slope, ols_ci_lo, ols_ci_hi, ols_r2, ols_p_075,
+           sma_slope, sma_ci_lo, sma_ci_hi, sma_r2, sma_p_075) |>
+    rename(Group = group, N = n,
+           `OLS slope` = ols_slope, `OLS CI lo` = ols_ci_lo, `OLS CI hi` = ols_ci_hi,
+           `OLS R2` = ols_r2, `OLS p(b=0.75)` = ols_p_075,
+           `SMA slope` = sma_slope, `SMA CI lo` = sma_ci_lo, `SMA CI hi` = sma_ci_hi,
+           `SMA R2` = sma_r2, `SMA p(b=0.75)` = sma_p_075) |>
+    mutate(across(where(is.numeric), ~ round(.x, 3))),
+  caption = "Summary: OLS and SMA scaling exponents for log respiration ~ log fresh mass by life form and plant part"
 )
 ```
 
