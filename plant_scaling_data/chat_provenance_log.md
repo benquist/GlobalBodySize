@@ -1,3 +1,5 @@
+2026-05-12 | Section 10.1 (Per-species intraspecific slopes) updated in kurosawa_respiration_scaling.Rmd. Added per-species SMA slopes (smatr::sma) alongside OLS in sp_intra; added sma_slope/sma_ci_lo/sma_ci_hi columns. Summary stats now report OLS and SMA median/IQR and one-sample t-tests against 0.75 and 1.0 for both estimators. Replaced OLS-only histogram with combined two-panel frequency distribution (rows: OLS|SMA, columns: life form, fill = plant part). Rendered 73/73 clean.
+
 2026-05-04 | Created baad_intraspecific_leaf_scaling.Rmd/html. Intraspecific scaling analysis: 6 allometric combinations (leaf mass and leaf area as responses, basal diameter / total plant biomass / stem mass as predictors). Per-species OLS + SMA slopes with 95% CIs, size-range plots, slope-vs-range scatter, distribution histograms, cross-combo summary. MIN_N=10 per species. 75 chunks, rendered 9 MB HTML. BAAD source: Falster et al. 2015 Ecology 96:1445. smatr::sma() explicit-vector pattern used throughout.
 
 2026-05-01 | Initialized plant_scaling_data project scaffold with reproducible workflow files and starting provenance entry.

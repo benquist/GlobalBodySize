@@ -1119,36 +1119,51 @@ sp_intra <- dat |>
   nest() |>
   mutate(
     lm_fit    = map(data, ~ lm(log_resp ~ log_mass, data = .x)),
+    sma_fit   = map(data, ~ tryCatch(smatr::sma(log_resp ~ log_mass, data = .x,
+                                                 method = "SMA"),
+                                     error = function(e) NULL)),
     n         = map_int(data, nrow),
     slope     = map_dbl(lm_fit, ~ coef(.x)[2]),
     slope_se  = map_dbl(lm_fit, ~ summary(.x)$coefficients[2, 2]),
     ci_lo     = map_dbl(lm_fit, ~ tryCatch(confint(.x)[2, 1], error = function(e) NA_real_)),
     ci_hi     = map_dbl(lm_fit, ~ tryCatch(confint(.x)[2, 2], error = function(e) NA_real_)),
-    r2        = map_dbl(lm_fit, ~ summary(.x)$r.squared)
+    r2        = map_dbl(lm_fit, ~ summary(.x)$r.squared),
+    sma_slope = map_dbl(sma_fit, ~ if (!is.null(.x)) coef(.x)[2] else NA_real_),
+    sma_ci_lo = map_dbl(sma_fit, ~ if (!is.null(.x)) .x$coef[[1]][2, 2] else NA_real_),
+    sma_ci_hi = map_dbl(sma_fit, ~ if (!is.null(.x)) .x$coef[[1]][2, 3] else NA_real_)
   ) |>
-  select(-lm_fit, -data) |>
+  select(-lm_fit, -sma_fit, -data) |>
   ungroup()
 
 cat("Species with n >= 3 (intraspecific slopes):", nrow(sp_intra), "\n")
-cat("Median intraspecific slope:", round(median(sp_intra$slope, na.rm = TRUE), 3), "\n")
-cat("IQR:", round(IQR(sp_intra$slope, na.rm = TRUE), 3), "\n")
+cat("\nOLS exponents:\n")
+cat("  Median:", round(median(sp_intra$slope,     na.rm = TRUE), 3), "\n")
+cat("  IQR:   ", round(IQR(sp_intra$slope,         na.rm = TRUE), 3), "\n")
+cat("\nSMA exponents:\n")
+cat("  Median:", round(median(sp_intra$sma_slope,  na.rm = TRUE), 3), "\n")
+cat("  IQR:   ", round(IQR(sp_intra$sma_slope,    na.rm = TRUE), 3), "\n")
 
 # One-sample t-tests: are intraspecific slopes centered on 0.75 or 1.0?
-t_vs_075 <- t.test(sp_intra$slope, mu = 0.75)
-t_vs_100 <- t.test(sp_intra$slope, mu = 1.00)
-cat(sprintf("\nOne-sample t-test, H0: mean slope = 0.75 -> p = %.4f\n", t_vs_075$p.value))
-cat(sprintf("One-sample t-test, H0: mean slope = 1.00 -> p = %.4f\n", t_vs_100$p.value))
+t_vs_075     <- t.test(sp_intra$slope,     mu = 0.75)
+t_vs_100     <- t.test(sp_intra$slope,     mu = 1.00)
+sma_t_vs_075 <- t.test(sp_intra$sma_slope, mu = 0.75)
+sma_t_vs_100 <- t.test(sp_intra$sma_slope, mu = 1.00)
+cat(sprintf("\nOLS one-sample t-test, H0: mean = 0.75 -> p = %.4f\n", t_vs_075$p.value))
+cat(sprintf("OLS one-sample t-test, H0: mean = 1.00 -> p = %.4f\n", t_vs_100$p.value))
+cat(sprintf("\nSMA one-sample t-test, H0: mean = 0.75 -> p = %.4f\n", sma_t_vs_075$p.value))
+cat(sprintf("SMA one-sample t-test, H0: mean = 1.00 -> p = %.4f\n", sma_t_vs_100$p.value))
 ```
 
-```{r intraspecific-histogram, fig.cap="Distribution of per-species intraspecific OLS slopes. Vertical lines at WBE 3/4 (red dashed) and isometric 1.0 (blue dotted). Per-species slopes are OLS on individual records within each species (n≥3)."}
-inter_slopes <- if (nrow(pgls_results) > 0) {
-  pgls_results |>
-    filter(method == "PGLS") |>
-    mutate(panel_label = paste(group, "\nPGLS slope")) |>
-    select(group, inter_slope = slope)
-} else { NULL }
+```{r intraspecific-histogram, fig.width=12, fig.height=8, fig.cap="Frequency distributions of per-species intraspecific scaling exponents. Rows: OLS (top) and SMA (bottom). Columns: life form. Fill colour distinguishes plant part (Shoot = green, Root = amber). Vertical lines at WBE 3/4 (red dashed) and isometric 1.0 (blue dotted). Each bar = one species (n\u22653 individuals). SMA exponents are systematically larger than OLS when within-species R\u00b2 < 1 because SMA minimises residuals in both axes."}
+sp_long <- sp_intra |>
+  select(species, family, life_form, plant_part,
+         OLS = slope, SMA = sma_slope) |>
+  pivot_longer(cols = c(OLS, SMA),
+               names_to = "method", values_to = "exponent") |>
+  filter(!is.na(exponent)) |>
+  mutate(method = factor(method, levels = c("OLS", "SMA")))
 
-ggplot(sp_intra, aes(x = slope, fill = life_form)) +
+ggplot(sp_long, aes(x = exponent, fill = plant_part)) +
   geom_histogram(bins = 25, alpha = 0.75, colour = "white") +
   geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
              linewidth = 1) +
@@ -1158,14 +1173,14 @@ ggplot(sp_intra, aes(x = slope, fill = life_form)) +
            colour = "#d6604d", size = 3.5, hjust = 0) +
   annotate("text", x = 1.00, y = Inf, label = "  Isometric 1.0", vjust = 2,
            colour = "#2166ac", size = 3.5, hjust = 0) +
-  facet_grid(plant_part ~ life_form, scales = "free_y") +
-  scale_fill_manual(values = c(Woody = "#2166ac", Herbaceous = "#d6604d")) +
-  labs(x = "Per-species OLS slope (log R ~ log Mass, within species)",
+  facet_grid(method ~ life_form, scales = "free_y") +
+  scale_fill_manual(values = c(Shoot = "#4dac26", Root = "#b8860b")) +
+  labs(x = "Scaling exponent (log R ~ log Mass, within species)",
        y = "Count",
-       fill = "Life form",
-       title = "Distribution of intraspecific scaling slopes",
+       fill = "Plant part",
+       title = "Distribution of intraspecific scaling exponents: OLS vs SMA",
        subtitle = "Each bar = one species (n\u22653 individuals)") +
-  theme(legend.position = "none")
+  theme(legend.position = "bottom")
 ```
 
 ```{r intraspecific-table}
