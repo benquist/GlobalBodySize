@@ -1,0 +1,3 @@
+source,n_total,n_range_checked,n_range_pass,n_range_fail,n_unit_checked,n_unit_pass,n_unit_fail,n_outlier_checked,n_outlier_flagged
+height,10167913,10166904,10087061,79843,10167913,10167913,0,10131083,101885
+dbh,14929488,14929004,14896463,32541,14929488,14929488,0,14905361,56270

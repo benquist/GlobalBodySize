@@ -1,0 +1,43 @@
+
+Attaching package: ‘data.table’
+
+The following object is masked from ‘package:base’:
+
+    %notin%
+
+[Stage 6] Loading: output/bien_height_raw.csv
+=== QA Summary ===
+  Total records:         10167913
+  Range check (n=10166904):  10087061 pass (99.2%)
+  Unit check  (n=10167913):  10167913 pass (100.0%)
+  Outlier flag (n=10131083): 101885 flagged (1.0%)
+[Stage 6] Written: output/bien_height_qa.csv (10167913 records)
+Warning messages:
+1: In `[.data.table`(sub, is.na(trait_value_numeric), `:=`(range_check_pass = NA,  :
+  Coercing 'character' RHS to 'logical' to match the type of column 28 named 'qa_note'.
+2: In `[.data.table`(sub, measurement_type == "height_m" & range_check_pass %in%  :
+  Coercing 'character' RHS to 'logical' to match the type of column 28 named 'qa_note'.
+3: In `[.data.table`(sub, , `:=`(gf_key, NULL)) :
+  Tried to assign NULL to column 'gf_key', but this column does not exist to remove
+[Stage 6] Loading: output/bien_dbh_raw.csv
+=== QA Summary ===
+  Total records:         14929488
+  Range check (n=14929004):  14896463 pass (99.8%)
+  Unit check  (n=14929488):  14929488 pass (100.0%)
+  Outlier flag (n=14905361): 56270 flagged (0.4%)
+[Stage 6] Written: output/bien_dbh_qa.csv (14929488 records)
+Warning messages:
+1: In `[.data.table`(sub, is.na(trait_value_numeric), `:=`(range_check_pass = NA,  :
+  Coercing 'character' RHS to 'logical' to match the type of column 28 named 'qa_note'.
+2: In `[.data.table`(sub, measurement_type == "dbh_cm" & range_check_pass %in%  :
+  Coercing 'character' RHS to 'logical' to match the type of column 28 named 'qa_note'.
+3: In `[.data.table`(sub, , `:=`(gf_key, NULL)) :
+  Tried to assign NULL to column 'gf_key', but this column does not exist to remove
+[Stage 6] QA summary written to: output/qa_summary_report.csv
+  source  n_total n_range_checked n_range_pass n_range_fail n_unit_checked
+1 height 10167913        10166904     10087061        79843       10167913
+2    dbh 14929488        14929004     14896463        32541       14929488
+  n_unit_pass n_unit_fail n_outlier_checked n_outlier_flagged
+1    10167913           0          10131083            101885
+2    14929488           0          14905361             56270
+=== Stage 6 complete ===
