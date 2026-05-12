@@ -56,7 +56,8 @@ HAS_PHYLOMAKER <- requireNamespace("V.PhyloMaker2", quietly = TRUE)
 if (!HAS_PHYLOMAKER) {
   message("V.PhyloMaker2 not available — PGLS phylogeny sections will use a simulated star tree as placeholder.")
 }
-HAS_CAPER <- requireNamespace("caper", quietly = TRUE)
+HAS_CAPER   <- requireNamespace("caper",     quietly = TRUE)
+HAS_BRMS    <- requireNamespace("brms",      quietly = TRUE)
 theme_set(theme_bw(base_size = 13))
 proj_dir <- dirname(knitr::current_input(dir = TRUE))
 ```
@@ -1199,6 +1200,532 @@ if (nrow(pgls_results) > 0) {
          subtitle = "Red dashed = WBE 3/4; blue dotted = isometric 1; grey dot-dash = Rubner 2/3") +
     theme_bw(base_size = 12) +
     theme(legend.position = "bottom")
+}
+```
+
+---
+
+# Bayesian PGLMM: emulating Kurosawa et al. 2025
+
+> **Modeling objective:** Estimate the interspecific scaling exponent $\hat{\beta}$
+> for $\log R \sim \log M$ within each life-form × plant-part group using a
+> Bayesian Phylogenetic Generalised Linear Mixed Model (PGLMM) that operates on
+> **individual-level observations** rather than species means — the approach most
+> consistent with Kurosawa et al. (2025). The phylogenetic covariance matrix enters
+> as a correlated random-intercept term on species, partitioning variance into
+> phylogenetic, non-phylogenetic species-level, and individual-level residual
+> components.
+>
+> **Expert assessments** (phylogenetics-comparative-agent + merow-ecology, 2026-05-12):
+> *  Recommend `brms` over `MCMCglmm` for superior convergence diagnostics (Rhat, Bulk/Tail ESS) and built-in `pp_check()`.
+> *  Use individual-level data with `(1 | gr(phylo, cov = A))` for phylogenetic random intercept; add `(1 | sp)` for non-phylogenetic species variance only if ESS is adequate.
+> *  Prior `Normal(0.75, 0.5)` on slope — wide enough to test WBE rather than assume it. Run sensitivity with `Normal(1, 0.5)`.
+> *  Include `dataset_source` as a fixed covariate to absorb Japan/Spain measurement-temperature confound.
+> *  Fixed-slope assumption is defensible: per-species OLS slope IQR (0.3–0.5) reflects estimation noise at n = 2–10, not true biological heterogeneity.
+> *  Flag Fagus crenata ontogenetic series as potential DGP mixing; test slope sensitivity with and without.
+> *  V.PhyloMaker2 single-topology tree is adequate; report as a stated uncertainty.
+>
+> **Known limitations:**
+> * Models use a single V.PhyloMaker2 tree (topology uncertainty not propagated).
+> * No temperature correction is possible if `meas_temp_c` is absent from the Dryad CSV; `dataset_source` acts as a nominal proxy.
+> * Measurement error in log-mass is not modelled (errors-in-variables); this causes mild attenuation of $\hat{\beta}$ toward zero in all estimators.
+> * brms sampling takes ~20–40 min per group; results are cached to `output/brm_cache/` and reloaded on subsequent renders.
+
+## Kurosawa et al. 2025 published slopes (reference)
+
+The following slopes are transcribed from Kurosawa et al. (2025, Table 1 /
+Fig. 2) for direct comparison. **These values must be verified against the paper
+before any publication use — transcription errors are possible.**
+
+```{r kurosawa-published-slopes}
+# ── Published Bayesian PGLMM slopes from Kurosawa et al. 2025 ─────────────────
+# Source: Kurosawa Y et al. (2025) PRSB 292:20241910. DOI: 10.1098/rspb.2024.1910
+# ⚠ All values UNVERIFIED — transcribed from abstract/figures, not from data.
+# Confirm against Table 1 or SI before manuscript use.
+kurosawa_published <- tibble::tribble(
+  ~group,                 ~pub_slope, ~pub_ci_lo, ~pub_ci_hi, ~verified,
+  "Woody — Shoot",         0.75,       NA,         NA,        "UNVERIFIED",
+  "Woody — Root",          0.75,       NA,         NA,        "UNVERIFIED",
+  "Herbaceous — Shoot",    0.91,       NA,         NA,        "UNVERIFIED",
+  "Herbaceous — Root",     0.91,       NA,         NA,        "UNVERIFIED"
+)
+# NOTE: The WBE prediction is 0.75. Kurosawa et al. 2025 report that woody plants
+# conform to WBE (slope ~0.75) while herbaceous plants show a steeper slope.
+# The exact posterior means and 95% credible intervals must be read from the paper.
+# The values above are placeholders derived from the paper's main narrative;
+# replace with exact Table values once verified.
+
+cat("⚠ Kurosawa et al. 2025 published slopes — PLACEHOLDER VALUES (unverified transcription)\n")
+cat("  Update pub_slope, pub_ci_lo, pub_ci_hi from Table 1 or SI before publication use.\n\n")
+kable(
+  kurosawa_published |>
+    mutate(across(c(pub_slope, pub_ci_lo, pub_ci_hi), ~ ifelse(is.na(.x), "—", as.character(round(.x, 3))))),
+  col.names = c("Group", "Published slope", "Published CI lo", "Published CI hi", "Verification"),
+  caption = "Kurosawa et al. 2025 Bayesian PGLMM slopes (placeholder — verify against paper Table 1 / SI)"
+)
+```
+
+## Bayesian PGLMM setup
+
+```{r pglmm-setup}
+# ── Check required packages ───────────────────────────────────────────────────
+HAS_BRMS      <- requireNamespace("brms",      quietly = TRUE)
+HAS_MCMCGLMM  <- requireNamespace("MCMCglmm",  quietly = TRUE)
+HAS_CODA      <- requireNamespace("coda",      quietly = TRUE)
+
+# ── DGP tagging: flag Fagus crenata ontogenetic records ──────────────────────
+# Kurosawa 2023 (Fagus crenata ontogenetic series) represents within-individual
+# developmental growth — a different DGP from cross-species interspecific scaling.
+# Records are tagged so we can test slope sensitivity with and without this subset.
+dat <- dat |>
+  dplyr::mutate(
+    dgp_type = dplyr::case_when(
+      grepl("Fagus crenata", species, ignore.case = TRUE) &
+        grepl("Kurosawa", dataset_source, ignore.case = TRUE) ~ "ontogenetic",
+      TRUE ~ "interspecific"
+    )
+  )
+n_ontogenetic <- sum(dat$dgp_type == "ontogenetic", na.rm = TRUE)
+cat(sprintf("DGP tagging: %d records tagged as 'ontogenetic' (Fagus crenata, Kurosawa 2023)\n",
+            n_ontogenetic))
+cat(sprintf("             %d records tagged as 'interspecific'\n",
+            sum(dat$dgp_type == "interspecific", na.rm = TRUE)))
+
+# ── Prepare species-label column for tree matching ────────────────────────────
+# brms gr() requires exact match between data column and rownames of covariance matrix.
+dat <- dat |>
+  dplyr::mutate(
+    phylo = gsub(" ", "_", species),   # phylogenetic RE (matched to tree tips)
+    sp    = gsub(" ", "_", species)    # non-phylogenetic species RE
+  )
+
+# ── Dataset source as factor (covariate to absorb temperature/geographic confound)
+dat <- dat |>
+  dplyr::mutate(source_fct = factor(dataset_source))
+
+cat("\nDataset sources (factor levels for temperature/geographic covariate):\n")
+print(table(dat$source_fct))
+```
+
+## PGLMM fitting: brms (primary)
+
+```{r pglmm-brms, cache=FALSE, message=FALSE, warning=FALSE}
+# ── This chunk fits Bayesian PGLMMs via brms (Stan/HMC) ───────────────────────
+# Each group model takes ~20–40 min on first fit; cached to output/brm_cache/.
+# Subsequent renders load cached .rds files instantly.
+#
+# Model: log_resp ~ log_mass + source_fct + (1 | gr(phylo, cov = A))
+#   Fixed: intercept, log_mass (the scaling exponent β), source_fct (confound)
+#   Random: phylogenetic correlated intercepts via A = vcv.phylo(tree, corr=TRUE)
+# Prior: Normal(0.75, 0.5) on β — wide enough to test WBE, not assume it.
+# Prior sensitivity: also fit with Normal(1, 0.5) on β.
+
+pglmm_brms_results <- list()
+
+if (HAS_BRMS && HAS_TREE && !USING_STAR_TREE) {
+  suppressPackageStartupMessages(library(brms))
+
+  cache_dir <- file.path(proj_dir, "output", "brm_cache")
+  dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
+
+  # ── Helper: fit one PGLMM group ─────────────────────────────────────────────
+  fit_pglmm_brms <- function(dat_sub, tree_full, group_label,
+                              prior_slope_mean = 0.75,
+                              prior_slope_sd   = 0.5,
+                              prior_tag        = "wbe_informed") {
+    dat_sub <- dat_sub |>
+      dplyr::filter(
+        phylo %in% tree_full$tip.label,
+        is.finite(log_resp), is.finite(log_mass)
+      )
+    n_sp  <- dplyr::n_distinct(dat_sub$phylo)
+    n_obs <- nrow(dat_sub)
+
+    if (n_obs < 15 || n_sp < 6) {
+      message("Skipping ", group_label, " (", prior_tag, "): n_sp=",
+              n_sp, " n_obs=", n_obs, " — insufficient.")
+      return(NULL)
+    }
+
+    tree_sub <- ape::keep.tip(tree_full, unique(dat_sub$phylo))
+    # Phylogenetic correlation matrix (corr=TRUE → max diagonal = 1)
+    A <- ape::vcv.phylo(tree_sub, corr = TRUE)
+    dat_sub <- dat_sub |> dplyr::filter(phylo %in% rownames(A))
+
+    # Priors
+    priors <- c(
+      brms::prior_string(
+        paste0("normal(", prior_slope_mean, ", ", prior_slope_sd, ")"),
+        class = "b", coef = "log_mass"
+      ),
+      brms::prior(normal(0, 2),    class = b),
+      brms::prior(normal(0, 5),    class = Intercept),
+      brms::prior(exponential(1),  class = sd),
+      brms::prior(exponential(1),  class = sigma)
+    )
+
+    safe_label <- gsub("[^A-Za-z0-9]", "_",
+                       paste0(group_label, "_", prior_tag))
+    cache_file <- file.path(cache_dir, safe_label)
+
+    # Drop non-phylogenetic species RE when n_sp < 15 (poorly identified)
+    re_formula <- if (n_sp >= 15) {
+      "log_resp ~ log_mass + source_fct + (1 | gr(phylo, cov = A)) + (1 | sp)"
+    } else {
+      "log_resp ~ log_mass + source_fct + (1 | gr(phylo, cov = A))"
+    }
+
+    fit <- tryCatch(
+      brms::brm(
+        formula = brms::bf(as.formula(re_formula)),
+        data    = as.data.frame(dat_sub),
+        data2   = list(A = A),
+        family  = gaussian(),
+        prior   = priors,
+        chains  = 4, iter = 4000, warmup = 2000, cores = 4,
+        seed    = 42, file = cache_file,
+        control = list(adapt_delta = 0.95, max_treedepth = 12),
+        silent  = 2
+      ),
+      error = function(e) {
+        message("brms fit failed for ", group_label, " (", prior_tag, "): ", e$message)
+        NULL
+      }
+    )
+    if (is.null(fit)) return(NULL)
+
+    # ── Extract results ──────────────────────────────────────────────────────
+    fx        <- brms::fixef(fit)
+    slope_m   <- fx["log_mass", "Estimate"]
+    slope_lo  <- fx["log_mass", "Q2.5"]
+    slope_hi  <- fx["log_mass", "Q97.5"]
+
+    rhat_max  <- max(brms::rhat(fit), na.rm = TRUE)
+    neff_r    <- brms::neff_ratio(fit)
+    ess_min   <- min(neff_r, na.rm = TRUE) * (4 * 2000)
+
+    vc        <- brms::VarCorr(fit)
+    sd_phylo  <- vc$phylo$sd[1, "Estimate"]
+    sd_resid  <- vc$residual__$sd[1, "Estimate"]
+    sd_sp     <- if ("sp" %in% names(vc)) vc$sp$sd[1, "Estimate"] else NA_real_
+    var_total <- sd_phylo^2 + replace(sd_sp^2, is.na(sd_sp), 0) + sd_resid^2
+    h2_phylo  <- sd_phylo^2 / var_total
+
+    post_s   <- brms::as_draws_df(fit)[["b_log_mass"]]
+    pp_ge075 <- mean(post_s >= 0.75)
+    pp_ge100 <- mean(post_s >= 1.00)
+
+    list(
+      group      = group_label,
+      prior_tag  = prior_tag,
+      n_sp       = n_sp,
+      n_obs      = n_obs,
+      formula    = re_formula,
+      slope      = slope_m,
+      ci_lo      = slope_lo,
+      ci_hi      = slope_hi,
+      rhat_max   = rhat_max,
+      ess_min    = round(ess_min),
+      sd_phylo   = sd_phylo,
+      sd_sp      = sd_sp,
+      sd_resid   = sd_resid,
+      h2_phylo   = h2_phylo,
+      pp_ge075   = pp_ge075,
+      pp_ge100   = pp_ge100,
+      fit        = fit,
+      post_slope = post_s
+    )
+  }
+
+  # ── Groups to fit ─────────────────────────────────────────────────────────
+  pglmm_groups <- list(
+    list(lf = "Woody",      part = "Shoot"),
+    list(lf = "Woody",      part = "Root"),
+    list(lf = "Herbaceous", part = "Shoot"),
+    list(lf = "Herbaceous", part = "Root")
+  )
+
+  for (g in pglmm_groups) {
+    label   <- paste(g$lf, "\u2014", g$part)
+    sub_all <- dplyr::filter(dat,
+                 life_form  == g$lf,
+                 plant_part == g$part)
+
+    # Primary: WBE-informed prior
+    res_wbe <- fit_pglmm_brms(sub_all, pgls_tree, label,
+                               prior_slope_mean = 0.75, prior_slope_sd = 0.5,
+                               prior_tag = "wbe_informed")
+
+    # Sensitivity: isometry-centred prior
+    res_iso <- fit_pglmm_brms(sub_all, pgls_tree, label,
+                               prior_slope_mean = 1.00, prior_slope_sd = 0.5,
+                               prior_tag = "iso_informed")
+
+    # DGP sensitivity: without Fagus crenata ontogenetic records
+    if (n_ontogenetic > 0) {
+      res_excl_ont <- fit_pglmm_brms(
+        dplyr::filter(sub_all, dgp_type != "ontogenetic"),
+        pgls_tree, paste0(label, " (excl. Fagus crenata ontog.)"),
+        prior_slope_mean = 0.75, prior_slope_sd = 0.5,
+        prior_tag = "excl_ontogenetic"
+      )
+    } else {
+      res_excl_ont <- NULL
+    }
+
+    pglmm_brms_results[[label]]    <- res_wbe
+    pglmm_brms_results[[paste0(label, "_iso")]]   <- res_iso
+    if (!is.null(res_excl_ont))
+      pglmm_brms_results[[paste0(label, "_excl")]] <- res_excl_ont
+  }
+
+  cat("brms PGLMM fits complete. Results stored in pglmm_brms_results.\n")
+
+} else if (!HAS_BRMS) {
+  cat("brms not installed. Install with: install.packages('brms')\n")
+  cat("Once installed, re-render to run Bayesian PGLMM.\n")
+  cat("Required also: Rtools (Windows) or Xcode CLI (macOS) for Stan compilation.\n")
+} else if (USING_STAR_TREE) {
+  cat("PGLMM skipped: star tree in use (V.PhyloMaker2 not available).\n")
+  cat("Install V.PhyloMaker2: remotes::install_github('jinyizju/V.PhyloMaker2')\n")
+}
+```
+
+## PGLMM results: primary slope estimates
+
+```{r pglmm-results-table}
+if (length(pglmm_brms_results) > 0) {
+
+  # ── Primary results table (WBE-informed prior only) ─────────────────────────
+  pglmm_primary <- purrr::keep(pglmm_brms_results,
+                                ~ !is.null(.x) && .x$prior_tag == "wbe_informed") |>
+    purrr::map_dfr(~ tibble::tibble(
+      Group       = .x$group,
+      N_sp        = .x$n_sp,
+      N_obs       = .x$n_obs,
+      Slope       = round(.x$slope, 3),
+      CI_lo       = round(.x$ci_lo, 3),
+      CI_hi       = round(.x$ci_hi, 3),
+      h2_phylo    = round(.x$h2_phylo, 3),
+      Rhat_max    = round(.x$rhat_max, 4),
+      ESS_min     = .x$ess_min,
+      PP_ge_WBE   = round(.x$pp_ge075, 3),
+      PP_ge_iso   = round(.x$pp_ge100, 3)
+    ))
+
+  kable(
+    pglmm_primary,
+    col.names = c("Group", "N sp", "N obs", "β (post. mean)",
+                  "95% CrI lo", "95% CrI hi",
+                  "h² phylo", "Rhat max", "ESS min",
+                  "P(β ≥ 0.75)", "P(β ≥ 1.0)"),
+    caption = paste(
+      "Bayesian PGLMM slopes (brms): log respiration ~ log fresh mass + dataset source.",
+      "β = posterior mean; 95% CrI = credible interval.",
+      "h² phylo = σ²_phylo / σ²_total (phylogenetic heritability).",
+      "P(β ≥ 0.75) = posterior probability of WBE slope or steeper;",
+      "P(β ≥ 1.0) = posterior probability of isometric slope or steeper.",
+      "Prior: Normal(0.75, 0.5) on slope.",
+      "Convergence: Rhat_max < 1.01 and ESS_min > 400 required."
+    )
+  )
+} else {
+  cat("No PGLMM results available (brms not installed or star tree in use).\n")
+}
+```
+
+## Prior sensitivity
+
+```{r pglmm-prior-sensitivity}
+if (length(pglmm_brms_results) > 0) {
+  # Compare WBE-informed vs isometry-informed prior slopes
+  prior_compare <- purrr::keep(pglmm_brms_results,
+                                ~ !is.null(.x) &&
+                                    .x$prior_tag %in% c("wbe_informed", "iso_informed")) |>
+    purrr::map_dfr(~ tibble::tibble(
+      Group     = .x$group,
+      Prior     = ifelse(.x$prior_tag == "wbe_informed",
+                         "Normal(0.75, 0.5)", "Normal(1.0, 0.5)"),
+      Slope     = round(.x$slope, 3),
+      CI_lo     = round(.x$ci_lo, 3),
+      CI_hi     = round(.x$ci_hi, 3)
+    ))
+
+  kable(
+    prior_compare,
+    caption = "Prior sensitivity: posterior mean slope ± 95% CrI under WBE-informed vs isometry-informed priors on β. If slopes are similar, the posterior is data-driven and prior-robust."
+  )
+} else {
+  cat("Prior sensitivity analysis requires brms results.\n")
+}
+```
+
+## PGLMM vs PGLS vs published: comparison forest plot
+
+```{r pglmm-comparison-forest, fig.width=11, fig.height=6, fig.cap="Comparison of scaling exponent estimates across methods. Circles = brms PGLMM posterior mean ± 95% CrI (WBE-informed prior); triangles = caper PGLS on species means ± 95% CI; squares = Kurosawa et al. 2025 published Bayesian PGLMM slope (UNVERIFIED placeholder — verify against paper Table 1 before publication use). Red dashed = WBE 3/4; blue dotted = isometric 1.0."}
+if (length(pglmm_brms_results) > 0 && nrow(pgls_results) > 0) {
+
+  # PGLMM primary
+  pglmm_pts <- purrr::keep(pglmm_brms_results,
+                            ~ !is.null(.x) && .x$prior_tag == "wbe_informed") |>
+    purrr::map_dfr(~ tibble::tibble(
+      group  = .x$group,
+      slope  = .x$slope,
+      ci_lo  = .x$ci_lo,
+      ci_hi  = .x$ci_hi,
+      method = "PGLMM (brms)"
+    ))
+
+  # PGLS
+  pgls_pts <- pgls_results |>
+    dplyr::filter(method == "PGLS", group %in% pglmm_pts$group) |>
+    dplyr::select(group, slope, ci_lo = ci_lower, ci_hi = ci_upper) |>
+    dplyr::mutate(method = "PGLS (caper)")
+
+  # Published (placeholder)
+  pub_pts <- kurosawa_published |>
+    dplyr::rename(group = group, slope = pub_slope,
+                  ci_lo = pub_ci_lo, ci_hi = pub_ci_hi) |>
+    dplyr::mutate(method = "Kurosawa 2025 (published\nUNVERIFIED)")
+
+  all_pts <- dplyr::bind_rows(pglmm_pts, pgls_pts, pub_pts) |>
+    dplyr::filter(!is.na(slope)) |>
+    dplyr::mutate(
+      method = factor(method,
+                      levels = c("PGLMM (brms)", "PGLS (caper)",
+                                 "Kurosawa 2025 (published\nUNVERIFIED)")),
+      y_pos = as.numeric(factor(group)) +
+              dplyr::case_when(
+                method == "PGLMM (brms)"                      ~  0.22,
+                method == "PGLS (caper)"                      ~  0.00,
+                TRUE                                           ~ -0.22
+              )
+    )
+
+  ggplot(all_pts, aes(x = slope, y = y_pos,
+                      colour = method, shape = method)) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
+               linewidth = 0.9) +
+    geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
+               linewidth = 0.9) +
+    annotate("text", x = 0.75, y = Inf, label = " WBE\n 3/4",
+             vjust = 1.3, colour = "#d6604d", size = 3.2, hjust = 0) +
+    annotate("text", x = 1.00, y = Inf, label = " Iso\n 1.0",
+             vjust = 1.3, colour = "#2166ac", size = 3.2, hjust = 0) +
+    geom_errorbarh(aes(xmin = ci_lo, xmax = ci_hi),
+                   height = 0.1, linewidth = 0.7, na.rm = TRUE) +
+    geom_point(size = 3.5) +
+    scale_y_continuous(
+      breaks = seq_len(dplyr::n_distinct(all_pts$group)),
+      labels = levels(factor(all_pts$group)),
+      expand = expansion(add = 0.6)
+    ) +
+    scale_colour_manual(values = c("PGLMM (brms)"                    = "#1b7837",
+                                   "PGLS (caper)"                    = "#762a83",
+                                   "Kurosawa 2025 (published\nUNVERIFIED)" = "#d6604d")) +
+    scale_shape_manual(values = c("PGLMM (brms)"                    = 16,
+                                  "PGLS (caper)"                    = 17,
+                                  "Kurosawa 2025 (published\nUNVERIFIED)" = 15)) +
+    labs(
+      x      = "Scaling exponent  (log R ~ log Mass)",
+      y      = NULL,
+      colour = "Method",
+      shape  = "Method",
+      title  = "Respiration scaling exponent: PGLMM vs PGLS vs Kurosawa 2025",
+      subtitle = "PGLMM: individual-level data + phylogenetic covariance (brms)  |  PGLS: species means (caper)\nPublished values are UNVERIFIED placeholder — verify against Kurosawa et al. 2025 Table 1"
+    ) +
+    theme_bw(base_size = 12) +
+    theme(legend.position = "bottom")
+
+} else if (nrow(pgls_results) > 0) {
+  # PGLS-only forest when brms not available
+  cat("brms PGLMM not available. Showing PGLS vs published comparison only.\n")
+
+  pgls_pub <- dplyr::bind_rows(
+    pgls_results |>
+      dplyr::filter(method == "PGLS") |>
+      dplyr::select(group, slope, ci_lo = ci_lower, ci_hi = ci_upper) |>
+      dplyr::mutate(method = "PGLS (caper)"),
+    kurosawa_published |>
+      dplyr::rename(group = group, slope = pub_slope,
+                    ci_lo = pub_ci_lo, ci_hi = pub_ci_hi) |>
+      dplyr::mutate(method = "Kurosawa 2025 (UNVERIFIED)")
+  ) |>
+    dplyr::filter(!is.na(slope)) |>
+    dplyr::mutate(
+      y_pos = as.numeric(factor(group)) +
+              ifelse(method == "PGLS (caper)", 0.15, -0.15)
+    )
+
+  ggplot(pgls_pub, aes(x = slope, y = y_pos, colour = method, shape = method)) +
+    geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d") +
+    geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac") +
+    geom_errorbarh(aes(xmin = ci_lo, xmax = ci_hi), height = 0.1, na.rm = TRUE) +
+    geom_point(size = 3) +
+    scale_y_continuous(
+      breaks = seq_len(dplyr::n_distinct(pgls_pub$group)),
+      labels = levels(factor(pgls_pub$group)),
+      expand = expansion(add = 0.5)
+    ) +
+    scale_colour_manual(values = c("PGLS (caper)" = "#762a83",
+                                   "Kurosawa 2025 (UNVERIFIED)" = "#d6604d")) +
+    scale_shape_manual(values = c("PGLS (caper)" = 17,
+                                  "Kurosawa 2025 (UNVERIFIED)" = 15)) +
+    labs(x = "Scaling exponent", y = NULL,
+         title = "PGLS vs Kurosawa 2025 published (install brms for full PGLMM)",
+         subtitle = "UNVERIFIED placeholder slopes — verify against Table 1") +
+    theme_bw(base_size = 12) +
+    theme(legend.position = "bottom")
+}
+```
+
+## Posterior predictive checks and convergence
+
+```{r pglmm-diagnostics, fig.width=10, fig.height=8}
+if (length(pglmm_brms_results) > 0) {
+  # Posterior predictive check for first group with a fit
+  primary_fits <- purrr::keep(pglmm_brms_results,
+                               ~ !is.null(.x) && .x$prior_tag == "wbe_informed")
+
+  if (length(primary_fits) > 0) {
+    first_fit <- primary_fits[[1]]$fit
+    first_label <- primary_fits[[1]]$group
+
+    cat(sprintf("Posterior predictive check for: %s\n", first_label))
+    print(brms::pp_check(first_fit, ndraws = 100) +
+            labs(title = paste("Posterior predictive check:", first_label),
+                 subtitle = "Dark line = observed; light lines = posterior predictive draws") +
+            theme_bw(base_size = 12))
+
+    # Slope posterior density overlay (WBE vs isometry priors)
+    wbe_post <- primary_fits[[1]]$post_slope
+    iso_key  <- paste0(primary_fits[[1]]$group, "_iso")
+    if (!is.null(pglmm_brms_results[[iso_key]])) {
+      iso_post <- pglmm_brms_results[[iso_key]]$post_slope
+      post_df  <- tibble::tibble(
+        slope = c(wbe_post, iso_post),
+        prior = rep(c("Normal(0.75, 0.5)", "Normal(1.0, 0.5)"),
+                    c(length(wbe_post), length(iso_post)))
+      )
+      p_dens <- ggplot(post_df, aes(x = slope, fill = prior)) +
+        geom_density(alpha = 0.5) +
+        geom_vline(xintercept = 0.75, linetype = "dashed",
+                   colour = "#d6604d", linewidth = 1) +
+        geom_vline(xintercept = 1.00, linetype = "dotted",
+                   colour = "#2166ac", linewidth = 1) +
+        scale_fill_manual(values = c("Normal(0.75, 0.5)" = "#4dac26",
+                                     "Normal(1.0, 0.5)"  = "#b8860b")) +
+        labs(x = "Posterior slope  (log R ~ log Mass)",
+             y = "Density",
+             fill = "Prior on β",
+             title = paste("Prior sensitivity: posterior slope density —", first_label),
+             subtitle = "If curves overlap, posterior is prior-robust (data-driven)") +
+        theme_bw(base_size = 12)
+      print(p_dens)
+    }
+  }
+} else {
+  cat("No brms fits available for diagnostic plots.\n")
 }
 ```
 
