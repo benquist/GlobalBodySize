@@ -1303,15 +1303,21 @@ make_stem_intra <- function(df, ycol) {
     group_modify(~ {
       if (nrow(.x) < MIN_N_ST) return(data.frame())
       tryCatch({
-        lx  <- log10(.x$m.st)
-        ly  <- log10(.x[[ycol]])
-        fit <- sma(ly ~ lx)
-        cm  <- fit$coef[[1]]
+        lx      <- log10(.x$m.st)
+        ly      <- log10(.x[[ycol]])
+        fit     <- sma(ly ~ lx)
+        cm      <- fit$coef[[1]]
+        lm_fit  <- lm(ly ~ lx)
+        lm_ci   <- confint(lm_fit)
         data.frame(
           n         = nrow(.x),
           clade     = .x$clade[1],
           slope     = cm[2, 1],
-          ols_slope = unname(coef(lm(ly ~ lx))[2]),
+          sma_ci_lo = cm[2, 2],
+          sma_ci_hi = cm[2, 3],
+          ols_slope = unname(coef(lm_fit)[2]),
+          ols_ci_lo = lm_ci[2, 1],
+          ols_ci_hi = lm_ci[2, 2],
           st_range  = diff(range(lx))
         )
       }, error = function(e) data.frame())
@@ -1354,6 +1360,73 @@ print(plot_stem_hist(intra_st_lf, sl_st_lf, ols_sl_st_lf, "leaf mass"))
 
 ```{r stem-intra-area, fig.height=5, fig.width=11}
 print(plot_stem_hist(intra_st_al, sl_st_al, ols_sl_st_al, "leaf area"))
+```
+
+```{r stem-intra-ci-plot, fig.height=7, fig.width=10, fig.cap="Per-species 95% confidence intervals for intraspecific scaling exponents (log10 leaf trait ~ log10 stem biomass). Circles = OLS, triangles = SMA, offset vertically. Species sorted by ascending OLS slope within each trait panel. Blue solid line = overall interspecific slope (SMA); blue dashed = interspecific OLS slope; grey dotted = isometry (slope = 1.0). Only species with n \u2265 8 individual records shown. Wide CIs indicate small n or narrow stem-mass range within that species."}
+plot_stem_ci <- function(intra_df, ref_sma, ref_ols, trait_label) {
+  if (nrow(intra_df) == 0) {
+    cat("No eligible species for", trait_label, "\n")
+    return(invisible(NULL))
+  }
+  ci_df <- intra_df |>
+    arrange(ols_slope) |>
+    mutate(sp_label = factor(speciesMatched, levels = rev(unique(speciesMatched)))) |>
+    tidyr::pivot_longer(
+      cols      = c(slope, ols_slope),
+      names_to  = "method",
+      values_to = "est"
+    ) |>
+    dplyr::mutate(
+      lo     = dplyr::if_else(method == "slope", sma_ci_lo, ols_ci_lo),
+      hi     = dplyr::if_else(method == "slope", sma_ci_hi, ols_ci_hi),
+      method = dplyr::if_else(method == "slope", "SMA", "OLS"),
+      method = factor(method, levels = c("OLS", "SMA"))
+    ) |>
+    dplyr::filter(is.finite(est), is.finite(lo), is.finite(hi))
+
+  ggplot(ci_df,
+         aes(x = est, y = sp_label, colour = clade, shape = method)) +
+    geom_vline(xintercept = ref_sma, linetype = "solid",
+               colour = "steelblue4", linewidth = 0.8) +
+    geom_vline(xintercept = ref_ols,  linetype = "dashed",
+               colour = "steelblue4", linewidth = 0.6) +
+    geom_vline(xintercept = 1.00, linetype = "dotted",
+               colour = "grey50", linewidth = 0.7) +
+    geom_errorbarh(aes(xmin = lo, xmax = hi),
+                   height    = 0.35,
+                   linewidth = 0.50,
+                   alpha     = 0.80,
+                   position  = position_dodge(width = 0.60)) +
+    geom_point(size     = 2.2,
+               position = position_dodge(width = 0.60)) +
+    scale_colour_manual(
+      values  = c(Angiosperm = "#e41a1c", Gymnosperm = "#377eb8"),
+      na.value = "grey60",
+      name    = "Clade"
+    ) +
+    scale_shape_manual(values = c(OLS = 16, SMA = 17), name = "Method") +
+    labs(
+      x        = paste0("Intraspecific slope  (log\u2081\u2080 ", trait_label, " ~ log\u2081\u2080 stem biomass)"),
+      y        = NULL,
+      title    = paste0("Per-species 95% CI forest plot \u2014 ", trait_label, " ~ stem biomass"),
+      subtitle = paste0("Sorted by OLS slope. Blue solid = interspecific SMA (\u03b2=", ref_sma,
+                        "); dashed = OLS (\u03b2=", ref_ols, "); dotted = isometry 1.0")
+    ) +
+    theme_bw(base_size = 11) +
+    theme(
+      legend.position    = "bottom",
+      strip.background   = element_rect(fill = "grey92"),
+      axis.text.y        = element_text(size = 8, face = "italic"),
+      panel.grid.major.y = element_line(colour = "grey90", linewidth = 0.3),
+      panel.grid.minor   = element_blank()
+    )
+}
+
+print(plot_stem_ci(intra_st_lf, sl_st_lf, ols_sl_st_lf, "leaf mass (kg)"))
+```
+
+```{r stem-intra-ci-plot-area, fig.height=7, fig.width=10, fig.cap="Per-species 95% CI forest plot for leaf area ~ stem biomass intraspecific slopes. Layout as above."}
+print(plot_stem_ci(intra_st_al, sl_st_al, ols_sl_st_al, "leaf area (m\u00b2)"))
 ```
 
 ---
