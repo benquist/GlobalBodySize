@@ -25,6 +25,15 @@ The active workflow is centered on these files:
 - grand_cross_study_allometry.Rmd
 - chat_provenance_log.md
 
+### Standalone Analysis Reports
+
+These Rmd files are self-contained analyses for individual datasets:
+
+- `kurosawa_respiration_scaling.Rmd` — Kurosawa et al. leaf/stem/root respiration ~ mass scaling; OLS, SMA, PGLS
+- `baad_agb_leaf_allometry.Rmd` — BAAD AGB ~ leaf mass and leaf area; SMA by clade, family, intraspecific
+- `baad_leaf_biomass_diameter_scaling.Rmd` — BAAD leaf biomass ~ stem diameter; OLS, SMA, PGLS
+- `niklas_enquist_organ_scaling.Rmd` — Niklas-Enquist organ-mass allometry (17 relationships); WBE scorecard
+
 ## Theoretical Background
 
 ### Core allometric form
@@ -86,7 +95,7 @@ Method choice is not cosmetic. It can change slope estimates, uncertainty, and c
 
 Run from the project root:
 
-1. cd /Users/brianjenquist/VSCode/plant_scaling_data
+1. cd plant_scaling_data  # adjust to your local path
 2. Ensure R is available: Rscript --version
 3. Install required packages (one-time):
 
@@ -94,7 +103,8 @@ Run from the project root:
 install.packages(c(
 	"readr", "dplyr", "stringr", "ggplot2", "tibble", "tidyr",
 	"ape", "caper", "smatr", "phytools", "baad.data", "V.PhyloMaker2",
-	"knitr", "rmarkdown", "purrr", "lme4", "performance", "quantreg", "leaflet"
+	"knitr", "rmarkdown", "purrr", "lme4", "performance", "quantreg", "leaflet",
+	"data.table", "sf", "geodata", "ggrepel", "gridExtra", "metafor"
 ))
 ```
 
@@ -139,6 +149,10 @@ Render the additional analyses when needed:
 ```bash
 Rscript -e "rmarkdown::render('sapfluxnet_water_use_scaling.Rmd', quiet=FALSE)"
 Rscript -e "rmarkdown::render('grand_cross_study_allometry.Rmd', quiet=FALSE)"
+Rscript -e "rmarkdown::render('kurosawa_respiration_scaling.Rmd')"
+Rscript -e "rmarkdown::render('baad_agb_leaf_allometry.Rmd')"
+Rscript -e "rmarkdown::render('baad_leaf_biomass_diameter_scaling.Rmd')"
+Rscript -e "rmarkdown::render('niklas_enquist_organ_scaling.Rmd')"
 ```
 
 These are broader syntheses and should be interpreted with dataset-specific caveats documented inside each Rmd.
@@ -166,6 +180,7 @@ Use these guardrails when reading results tables and figures:
 4. Distinguish descriptive scaling from mechanistic confirmation.
 5. Do not report numeric claims from stale outputs without re-running the pipeline.
 6. Do not infer universality from clade- or biome-skewed samples.
+- The constant `STRESS_H_DBH = 1/2` in `grand_cross_study_allometry.Rmd` is flagged UNVERIFIED in source. Do not interpret empirical results against this theoretical value until the source citation is confirmed.
 
 ## Phylogeny and Taxonomy Caveats
 

@@ -856,6 +856,7 @@ if (HAS_PHYLOMAKER) {
     cat("Tree building failed — PGLS sections will be skipped.\n")
   }
   HAS_TREE <- !is.null(pgls_tree)
+  USING_STAR_TREE <- FALSE
 } else {
   # Fallback: star tree for demonstration when V.PhyloMaker2 not available
   message("V.PhyloMaker2 not available. Building a star tree for PGLS demonstration.")
@@ -865,6 +866,7 @@ if (HAS_PHYLOMAKER) {
   pgls_tree$edge.length <- rep(1, nrow(pgls_tree$edge))
   pgls_tree$node.label  <- NULL
   HAS_TREE <- TRUE
+  USING_STAR_TREE <- TRUE
   cat("Star tree built with", ape::Ntip(pgls_tree), "tips.\n")
   cat("Note: Star tree has lambda = 0 by construction — PGLS = OLS on a star tree.\n")
 }
@@ -873,6 +875,9 @@ if (HAS_PHYLOMAKER) {
 ## PGLS fits by group
 
 ```{r pgls-fit}
+if (isTRUE(USING_STAR_TREE)) {
+  cat("\n> **WARNING: PGLS results below used a star tree (V.PhyloMaker2 unavailable). All branch lengths are equal, lambda estimates are artifactually zero, and these results are NOT phylogenetically informed. Install V.PhyloMaker2 for valid PGLS: `remotes::install_github('jinyizju/V.PhyloMaker2')`**\n\n")
+}
 if (HAS_TREE) {
   # Helper: fit OLS + SMA + PGLS for one group subset
   fit_group_pgls <- function(sp_sub, tree, group_label) {

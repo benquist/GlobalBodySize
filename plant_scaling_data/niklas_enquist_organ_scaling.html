@@ -11,7 +11,7 @@
 
 <meta name="author" content="plant_scaling_data project" />
 
-<meta name="date" content="2026-05-02" />
+<meta name="date" content="2026-05-04" />
 
 <title>Niklas &amp; Enquist Organ-Mass Scaling: Theory Testing Across Biomass Partitions</title>
 
@@ -1590,7 +1590,7 @@ Theory Testing Across Biomass Partitions</h1>
 <h3 class="subtitle">OLS, SMA, PGLS — Interspecific,
 Gymnosperm/Angiosperm, Family, and Intraspecific</h3>
 <h4 class="author">plant_scaling_data project</h4>
-<h4 class="date">2026-05-02</h4>
+<h4 class="date">2026-05-04</h4>
 
 </div>
 
@@ -2106,6 +2106,26 @@ Helper</h1>
 <div id="sec-interspecific" class="section level1" number="8">
 <h1><span class="header-section-number">8</span> Interspecific Scaling —
 All Relationships</h1>
+<p>This section evaluates WBE/Enquist predictions for organ mass,
+height, and whole-plant growth scaling. The key growth-rate relationship
+is tested as:</p>
+<p><span class="math display">\[
+\frac{dM}{dt} \propto M^{3/4}
+\]</span></p>
+<p>where <code>total_growth_kgyr</code> approximates the annual net
+biomass increment and <code>total_biomass_kg</code> is the whole-plant
+size metric. The predicted WBE/Enquist exponents in this dataset
+are:</p>
+<ul>
+<li>total biomass vs height: exponent <span class="math inline">\(\beta
+= 8/3 \approx 2.67\)</span>,</li>
+<li>whole-plant growth rate vs total biomass: exponent <span class="math inline">\(\beta = 3/4 = 0.75\)</span>,</li>
+<li>leaf mass vs total biomass: exponent <span class="math inline">\(\beta = 3/4 = 0.75\)</span>.</li>
+</ul>
+<p>Because the Niklas-Enquist dataset contains annual net increments
+rather than instantaneous metabolic fluxes, this is an approximate
+descriptive test of WBE growth scaling, not a direct test of
+instantaneous metabolic rates.</p>
 <pre class="r"><code># All organ relationships to analyze with their WBE priors
 relationships &lt;- list(
   # Organ ~ Total biomass

@@ -513,6 +513,22 @@ run_one_allom <- function(df, tree, y_col, x_col, rel_label,
 
 # Interspecific Scaling — All Relationships {#sec-interspecific}
 
+This section evaluates WBE/Enquist predictions for organ mass, height, and whole-plant growth scaling.
+The key growth-rate relationship is tested as:
+
+\[
+\frac{dM}{dt} \propto M^{3/4}
+\]
+
+where `total_growth_kgyr` approximates the annual net biomass increment and `total_biomass_kg` is the whole-plant size metric.
+The predicted WBE/Enquist exponents in this dataset are:
+
+- total biomass vs height: exponent $\beta = 8/3 \approx 2.67$,
+- whole-plant growth rate vs total biomass: exponent $\beta = 3/4 = 0.75$,
+- leaf mass vs total biomass: exponent $\beta = 3/4 = 0.75$.
+
+Because the Niklas-Enquist dataset contains annual net increments rather than instantaneous metabolic fluxes, this is an approximate descriptive test of WBE growth scaling, not a direct test of instantaneous metabolic rates.
+
 ```{r define-relationships}
 # All organ relationships to analyze with their WBE priors
 relationships <- list(

@@ -2,6 +2,26 @@
 
 ---
 
+## 2026-05-12 — Stages 6–8 Complete; Stage 6 vectorized
+
+**Stage 6 (QA checks — vectorized rebuild):**  
+Original row-by-row `for` loop in `run_range_check_plants()` was O(n) in R — terminated after 12 hours on 10M records. Rewrote using `data.table` merge + vectorized `:=` assignments. Re-ran and completed in minutes.
+
+| Source | Records | Range checked | Range pass | Range fail | Outlier flagged |
+|--------|---------|---------------|------------|------------|-----------------|
+| height | 10,167,913 | 10,166,904 | 10,087,061 | 79,843 | 101,885 |
+| dbh | 14,929,488 | 14,929,004 | 14,896,463 | 32,541 | 56,270 |
+
+Output: `output/bien_height_qa.csv`, `output/bien_dbh_qa.csv`, `output/qa_summary_report.csv`
+
+**Stages 7–8 (summarize + finalize):**  
+Final database: `output/plant_bodysize_final.csv` — 333,778 species rows  
+Species with any trait data: ~78,110 | Allometric-ready (height + DBH): ~1,985
+
+**Next:** Phase 2 extensions (TRY cross-validation, climate niche joins, phylogenetic imputation).
+
+---
+
 ## 2026-05-11 — Stages 2 and 3 Complete
 
 **Stage 2 results (scripts/02_trait_query.R):**
