@@ -1351,6 +1351,64 @@ kable(
 )
 ```
 
+## Per-species 95% CI forest plot
+
+```{r intraspecific-ci-plot, fig.width=10, fig.height=7, fig.cap="Per-species 95% confidence intervals for intraspecific scaling exponents (log R ~ log fresh mass). Circles = OLS, triangles = SMA, offset vertically within each facet. Species sorted by ascending OLS slope within each life-form \u00d7 plant-part group. Red dashed line = WBE \u00be (\u03b2 = 0.75); blue dotted line = isometric (\u03b2 = 1.0). Wide CIs reflect small sample size or narrow mass range within a species; narrow CIs indicate well-constrained slopes. Only species with n \u2265 3 individuals are shown."}
+# ── Build long-format CI data sorted by OLS slope within group ────────────────
+ci_plot_df <- sp_intra |>
+  mutate(
+    facet_grp    = paste0(life_form, "\n", plant_part),
+    ols_sort_key = slope
+  ) |>
+  arrange(facet_grp, ols_sort_key) |>
+  mutate(sp_label = factor(species, levels = unique(species))) |>
+  pivot_longer(
+    cols      = c(slope, sma_slope),
+    names_to  = "method",
+    values_to = "est"
+  ) |>
+  mutate(
+    lo     = if_else(method == "slope", ci_lo,     sma_ci_lo),
+    hi     = if_else(method == "slope", ci_hi,     sma_ci_hi),
+    method = if_else(method == "slope", "OLS", "SMA"),
+    method = factor(method, levels = c("OLS", "SMA"))
+  ) |>
+  filter(!is.na(est), !is.na(lo), !is.na(hi))
+
+ggplot(ci_plot_df,
+       aes(x = est, y = sp_label, colour = method, shape = method)) +
+  geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
+             linewidth = 0.8) +
+  geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
+             linewidth = 0.8) +
+  geom_errorbarh(aes(xmin = lo, xmax = hi),
+                 height   = 0.30,
+                 linewidth = 0.55,
+                 alpha    = 0.8,
+                 position = position_dodge(width = 0.55)) +
+  geom_point(size     = 2.4,
+             position = position_dodge(width = 0.55)) +
+  facet_wrap(~ facet_grp, scales = "free_y", ncol = 2) +
+  scale_colour_manual(values = c(OLS = "#1a6faf", SMA = "#d95f02"),
+                      name   = "Method") +
+  scale_shape_manual(values  = c(OLS = 16, SMA = 17),
+                     name    = "Method") +
+  labs(
+    x        = expression(paste("Scaling exponent  ", beta, "  (log R ~ log M, within species)")),
+    y        = NULL,
+    title    = "Per-species intraspecific 95% CI forest plot",
+    subtitle = "Sorted by OLS slope within group. Red dashed = WBE \u00be, blue dotted = isometric 1.0."
+  ) +
+  theme_bw(base_size = 11) +
+  theme(
+    legend.position    = "bottom",
+    strip.background   = element_rect(fill = "grey92"),
+    axis.text.y        = element_text(size = 8, face = "italic"),
+    panel.grid.major.y = element_line(colour = "grey90", linewidth = 0.3),
+    panel.grid.minor   = element_blank()
+  )
+```
+
 ## Inter- vs. intraspecific: Glazier comparison
 
 ```{r glazier-comparison}
