@@ -1,0 +1,514 @@
+---
+title: "Global_Plant_BodySize: Science Summary"
+subtitle: "BIEN Vascular Plant Size Database — Pipeline Summary and Coverage Report"
+author: "Global_Plant_BodySize Project"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    fig_width: 10
+    fig_height: 6
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  warning   = FALSE,
+  message   = FALSE,
+  fig.align = "center",
+  cache     = FALSE
+)
+session_render_time <- format(Sys.time(), "%Y-%m-%d %H:%M:%S UTC", tz = "UTC")
+```
+
+```{r packages}
+required_pkgs <- c("ggplot2", "dplyr", "scales", "knitr", "kableExtra",
+                   "data.table", "tidyr", "patchwork")
+missing_pkgs  <- required_pkgs[!required_pkgs %in% rownames(installed.packages())]
+if (length(missing_pkgs) > 0) {
+  install.packages(missing_pkgs, repos = "https://cran.r-project.org/", quiet = TRUE)
+}
+invisible(lapply(required_pkgs, library, character.only = TRUE))
+
+## Consistent ggplot theme
+theme_plantsize <- function(base_size = 12) {
+  theme_bw(base_size = base_size) +
+    theme(
+      panel.grid.minor = element_blank(),
+      strip.background = element_rect(fill = "grey92", colour = "grey60"),
+      strip.text       = element_text(face = "bold"),
+      plot.title       = element_text(face = "bold", size = base_size + 2),
+      plot.subtitle    = element_text(size = base_size, colour = "grey40"),
+      plot.caption     = element_text(size = base_size - 2, colour = "grey50", hjust = 0)
+    )
+}
+theme_set(theme_plantsize())
+
+GF_COLOURS <- c(
+  "tree"      = "#2E7D32",
+  "shrub"     = "#81C784",
+  "subshrub"  = "#A5D6A7",
+  "herb"      = "#FDD835",
+  "graminoid" = "#F9A825",
+  "bamboo"    = "#00897B",
+  "vine"      = "#7B1FA2",
+  "epiphyte"  = "#AB47BC",
+  "aquatic"   = "#1565C0",
+  "parasite"  = "#E64A19",
+  "unknown"   = "#9E9E9E"
+)
+```
+
+---
+
+# 1. Project Overview
+
+The **Global_Plant_BodySize** project assembles a reproducible, provenance-rich body size database for all vascular plant species in BIEN (Botanical Information and Ecology Network). Plant body size — quantified here as whole-plant height (m) and stem diameter at breast height (DBH, cm) — determines light capture geometry, self-thinning dynamics, above-ground biomass, and demographic rates. Height scales with metabolic rate via pipe-model theory (West, Brown & Enquist 1999), and DBH underpins the dominant allometric equations for above-ground biomass estimation (Chave et al. 2014).
+
+**Pipeline stages completed:**
+
+| Stage | Script | Description | Key output |
+|-------|--------|-------------|------------|
+| 01 | `01_species_list.R` | BIEN vascular plant roster | `bien_species_list.csv` |
+| 02 | `02_trait_query.R` | Bulk height + DBH trait pull | `bien_height_raw.csv`, `bien_dbh_raw.csv` |
+| 03 | `03_growth_form_query.R` | Growth form trait pull | `bien_growth_form_raw.csv` |
+| 04 | `04_taxonomy_reconcile.R` | Taxonomy enrichment | `bien_species_roster.csv` |
+| 05 | `05_reconcile_growth_form.R` | Canonical growth form mapping | `species_growth_form.csv` |
+| 06 | `06_qa_checks.R` | Vectorized range/unit/outlier QA | `bien_height_qa.csv`, `bien_dbh_qa.csv` |
+| 07 | `07_summarize.R` | Species-level aggregation | `plant_size_summary.csv` |
+| 08 | `08_finalize.R` | Final database assembly | `plant_bodysize_final.csv` |
+| 09a | `09a_load_wood_density.R` | GWDD wood density matching | `species_wood_density.csv` |
+| 09b | `09b_estimate_biomass_tiers.R` | Tiered AGB + BGB estimation | `plant_biomass_estimates.csv` |
+
+**Data source:** BIEN R package (Maitner et al. 2018 — DOI UNVERIFIED); trait records accessed via `BIEN_trait_trait()`.
+
+> **Honest uncertainty notice:** This database is a first-pass intake from BIEN. Known limitations include: (1) growth form `unknown` for ~78% of species (BIEN trait coverage gap), (2) height and DBH data available for only ~1.6% and ~2.7% of species respectively, (3) biomass equations calibrated on tropical forest taxa — extrapolation to temperate/dry/arid biomes introduces unknown bias, (4) all biomass equation citations flagged UNVERIFIED and require independent checking before publication use.
+
+---
+
+# 2. Data Loading
+
+```{r load-data}
+## Paths relative to project root (Global_Plant_BodySize/)
+final_file    <- "output/plant_bodysize_final.csv"
+biomass_file  <- "output/plant_biomass_estimates.csv"
+wd_file       <- "output/species_wood_density.csv"
+
+stopifnot(file.exists(final_file))
+stopifnot(file.exists(biomass_file))
+stopifnot(file.exists(wd_file))
+
+final   <- fread(final_file,   data.table = FALSE)
+biomass <- fread(biomass_file, data.table = FALSE)
+wd      <- fread(wd_file,      data.table = FALSE)
+
+## Clean up growth form for display
+final$gf <- ifelse(is.na(final$growth_form_canonical) | final$growth_form_canonical == "",
+                   "unknown", final$growth_form_canonical)
+final$gf <- factor(final$gf, levels = names(GF_COLOURS))
+
+cat(sprintf("Final database:      %s rows, %s columns\n",
+            scales::comma(nrow(final)), ncol(final)))
+cat(sprintf("Biomass estimates:   %s rows\n", scales::comma(nrow(biomass))))
+cat(sprintf("Wood density file:   %s rows\n", scales::comma(nrow(wd))))
+cat(sprintf("Rendered: %s\n", session_render_time))
+```
+
+---
+
+# 3. Species Coverage
+
+```{r coverage-table}
+n_total  <- nrow(final)
+n_any    <- sum(final$trait_data_available, na.rm = TRUE)
+n_height <- sum(final$height_data_available, na.rm = TRUE)
+n_dbh    <- sum(final$dbh_data_available, na.rm = TRUE)
+n_gf     <- sum(final$growth_form_available, na.rm = TRUE)
+n_allom  <- sum(final$allometric_ready, na.rm = TRUE)
+
+cov_tbl <- data.frame(
+  Metric = c(
+    "Total BIEN species",
+    "Species with any trait data",
+    "Species with height (m)",
+    "Species with DBH (cm)",
+    "Species with growth form",
+    "Allometric-ready (height + DBH)"
+  ),
+  N = c(n_total, n_any, n_height, n_dbh, n_gf, n_allom),
+  Pct = c(100,
+          round(100 * n_any    / n_total, 1),
+          round(100 * n_height / n_total, 2),
+          round(100 * n_dbh    / n_total, 2),
+          round(100 * n_gf     / n_total, 1),
+          round(100 * n_allom  / n_total, 2))
+)
+cov_tbl$N   <- scales::comma(cov_tbl$N)
+cov_tbl$Pct <- paste0(cov_tbl$Pct, "%")
+
+knitr::kable(cov_tbl, col.names = c("Coverage metric", "N species", "% of total"),
+             caption = "Table 1. Species coverage by data type.")
+```
+
+```{r coverage-bar, fig.height=4, fig.cap="Fig. 1. Species coverage by data type. The vast majority of BIEN species have no size measurements; allometric-ready (height + DBH) species represent the most informative subset for biomass estimation."}
+cov_plot <- data.frame(
+  metric = c("Any trait", "Height", "DBH", "Growth form", "Height + DBH"),
+  n      = c(n_any, n_height, n_dbh, n_gf, n_allom),
+  color  = c("#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#F44336")
+)
+cov_plot$metric <- factor(cov_plot$metric, levels = rev(cov_plot$metric))
+
+ggplot(cov_plot, aes(x = metric, y = n, fill = metric)) +
+  geom_col(width = 0.6, colour = "grey30", linewidth = 0.25, alpha = 0.85) +
+  geom_text(aes(label = scales::comma(n)), hjust = -0.15, size = 3.5) +
+  scale_fill_manual(values = setNames(cov_plot$color, cov_plot$metric), guide = "none") +
+  scale_y_continuous(labels = scales::comma,
+                     limits = c(0, n_total * 1.1),
+                     expand = c(0, 0)) +
+  coord_flip() +
+  labs(title = "Species coverage by data type",
+       subtitle = paste0("Total BIEN roster: ", scales::comma(n_total), " species"),
+       x = NULL, y = "Number of species",
+       caption = "Source: BIEN trait database (Stages 1–8 intake)")
+```
+
+---
+
+# 4. Growth Form Distribution
+
+```{r gf-table}
+gf_tbl <- final |>
+  dplyr::group_by(gf) |>
+  dplyr::summarise(
+    n_total       = dplyr::n(),
+    n_height      = sum(height_data_available, na.rm = TRUE),
+    n_dbh         = sum(dbh_data_available, na.rm = TRUE),
+    n_allom_ready = sum(allometric_ready, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(dplyr::desc(n_total)) |>
+  dplyr::mutate(pct_total = paste0(round(100 * n_total / sum(n_total), 1), "%"))
+
+knitr::kable(gf_tbl,
+             col.names = c("Growth form", "Total species", "With height",
+                           "With DBH", "Allometric-ready", "% of total"),
+             caption = "Table 2. Species and data coverage by canonical growth form.")
+```
+
+```{r gf-bar, fig.height=5, fig.cap="Fig. 2. Number of species per growth form (excluding unknown). Note that 'unknown' accounts for ~78% of the roster; only species with growth form data are shown here for clarity."}
+gf_known <- gf_tbl |> dplyr::filter(gf != "unknown")
+
+ggplot(gf_known, aes(x = reorder(gf, n_total), y = n_total,
+                      fill = gf)) +
+  geom_col(width = 0.65, colour = "grey30", linewidth = 0.25, alpha = 0.88) +
+  geom_text(aes(label = scales::comma(n_total)), hjust = -0.15, size = 3.5) +
+  scale_fill_manual(values = GF_COLOURS, guide = "none") +
+  scale_y_continuous(labels = scales::comma,
+                     limits = c(0, max(gf_known$n_total) * 1.15),
+                     expand = c(0, 0)) +
+  coord_flip() +
+  labs(title = "Species per canonical growth form",
+       subtitle = "Excluding 'unknown' (~261,405 species; ~78% of roster)",
+       x = NULL, y = "Number of species",
+       caption = "Stage 5: reconciled from BIEN growth form free-text")
+```
+
+---
+
+# 5. Height Distribution
+
+```{r height-dist, fig.height=5, fig.cap="Fig. 3. Distribution of species-mean plant height (m) by growth form, log10 scale. Only species with height_data_available = TRUE and ≥1 QA-passing record are shown. Vertical lines indicate expected median by growth form."}
+h_dat <- final |>
+  dplyr::filter(height_data_available == TRUE & !is.na(height_m_mean) & height_m_mean > 0) |>
+  dplyr::mutate(log10_h = log10(height_m_mean),
+                gf_plot = ifelse(gf %in% c("unknown", NA), "other", as.character(gf)))
+
+h_dat$gf_plot <- factor(h_dat$gf_plot, levels = c(names(GF_COLOURS), "other"))
+
+cat(sprintf("Species with height data for plotting: %s\n", scales::comma(nrow(h_dat))))
+
+ggplot(h_dat, aes(x = log10_h, fill = gf_plot)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50,
+                 colour = "white", linewidth = 0.15, alpha = 0.85) +
+  scale_fill_manual(values = GF_COLOURS, na.value = "grey70", name = "Growth form") +
+  facet_wrap(~ gf_plot, scales = "free_y", ncol = 3) +
+  scale_x_continuous(
+    breaks = c(-2, -1, 0, 1, 2),
+    labels = c("0.01 m", "0.1 m", "1 m", "10 m", "100 m")
+  ) +
+  labs(title = "Species-mean height distribution by growth form",
+       x = "Height (m, log10 scale)", y = "Density",
+       caption = "Stage 7 aggregated means; QA-passing records only") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 30, hjust = 1, size = 8))
+```
+
+```{r height-summary-table}
+h_sum <- h_dat |>
+  dplyr::group_by(gf_plot) |>
+  dplyr::summarise(
+    n          = dplyr::n(),
+    median_m   = round(median(height_m_mean, na.rm = TRUE), 2),
+    mean_m     = round(mean(height_m_mean, na.rm = TRUE), 2),
+    p10_m      = round(quantile(height_m_mean, 0.10, na.rm = TRUE), 2),
+    p90_m      = round(quantile(height_m_mean, 0.90, na.rm = TRUE), 2),
+    min_m      = round(min(height_m_mean, na.rm = TRUE), 3),
+    max_m      = round(max(height_m_mean, na.rm = TRUE), 1),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(dplyr::desc(median_m))
+
+knitr::kable(h_sum,
+             col.names = c("Growth form", "N species", "Median (m)", "Mean (m)",
+                           "P10 (m)", "P90 (m)", "Min (m)", "Max (m)"),
+             caption = "Table 3. Height summary statistics by growth form (species means).")
+```
+
+---
+
+# 6. DBH Distribution
+
+```{r dbh-dist, fig.height=5, fig.cap="Fig. 4. Distribution of species-mean DBH (cm) for woody growth forms, log10 scale. Only allometric-ready species (height + DBH) are shown in the inset."}
+dbh_dat <- final |>
+  dplyr::filter(dbh_data_available == TRUE & !is.na(dbh_cm_mean) & dbh_cm_mean > 0) |>
+  dplyr::mutate(log10_dbh = log10(dbh_cm_mean),
+                gf_plot = ifelse(gf %in% c("unknown", NA), "other", as.character(gf)))
+
+cat(sprintf("Species with DBH data for plotting: %s\n", scales::comma(nrow(dbh_dat))))
+
+ggplot(dbh_dat, aes(x = log10_dbh, fill = gf_plot)) +
+  geom_histogram(bins = 50, colour = "white", linewidth = 0.15, alpha = 0.85) +
+  scale_fill_manual(values = GF_COLOURS, na.value = "grey70", name = "Growth form") +
+  scale_x_continuous(
+    breaks = c(-1, 0, 1, 2, 3),
+    labels = c("0.1 cm", "1 cm", "10 cm", "100 cm", "1000 cm")
+  ) +
+  labs(title = "Species-mean DBH distribution by growth form",
+       x = "DBH (cm, log10 scale)", y = "Count",
+       caption = "Stage 7 aggregated means; QA-passing records only") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1, size = 8))
+```
+
+---
+
+# 7. Height–DBH Scaling (Allometric-Ready Species)
+
+```{r height-dbh, fig.height=6, fig.cap="Fig. 5. Height vs. DBH for allometric-ready species (both measurements available, n = 1,978). Points are species means. Lines show OLS regression per growth form. Log-log scaling reveals the allometric relationship H ~ D^b expected from pipe-model theory."}
+allom <- final |>
+  dplyr::filter(allometric_ready == TRUE &
+                  !is.na(height_m_mean) & height_m_mean > 0 &
+                  !is.na(dbh_cm_mean) & dbh_cm_mean > 0) |>
+  dplyr::mutate(log10_h   = log10(height_m_mean),
+                log10_dbh = log10(dbh_cm_mean),
+                gf_plot   = ifelse(is.na(gf) | gf == "unknown",
+                                   "other", as.character(gf)))
+
+cat(sprintf("Allometric-ready species for plot: %s\n", scales::comma(nrow(allom))))
+
+ggplot(allom, aes(x = log10_dbh, y = log10_h, colour = gf_plot)) +
+  geom_point(alpha = 0.5, size = 1.5) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.9) +
+  scale_colour_manual(values = GF_COLOURS, na.value = "grey50", name = "Growth form") +
+  scale_x_continuous(breaks = c(0, 1, 2, 3),
+                     labels = c("1 cm", "10 cm", "100 cm", "1000 cm")) +
+  scale_y_continuous(breaks = c(-1, 0, 1, 2),
+                     labels = c("0.1 m", "1 m", "10 m", "100 m")) +
+  labs(title = "Height–DBH allometry (species means)",
+       subtitle = paste0("Allometric-ready species: n = ", scales::comma(nrow(allom))),
+       x = "DBH (cm, log10)", y = "Height (m, log10)",
+       caption = "Lines: OLS regression per growth form. Each point = one species mean.")
+```
+
+```{r height-dbh-slopes}
+## Compute OLS slope (b in log10(H) ~ b * log10(DBH) + a) per growth form
+slope_tbl <- allom |>
+  dplyr::group_by(gf_plot) |>
+  dplyr::filter(dplyr::n() >= 5) |>
+  dplyr::summarise(
+    n        = dplyr::n(),
+    slope    = coef(lm(log10_h ~ log10_dbh))[2],
+    intercept = coef(lm(log10_h ~ log10_dbh))[1],
+    r2       = summary(lm(log10_h ~ log10_dbh))$r.squared,
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(across(c(slope, intercept, r2), ~ round(.x, 3))) |>
+  dplyr::arrange(dplyr::desc(n))
+
+knitr::kable(slope_tbl,
+             col.names = c("Growth form", "N species", "Slope (b)", "Intercept (a)", "R²"),
+             caption = "Table 4. OLS allometric slopes for log10(H) ~ b·log10(DBH) by growth form. Pipe-model theory predicts b ≈ 0.5–0.67 for trees (WBE 1999). NOTE: these are cross-species slopes from BIEN means, not within-stand measurements.")
+```
+
+---
+
+# 8. Wood Density Coverage
+
+```{r wd-coverage}
+wd_tab <- table(wd$rho_match_level, useNA = "ifany")
+wd_df  <- data.frame(
+  match_level = names(wd_tab),
+  n_species   = as.integer(wd_tab)
+) |>
+  dplyr::mutate(pct = paste0(round(100 * n_species / nrow(wd), 1), "%")) |>
+  dplyr::arrange(match_level)
+
+knitr::kable(wd_df,
+             col.names = c("Match level", "N species", "% of total"),
+             caption = "Table 5. Wood density (rho) match level from GWDD (Zanne et al. 2009 via BIOMASS::wdData). Non-woody species receive match_level = 'none'. Global fallback rho = 0.58 g/cm³ (UNVERIFIED).")
+```
+
+```{r wd-dist, fig.height=4, fig.cap="Fig. 6. Distribution of wood density (rho, g/cm³) for woody species, coloured by match level. Species-level matches are most reliable; global-fallback values cluster at 0.58 g/cm³."}
+wd_woody <- wd |>
+  dplyr::filter(rho_match_level != "none" & !is.na(rho_mean) & rho_mean > 0)
+
+ggplot(wd_woody, aes(x = rho_mean, fill = rho_match_level)) +
+  geom_histogram(bins = 60, colour = "white", linewidth = 0.15, alpha = 0.85) +
+  scale_fill_manual(
+    values = c("species"         = "#1B5E20",
+               "genus"           = "#66BB6A",
+               "family"          = "#FFA726",
+               "global_fallback" = "#EF9A9A"),
+    name = "Match level"
+  ) +
+  labs(title = "Wood density distribution by match level",
+       x = "Wood density (g/cm³)", y = "Count",
+       caption = "Source: BIOMASS::wdData (Zanne et al. 2009). Global fallback = 0.58 g/cm³ (UNVERIFIED).")
+```
+
+---
+
+# 9. Biomass Estimates
+
+```{r biomass-coverage}
+bm  <- biomass |> dplyr::filter(!is.na(agb_best_kg))
+n_bm <- nrow(bm)
+
+tier_tbl <- biomass |>
+  dplyr::filter(!is.na(agb_best_tier)) |>
+  dplyr::mutate(agb_best_tier = as.integer(agb_best_tier)) |>
+  dplyr::group_by(agb_best_tier) |>
+  dplyr::summarise(
+    n_species    = dplyr::n(),
+    median_agb   = round(median(agb_best_kg, na.rm = TRUE), 1),
+    median_total = round(median(total_biomass_kg, na.rm = TRUE), 1),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(agb_best_tier)
+
+tier_descriptions <- data.frame(
+  agb_best_tier = c(1L, 2L, 3L, 4L),
+  method = c(
+    "Height-only allometry (Brown 1997 / Muukkonen 2007)",
+    "DBH-only, no wood density (Chave 2005 Eq. 3)",
+    "DBH + height + imputed rho (Chave 2014 Eq. 7)",
+    "DBH + height + species rho (Chave 2014 Eq. 7)"
+  )
+)
+
+tier_tbl <- dplyr::left_join(tier_tbl, tier_descriptions, by = "agb_best_tier")
+
+knitr::kable(tier_tbl,
+             col.names = c("Tier", "N species", "Median AGB (kg)",
+                           "Median total biomass (kg)", "Method"),
+             caption = "Table 6. Biomass estimate coverage by tier. Higher tier = better data. All equations flagged UNVERIFIED — see Stage 9b script for citation details. Median total biomass includes BGB via Mokany et al. 2006 R:S ratios (UNVERIFIED).")
+```
+
+```{r biomass-dist, fig.height=5, fig.cap="Fig. 7. Distribution of best-available AGB (kg) by growth form, log10 scale. Tier 4 (best) and Tier 3 species use Chave 2014; Tier 2 uses Chave 2005; Tier 1 uses height-only allometry. NOTE: these are species-mean estimates, not individual tree measurements."}
+bm_plot <- biomass |>
+  dplyr::filter(!is.na(agb_best_kg) & agb_best_kg > 0 &
+                  !is.na(growth_form_canonical)) |>
+  dplyr::mutate(
+    log10_agb = log10(agb_best_kg),
+    gf_plot   = ifelse(growth_form_canonical %in% names(GF_COLOURS),
+                       growth_form_canonical, "unknown")
+  ) |>
+  dplyr::filter(gf_plot != "unknown")
+
+ggplot(bm_plot, aes(x = log10_agb, fill = gf_plot)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50,
+                 colour = "white", linewidth = 0.15, alpha = 0.85) +
+  scale_fill_manual(values = GF_COLOURS, guide = "none") +
+  facet_wrap(~ gf_plot, scales = "free_y", ncol = 3) +
+  scale_x_continuous(
+    breaks = c(-3, -1, 1, 3, 5),
+    labels = c("0.001 kg", "0.1 kg", "10 kg", "1,000 kg", "100,000 kg")
+  ) +
+  labs(title = "AGB estimate distribution by growth form",
+       x = "AGB (kg, log10 scale)", y = "Density",
+       caption = "All equations flagged UNVERIFIED. R:S ratios from Mokany et al. 2006 (UNVERIFIED).") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1, size = 7),
+        legend.position = "none")
+```
+
+```{r biomass-growth-form-scatter, fig.height=5, fig.cap="Fig. 8. Relationship between species-mean height and AGB estimate, coloured by growth form. Points are species. The expected positive allometric relationship is visible across growth forms."}
+hbm <- biomass |>
+  dplyr::filter(!is.na(agb_best_kg) & agb_best_kg > 0 &
+                  !is.na(height_m_mean) & height_m_mean > 0 &
+                  !is.na(growth_form_canonical)) |>
+  dplyr::mutate(
+    log10_agb = log10(agb_best_kg),
+    log10_h   = log10(height_m_mean),
+    gf_plot   = ifelse(growth_form_canonical %in% names(GF_COLOURS),
+                       growth_form_canonical, "unknown")
+  )
+
+ggplot(hbm, aes(x = log10_h, y = log10_agb, colour = gf_plot)) +
+  geom_point(alpha = 0.5, size = 1.5) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.8) +
+  scale_colour_manual(values = GF_COLOURS, na.value = "grey50", name = "Growth form") +
+  scale_x_continuous(breaks = c(-1, 0, 1, 2),
+                     labels = c("0.1 m", "1 m", "10 m", "100 m")) +
+  scale_y_continuous(breaks = c(-3, -1, 1, 3, 5),
+                     labels = c("0.001 kg", "0.1 kg", "10 kg", "1,000 kg", "100,000 kg")) +
+  labs(title = "Height vs. AGB (species means)",
+       x = "Height (m, log10)", y = "AGB (kg, log10)",
+       caption = "AGB equations: height-only (Tier 1), DBH-based (Tiers 2–4). All UNVERIFIED.")
+```
+
+---
+
+# 10. Known Limitations and Next Steps
+
+```{r limitations}
+cat("Known limitations of this database (as of", format(Sys.Date(), "%Y-%m-%d"), "):\n\n")
+
+limits <- c(
+  "Growth form: ~78% of BIEN species have unknown growth form. BIEN trait tables lack family annotations for many records, preventing family-based graminoid/bamboo flagging.",
+  "Height coverage: Only ~1.6% of species have height data (5,206 / 333,778). BIEN measurement density is highly biased toward common, well-studied taxa.",
+  "DBH coverage: Only ~2.7% of species have DBH data (8,903 / 333,778). Strong tropical forest bias.",
+  "Allometric-ready: Only ~0.6% of species have both height AND DBH (1,978 species). Biomass Tiers 3-4 apply only to this subset.",
+  "Wood density: Family-level GWDD matching returned 0 hits due to nomenclature mismatches between BIEN family labels and GWDD. ~46% of woody species fall back to global-mean rho (0.58 g/cm³), introducing high biomass uncertainty.",
+  "Biomass equations: All citations (Chave 2014, Chave 2005, Brown 1997, Mokany 2006) flagged UNVERIFIED — require independent checking before publication.",
+  "Biome extrapolation: Chave 2014 calibrated on tropical/subtropical forest. Temperate and boreal species not flagged at species level (higher_plant_group sparse); equation_biome_flag = 'chave_pantropical' applied generically.",
+  "Taxonomy: 5,517 BIEN trait names (6.5%) could not be matched to the species roster — likely synonyms or BIEN version gaps.",
+  "Bryophytes: is_bryophyte flag not yet systematically applied (BIEN trait table lacks order/class for many records)."
+)
+
+for (i in seq_along(limits)) {
+  cat(sprintf("%d. %s\n\n", i, limits[i]))
+}
+```
+
+**Priority next steps:**
+
+1. Improve family-level wood density matching by harmonising BIEN family labels to APG IV (e.g. via `taxize::tax_name()`).
+2. Extend growth form inference using APG family → growth form lookup tables.
+3. Add biome assignment at species level (e.g. BIEN range maps → climate zone overlay) to support `equation_biome_flag`.
+4. Stage 9c: Bayesian hierarchical imputation (`brms`) for height and DBH using genus/family/growth-form random effects.
+5. Integrate TRY database as a supplementary source for height and SLA.
+
+---
+
+# 11. Session Info
+
+```{r session-info}
+cat("Render time:", session_render_time, "\n\n")
+sessionInfo()
+```
