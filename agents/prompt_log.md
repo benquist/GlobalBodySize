@@ -2274,3 +2274,12 @@ User: Add Gallagher et al. 2020 "Open Science principles for accelerating trait-
 Action: Paper already in publications_full_from_doc.md (2020 section) but had malformed HTML (nested duplicate <a> tag). Fixed HTML. Added `/tree of life/i` weight-2 matcher to phylogenetic-ecology tab so both Gallagher 2020 and Eiserhardt 2018 appear there. Pushed to enquistlab.github.io (commits c7d6c1a, 9abba69).
 
 2026-05-13 | "@M Safety pre-flight before implementing BIEN Traits app changes: ran optimizer and coder agents against 26 proposed changes. Produced go/no-go verdict table: 6 Tier-1 GO items (CSS + core_cols additions), 8 Tier-2 GO WITH CARE items (bug fixes A1/A2 with coder traps noted), 4 Tier-3 GO WITH PREREQUISITE items (B1/B3/B4/C9), and 2 HOLD items (B6 coordinate QA — needs char-precision detection before numeric coercion; C6 download_all removal — needs req(nrow(dat)>0) prereq + 4-step atomic plan). No code changed. app_gateway.R is unchanged." — Files: BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
+
+## 2026-05-13 — Tropical Ecology tab deep dive + Lourenco Jr papers
+User: Deep dive on publications at enquistlab.github.io/publications/. Update the Tropical Ecology tab; papers with Lourenco Jr, J. should be included.
+Action: Audited all ~200 publications. Found 4 papers missed by Tropical Ecology tab matchers:
+  1. Lourenco Jr et al. (2021) Ecosphere 12: e03629 — Atlantic Forest coastal tree communities (×2 entries) → added `/atlantic forest/i` wt 3
+  2. Martínez-Villa et al. (2024) GEB 33:85 — Andean forests, Colombia → added `/\bandean\b/i` wt 2
+  3. Kaspari et al. (2017) Ecology 98:2019 — Panama forest → added `/\bpanama\b/i` wt 2
+  4. Hogan et al. (2019) Biotropica 51:139 — Luquillo wet tropical forest → added `/biotropica/i` wt 2
+Also fixed duplicate `label: 'Tropical Ecology'` property in the tab definition (JS silently used the last one; removed the redundant line). 38 papers already matched; 4 newly added. Committed and pushed to enquistlab.github.io.
