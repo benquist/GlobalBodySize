@@ -2,7 +2,43 @@
 
 ---
 
-## 2026-05-12 — Stages 6–8 Complete; Stage 6 vectorized
+## 2026-05-12 — Stages 9a–9b Complete: Wood density matching + tiered biomass estimation
+
+**Stage 9a (wood density — `scripts/09a_load_wood_density.R`):**  
+Downloaded Global Wood Density Database (GWDD) via `BIOMASS::wdData` (Zanne et al. 2009, 16,467 rows). Hierarchical species → genus → global-fallback match applied to 35,307 woody species (growth form ∈ tree, shrub, subshrub, bamboo, vine, epiphyte). Non-woody species receive `rho_match_level = "none"`.
+
+| Match level | Species |
+|-------------|---------|
+| species | 4,464 |
+| genus | 15,360 |
+| global_fallback | 15,483 |
+| none (non-woody) | 298,471 |
+
+Family-level match returned 0 — BIEN `family` column and GWDD family names not aligned; genus-level catch absorbs most of the residual. Global fallback = 0.58 g/cm³ (UNVERIFIED).  
+Output: `output/species_wood_density.csv` (333,778 rows)
+
+**Stage 9b (biomass tiers — `scripts/09b_estimate_biomass_tiers.R`):**  
+Four deterministic AGB tiers, best tier selected per species:
+
+| Tier | Method | Species |
+|------|--------|---------|
+| 4 (best) | Chave 2014 Eq.7: DBH + H + species ρ | 1,056 |
+| 3 | Chave 2014 Eq.7: DBH + H + imputed ρ | 902 |
+| 2 | Chave 2005 Eq.3: DBH only | 6,690 |
+| 1 (weakest) | Height-only allometry | 3,173 |
+| **Total** | | **11,821** |
+
+BGB via Mokany et al. 2006 R:S ratios (UNVERIFIED). Plausibility check: tree median AGB = 133.6 kg — PASS.  
+Output: `output/plant_biomass_estimates.csv` (333,778 rows)
+
+**Citation flags (all UNVERIFIED — verify before publication):**  
+- BIOMASS::wdData source: Zanne et al. 2009 (Dryad 10.5061/dryad.234) via Chave et al. 2009 *Ecology Letters* 12(4):351–366  
+- Chave et al. 2014 *Global Change Biology* 20(10):3177–3190  
+- Chave et al. 2005 *Oecologia* 145:87–99  
+- Brown 1997 FAO Forestry Paper 134  
+- Mokany et al. 2006 *Global Change Biology* 12:84–96
+
+
 
 **Stage 6 (QA checks — vectorized rebuild):**  
 Original row-by-row `for` loop in `run_range_check_plants()` was O(n) in R — terminated after 12 hours on 10M records. Rewrote using `data.table` merge + vectorized `:=` assignments. Re-ran and completed in minutes.
