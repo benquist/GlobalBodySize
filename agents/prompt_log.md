@@ -2233,3 +2233,26 @@ Action: Root cause was .hero-photo using width:100vw which is wider than the vis
 2026-05-13 | "Yes, stage A first, give a report and then also B-E in order" — Global_Plant_BodySize: full 5-stage habit + body mass synthesis pipeline implemented. (A) Stage 3b (03b_habit_integration.R): pulled BIEN 'whole plant woodiness' (49,060 records) and 'whole plant growth form diversity' (67,413 records); 3-source priority merge expanded species with known habit from 83,580 → 91,939 (98.5% known). (B) Stage 9c (09c_tier_bias_check.R): Bland-Altman bias analysis on 1,958 allometric-ready species; T1 (height-only) bias = -0.877 log10-kg, T2 (DBH-only) bias = +0.380 log10-kg vs Chave 2014 reference; output: tier_bias_summary.csv, tier_bias_corrections.csv. (C+D) Stage 9d (09d_add_biomass_uncertainty.R): added agb_log10_sd column (tier-specific from LoA or equation RSE); herb proxy flagged 'herb_proxy_uncertain' with within-GF SD; growth-form imputation for 60,552 existing T0 + 6,358 new Stage 3b species; output: plant_biomass_with_uncertainty.csv (340,136 rows, 32 cols). (E) plant_bodysize_summary.Rmd: added Section 11 with unified log10(total biomass) figure — horizontal violins × growth form, strip points by tier (shape+alpha), 95% CI error bars; Bland-Altman bias table; summary table by GF × tier. Rendered clean. Files: scripts/03b_habit_integration.R, scripts/09c_tier_bias_check.R, scripts/09d_add_biomass_uncertainty.R, plant_bodysize_summary.Rmd, providers/bien/load_bien_traits.R (gf_diversity added to measurement type map).
 
 2026-05-13 | "For enquistlab.github.io/publications/ I would like to add another tab under 'phylogenetic ecology'. Include many of the papers with Nate Swenson, Nathan Kraft, as well as other papers coauthored with Jessica Green." — Added 'Phylogenetic Ecology' topic tab to enquistlab-site-migration/_pages/publications.html. Tab inserted after 'Functional Ecology' in topicDefinitions. Matchers designed with phylogenetics-comparative-agent input: weight-3 patterns for community phylogenetics, phylogenetic diversity/endemism/signal, and scale-dependency; weight-2 for any 'phylogeneti' occurrence; weight-1 weak signals (swenson, eco-evolutionary, opposing assembly mechanisms) that combine to reach threshold. Green papers classified as macroecology/theory (not included in tab); Kraft papers captured only where phylogenetic content is explicit in title/text. Agent: m → phylogenetics-comparative-agent (paper classification) → direct edit.
+
+## 2026-05-13 — Macroecology tab expansion for enquistlab publications
+
+**Prompt:** User noted several macroecology papers missing from the Macroecology tab at https://enquistlab.github.io/publications/, including:
+- Enquist et al. 2019 (commonness of rarity)
+- Bektaş et al. 2024 (mountain plant communities across Northern Hemisphere)
+- McGill et al. 2007 (species abundance distributions)
+- Swenson et al. 2007 (scale dependency in tropical forests)
+- Enquist et al. 2002 (modeling macroscopic patterns)
+
+**Action:** Delegated to merow-ecology, ecology-user, and scholarly-rigor-reviewer agents to conduct deep review of all Enquist publications and classify macroecological papers. Synthesized 80 candidate macroecology papers across 9 themes. Added 17 new JS regex patterns to the Macroecology tab matcher in `enquistlab-site-migration/_pages/publications.html`.
+
+**Key additions:**
+- species abundance distributions (McGill 2007, Morlon 2009)
+- macroscopic patterns (Enquist 2002)
+- global rarity (Enquist 2019)
+- northern/southern hemisphere (Bektaş 2024)
+- latitudinal diversity gradient, diversity gradients
+- species-energy relationship, global beta-diversity
+- body size–abundance, broad climatic gradients
+- general laws of biodiversity, across the globe, global relationship–richness
+
+**File changed:** `enquistlab-site-migration/_pages/publications.html`
