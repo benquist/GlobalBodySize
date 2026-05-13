@@ -361,7 +361,7 @@ organize_columns_for_export <- function(dat) {
   if (!is.data.frame(dat) || nrow(dat) == 0) return(dat)
   
   # Standard priority columns: species, trait info, value
-  core_cols <- c("scrubbed_species_binomial", "trait_name", "trait_value", "unit", "method")
+  core_cols <- c("scrubbed_species_binomial", "trait_name", "trait_value", "unit", "method", "observation_type")
   
   # Source/citation first (especially important for plot traits to access metadata)
   source_cols <- c("url_source", "source_citation", "project_pi")
@@ -370,7 +370,7 @@ organize_columns_for_export <- function(dat) {
   location_cols <- c("latitude", "longitude", "elevation_m")
   
   # Plot trait marker
-  marker_cols <- c("is_plot_trait")
+  marker_cols <- c("is_plot_trait", "is_introduced")
   
   # Taxonomy columns
   tax_cols <- names(dat)[which(grepl("^scrubbed_", names(dat)) & !grepl("binomial|species", names(dat)))]
@@ -705,8 +705,7 @@ queryUI <- function(id) {
           )
         ),
         div(class = "col-sm-6",
-          p(class = "text-muted", style = "margin-top: 28px;",
-            "Higher limits may take longer and can increase BIEN timeout risk.")
+          uiOutput(ns("max_records_hint"))
         )
       ),
       div(
@@ -714,7 +713,7 @@ queryUI <- function(id) {
                     label = tagList(span(id = ns("query_btn_spinner"), class = "fa fa-spinner fa-spin", style = "display:none; margin-right:6px;"), "Query BIEN"),
                     class = "btn btn-primary btn-lg bien-query-btn", 
                     style = "margin-top: 10px;"),
-        textOutput(ns("query_status"))
+        uiOutput(ns("query_status"))
       )
     )
   )
@@ -951,25 +950,41 @@ queryServer <- function(id) {
       )
     })
     
-    output$query_status <- renderText({
+    output$max_records_hint <- renderUI({
+      rank <- input$rank
+      hint <- switch(rank,
+        "species"    = "Species queries: 5,000\u201310,000 is sufficient for most species.",
+        "genus"      = "Genus queries span many species; 10,000\u201325,000 recommended.",
+        "family"     = "Family queries are broad; 25,000\u201350,000 may be needed for full coverage.",
+        "trait-only" = "Trait-only queries can return many records; start with 10,000 and increase if needed.",
+        "Higher limits may take longer and can increase BIEN timeout risk."
+      )
+      p(class = "text-muted", style = "margin-top: 28px;", hint)
+    })
+
+    output$query_status <- renderUI({
       if (rv$is_querying) {
-        "Querying BIEN (this may take 30-60 seconds)..."
+        div(class = "alert alert-info", style = "margin-top: 8px;",
+          tags$i(class = "fa fa-spinner fa-spin"), " Querying BIEN (this may take 30\u201360 seconds)...")
       } else if (nzchar(rv$error_msg)) {
-        paste("Status:", rv$error_msg)
+        div(class = "alert alert-danger", style = "margin-top: 8px;",
+          tags$strong("Error: "), rv$error_msg)
       } else if (nrow(rv$query_data) > 0) {
-        if (!is.null(rv$diagnostics$total_available_records) && !is.na(rv$diagnostics$total_available_records)) {
-          paste(
-            "✓ Returned", nrow(rv$query_data), "of", rv$diagnostics$total_available_records,
-            "BIEN records across", rv$diagnostics$unique_species, "species",
-            "(limit:", input$max_records, ")"
-          )
+        msg <- if (!is.null(rv$diagnostics$total_available_records) && !is.na(rv$diagnostics$total_available_records)) {
+          sprintf("\u2713 Returned %s of %s BIEN records across %s species (limit: %s)",
+            format(nrow(rv$query_data), big.mark = ","),
+            format(rv$diagnostics$total_available_records, big.mark = ","),
+            format(rv$diagnostics$unique_species, big.mark = ","),
+            format(input$max_records, big.mark = ","))
         } else {
-          paste("✓ Found", nrow(rv$query_data), "records across",
-                rv$diagnostics$unique_species, "species",
-                "(limit:", input$max_records, ")")
+          sprintf("\u2713 Found %s records across %s species (limit: %s)",
+            format(nrow(rv$query_data), big.mark = ","),
+            format(rv$diagnostics$unique_species, big.mark = ","),
+            format(input$max_records, big.mark = ","))
         }
+        div(class = "alert alert-success", style = "margin-top: 8px;", msg)
       } else {
-        ""
+        NULL
       }
     })
 
@@ -1312,18 +1327,41 @@ provenanceServer <- function(id, query_result) {
         unique_species = if (!is.null(diag)) diag$unique_species else NA_integer_,
         unique_traits = if (!is.null(diag)) diag$unique_traits else NA_integer_,
         download_all_traits = isTRUE(qr$download_all),
-        selected_traits = qr$selected_traits
+        selected_traits = qr$selected_traits,
+        bien_pkg_version = as.character(packageVersion("BIEN"))
       )
 
       manifest_json <- toJSON(manifest, pretty = TRUE)
-      
+
+      fmt_n <- function(x) if (is.null(x) || (length(x) == 1 && is.na(x))) "\u2014" else format(x, big.mark = ",")
+      fmt_c <- function(x) if (is.null(x) || (length(x) == 1 && is.na(x))) "\u2014" else as.character(x)
+
       tagList(
-        div(
-          h4("Query Manifest:"),
-          p("Use this for reproducibility and citation:"),
-          tags$pre(manifest_json, style = "background: #f5f5f5; padding: 10px;"),
-          downloadButton(session$ns("dl_manifest"), "Download Manifest"),
-          downloadButton(session$ns("dl_script"), "Download R Script")
+        div(class = "panel panel-default",
+          div(class = "panel-heading", h4("Query Provenance", style = "margin: 0;")),
+          div(class = "panel-body",
+            tags$dl(class = "dl-horizontal",
+              tags$dt("Rank"),              tags$dd(fmt_c(manifest$query_rank)),
+              tags$dt("Taxon"),             tags$dd(fmt_c(manifest$query_taxon)),
+              tags$dt("Records returned"),  tags$dd(fmt_n(manifest$records)),
+              tags$dt("Records available"), tags$dd(fmt_n(manifest$total_available_records)),
+              tags$dt("Unique species"),    tags$dd(fmt_n(manifest$unique_species)),
+              tags$dt("Unique traits"),     tags$dd(fmt_n(manifest$unique_traits)),
+              tags$dt("Max records limit"), tags$dd(fmt_n(manifest$max_records)),
+              tags$dt("BIEN version"),      tags$dd(fmt_c(manifest$bien_pkg_version)),
+              tags$dt("Timestamp (UTC)"),   tags$dd(fmt_c(manifest$timestamp_utc)),
+              tags$dt("App version"),       tags$dd(fmt_c(manifest$app_version))
+            ),
+            tags$details(
+              tags$summary("Full JSON (for reproducibility)"),
+              tags$pre(manifest_json, style = "background: #f5f5f5; padding: 10px; margin-top: 8px; font-size: 12px;")
+            ),
+            div(style = "margin-top: 12px;",
+              downloadButton(session$ns("dl_manifest"), "Download Manifest (JSON)"),
+              " ",
+              downloadButton(session$ns("dl_script"), "Download R Script")
+            )
+          )
         )
       )
     })
@@ -1341,7 +1379,8 @@ provenanceServer <- function(id, query_result) {
         total_available_records = if (!is.null(diag)) diag$total_available_records else NA_integer_,
         records_not_returned = if (!is.null(diag)) diag$records_not_returned else NA_integer_,
         download_all_traits = isTRUE(query_result()$download_all),
-        selected_traits = query_result()$selected_traits
+        selected_traits = query_result()$selected_traits,
+        bien_pkg_version = as.character(packageVersion("BIEN"))
       )
       manifest
     })
@@ -1367,6 +1406,7 @@ provenanceServer <- function(id, query_result) {
           unique_traits = if (!is.null(diag)) diag$unique_traits else NA_integer_,
           download_all_traits = isTRUE(query_result()$download_all),
           selected_traits = query_result()$selected_traits,
+          bien_pkg_version = as.character(packageVersion("BIEN")),
           diagnostics = if (!is.null(diag)) diag else list()
         )
         writeLines(toJSON(manifest, pretty = TRUE, auto_unbox = TRUE), con = file)
@@ -1980,19 +2020,49 @@ distributionsServer <- function(id, query_result) {
       vals <- sel$vals
       req(length(vals) > 0)
 
+      # A1+A2: apply log10 transformation locally (mirrors hist_plot pattern)
+      use_log <- isTRUE(input$dist_log10)
+      plot_vals <- if (use_log) {
+        v <- vals[vals > 0]
+        req(length(v) > 0)
+        log10(v)
+      } else {
+        vals
+      }
+
+      # A2: recompute outlier count on transformed scale (not from dist_selected())
+      q1 <- stats::quantile(plot_vals, 0.25, na.rm = TRUE, names = FALSE)
+      q3 <- stats::quantile(plot_vals, 0.75, na.rm = TRUE, names = FALSE)
+      iqr_val <- q3 - q1
+      local_outlier_n <- sum(plot_vals < (q1 - 1.5 * iqr_val) | plot_vals > (q3 + 1.5 * iqr_val), na.rm = TRUE)
+
+      scale_sfx <- if (use_log) " (log10)" else ""
+      outlier_label <- if (use_log) "Outliers (1.5*IQR, log10 scale)" else "Outliers (1.5*IQR)"
+
       data.frame(
-        metric = c("N (non-missing)", "Mean", "Median", "SD", "IQR", "Min", "Max", "5th percentile", "95th percentile", "Outliers (1.5*IQR)"),
+        metric = c(
+          "N (non-missing)",
+          paste0("Mean", scale_sfx),
+          paste0("Median", scale_sfx),
+          paste0("SD", scale_sfx),
+          paste0("IQR", scale_sfx),
+          paste0("Min", scale_sfx),
+          paste0("Max", scale_sfx),
+          paste0("5th percentile", scale_sfx),
+          paste0("95th percentile", scale_sfx),
+          outlier_label
+        ),
         value = c(
-          length(vals),
-          round(mean(vals, na.rm = TRUE), 4),
-          round(median(vals, na.rm = TRUE), 4),
-          round(stats::sd(vals, na.rm = TRUE), 4),
-          round(stats::IQR(vals, na.rm = TRUE), 4),
-          round(min(vals, na.rm = TRUE), 4),
-          round(max(vals, na.rm = TRUE), 4),
-          round(stats::quantile(vals, 0.05, na.rm = TRUE, names = FALSE), 4),
-          round(stats::quantile(vals, 0.95, na.rm = TRUE, names = FALSE), 4),
-          sel$outlier_n
+          length(plot_vals),
+          round(mean(plot_vals, na.rm = TRUE), 4),
+          round(median(plot_vals, na.rm = TRUE), 4),
+          round(stats::sd(plot_vals, na.rm = TRUE), 4),
+          round(stats::IQR(plot_vals, na.rm = TRUE), 4),
+          round(min(plot_vals, na.rm = TRUE), 4),
+          round(max(plot_vals, na.rm = TRUE), 4),
+          round(stats::quantile(plot_vals, 0.05, na.rm = TRUE, names = FALSE), 4),
+          round(stats::quantile(plot_vals, 0.95, na.rm = TRUE, names = FALSE), 4),
+          local_outlier_n
         ),
         check.names = FALSE,
         stringsAsFactors = FALSE
@@ -2382,6 +2452,8 @@ ui <- fluidPage(
       )
     ),
 
+    uiOutput("query_context_strip"),
+
     tabsetPanel(
       id = "workflow_tabs",
       type = "tabs",
@@ -2389,7 +2461,7 @@ ui <- fluidPage(
       tabPanel("Step 2: Scope", scopeUI("scope")),
       tabPanel("Step 3: Traits", traitSelectUI("traitSelect")),
       tabPanel("Step 4: Distributions", distributionsUI("distributions")),
-      tabPanel("Map", mapUI("map")),
+      tabPanel("Step 4b: Map", mapUI("map")),
       tabPanel("Step 5: Diagnostics", diagnosticsUI("diagnostics")),
       tabPanel("Step 6: Records", recordsUI("records")),
       tabPanel("Step 7: Provenance", provenanceUI("provenance")),
@@ -2457,7 +2529,7 @@ ui <- fluidPage(
     .panel-warning > .panel-heading,
     .panel-success > .panel-heading,
     .panel-default > .panel-heading {
-      background: linear-gradient(180deg, #ecf6ff 0%, #f4fbef 100%);
+      background: #f7fbff;
       color: var(--bien-blue-deep);
       border-color: var(--panel-border);
     }
@@ -2491,13 +2563,7 @@ ui <- fluidPage(
       border-color: #92b7d6;
       color: #163d5a;
     }
-    .nav-tabs > li:nth-child(1) > a { border-left: 6px solid #2f79b7; }
-    .nav-tabs > li:nth-child(2) > a { border-left: 6px solid #49a078; }
-    .nav-tabs > li:nth-child(3) > a { border-left: 6px solid #69b34c; }
-    .nav-tabs > li:nth-child(4) > a { border-left: 6px solid #d4a537; }
-    .nav-tabs > li:nth-child(5) > a { border-left: 6px solid #e07a5f; }
-    .nav-tabs > li:nth-child(6) > a { border-left: 6px solid #7b8ec8; }
-    .nav-tabs > li:nth-child(7) > a { border-left: 6px solid #4e8c2c; }
+    .nav-tabs > li > a { border-left: 6px solid var(--bien-blue); }
     .nav-tabs > li.active > a,
     .nav-tabs > li.active > a:focus,
     .nav-tabs > li.active > a:hover {
@@ -2506,19 +2572,6 @@ ui <- fluidPage(
       border: 2px solid #1f5b8f;
       box-shadow: 0 2px 0 #18456f, 0 7px 14px rgba(31, 91, 143, 0.25);
       transform: translateY(-1px);
-    }
-    .nav-tabs > li.active:nth-child(2) > a,
-    .nav-tabs > li.active:nth-child(2) > a:focus,
-    .nav-tabs > li.active:nth-child(2) > a:hover,
-    .nav-tabs > li.active:nth-child(3) > a,
-    .nav-tabs > li.active:nth-child(3) > a:focus,
-    .nav-tabs > li.active:nth-child(3) > a:hover,
-    .nav-tabs > li.active:nth-child(7) > a,
-    .nav-tabs > li.active:nth-child(7) > a:focus,
-    .nav-tabs > li.active:nth-child(7) > a:hover {
-      background: linear-gradient(180deg, #87c95d 0%, #4e8c2c 100%);
-      border-color: #4e8c2c;
-      box-shadow: 0 2px 0 #386620, 0 7px 14px rgba(62, 112, 36, 0.22);
     }
     .tab-content {
       background: #fff;
@@ -2585,6 +2638,19 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   query_result <- queryServer("query")
+
+  output$query_context_strip <- renderUI({
+    qr <- query_result()
+    if (!is.data.frame(qr$data) || nrow(qr$data) == 0) return(NULL)
+    rank_label <- paste0(toupper(substr(qr$rank, 1, 1)), substr(qr$rank, 2, nchar(qr$rank)))
+    div(
+      class = "alert alert-info",
+      style = "margin-bottom: 8px; padding: 8px 14px; border-radius: 6px; font-size: 13px;",
+      tags$strong(paste0("Active query \u2014 ", rank_label, ": ")),
+      qr$taxon, " | ",
+      format(nrow(qr$data), big.mark = ","), " records"
+    )
+  })
   scope_result <- scopeServer("scope", query_result)
   trait_result <- traitSelectServer("traitSelect", query_result)
   distributions_result <- distributionsServer("distributions", trait_result)

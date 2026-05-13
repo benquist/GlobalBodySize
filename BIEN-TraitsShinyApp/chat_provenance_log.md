@@ -270,3 +270,9 @@
 - Prompt summary: @M orchestrated optimizer + coder pre-flight safety review of 26 proposed app changes. Optimizer: all items rated SAFE except C6 (RISKY). Coder: added implementation traps for A1 (label update required), A2 (Option B — local recompute in renderTable), B1 (verify API columns first), B3 (url_source guard needed), B6 (HOLD — numeric precision loss), C6 (HOLD — silent 0-row download risk; add req(nrow(dat)>0) prereq). No code changed.
 - Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+---
+- Date: 2026-05-13
+- Prompt summary: Implemented Tier 1 and Tier 2 changes in app_gateway.R. Tier 1: B2 (observation_type in core_cols), B5 (is_introduced in marker_cols), B7 (BIEN pkg version in manifests), C1 (flat panel headings), C2 (uniform blue tab borders), C3 (Map → Step 4b: Map). Tier 2: A1+A2 (log10-aware summary stats with corrected labels and local outlier recompute), C4 (query context strip), C5 (query_status Bootstrap alerts), C7 (rank-sensitive max_records hint), C8 (structured provenance dl/dd card). File parses clean. Tier 3 and HOLD items deferred.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
+- Completed by: GitHub Copilot
