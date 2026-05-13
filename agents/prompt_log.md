@@ -2264,3 +2264,7 @@ Action: Root cause was .hero-photo using width:100vw which is wider than the vis
 **File changed:** `enquistlab-site-migration/_pages/publications.html`
 
 2026-05-13 | "Add additional papers: Bryant et al. microbial PNAS; Neves et al. PNAS; and also The adaptive challenge of extreme conditions... DM Neves et al. PNAS 118(37) e2021132118 (is this paper in my CV??)" — Confirmed Neves et al. 2021 PNAS was MISSING from publications list. Added it to _includes/publications_full_from_doc.md (2021 papers in 2022 section). Updated phylogenetic-ecology matchers in _pages/publications.html: added weight-3 patterns for /microbes on mountainsides/ (Bryant 2008 PNAS), /adaptive challenge.*extreme conditions/, and /evolutionary diversity.*plant assemblages/ (Neves 2021). Both files committed and pushed to enquistlab.github.io. Agent: m → direct edit.
+
+## 2026-05-13 — Gallagher 2020 publication check
+User: Add Gallagher et al. 2020 "Open Science principles for accelerating trait-based science across the Tree of Life" (Nature Ecology & Evolution 4(3), 294-303).
+Action: Paper already in publications_full_from_doc.md (2020 section) but had malformed HTML (nested duplicate <a> tag). Fixed HTML. Added `/tree of life/i` weight-2 matcher to phylogenetic-ecology tab so both Gallagher 2020 and Eiserhardt 2018 appear there. Pushed to enquistlab.github.io (commits c7d6c1a, 9abba69).
