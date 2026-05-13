@@ -189,6 +189,7 @@ model_s1 <- MCMCglmm(
   nitt     = NITT,
   burnin   = BURNIN,
   thin     = THIN,
+  pr       = TRUE,   ## Save per-level RE posterior samples in Sol (required for BLUP extraction)
   verbose  = TRUE
 )
 
