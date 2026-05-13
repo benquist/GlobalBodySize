@@ -1,6 +1,6 @@
 ---
 title: "Niklas & Enquist Organ-Mass Scaling: Theory Testing Across Biomass Partitions"
-subtitle: "OLS, SMA, PGLS — Interspecific, Gymnosperm/Angiosperm, Family, and Intraspecific"
+subtitle: "OLS, SMA, PGLS, PGLMM — Interspecific, Gymnosperm/Angiosperm, Family, Intraspecific, and Bayesian Variance Partitioning"
 author: "plant_scaling_data project"
 date: "`r Sys.Date()`"
 output:
@@ -22,6 +22,7 @@ suppressPackageStartupMessages({
   library(stringr); library(tibble); library(caper);  library(ape)
   library(phytools)
 })
+if (requireNamespace("brms", quietly = TRUE)) suppressPackageStartupMessages(library(brms))
 
 HAS_PHYLOMAKER <- requireNamespace("V.PhyloMaker2", quietly = TRUE)
 
@@ -59,6 +60,19 @@ WBE_ROOT_STEM   <- 1.0
 WBE_ROOT_SHOOT  <- 1.0
 WBE_TOTAL_H     <- 8/3   # total biomass ~ height^(8/3): derived from vascular geometry
 WBE_GROWTH      <- 3/4   # growth rate ~ mass^(3/4)
+
+# Kerkhoff et al. (2005) GEB: metabolic-stoichiometric slope predictions
+# [CITATION-UNVERIFIED] Kerkhoff, A.J., Enquist, B.J., Elser, J.J. & Fagan, W.F. (2005)
+#   Plant allometry, stoichiometry and the temperature-dependence of primary productivity.
+#   Global Ecology and Biogeography, 14, 585-598.
+# Extends WBE to stoichiometry: metabolic demand constrains leaf tissue allocation;
+# leaf biomass and growth rate (NPP proxy) both predicted at M^(3/4).
+KERKHOFF_LEAF_TOTAL   <- 3/4   # leaf ~ total (stoichiometric mechanism ≡ WBE)
+KERKHOFF_GROWTH_TOTAL <- 3/4   # growth ~ total (NPP proxy, metabolic prediction)
+# Related:
+# [CITATION-UNVERIFIED] Brown et al. (2004) Ecology 85:1771 — Metabolic Theory of Ecology
+# [CITATION-UNVERIFIED] Kerkhoff & Enquist (2006) Ecol Lett 9:419 — Ecosystem allometry
+# [CITATION-UNVERIFIED] Elser et al. (2000) Nature 408:578 — Stoichiometric constraints
 ```
 
 ---
@@ -352,12 +366,15 @@ if (HAS_PHYLOMAKER && nrow(ne_sp_means) > 10) {
         genus   = sp_for_tree$genus,
         family  = sp_for_tree$family),
       tree    = V.PhyloMaker2::GBOTB.extended.TPL,
-      nodes   = V.PhyloMaker2::nodes.info.1,
+      nodes   = V.PhyloMaker2::nodes.info.1.TPL,
       scenario = "S3")
-    if (!is.null(res$phylo)) {
-      tr <- res$phylo
-      tr$node.label <- NULL
-      tr
+    # V.PhyloMaker2 >= 0.1.0 returns res$scenario.3 (not res$phylo)
+    tr_obj <- if (!is.null(res$scenario.3)) res$scenario.3
+              else if (!is.null(res$phylo))  res$phylo
+              else NULL
+    if (!is.null(tr_obj)) {
+      tr_obj$node.label <- NULL
+      tr_obj
     } else NULL
   }, error = function(e) { message("V.PhyloMaker2 failed: ", e$message); NULL })
 
@@ -1054,6 +1071,429 @@ kable(sens_compare |>
 
 ---
 
+# Bayesian PGLMM: Individual-Level Scaling {#sec-pglmm}
+
+## Motivation and Design
+
+The OLS, SMA, and PGLS analyses above operate on **species means** — one data point per species. A Bayesian Phylogenetic Generalised Linear Mixed Model (PGLMM) operates instead on **individual-level observations**, partitioning variance explicitly into three components:
+
+- $\sigma^2_{phy}$: variance among species attributable to shared evolutionary history (phylogenetic signal)
+- $\sigma^2_{spp}$: non-phylogenetic species-level variance (ecological/developmental differences not explained by phylogeny)
+- $\sigma^2_e$: individual-level residual (within-species variation and measurement error)
+
+### The Mundlak Device
+
+Because the NE database contains 1–40+ observations per species spanning seedlings to old-growth trees, a naive individual-level regression would estimate a mixture of *inter-* and *intraspecific* slopes. We apply the **Mundlak (1978) within-between decomposition**:
+
+$$\log_{10}(R_{ij}) = \alpha + \underbrace{\beta_B \,\overline{\log_{10}(M)}_i}_{\text{between-species}} + \underbrace{\beta_W (\log_{10}(M_{ij}) - \overline{\log_{10}(M)}_i)}_{\text{within-species}} + u_i^{phy} + u_i^{spp} + \varepsilon_{ij}$$
+
+where $i$ indexes species and $j$ indexes individual observations within a species. The **between-species slope $\beta_B$** is the PGLMM quantity comparable to the PGLS interspecific slope. The **within-species slope $\beta_W$** is comparable to intraspecific OLS regressions.
+
+The phylogenetic random effect $u_i^{phy} \sim \mathcal{N}(\mathbf{0}, \sigma^2_{phy} \mathbf{C})$, where $\mathbf{C}$ is the Brownian-motion phylogenetic correlation matrix from `ape::vcv.phylo(tree, corr = TRUE)`. Implementation uses `brms` (Bürkner 2017) with Stan.
+
+### Caveats
+
+- **$\beta_B$ is not identical to the PGLS slope**; it is a hierarchical Bayesian estimand from individual records. They are comparable estimators of the same theoretical quantity under shared assumptions.
+- **Unbalanced sampling creates implicit weighting**: species with many records dominate estimation of $\sigma^2_e$ and $\beta_W$; singletons contribute only to $\beta_B$.
+- **PGLMM is presented as a robustness and variance-decomposition supplement** to PGLS, not a replacement.
+- Priors are weakly informative: $\beta_B, \beta_W \sim \mathcal{N}(1, 1)$; SD terms $\sim \text{Student-}t(3, 0, 0.5)$.
+- Convergence assessed by $\hat{R} < 1.05$ and ESS ratio $> 0.1$ for all parameters.
+
+```{r pglmm-packages}
+HAS_BRMS <- requireNamespace("brms", quietly = TRUE) &&
+  utils::packageVersion("brms") >= "2.17.0"
+if (!HAS_BRMS) message("brms ≥ 2.17.0 not available — PGLMM section will be skipped.")
+```
+
+```{r pglmm-data-prep}
+ne_wild_log10 <- ne_wild |>
+  dplyr::filter(!is.na(binomial), !flag_uncertain) |>
+  dplyr::mutate(
+    log10_leaf  = log10(leaf_biomass_kg),
+    log10_stem  = log10(stem_biomass_kg),
+    log10_root  = log10(root_biomass_kg),
+    log10_shoot = log10(shoot_biomass_kg),
+    log10_total = log10(total_biomass_kg),
+    log10_total_growth = log10(total_growth_kgyr),
+    sp_tree     = gsub(" ", "_", binomial)
+  ) |>
+  dplyr::mutate(across(starts_with("log10_"), ~ ifelse(is.nan(.) | is.infinite(.), NA_real_, .)))
+
+# Report records/species per division
+ne_wild_log10 |>
+  dplyr::filter(!is.na(ne_division)) |>
+  dplyr::count(ne_division, name = "n_obs") |>
+  dplyr::left_join(
+    ne_wild_log10 |> dplyr::filter(!is.na(ne_division)) |>
+      dplyr::group_by(ne_division) |>
+      dplyr::summarise(n_spp = dplyr::n_distinct(sp_tree), .groups="drop"),
+    by = "ne_division") |>
+  kable(caption = "Individual-level records available for PGLMM by division.")
+
+# Species sampling summary (to assess Mundlak device validity)
+samp_summary <- ne_wild_log10 |>
+  dplyr::filter(!is.na(binomial)) |>
+  dplyr::count(sp_tree, name = "n_records") |>
+  dplyr::summarise(
+    n_singletons = sum(n_records == 1),
+    n_2_to_5     = sum(n_records >= 2 & n_records <= 5),
+    n_6plus      = sum(n_records >= 6),
+    total_spp    = n(),
+    pct_singleton = round(100 * mean(n_records == 1), 1)
+  )
+cat(sprintf(
+  "Species sampling: %d total; %d singletons (%.1f%%); %d with 2-5 records; %d with ≥6 records\n",
+  samp_summary$total_spp, samp_summary$n_singletons, samp_summary$pct_singleton,
+  samp_summary$n_2_to_5, samp_summary$n_6plus))
+```
+
+```{r run-one-pglmm}
+run_one_pglmm <- function(df_individual, tree,
+                           y_col, x_col,
+                           rel_label,
+                           group_label = "All",
+                           wbe_slope   = NA_real_,
+                           iter        = 2000,
+                           chains      = 4,
+                           cache_dir   = NULL,
+                           seed        = 42) {
+  if (!requireNamespace("brms", quietly = TRUE)) return(NULL)
+  library(brms)
+
+  df <- df_individual |>
+    dplyr::filter(!is.na(binomial), is.finite(.data[[y_col]]), is.finite(.data[[x_col]])) |>
+    dplyr::mutate(sp_tree = gsub(" ", "_", binomial))
+
+  shared_sp <- intersect(df$sp_tree, tree$tip.label)
+  n_shared  <- length(shared_sp)
+  if (n_shared < 8) {
+    message(sprintf("Skipping %s [%s] — %d species matched to tree (need ≥ 8).", rel_label, group_label, n_shared))
+    return(NULL)
+  }
+
+  pruned_tree <- ape::keep.tip(tree, shared_sp)
+  pruned_tree$node.label <- NULL
+  df <- df |> dplyr::filter(sp_tree %in% shared_sp)
+  n_obs <- nrow(df); n_spp <- dplyr::n_distinct(df$sp_tree)
+  message(sprintf("PGLMM %s [%s]: %d obs, %d spp", rel_label, group_label, n_obs, n_spp))
+
+  # Mundlak device: within/between decomposition
+  df <- df |>
+    dplyr::group_by(sp_tree) |>
+    dplyr::mutate(
+      x_bar = mean(.data[[x_col]], na.rm = TRUE),
+      x_dev = .data[[x_col]] - x_bar
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::rename(log10_y = !!rlang::sym(y_col)) |>
+    dplyr::mutate(phylo = sp_tree, spp = sp_tree)
+
+  # Phylogenetic correlation matrix (Brownian motion, corr=TRUE → diagonal=1)
+  A <- ape::vcv.phylo(pruned_tree, corr = TRUE)
+
+  priors <- c(
+    brms::prior(normal(1, 1),         class = "b",   coef = "x_bar"),
+    brms::prior(normal(1, 1),         class = "b",   coef = "x_dev"),
+    brms::prior(normal(0, 2),         class = "Intercept"),
+    brms::prior(student_t(3, 0, 0.5), class = "sd",  group = "phylo"),
+    brms::prior(student_t(3, 0, 0.5), class = "sd",  group = "spp"),
+    brms::prior(student_t(3, 0, 0.5), class = "sigma")
+  )
+
+  cache_file <- if (!is.null(cache_dir)) {
+    dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
+    file.path(cache_dir,
+              sprintf("pglmm_%s_%s.rds",
+                      gsub("[^a-zA-Z0-9]", "_", rel_label),
+                      gsub("[^a-zA-Z0-9]", "_", group_label)))
+  } else NULL
+
+  # Try cmdstanr backend first, fall back to rstan
+  backend <- if (requireNamespace("cmdstanr", quietly = TRUE)) "cmdstanr" else "rstan"
+
+  fit <- tryCatch(
+    brms::brm(
+      formula = brms::bf(log10_y ~ x_bar + x_dev + (1 | gr(phylo, cov = A)) + (1 | spp)),
+      data    = df,
+      data2   = list(A = A),
+      prior   = priors,
+      family  = gaussian(),
+      iter    = iter,
+      warmup  = iter %/% 2,
+      chains  = chains,
+      cores   = chains,
+      seed    = seed,
+      file    = cache_file,
+      refresh = 0,
+      silent  = 2,
+      backend = backend
+    ),
+    error = function(e) {
+      message(sprintf("brms failed [%s / %s]: %s", rel_label, group_label, e$message))
+      NULL
+    }
+  )
+  if (is.null(fit)) return(NULL)
+
+  rhat_max <- max(brms::rhat(fit), na.rm = TRUE)
+  ess_min  <- min(brms::neff_ratio(fit), na.rm = TRUE)
+  if (rhat_max > 1.05) warning(sprintf("R-hat > 1.05 for %s [%s]", rel_label, group_label))
+
+  fe   <- brms::fixef(fit)
+  beta_B <- fe["x_bar", "Estimate"];  se_B <- fe["x_bar", "Est.Error"]
+  beta_W <- fe["x_dev", "Estimate"];  se_W <- fe["x_dev", "Est.Error"]
+  ci_B   <- fe["x_bar", c("Q2.5", "Q97.5")]
+  ci_W   <- fe["x_dev", c("Q2.5", "Q97.5")]
+
+  vc      <- brms::VarCorr(fit, summary = TRUE)
+  var_phy <- tryCatch(vc$phylo$sd[1, "Estimate"]^2,      error = function(e) NA_real_)
+  var_spp <- tryCatch(vc$spp$sd[1, "Estimate"]^2,        error = function(e) NA_real_)
+  var_e   <- tryCatch(vc$residual__$sd[1, "Estimate"]^2, error = function(e) NA_real_)
+  var_tot <- sum(c(var_phy, var_spp, var_e), na.rm = TRUE)
+
+  lambda_analog <- if (!is.na(var_phy) && !is.na(var_spp) && (var_phy + var_spp) > 0)
+    var_phy / (var_phy + var_spp) else NA_real_
+  h2_phy        <- if (!is.na(var_phy) && var_tot > 0) var_phy / var_tot else NA_real_
+  icc_spp       <- if (var_tot > 0) sum(c(var_phy, var_spp), na.rm=TRUE) / var_tot else NA_real_
+
+  # Full posterior for variance fraction CIs
+  post <- brms::as_draws_df(fit)
+  sd_phy_col <- grep("^sd_phylo", names(post), value = TRUE)[1]
+  sd_spp_col <- grep("^sd_spp",  names(post), value = TRUE)[1]
+  sig_col    <- grep("^sigma",   names(post), value = TRUE)[1]
+  b_xbar_col <- grep("^b_x_bar", names(post), value = TRUE)[1]
+
+  if (!is.na(sd_phy_col) && !is.na(sd_spp_col) && !is.na(sig_col)) {
+    v_phy <- post[[sd_phy_col]]^2; v_spp <- post[[sd_spp_col]]^2; v_e <- post[[sig_col]]^2
+    v_tot <- v_phy + v_spp + v_e
+    lambda_ci <- quantile(v_phy / (v_phy + v_spp), c(0.025, 0.975), na.rm = TRUE)
+    h2_ci     <- quantile(v_phy / v_tot,            c(0.025, 0.975), na.rm = TRUE)
+  } else {
+    lambda_ci <- h2_ci <- c(NA_real_, NA_real_)
+  }
+
+  p_vs_wbe_B <- if (!is.na(wbe_slope) && !is.na(b_xbar_col)) {
+    b_post <- post[[b_xbar_col]]
+    min(mean(b_post < wbe_slope), mean(b_post > wbe_slope)) * 2
+  } else NA_real_
+
+  tibble::tibble(
+    relationship  = rel_label,
+    group         = group_label,
+    y_var         = y_col,
+    x_var         = x_col,
+    wbe_slope     = wbe_slope,
+    n_obs         = n_obs,
+    n_species     = n_spp,
+    method        = c("PGLMM-between", "PGLMM-within"),
+    slope         = c(beta_B,   beta_W),
+    slope_se      = c(se_B,     se_W),
+    ci_lower      = c(ci_B[1],  ci_W[1]),
+    ci_upper      = c(ci_B[2],  ci_W[2]),
+    var_phy       = var_phy,
+    var_spp       = var_spp,
+    var_e         = var_e,
+    lambda_analog = lambda_analog,
+    lambda_ci_lo  = lambda_ci[1],
+    lambda_ci_hi  = lambda_ci[2],
+    h2_phy        = h2_phy,
+    h2_ci_lo      = h2_ci[1],
+    h2_ci_hi      = h2_ci[2],
+    icc_spp       = icc_spp,
+    rhat_max      = rhat_max,
+    ess_ratio_min = ess_min,
+    p_vs_wbe      = c(p_vs_wbe_B, NA_real_),
+    lambda_ml     = NA_real_
+  )
+}
+```
+
+```{r pglmm-key-relationships}
+pglmm_rels <- list(
+  list(y = "log10_leaf",  x = "log10_stem",  label = "Leaf ~ Stem (KEY)", wbe = WBE_LEAF_STEM),
+  list(y = "log10_leaf",  x = "log10_total", label = "Leaf ~ Total",      wbe = WBE_LEAF_TOTAL),
+  list(y = "log10_root",  x = "log10_shoot", label = "Root ~ Shoot",      wbe = WBE_ROOT_SHOOT),
+  list(y = "log10_stem",  x = "log10_total", label = "Stem ~ Total",      wbe = WBE_STEM_TOTAL),
+  list(y = "log10_total_growth", x = "log10_total", label = "TotalGrowth ~ Total", wbe = WBE_GROWTH)
+)
+```
+
+```{r pglmm-fit, cache=TRUE}
+pglmm_results <- NULL
+if (!is.null(ne_phy_tree) && HAS_BRMS) {
+  pglmm_cache <- file.path(proj_dir, "pglmm_cache")
+
+  pglmm_results_list <- lapply(pglmm_rels, function(r) {
+    lapply(c("All", "Gymnosperm", "Angiosperm"), function(grp) {
+      df_grp <- if (grp == "All") {
+        ne_wild_log10 |> dplyr::filter(!is.na(ne_division))
+      } else {
+        ne_wild_log10 |> dplyr::filter(ne_division == grp)
+      }
+      run_one_pglmm(
+        df_individual = df_grp,
+        tree          = ne_phy_tree,
+        y_col         = r$y,
+        x_col         = r$x,
+        rel_label     = r$label,
+        group_label   = grp,
+        wbe_slope     = r$wbe,
+        iter          = 2000,
+        chains        = 4,
+        cache_dir     = pglmm_cache,
+        seed          = 42
+      )
+    })
+  })
+
+  pglmm_results <- dplyr::bind_rows(
+    lapply(pglmm_results_list, function(x) dplyr::bind_rows(x))
+  )
+
+  if (!is.null(pglmm_results) && nrow(pglmm_results) > 0) {
+    kable(
+      pglmm_results |>
+        dplyr::filter(method == "PGLMM-between") |>
+        dplyr::select(relationship, group, n_obs, n_species, slope, ci_lower, ci_upper,
+               lambda_analog, h2_phy, p_vs_wbe, rhat_max) |>
+        dplyr::mutate(across(where(is.numeric), ~ round(.x, 3))),
+      caption = paste(
+        "PGLMM between-species slopes (β_B) per life-form group.",
+        "λ_analog = phylogenetic variance fraction; h²_phy = phylogenetic heritability.",
+        "Convergence: R-hat < 1.05 indicates good mixing."))
+  }
+} else {
+  message("Phylogeny or brms not available — PGLMM skipped.")
+}
+```
+
+```{r pglmm-variance-components}
+if (!is.null(pglmm_results) && nrow(pglmm_results) > 0) {
+  vc_df <- pglmm_results |>
+    dplyr::filter(method == "PGLMM-between") |>
+    dplyr::select(relationship, group, var_phy, var_spp, var_e) |>
+    tidyr::pivot_longer(c(var_phy, var_spp, var_e),
+                        names_to = "component", values_to = "variance") |>
+    dplyr::mutate(
+      component = factor(component,
+        levels = c("var_phy", "var_spp", "var_e"),
+        labels = c("Phylogenetic (σ²_phy)",
+                   "Non-phylo species (σ²_spp)",
+                   "Individual residual (σ²_e)")),
+      relationship = stringr::str_remove(relationship, " \\(KEY\\)")
+    ) |>
+    dplyr::group_by(relationship, group) |>
+    dplyr::mutate(prop = variance / sum(variance, na.rm = TRUE)) |>
+    dplyr::ungroup()
+
+  ggplot(vc_df |> dplyr::filter(!is.na(prop)),
+         aes(group, prop, fill = component)) +
+    geom_col(position = "stack") +
+    scale_fill_manual(values = c(
+      "Phylogenetic (σ²_phy)"        = "#6A1B9A",
+      "Non-phylo species (σ²_spp)"   = "#1565C0",
+      "Individual residual (σ²_e)"   = "#B0BEC5")) +
+    facet_wrap(~ relationship, ncol = 3) +
+    scale_y_continuous(labels = scales::percent) +
+    labs(title = "PGLMM variance partitioning",
+         subtitle = "Proportion of total variance by component and life-form group",
+         x = "Life-form group", y = "Proportion of variance", fill = "Component") +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+          legend.position = "bottom")
+}
+```
+
+```{r pglmm-slope-comparison}
+if (!is.null(pglmm_results) && nrow(pglmm_results) > 0) {
+  # Bind OLS/SMA/PGLS (from inter_results + div_results) with PGLMM
+  # inter_results has group = "All"; div_results has group in {"Gymnosperm","Angiosperm"}
+  ols_sma_pgls <- dplyr::bind_rows(
+    inter_results |> dplyr::mutate(data_level = "Species means"),
+    div_results   |> dplyr::mutate(data_level = "Species means")
+  ) |>
+    dplyr::filter(method %in% c("OLS", "SMA", "PGLS"))
+
+  pglmm_for_plot <- pglmm_results |>
+    dplyr::mutate(data_level = "Individual records")
+
+  comparison_df <- dplyr::bind_rows(ols_sma_pgls, pglmm_for_plot) |>
+    dplyr::filter(
+      relationship %in% c("Leaf ~ Stem (KEY)", "Leaf ~ Total",
+                           "Root ~ Shoot", "Stem ~ Total", "TotalGrowth ~ Total"),
+      method %in% c("OLS", "SMA", "PGLS", "PGLMM-between"),
+      group   %in% c("All", "Gymnosperm", "Angiosperm"),
+      !is.na(slope), is.finite(slope)
+    ) |>
+    dplyr::mutate(
+      method_label = factor(method,
+        levels = c("OLS", "SMA", "PGLS", "PGLMM-between"),
+        labels = c("OLS (spp means)", "SMA (spp means)",
+                   "PGLS (spp means)", "PGLMM β_B (individuals)")),
+      relationship = stringr::str_remove(relationship, " \\(KEY\\)")
+    )
+
+  ggplot(comparison_df,
+         aes(slope, group, colour = method_label, shape = method_label)) +
+    geom_pointrange(
+      aes(xmin = ci_lower, xmax = ci_upper),
+      position = position_dodge(width = 0.6), size = 0.5) +
+    geom_vline(
+      data = comparison_df |>
+        dplyr::distinct(relationship, wbe_slope) |>
+        dplyr::filter(!is.na(wbe_slope)),
+      aes(xintercept = wbe_slope),
+      colour = "firebrick", linetype = "dashed", linewidth = 0.7,
+      inherit.aes = FALSE) +
+    scale_colour_manual(values = c(
+      "OLS (spp means)"         = "#555555",
+      "SMA (spp means)"         = "#1565C0",
+      "PGLS (spp means)"        = "#2E7D32",
+      "PGLMM β_B (individuals)" = "#6A1B9A")) +
+    scale_shape_manual(values = c(16, 17, 15, 18)) +
+    facet_wrap(~ relationship, scales = "free_x", ncol = 2) +
+    labs(
+      title    = "Scaling exponent comparison: OLS / SMA / PGLS / PGLMM",
+      subtitle = paste("PGLMM β_B = between-species slope (Mundlak device, individual records).",
+                       "Red dashed = WBE prediction. CIs: 95% frequentist for OLS/SMA/PGLS,",
+                       "95% Bayesian credible interval for PGLMM."),
+      x      = "Slope ± 95% CI",
+      y      = "Life-form group",
+      colour = "Method", shape = "Method") +
+    theme(legend.position = "bottom",
+          strip.text = element_text(size = 9))
+}
+```
+
+```{r pglmm-mundlak-check}
+if (!is.null(pglmm_results) && nrow(pglmm_results) > 0) {
+  mundlak_df <- pglmm_results |>
+    dplyr::select(relationship, group, method, slope, ci_lower, ci_upper) |>
+    tidyr::pivot_wider(
+      names_from = method,
+      values_from = c(slope, ci_lower, ci_upper)
+    ) |>
+    dplyr::mutate(
+      beta_C = `slope_PGLMM-between` - `slope_PGLMM-within`,
+      mundlak_informative = abs(beta_C) > 0.1,
+      relationship = stringr::str_remove(relationship, " \\(KEY\\)")
+    )
+
+  kable(
+    mundlak_df |>
+      dplyr::select(relationship, group,
+             between = `slope_PGLMM-between`,
+             within  = `slope_PGLMM-within`,
+             beta_C, mundlak_informative) |>
+      dplyr::mutate(across(where(is.numeric), ~ round(.x, 3))),
+    caption = paste(
+      "Mundlak diagnostic: β_B (between-species) vs β_W (within-species) slopes.",
+      "β_C = β_B − β_W. If |β_C| > 0.1, the within/between decomposition is",
+      "informative and the Mundlak device is justified."))
+}
+```
+
+---
+
 # Theory Synthesis {#sec-synthesis}
 
 ```{r synthesis, results='asis'}
@@ -1091,6 +1531,133 @@ Sample sizes for growth records are smaller, limiting PGLS. Where supported, the
 corroborate the metabolic basis of WBE rather than purely structural arguments.
 ")
 ```
+
+---
+
+# Stoichiometric Scaling Context: Kerkhoff et al. (2005) {#sec-kerkhoff}
+
+[CITATION-UNVERIFIED] Kerkhoff, A.J., Enquist, B.J., Elser, J.J. & Fagan, W.F. (2005).
+Plant allometry, stoichiometry and the temperature-dependence of primary productivity.
+*Global Ecology and Biogeography*, 14, 585–598.
+
+Kerkhoff et al. (2005) extended the WBE allometric framework to predict how plant
+**nutrient stoichiometry** — specifically leaf nitrogen (N) and phosphorus (P) content
+per unit mass — co-varies with body size across vascular plant species. The central
+mechanism: whole-plant metabolic rate scales as $M^{3/4}$ (WBE), constraining what
+fraction of total biomass is allocated to metabolically active leaf tissue relative to
+structural tissue (stem, root). Three scaling consequences follow:
+
+$$M_{\text{leaf}} \propto M_{\text{total}}^{3/4}$$
+
+$$\frac{dM_{\text{total}}}{dt} \propto M_{\text{total}}^{3/4}$$
+
+$$[\text{N}]_{\text{leaf}} \propto M_{\text{leaf}}^{-1/4} \quad (\text{not testable in NE dataset — no elemental data})$$
+
+The first two predictions are directly testable in the Niklas-Enquist dataset and are
+already estimated above as *Leaf ~ Total* and *TotalGrowth ~ Total*. Kerkhoff et al.
+(2005) provides the stoichiometric mechanistic basis for why those exponents should equal
+$3/4$: larger plants sustain higher metabolic demand from proportionally less leaf tissue,
+which is only feasible if leaf N per unit mass declines with plant size ($\propto M^{-1/4}$).
+
+```{r kerkhoff-slope-extract}
+# Extract the Kerkhoff-relevant empirical slopes from existing interspecific results
+kerkhoff_targets <- c("Leaf ~ Total", "TotalGrowth ~ Total")
+
+k_compare <- inter_results |>
+  dplyr::filter(
+    relationship %in% kerkhoff_targets,
+    group == "All",
+    method %in% c("OLS", "SMA", "PGLS")
+  ) |>
+  dplyr::mutate(
+    kerkhoff_pred = 0.75,
+    pred_in_ci    = kerkhoff_pred >= ci_lower & kerkhoff_pred <= ci_upper
+  ) |>
+  dplyr::select(relationship, method, n_species, slope, ci_lower, ci_upper,
+                r_squared, kerkhoff_pred, pred_in_ci) |>
+  dplyr::mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+kable(k_compare,
+      caption = paste(
+        "Empirical slopes vs. Kerkhoff et al. (2005) GEB prediction (β = 3/4) [CITATION-UNVERIFIED].",
+        "Leaf ~ Total biomass and whole-plant growth rate ~ Total biomass both predicted at 3/4.",
+        "pred_in_ci = TRUE if Kerkhoff β = 0.75 falls within empirical 95% CI."))
+```
+
+```{r kerkhoff-figure, fig.height=4.5, fig.cap="Empirical organ-scaling slopes vs. Kerkhoff et al. (2005) GEB metabolic-stoichiometric prediction (β = 3/4, purple dashed). Colours indicate whether the Kerkhoff prediction falls inside the empirical 95% CI. [CITATION-UNVERIFIED]"}
+if (nrow(k_compare) > 0) {
+  k_compare |>
+    dplyr::filter(!is.na(slope), is.finite(slope)) |>
+    dplyr::mutate(
+      method = factor(method, levels = c("OLS", "SMA", "PGLS"))
+    ) |>
+    ggplot(aes(slope, method, colour = pred_in_ci, shape = method)) +
+    geom_pointrange(aes(xmin = ci_lower, xmax = ci_upper), size = 0.6) +
+    geom_vline(xintercept = 0.75, colour = "#6A1B9A",
+               linetype = "dashed", linewidth = 1) +
+    scale_colour_manual(
+      values = c(`TRUE` = "#43A047", `FALSE` = "#E53935"),
+      labels = c(`TRUE` = "Kerkhoff β in 95% CI", `FALSE` = "Kerkhoff β outside 95% CI")) +
+    facet_wrap(~ relationship, ncol = 2) +
+    labs(
+      title    = "Kerkhoff et al. (2005) GEB metabolic-stoichiometric predictions [CITATION-UNVERIFIED]",
+      subtitle = "Purple dashed = β = 3/4; green = prediction supported, red = rejected",
+      x = "Slope ± 95% CI", y = "Method", colour = "Prediction support"
+    ) +
+    theme(legend.position = "bottom")
+}
+```
+
+```{r kerkhoff-division}
+# Division-stratified comparison to Kerkhoff prediction
+k_div <- div_results |>
+  dplyr::filter(
+    relationship %in% kerkhoff_targets,
+    method %in% c("OLS", "SMA", "PGLS")
+  ) |>
+  dplyr::mutate(
+    kerkhoff_pred = 0.75,
+    pred_in_ci    = kerkhoff_pred >= ci_lower & kerkhoff_pred <= ci_upper
+  ) |>
+  dplyr::select(relationship, group, method, n_species, slope, ci_lower, ci_upper,
+                pred_in_ci) |>
+  dplyr::mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+kable(k_div,
+      caption = paste(
+        "Gymnosperm vs. Angiosperm: Kerkhoff et al. (2005) prediction (β = 3/4) vs. empirical slopes [CITATION-UNVERIFIED].",
+        "If both divisions support β = 3/4, the stoichiometric constraint is consistent with taxonomic breadth."))
+```
+
+## Related Literature
+
+The Kerkhoff et al. (2005) GEB framework is part of a broader metabolic-stoichiometric
+research programme. Key related papers contextualising the organ-scaling analyses in this
+document are listed below. **All citations UNVERIFIED — verify before use.**
+
+```{r kerkhoff-related-papers, echo=FALSE}
+related_papers <- tibble::tribble(
+  ~Citation,                          ~Journal,             ~Key_contribution,
+  "Kerkhoff & Enquist (2006)",        "Ecol Lett 9:419",    "Ecosystem allometry: scaling NPP and stand biomass from individual-level WBE; companion to Kerkhoff 2005",
+  "Brown et al. (2004)",              "Ecology 85:1771",    "Metabolic Theory of Ecology: B ∝ M^(3/4) exp(−E/kT); integrates allometry with temperature",
+  "Enquist & Niklas (2002)",          "Science 295:1517",   "Global allocation rules for seed plant biomass partitioning; primary empirical companion to this Rmd",
+  "Niklas & Enquist (2002)",          "Am J Bot 89:812",    "Canonical biomass partitioning rules across life forms; source dataset used here",
+  "Elser et al. (2000)",              "Nature 408:578",     "Nutritional constraints and stoichiometric ratios; motivates leaf N/P expectations in Kerkhoff 2005",
+  "Sterner & Elser (2002)",           "Princeton Univ. Press","Ecological Stoichiometry; theoretical basis for C:N:P scaling linked to allometry",
+  "West et al. (1997)",               "Science 276:122",    "Original WBE vascular model; quarter-power scaling derivation; foundation for Kerkhoff 2005",
+  "West et al. (1999)",               "Science 284:1677",   "WBE extension to plant vascular systems; basis for slope priors used throughout"
+)
+kable(related_papers,
+      col.names = c("Citation [UNVERIFIED]", "Journal", "Key Contribution"),
+      caption   = "Related papers in the metabolic-stoichiometric allometry literature. ALL CITATIONS UNVERIFIED.")
+```
+
+> **Stoichiometric limitation of the NE dataset.**
+> The Niklas-Enquist database contains organic biomass measurements but no elemental
+> (N, P, C) data. The Kerkhoff et al. (2005) prediction that **leaf N per unit mass
+> declines with plant size** ($[\text{N}]_{\text{leaf}} \propto M^{-1/4}$) is not
+> testable here. Integration with foliar trait databases (e.g., GLOPNET, TRY, BIEN)
+> would be needed to evaluate the full stoichiometric model against the NE biomass data.
 
 ---
 
