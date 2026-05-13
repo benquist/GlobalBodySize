@@ -140,3 +140,59 @@ Species with any trait data: ~78,110 | Allometric-ready (height + DBH): ~1,985
 3. Community-weighted mean height from BIEN plot data
 4. TRY cross-validation for bias quantification
 5. Chave et al. (2014) AGB estimation for allometric_ready species
+
+## 2026-05-13 — Stages A–E: habit expansion + unified body mass pipeline
+
+**Prompt:** "Yes, stage A first, give a report and then also B-E in order"
+
+**Stages implemented:**
+
+### Stage A: Habit Integration (03b_habit_integration.R)
+- Pulled BIEN `whole plant woodiness` (49,060 records, 45,815 species) and `whole plant growth form diversity` (67,413 records, 66,473 species)
+- Added `"whole plant growth form diversity"` → `"gf_diversity"` to `providers/bien/load_bien_traits.R` measurement type map
+- 3-source priority merge (primary GF > GF diversity > woodiness):
+  - 77,603 species from primary GF (Stage 5)
+  - 4,406 "unknown" upgraded via GF diversity
+  - 8,525 added/upgraded via woodiness (8,359 new + 166 upgrades)
+- **Result: 83,580 → 91,939 species with known growth form (98.5%)**
+- Outputs: `output/species_growth_form_expanded.csv`, `output/habit_integration_report.csv`
+- Caution: woodiness "woody" mapped to tree/shrub by family heuristic; families not in lookup remain "unknown"
+
+### Stage B: Tier Bias Check (09c_tier_bias_check.R)
+- Bland-Altman analysis on 1,958 allometric-ready species (H + DBH + rho)
+- **T1 (height-only) vs Chave 2014: mean bias = −0.877 log₁₀ kg, LoA = [−3.94, +2.19]** — massive underestimate
+- **T2 (DBH-only) vs Chave 2014: mean bias = +0.380 log₁₀ kg, LoA = [−0.40, +1.16]** — systematic overestimate
+- Growth-form-specific: tree T1 bias = −0.911; shrub T1 = −0.493; vine T2 = +0.270
+- Outputs: `output/tier_bias_summary.csv`, `output/tier_bias_corrections.csv`
+- NOTE: Correction factors computed for significant biases (n ≥ 10). Review before applying. Calibration sample is biased toward tropical trees.
+
+### Stages C + D: Uncertainty + GF Imputation (09d_add_biomass_uncertainty.R)
+- `agb_log10_sd` column added per species:
+  - T4: 0.104 log₁₀ kg (Chave 2014 RSE, UNVERIFIED)
+  - T3: 0.200 log₁₀ kg (wider for imputed rho)
+  - T2: 0.397 log₁₀ kg (from Bland-Altman LoA)
+  - T1 trees: 1.526; T1 shrubs: 2.008 log₁₀ kg (from LoA — very wide)
+  - T1 herbs/gram: 0.626 log₁₀ kg (within-GF empirical SD; flagged `herb_proxy_uncertain`)
+- Tier 0 GF imputation: 60,552 existing + 6,358 new = **66,910 GF-imputed species**
+  - Imputed from within-GF mean ± SD of calibration species (Tiers 1–4)
+  - Root:shoot ratios from Mokany 2006 (UNVERIFIED)
+- 95% CI columns added: `agb_ci_lower_kg`, `agb_ci_upper_kg` (asymmetric on natural scale)
+- **Output: `output/plant_biomass_with_uncertainty.csv` (340,136 rows, 32 cols)**
+
+### Stage E: Unified Visualization (plant_bodysize_summary.Rmd Section 11)
+- New Section 11: "Unified Body Mass Axis: All Species"
+- Horizontal violin plot per growth form (tree → parasite)
+- Strip jitter points encoded by **shape** (T4: filled circle, T3: filled circle, T2: triangle, T1: square, T0: open diamond) **and alpha** (T4: 1.0 → T0: 0.4)
+- 95% CI error bars on subsampled points (n ≤ 60 per GF)
+- 1 kg reference line (log₁₀ = 0)
+- Summary table: median log₁₀(total biomass) by GF × tier
+- Bland-Altman bias table displayed for user reference
+- All equations FLAGGED UNVERIFIED in figure caption
+- Rmd rendered clean to HTML
+
+**Key science caveats embedded in the visualization:**
+1. T0 values are group means — within-GF variance spans 4–6 orders of magnitude
+2. T1 underestimates by ~7.5× vs. Chave 2014 reference
+3. T2 overestimates by ~2.4× vs. Chave 2014 reference
+4. Herb proxy equation (AGB = 0.04 × H^1.5) not literature-derived — flagged
+5. 261,405 species with no data remain explicit NA (not imputed phylogenetically)

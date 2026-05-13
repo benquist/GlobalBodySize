@@ -506,9 +506,174 @@ for (i in seq_along(limits)) {
 
 ---
 
-# 11. Session Info
+# 11. Unified Body Mass Axis: All Species
+
+This section places all species with any body mass estimate — from high-confidence
+allometric measurements (Tiers 3–4) through growth-form-level imputation (Tier 0)
+— onto a single log₁₀(total biomass, kg) axis. Each tier is encoded by both
+**shape** and **alpha**, with 95% confidence intervals derived from the Bland-Altman
+analysis (Stage 9c) or within-growth-form SD (Tiers 0 and 1 herb).
+
+**IMPORTANT CAVEATS (per merow-ecology and stats-specialist review):**
+
+- Tier 0 (GF-imputed) values represent growth-form group means, NOT individual species measurements. Within-growth-form variance spans 4–6 orders of magnitude for trees.
+- Tier 1 (height-only) shows a systematic underestimate bias of **−0.88 log₁₀ kg** vs. the Chave 2014 reference (Stage 9c Bland-Altman).
+- Tier 2 (DBH-only) shows a systematic overestimate of **+0.38 log₁₀ kg** vs. Chave 2014.
+- Herb and graminoid height-only estimates use an uncalibrated proxy equation; SDs are widened to within-GF empirical SD.
+- Do NOT compare individual species across tiers without accounting for these biases.
+
+```{r unified-body-mass-load}
+## Load the uncertainty-augmented biomass table (Stage 9d output)
+bm_path <- "output/plant_biomass_with_uncertainty.csv"
+if (!file.exists(bm_path)) {
+  cat("Stage 9d output not found:", bm_path, "\n",
+      "Run: Rscript scripts/09d_add_biomass_uncertainty.R\n")
+  knitr::knit_exit()
+}
+
+bm <- fread(bm_path, colClasses = list(character = "agb_best_tier"))
+bm <- bm[!is.na(agb_best_kg) & agb_best_kg > 0]
+bm[, log10_total_biomass := log10(total_biomass_kg)]
+bm[, log10_total_ci_lower := log10(pmax(total_biomass_ci_lower_kg, 1e-9))]
+bm[, log10_total_ci_upper := log10(pmax(total_biomass_ci_upper_kg, 1e-9))]
+
+## Tier labels for display
+tier_labels <- c(
+  "4"           = "T4: DBH+H+species ρ (Chave 2014)",
+  "3"           = "T3: DBH+H+imputed ρ (Chave 2014)",
+  "2"           = "T2: DBH only (Chave 2005 / Muukkonen)",
+  "1"           = "T1: Height only (Brown / Muukkonen / proxy)",
+  "0_gf_imputed"= "T0: Growth-form mean (imputed)"
+)
+tier_shapes <- c("4" = 16, "3" = 16, "2" = 17, "1" = 15, "0_gf_imputed" = 5)
+tier_alpha  <- c("4" = 1.0, "3" = 0.8, "2" = 0.7, "1" = 0.7, "0_gf_imputed" = 0.4)
+
+bm[, tier_display := factor(agb_best_tier,
+                             levels = names(tier_labels),
+                             labels = unname(tier_labels))]
+
+## Keep only displayed growth forms (exclude unknown for clarity)
+gf_order <- c("tree", "shrub", "subshrub", "vine", "epiphyte",
+               "bamboo", "herb", "graminoid", "aquatic", "parasite")
+bm_plot <- bm[growth_form_canonical %in% gf_order]
+bm_plot[, gf_f := factor(growth_form_canonical,
+                           levels = rev(gf_order))]  ## reverse so tree is at top
+
+cat(sprintf("Species with AGB estimate (all tiers): %s\n", format(nrow(bm), big.mark = ",")))
+cat(sprintf("Species shown in figure (known GF):    %s\n", format(nrow(bm_plot), big.mark = ",")))
+```
+
+```{r unified-body-mass-violin, fig.width=11, fig.height=7, fig.cap="**Figure: Unified log₁₀(total biomass) by growth form and estimation tier.** Horizontal violins show the within-group distribution across all species with estimates (Tiers 0–4 combined). Strip points show individual species colour-coded by tier. Error bars (95% CI) are shown for a random subsample (n ≤ 60 per GF) to avoid overplotting. CIs are asymmetric on the natural scale, symmetric here on the log₁₀ scale. Dashed vertical line = 1 kg reference."}
+
+## Sample for error bars (avoid overplotting)
+set.seed(42)
+bm_err <- bm_plot[!is.na(log10_total_ci_lower),
+  .SD[sample(.N, min(.N, 60))],
+  by = growth_form_canonical]
+
+ggplot(bm_plot, aes(x = log10_total_biomass, y = gf_f)) +
+  ## Violin (within-GF distribution, all tiers combined)
+  geom_violin(aes(fill = growth_form_canonical),
+              colour = NA, alpha = 0.18, scale = "width", bw = 0.3) +
+  ## Individual species points (subsample for speed)
+  geom_jitter(
+    data = bm_plot[!is.na(tier_display)][
+      , .SD[sample(.N, min(.N, 400))], by = growth_form_canonical],
+    aes(shape = tier_display,
+        alpha = tier_display,
+        colour = growth_form_canonical),
+    width = 0, height = 0.35, size = 1.1) +
+  ## Error bars on subsample
+  geom_errorbarh(
+    data = bm_err,
+    aes(xmin = log10_total_ci_lower,
+        xmax = log10_total_ci_upper,
+        colour = growth_form_canonical),
+    height = 0.15, alpha = 0.35, linewidth = 0.4) +
+  ## Reference line: 1 kg
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey40", linewidth = 0.7) +
+  scale_fill_manual(values = GF_COLOURS, guide = "none") +
+  scale_colour_manual(values = GF_COLOURS, guide = "none") +
+  scale_shape_manual(
+    name   = "Estimation tier",
+    values = c(16, 16, 17, 15, 5),
+    drop   = FALSE) +
+  scale_alpha_manual(
+    name   = "Estimation tier",
+    values = c(1.0, 0.8, 0.7, 0.7, 0.4),
+    drop   = FALSE) +
+  guides(shape = guide_legend(override.aes = list(size = 3, alpha = 1)),
+         alpha = guide_legend()) +
+  labs(
+    x        = expression(log[10]~"(total biomass, kg)"),
+    y        = "Growth form",
+    title    = "Plant body mass across growth forms",
+    subtitle = paste0(format(nrow(bm_plot), big.mark = ","),
+                      " BIEN species | Tiers 0–4 | Dashed = 1 kg"),
+    caption  = paste0(
+      "T4/T3: Chave et al. 2014 GCB 20:3177 [UNVERIFIED]. ",
+      "T2: Chave et al. 2005 Oecologia 145:87 [UNVERIFIED]. ",
+      "T1 trees: Brown 1997 FAO FP 134 [UNVERIFIED]. ",
+      "T1 shrubs: Muukkonen 2007 Silva Fennica 41:651 [UNVERIFIED]. ",
+      "T1 herbs: uncalibrated proxy (flagged). ",
+      "T0: within-GF mean ± SD from calibration species. ",
+      "BGB via Mokany et al. 2006 GCB 12:84 [UNVERIFIED]. ",
+      "Tier 1 bias: −0.88 log₁₀ kg vs Chave ref. Tier 2 bias: +0.38 log₁₀ kg. ",
+      "Imputed species should not be compared directly to measured species."
+    )
+  ) +
+  theme_plantsize() +
+  theme(legend.position = "bottom",
+        axis.text.y = element_text(size = 11))
+```
+
+```{r unified-body-mass-summary-table}
+## Summary table: median and IQR by growth form × tier
+sum_tbl <- bm_plot[, .(
+  n              = .N,
+  median_log10   = round(median(log10_total_biomass, na.rm = TRUE), 2),
+  q25_log10      = round(quantile(log10_total_biomass, 0.25, na.rm = TRUE), 2),
+  q75_log10      = round(quantile(log10_total_biomass, 0.75, na.rm = TRUE), 2),
+  median_kg      = round(10^median(log10_total_biomass, na.rm = TRUE), 2),
+  tier_breakdown = paste(sort(unique(agb_best_tier[!is.na(agb_best_tier)])),
+                          collapse = ", ")
+), by = growth_form_canonical][order(-median_log10)]
+
+knitr::kable(sum_tbl,
+  col.names = c("Growth form", "n species", "Median log₁₀(kg)",
+                "Q25 log₁₀(kg)", "Q75 log₁₀(kg)", "Median (kg)",
+                "Tiers present"),
+  caption = paste0("Table: Body mass summary by growth form. ",
+                   "Includes GF-imputed (T0) and measured (T1–T4) species. ",
+                   "Compare tiers separately — systematic biases exist between tiers ",
+                   "(see Stage 9c Bland-Altman report)."))
+```
+
+```{r tier-bias-display}
+## Show the Stage 9c Bland-Altman results as a reference
+bias_path <- "output/tier_bias_summary.csv"
+if (file.exists(bias_path)) {
+  bias_tbl <- fread(bias_path)
+  bias_show <- bias_tbl[growth_form %in% c("all", "tree", "shrub"),
+    .(comparison, growth_form, n, mean_bias_log10, loa_lower, loa_upper,
+      p_value, bias_significant)]
+  knitr::kable(bias_show,
+    col.names = c("Comparison", "Growth form", "n", "Mean bias (log₁₀ kg)",
+                  "LoA lower", "LoA upper", "p-value", "Significant?"),
+    caption = paste0("Table: Bland-Altman tier bias summary (Stage 9c). ",
+                     "Mean bias = log₁₀(AGB_estimated) − log₁₀(AGB_Chave2014). ",
+                     "Positive = overestimate; negative = underestimate. ",
+                     "LoA = 95% limits of agreement. ",
+                     "Calibration set: 1,958 species with height + DBH + wood density."))
+}
+```
+
+---
+
+# 12. Session Info
 
 ```{r session-info}
 cat("Render time:", session_render_time, "\n\n")
 sessionInfo()
 ```
+

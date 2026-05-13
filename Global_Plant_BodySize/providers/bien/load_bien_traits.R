@@ -59,6 +59,7 @@ bien_trait_to_measurement_type <- function(trait_name) {
     "diameter at breast height (1.3 m)" = "dbh_cm",
     "whole plant growth form"            = "growth_form",
     "whole plant woodiness"              = "woodiness",
+    "whole plant growth form diversity"  = "gf_diversity",
     "leaf area"                          = "other_size",
     "stem wood density"                  = "wood_density",
     "other_size"             # default for unrecognized traits
