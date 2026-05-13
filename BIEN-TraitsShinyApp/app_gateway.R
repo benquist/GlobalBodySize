@@ -1623,25 +1623,14 @@ traitSelectServer <- function(id, query_result) {
       out
     })
 
+    # When available traits change (new query), reset selection to all traits
     observeEvent(trait_summary_tbl(), {
       tbl <- trait_summary_tbl()
       choices <- if (nrow(tbl) > 0) tbl$trait_name else character(0)
       updateSelectInput(session, "selected_traits", choices = choices, selected = choices)
-      updateCheckboxInput(session, "download_all", value = FALSE)
     }, ignoreInit = FALSE)
 
-    # Auto-uncheck "download all" when user deselects traits in the picker
-    observeEvent(input$selected_traits, {
-      tbl <- trait_summary_tbl()
-      if (nrow(tbl) == 0) return()
-      all_choices <- tbl$trait_name
-      if (!isTRUE(input$download_all)) return()  # already unchecked, nothing to do
-      if (!setequal(input$selected_traits, all_choices)) {
-        updateCheckboxInput(session, "download_all", value = FALSE)
-      }
-    }, ignoreNULL = FALSE, ignoreInit = TRUE)
-
-    # Clicking rows in the trait table should drive the same selection used for download.
+    # Clicking rows in the trait table drives selection
     observeEvent(input$trait_summary_rows_selected, {
       idx <- input$trait_summary_rows_selected
       if (is.null(idx) || length(idx) == 0) return()
@@ -1651,16 +1640,17 @@ traitSelectServer <- function(id, query_result) {
       if (length(idx) == 0) return()
       picked_from_table <- as.character(tbl$trait_name[idx])
       updateSelectInput(session, "selected_traits", selected = picked_from_table)
-      updateCheckboxInput(session, "download_all", value = FALSE)
     }, ignoreInit = TRUE)
 
-    # When user re-checks "download all", re-select all traits
-    observeEvent(input$download_all, {
-      if (isTRUE(input$download_all)) {
-        tbl <- trait_summary_tbl()
-        choices <- if (nrow(tbl) > 0) tbl$trait_name else character(0)
-        updateSelectInput(session, "selected_traits", choices = choices, selected = choices)
-      }
+    # "Select All" and "Clear" action links
+    observeEvent(input$select_all_traits, {
+      tbl <- trait_summary_tbl()
+      choices <- if (nrow(tbl) > 0) tbl$trait_name else character(0)
+      updateSelectInput(session, "selected_traits", selected = choices)
+    }, ignoreInit = TRUE)
+
+    observeEvent(input$clear_traits, {
+      updateSelectInput(session, "selected_traits", selected = character(0))
     }, ignoreInit = TRUE)
 
     output$selector_controls <- renderUI({
@@ -1682,18 +1672,14 @@ traitSelectServer <- function(id, query_result) {
 
       tagList(
         div(
-          class = "alert alert-warning",
-          strong("Important: "),
-          "If this box is checked, your CSV will include all returned traits, even if only some traits are selected below."
-        ),
-        checkboxInput(
-          ns("download_all"),
-          "Download all returned traits (override trait picker below)",
-          value = FALSE
+          style = "margin-bottom: 6px;",
+          actionLink(ns("select_all_traits"), "Select All", class = "btn btn-xs btn-default"),
+          span(" | ", style = "color: #ccc;"),
+          actionLink(ns("clear_traits"), "Clear", class = "btn btn-xs btn-default")
         ),
         selectInput(
           ns("selected_traits"),
-          "Choose one or more traits:",
+          "Choose one or more traits to preview and download:",
           choices = tbl$trait_name,
           selected = tbl$trait_name,
           multiple = TRUE,
@@ -1701,7 +1687,7 @@ traitSelectServer <- function(id, query_result) {
         ),
         p(
           class = "text-muted",
-          "Tip: uncheck the box above to download only the selected traits."
+          "All traits are selected by default. Use the picker or row-click in the table below to refine."
         )
       )
     })
@@ -1828,7 +1814,7 @@ traitSelectServer <- function(id, query_result) {
       all_traits <- unique(as.character(dat[[trait_col]]))
       all_traits <- all_traits[!is.na(all_traits) & nzchar(all_traits)]
 
-      is_all <- isTRUE(input$download_all)
+      is_all <- length(all_traits) > 0 && setequal(sort(input$selected_traits), sort(all_traits))
       picked <- input$selected_traits
 
       # Prefer explicit table-row selections when present.

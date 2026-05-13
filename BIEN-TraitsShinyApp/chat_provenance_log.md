@@ -282,3 +282,9 @@
 - Prompt summary: Implemented Tier 3+4 changes in app_gateway.R. B1 reconciliation panel, B3 source bibliography DT, B4 unit-excluded count in na_note, C9 Help moved to modal, B6 coordinate precision QA from character detection, C6 prereq guard (req(nrow(dat)>0)). Full C6 checkbox removal deferred. File parses clean.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+---
+- Date: 2026-05-13
+- Prompt summary: C6 full implementation: removed download_all checkbox, added Select All/Clear actionLinks, derived is_all from selected_traits set equality. Code-checker PASS.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
+- Completed by: GitHub Copilot
