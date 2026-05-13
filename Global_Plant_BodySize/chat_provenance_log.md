@@ -300,3 +300,40 @@ Three specialist agents (phylogenetics-comparative-agent, merow-ecology, stats-s
 
 **Commit:** baee496
 **Status:** Scripts updated; Stage 10b and 10d not yet run — requires full MCMCglmm fit (~30-120 min for 10b).
+
+---
+
+## 2026-05-13 — Stage 09e expanded: Option B non-seed plant flagging (sections 6–10)
+
+**Prompt:** "Do option B now" — add genus-based `agb_method_flag` entries for five non-seed-plant groups in `scripts/09e_fix_allometry_methods.R`.
+
+**Background:**
+Dataset has `family = NA` for all rows; identification must use the `genus` column. Tree ferns (*Cyathea*, *Alsophila*, *Sphaeropteris*, *Dicksonia*, etc.) are incorrectly coded as `growth_form_canonical = "herb"` and receive the `0.04 * H^1.5` herb proxy — mechanistically indefensible. Bryophytes are in Tier 0 GF-imputed with `growth_form_canonical = "unknown"`; the correct metric for mosses/liverworts is shoot biomass per area (g m⁻²), not per-individual AGB. BIEN DOES include bryophytes (user-confirmed); they appear in the output with ~1400+ species.
+
+**Changes made to `scripts/09e_fix_allometry_methods.R`:**
+- Header updated: "five growth forms" → "ten growth forms (five vascular + five non-seed-plant groups)"
+- Five new flag values added to header documentation table
+- Sections 6–10 inserted before `## ---- Summary audit ---`:
+
+| Section | Group | Genus list size | Flag | Action |
+|---|---|---|---|---|
+| 6 | Tree ferns | 9 genera | `tree_fern_stipe_PENDING` | `agb_log10_sd` × 2; CI recomputed |
+| 7 | Ground ferns | 38 genera | `ground_fern_frond_PENDING` | Flag only |
+| 8 | Lycophytes | 8 genera | `lycophyte_herb_proxy_LOW` | Flag only |
+| 9 | Horsetails | 1 genus (*Equisetum*) | `horsetail_herb_proxy_LOW` | Flag only |
+| 10 | Bryophytes | 34 genera | `bryophyte_area_basis` | Flag + `biomass_note` noting g m⁻² is correct unit |
+
+**Verified flag counts (run against 340,136-row output):**
+- Tree ferns: 785 species
+- Ground ferns: 5,420 species
+- Lycophytes: 1,244 species
+- Horsetails: 35 species
+- Bryophytes: 2,865 species
+
+**Known issues (deferred):**
+- `is_bryophyte <- FALSE` hardcoded in `scripts/05_reconcile_growth_form.R` is incorrect — separate fix needed
+- `higher_plant_group` column is all NA in output — upstream stage issue, deferred
+- Tree ferns received herb proxy due to incorrect `growth_form_canonical = "herb"` assignment; stipe-diameter allometry is the correct approach but not yet implemented
+
+**Commit:** 9ee4953
+**Status:** Script run and verified; output CSV updated.
