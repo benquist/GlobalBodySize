@@ -1,6 +1,7 @@
 ## Global_Plant_BodySize/scripts/09e_fix_allometry_methods.R
 ## Stage 9e: Correct mechanistically inappropriate allometric equations for
-##   five growth forms identified by merow-ecology review (2026-05-13):
+##   ten growth forms (five vascular + five non-seed-plant groups) identified
+##   by merow-ecology review (2026-05-13):
 ##
 ##   1. VINES (lianas): Chave 2005 / Chave 2014 tree equations applied in
 ##      Stages 9b/9d are mechanistically indefensible for liana architecture
@@ -25,6 +26,14 @@
 ##   5. SUBSHRUBS (boreal only): Muukkonen 2007 is marginal but retained.
 ##      Flagged "subshrub_muukkonen_MARGINAL" for tropical/arid species.
 ##
+##   Non-seed plant groups (identified by genus column; family column is all NA):
+##   6. TREE FERNS: Chave 2014 (tree) and herb proxy are both indefensible.
+##      Stipe-diameter allometry required. agb_log10_sd widened 2×.
+##   7. GROUND FERNS: herb/epiphyte proxy retained; frond allometry needed.
+##   8. LYCOPHYTES: herb proxy retained; unvalidated for lycophyte architecture.
+##   9. HORSETAILS: herb proxy retained; hollow-stem architecture reduces accuracy.
+##  10. BRYOPHYTES: correct metric is shoot biomass per area (g m-2); AGB inapplicable.
+##
 ## New column added:
 ##   agb_method_flag — machine-readable status for downstream filtering:
 ##     "ok"                          — equation appropriate and calibration reasonable
@@ -34,6 +43,11 @@
 ##     "graminoid_height_LOW"        — graminoid height proxy; low predictor quality
 ##     "subshrub_muukkonen_MARGINAL" — marginal transferability outside boreal
 ##     "gf_imputed_ok"               — growth-form imputed (Tier 0); no measurement data
+##     "tree_fern_stipe_PENDING"     — tree fern: stipe allometry required; Chave/herb equations inappropriate
+##     "ground_fern_frond_PENDING"   — ground fern: frond allometry needed; herb proxy retained as placeholder
+##     "lycophyte_herb_proxy_LOW"    — lycophyte: herb proxy applied; small body plan but unvalidated
+##     "horsetail_herb_proxy_LOW"    — horsetail: herb proxy applied; hollow-stem architecture reduces accuracy
+##     "bryophyte_area_basis"        — bryophyte: shoot biomass per area is the correct metric; AGB inapplicable
 ##
 ## Input:
 ##   output/plant_biomass_with_uncertainty.csv  (Stage 9d output, 340,136 rows)
@@ -199,6 +213,155 @@ dt[agb_method_flag == "subshrub_muukkonen_MARGINAL" & is.na(biomass_note),
      "Transferability to tropical, Mediterranean, or arid subshrubs is marginal. ",
      "No biome filter applied at this stage — user must assess by species range. ",
      "See merow-ecology review 2026-05-13."
+   )]
+
+## ---- 6. TREE FERNS ----------------------------------------------------------
+## Cyatheoid and dicksonioid tree ferns have stipe-based architecture.
+## Chave 2014 (tree) and the herb proxy 0.04*H^1.5 are both mechanistically
+## indefensible: the former requires a wood-density trunk, the latter was
+## calibrated on herbaceous rosettes. Stipe-diameter allometry exists for some
+## genera (e.g., Forsythe et al. 2010 [UNVERIFIED] for Dicksonia; regional
+## Cyathea equations [UNVERIFIED]) but is not implemented here.
+## All tree fern species are flagged and uncertainty widened 2×.
+
+TREE_FERN_GENERA <- c("Cyathea","Alsophila","Hemitelia","Sphaeropteris",
+                       "Dicksonia","Cibotium","Culcita","Thyrsopteris","Lophosoria")
+
+n_tree_fern <- dt[genus %in% TREE_FERN_GENERA, .N]
+message("[9e] Tree fern species to flag: ", n_tree_fern)
+
+dt[genus %in% TREE_FERN_GENERA, agb_method_flag := "tree_fern_stipe_PENDING"]
+
+## Widen agb_log10_sd by 2× for measurement tiers (same logic as vines)
+dt[genus %in% TREE_FERN_GENERA & agb_best_tier %in% c("1","2","3","4") &
+   !is.na(agb_log10_sd),
+   agb_log10_sd := agb_log10_sd * 2]
+
+dt[genus %in% TREE_FERN_GENERA & agb_best_tier %in% c("1","2","3","4") &
+   !is.na(agb_best_kg) & agb_best_kg > 0 & !is.na(agb_log10_sd),
+   `:=`(agb_ci_lower_kg = 10^(log10(agb_best_kg) - 1.96 * agb_log10_sd),
+        agb_ci_upper_kg = 10^(log10(agb_best_kg) + 1.96 * agb_log10_sd))]
+
+dt[genus %in% TREE_FERN_GENERA,
+   biomass_note := paste0(
+     ifelse(!is.na(biomass_note) & biomass_note != "", paste0(biomass_note, "; "), ""),
+     "TREE_FERN_STIPE_PENDING: Chave 2014 (tree) and herb proxy (0.04*H^1.5) are ",
+     "mechanistically indefensible for tree fern architecture. Stipe-diameter ",
+     "allometry is the correct approach (Forsythe et al. 2010 [UNVERIFIED]; ",
+     "regional Cyathea equations [UNVERIFIED]). AGB retained as placeholder with ",
+     "widened uncertainty (2x agb_log10_sd). See Global_Plant_BodySize pipeline 2026-05-13."
+   )]
+
+## ---- 7. GROUND FERNS --------------------------------------------------------
+## Ground ferns assigned growth_form = "herb" or "epiphyte" are receiving the
+## herb proxy (0.04*H^1.5) or epiphyte_NA equation. The herb proxy is
+## dimensionally reasonable for small ground ferns but uncalibrated for fern
+## frond architecture. Frond-area allometry from Niklas (1994) provides an
+## alternative but has not been implemented. Tree fern genera are excluded.
+## AGB values are NOT altered — flag only.
+
+GROUND_FERN_GENERA <- c("Asplenium","Pteridium","Dryopteris","Polypodium",
+                         "Adiantum","Athyrium","Polystichum","Thelypteris",
+                         "Osmunda","Blechnum","Gleichenia","Lygodium","Salvinia",
+                         "Azolla","Marsilea","Ophioglossum","Botrychium",
+                         "Anemia","Acrostichum","Pityrogramma","Nephrolepis",
+                         "Diplazium","Cystopteris","Gymnocarpium","Oreopteris",
+                         "Phegopteris","Woodsia","Cryptogramma","Pteris",
+                         "Vittaria","Elaphoglossum","Pleopeltis","Pyrrosia",
+                         "Campyloneurum","Niphidium","Pecluma","Stenogramma")
+
+n_ground_fern <- dt[genus %in% GROUND_FERN_GENERA &
+                     !genus %in% TREE_FERN_GENERA, .N]
+message("[9e] Ground fern species to flag: ", n_ground_fern)
+
+dt[genus %in% GROUND_FERN_GENERA & !genus %in% TREE_FERN_GENERA,
+   agb_method_flag := "ground_fern_frond_PENDING"]
+
+dt[genus %in% GROUND_FERN_GENERA & !genus %in% TREE_FERN_GENERA &
+   (is.na(biomass_note) | biomass_note == ""),
+   biomass_note := paste0(
+     "GROUND_FERN_FROND_PENDING: Herb proxy (0.04*H^1.5) or epiphyte_NA assigned. ",
+     "Frond-area allometry (Niklas 1994) is the preferred approach for ferns but ",
+     "has not been implemented. AGB estimate is a low-confidence placeholder. ",
+     "See Global_Plant_BodySize pipeline 2026-05-13."
+   )]
+
+## ---- 8. LYCOPHYTES ----------------------------------------------------------
+## Selaginella, Lycopodium, Huperzia, Isoetes and relatives are assigned herb,
+## epiphyte, or aquatic growth forms and receive the corresponding proxy equations.
+## These are dimensionally plausible for their small body plans but the herb
+## proxy (0.04*H^1.5) has no calibration on lycophyte architecture.
+## Isoetes is aquatic and receives the aquatic tier, which is marginally better.
+## AGB values are NOT altered — flag only.
+
+LYCOPHYTE_GENERA <- c("Selaginella","Lycopodium","Huperzia","Lycopodiella",
+                       "Diphasiastrum","Isoetes","Phlegmariurus","Pseudolycopodiella")
+
+n_lyco <- dt[genus %in% LYCOPHYTE_GENERA, .N]
+message("[9e] Lycophyte species to flag: ", n_lyco)
+
+dt[genus %in% LYCOPHYTE_GENERA, agb_method_flag := "lycophyte_herb_proxy_LOW"]
+
+dt[genus %in% LYCOPHYTE_GENERA & (is.na(biomass_note) | biomass_note == ""),
+   biomass_note := paste0(
+     "LYCOPHYTE_HERB_PROXY_LOW: Herb proxy (0.04*H^1.5) or proxy equation applied. ",
+     "Dimensionally plausible for small lycophyte body plans but not calibrated ",
+     "on lycophyte tissue architecture or branching patterns. AGB estimate is ",
+     "low-confidence. See Global_Plant_BodySize pipeline 2026-05-13."
+   )]
+
+## ---- 9. HORSETAILS ----------------------------------------------------------
+## Equisetum species are assigned growth_form = "herb" and receive the herb
+## proxy (0.04*H^1.5). Hollow-stem architecture and rhizome-dominant biomass
+## distribution make height a poor predictor of total shoot biomass.
+## AGB values are NOT altered — flag only.
+
+HORSETAIL_GENERA <- c("Equisetum")
+
+n_horse <- dt[genus %in% HORSETAIL_GENERA, .N]
+message("[9e] Horsetail species to flag: ", n_horse)
+
+dt[genus %in% HORSETAIL_GENERA, agb_method_flag := "horsetail_herb_proxy_LOW"]
+
+dt[genus %in% HORSETAIL_GENERA & (is.na(biomass_note) | biomass_note == ""),
+   biomass_note := paste0(
+     "HORSETAIL_HERB_PROXY_LOW: Herb proxy (0.04*H^1.5) applied. Hollow-stem ",
+     "architecture and rhizome-dominant biomass make height a weak AGB predictor ",
+     "for Equisetum. Consider replacing with shoot biomass per unit area. ",
+     "See Global_Plant_BodySize pipeline 2026-05-13."
+   )]
+
+## ---- 10. BRYOPHYTES ---------------------------------------------------------
+## Mosses, liverworts and hornworts are present in the dataset (assigned
+## growth_form_canonical = "unknown", agb_best_tier = "0_gf_imputed").
+## The correct biomass metric for bryophytes is shoot biomass per unit area
+## (g m-2), NOT per-individual AGB. The GF-median imputed value assigned in
+## Stage 9d is dimensionally incorrect for colony-forming mat species.
+## AGB values are NOT altered — flag only, and note the unit mismatch.
+
+BRYOPHYTE_GENERA <- c("Sphagnum","Polytrichum","Polytrichastrum","Marchantia",
+                       "Bryum","Ceratodon","Dicranum","Hypnum","Pleurozium",
+                       "Funaria","Porella","Conocephalum","Plagiomnium","Tortula",
+                       "Barbula","Physcomitrella","Mnium","Rhytidiadelphus",
+                       "Aulacomnium","Calliergon","Drepanocladus","Campylium",
+                       "Schistidium","Grimmia","Racomitrium","Andreaea",
+                       "Pellia","Riccia","Fossombronia","Aneura","Metzgeria",
+                       "Anthoceros","Phaeoceros","Notothylas")
+
+n_bryo <- dt[genus %in% BRYOPHYTE_GENERA, .N]
+message("[9e] Bryophyte species to flag: ", n_bryo)
+
+dt[genus %in% BRYOPHYTE_GENERA, agb_method_flag := "bryophyte_area_basis"]
+
+dt[genus %in% BRYOPHYTE_GENERA,
+   biomass_note := paste0(
+     ifelse(!is.na(biomass_note) & biomass_note != "", paste0(biomass_note, "; "), ""),
+     "BRYOPHYTE_AREA_BASIS: Correct biomass metric for bryophytes is shoot biomass ",
+     "per unit area (g m-2), not per-individual AGB. The GF-median imputed value ",
+     "is dimensionally inappropriate for colony-forming mat species. A separate ",
+     "literature-based intake (e.g., Turetsky et al. 2010 GCB; Olson et al. 2013) ",
+     "is required. AGB retained as placeholder only. ",
+     "See Global_Plant_BodySize pipeline 2026-05-13."
    )]
 
 ## ---- Summary audit ----------------------------------------------------------

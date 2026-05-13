@@ -2330,3 +2330,6 @@ Render: exit 0, staging CSV regenerated with verified fixes.
 - Prompt: Three specialist agents reviewed Stage 10d family-holdout CV; user approved synthesis and said "Lets implement this plan and start"
 - Actions: Fixed 10b (pr=TRUE in MCMCglmm); rewrote 10d with three CV modes (family/genus_extrap/genus_interp); committed baee496; updated Global_Plant_BodySize/chat_provenance_log.md
 - Key decisions: data_tier=T1 for held-out species; S3 RMSE labeled lower bound; R-hat via coda; calibration tables; stratified folds; write_cv_outputs() helper for DRY output pattern
+
+## 2026-05-13 — Global_Plant_BodySize Stage 9e: Option B non-seed plant flagging
+- Prompt: Added sections 6-10 to scripts/09e_fix_allometry_methods.R for ferns, lycophytes, horsetails, and bryophytes. Tree ferns (Cyathea, Alsophila, Sphaeropteris, Dicksonia, etc.): 785 species flagged tree_fern_stipe_PENDING, agb_log10_sd widened 2x. Ground ferns: 5420 species flagged ground_fern_frond_PENDING. Lycophytes: 1244 species flagged lycophyte_herb_proxy_LOW. Horsetails (Equisetum): 35 species flagged horsetail_herb_proxy_LOW. Bryophytes (Sphagnum, Bryum, etc.): 2865 species flagged bryophyte_area_basis (noting shoot biomass per area is correct metric). Script ran successfully: 340136 rows, allometry_method_audit.csv updated. All identification is genus-based (family column is NA in output).
