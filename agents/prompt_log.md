@@ -2313,3 +2313,15 @@ Final staging CSV: 1,088,279 rows, 1,069,996 with coordinates, 10 datasets: adle
 Files: Literature_Data_To_BIENdb/MADcomm_BIEN_loading.Rmd, Literature_Data_To_BIENdb/output/madcomm_bien_staging.csv, agents/prompt_log.md.
 
 2026-05-13 | "How many species do we have reasonable biomass estimates for? / I am wondering if we know the growth form of a species... / Check with phylogenetics-comparative-agent and biodiversity-science-guard to plot a way forward / Lets make sure to update project log" — Global_Plant_BodySize: (1) Coverage diagnosis: 11,820 measured T1–T4 species (3.5% of 340,136 BIEN species); 8,256 with clean 'ok' allometry flag; 66,907 GF-imputed; 261,409 no estimate. (2) Key finding: 261,405 of 261,409 no-estimate species have unknown GF AND no higher_plant_group — GF-constrained imputation cannot be applied directly; 217,308 share genus with measured species; 44,101 have no genus-level data. (3) Stage 10a bugs fixed and tree built: GBMB→GBOTB.extended.WP, nodes.info.1→nodes.info.1.WP, family column all-NA fixed via genus_family_lookup.csv from tips.info.WP (10,583 genera). tree_measured.nwk written (11,176 tips). BUILD_FULL_TREE=FALSE (19h run deferred). (4) Forward plan: immediate=run 10b; near-term=Stage 09f GF inference from congeners (≥80% consensus rule, gf_inferred_from_genus flag, phylogenetic conservatism caveat per GF); PGLMM 10c BLUPs as primary imputation route for 261K; all imputation basis must be flagged explicitly. (5) Provenance updated in Global_Plant_BodySize/chat_provenance_log.md. Files: Global_Plant_BodySize/scripts/10a_build_phylo_tree.R, 10b_pglmm_fit.R, 10c_pglmm_predict.R, 10d_pglmm_validate.R, output/genus_family_lookup.csv, output/tree_measured.nwk, Global_Plant_BodySize/chat_provenance_log.md.
+
+## 2026-05-13 — MADcomm→BIEN: staging CSV field fixes (occurrenceID, is_centroid, is_introduced)
+
+User request: Implement BIEN loading table fixes and update project log.
+
+Changes to `Literature_Data_To_BIENdb/MADcomm_BIEN_loading.Rmd` (bien-loading-table chunk):
+- `occurrenceID`: added `dplyr::row_number()` suffix → 1,088,279 unique IDs (was 268K duplicates from BioTIME multi-year records sharing same species×plot×date string)
+- `is_centroid`: `grepl("anderson\\.2011|anderson\\.2012", dataset)` → 1L else 0L; anderson.2011 (2016 records) + anderson.2012 (475 records) correctly flagged as centroids
+- `is_introduced` / `is_cultivated_observation`: set to `0L` (FALSE) as conservative default for all 1,088,279 records (all MADcomm datasets are natural vegetation surveys); was NA
+- `chat_provenance_log.md` updated in Literature_Data_To_BIENdb/
+
+Render: exit 0, staging CSV regenerated with verified fixes.
