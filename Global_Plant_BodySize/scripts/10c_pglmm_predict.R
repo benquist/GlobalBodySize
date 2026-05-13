@@ -82,6 +82,19 @@ message("[10c] Loaded: ", nrow(dt_all), " species total")
 message("[10c] Family BLUPs: ", nrow(fam_blups), " families")
 message("[10c] Genus BLUPs : ", nrow(gen_blups), " genera")
 
+## ---- Fill family from backbone lookup (family column is all NA in pipeline) -
+if (file.exists("output/genus_family_lookup.csv")) {
+  gf_lookup <- fread("output/genus_family_lookup.csv")
+  setnames(gf_lookup, c("genus", "family_backbone"))
+  dt_all[, genus_clean := trimws(genus)]
+  dt_all <- merge(dt_all, gf_lookup, by.x = "genus_clean", by.y = "genus", all.x = TRUE)
+  dt_all[, family := ifelse(!is.na(family_backbone) & family_backbone != "",
+                            family_backbone,
+                     ifelse(!is.na(family) & family != "", family, NA_character_))]
+  dt_all[, family_backbone := NULL]
+  message("[10c] Family filled from backbone: ", dt_all[!is.na(family), .N], " / ", nrow(dt_all))
+}
+
 ## ---- Extract posterior draws from MCMCglmm Sol matrix ----------------------
 sol_post <- model_s1$Sol   ## rows = MCMC draws, cols = parameters
 vcv_post <- model_s1$VCV   ## variance component draws

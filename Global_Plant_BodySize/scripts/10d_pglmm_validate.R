@@ -86,6 +86,19 @@ dt_all   <- fread("output/plant_biomass_with_uncertainty.csv",
 model_s1 <- readRDS("output/pglmm_stage1_model.rds")
 tree_m   <- read.tree("output/tree_measured.nwk")
 
+## ---- Fill family from backbone lookup (family column is all NA in pipeline) -
+if (file.exists("output/genus_family_lookup.csv")) {
+  gf_lookup <- fread("output/genus_family_lookup.csv")
+  setnames(gf_lookup, c("genus", "family_backbone"))
+  dt_all[, genus_clean := trimws(genus)]
+  dt_all <- merge(dt_all, gf_lookup, by.x = "genus_clean", by.y = "genus", all.x = TRUE)
+  dt_all[, family := ifelse(!is.na(family_backbone) & family_backbone != "",
+                            family_backbone,
+                     ifelse(!is.na(family) & family != "", family, NA_character_))]
+  dt_all[, family_backbone := NULL]
+  message("[10d] Family filled from backbone: ", dt_all[!is.na(family), .N], " / ", nrow(dt_all))
+}
+
 MEAS_TIERS <- c("1", "2", "3", "4")
 meas <- dt_all[agb_best_tier %in% MEAS_TIERS &
                !is.na(agb_best_kg) & agb_best_kg > 0 &

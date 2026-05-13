@@ -72,11 +72,24 @@ message("=== Stage 10b: MCMCglmm PGLMM fit (Stage 1 — measured species) ===")
 
 ## ---- Load data -------------------------------------------------------------
 stopifnot(file.exists("output/plant_biomass_with_uncertainty.csv"),
-          file.exists("output/tree_measured.nwk"))
+          file.exists("output/tree_measured.nwk"),
+          file.exists("output/genus_family_lookup.csv"))
 
 dt_all <- fread("output/plant_biomass_with_uncertainty.csv",
                 colClasses = list(character = "agb_best_tier"))
 tree_m  <- read.tree("output/tree_measured.nwk")
+
+## ---- Fill family from backbone lookup (family column is all NA in pipeline) -
+## 10a writes genus_family_lookup.csv from V.PhyloMaker2 tips.info.WP
+gf_lookup <- fread("output/genus_family_lookup.csv")
+setnames(gf_lookup, c("genus", "family_backbone"))
+dt_all[, genus_clean := trimws(genus)]
+dt_all <- merge(dt_all, gf_lookup, by.x = "genus_clean", by.y = "genus", all.x = TRUE)
+dt_all[, family := ifelse(!is.na(family_backbone) & family_backbone != "",
+                          family_backbone,
+                   ifelse(!is.na(family) & family != "", family, NA_character_))]
+dt_all[, family_backbone := NULL]
+message("[10b] Family filled from backbone: ", dt_all[!is.na(family), .N], " / ", nrow(dt_all))
 
 message("[10b] Full species data: ", nrow(dt_all))
 message("[10b] Measured tree tips: ", length(tree_m$tip.label))

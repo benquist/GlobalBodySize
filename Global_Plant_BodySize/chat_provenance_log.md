@@ -196,3 +196,68 @@ Species with any trait data: ~78,110 | Allometric-ready (height + DBH): ~1,985
 3. T2 overestimates by ~2.4× vs. Chave 2014 reference
 4. Herb proxy equation (AGB = 0.04 × H^1.5) not literature-derived — flagged
 5. 261,405 species with no data remain explicit NA (not imputed phylogenetically)
+
+---
+
+## 2026-05-13 — Stage 10a bug fixes + coverage diagnosis + forward planning
+
+### Bug fixes applied to Stage 10a (`10a_build_phylo_tree.R`)
+
+**Bug 1 — Wrong V.PhyloMaker2 object names (CRITICAL, fixed):**
+- V.PhyloMaker2 v0.1.0 does NOT export `GBMB` or `nodes.info.1` — these were incorrect object names from an earlier version.
+- Fixed throughout: `GBMB` → `GBOTB.extended.WP` (72,570 tips, time-calibrated); `nodes.info.1` → `nodes.info.1.WP`.
+- Backbone genera/families audit updated to use `tips.info.WP` (columns: group, species, genus, family) and `nodes.info.1.WP`.
+
+**Bug 2 — `family` column all NA throughout pipeline (CRITICAL, fixed):**
+- BIEN trait queries populate `genus` but not `family`. All output CSVs have `family` as logical NA.
+- Fix: build `genus_to_family` lookup from `tips.info.WP` (10,583 genera → families) and join by genus before calling `phylo.maker()`.
+- 286,882 / 340,136 species matched to families this way; 53,254 unmatched (non-vascular plants, algae, unrecognised genera).
+- Fix applied to `10a_build_phylo_tree.R`. Same fix (loading `output/genus_family_lookup.csv`) propagated to `10b_pglmm_fit.R`, `10c_pglmm_predict.R`, `10d_pglmm_validate.R`.
+- `output/genus_family_lookup.csv` written (10,583 rows) from `tips.info.WP`.
+
+**Performance finding — full tree not feasible in one session:**
+- `phylo.maker()` in Scenario 3 processes ~100 species / 24 sec → 287K species ≈ 19 hours.
+- Redesigned 10a: `BUILD_FULL_TREE = FALSE` (default). Critical path builds only `tree_measured.nwk` (11,176 measured Tier 1–4 species, ~45 min). Full tree is an optional future overnight run.
+- `tree_measured.nwk` successfully written (11,176 tips, 399 KB). `tree_placement_audit.csv` written (28.5 MB).
+
+### Coverage diagnosis (as of this session)
+
+| Category | N species | % of 340,136 |
+|---|---|---|
+| Tier 4 — Chave 2014 reference | 1,056 | 0.3% |
+| Tier 3 — height + DBH allometry | 902 | 0.3% |
+| Tier 2 — DBH only | 6,690 | 2.0% |
+| Tier 1 — height only | 3,172 | 0.9% |
+| **All measured T1–T4** | **11,820** | **3.5%** |
+| GF-imputed (within-GF mean) | 66,907 | 19.7% |
+| No estimate | 261,409 | 76.9% |
+
+Of the 11,820 measured species: 8,256 flagged `ok`; 2,308 `herb_proxy_UNVALIDATED`; 1,135 `liana_PENDING`; 121 `graminoid_height_LOW`.
+
+**Critical finding on the 261K no-estimate species:**
+- 261,405 of 261,409 have `growth_form_canonical = "unknown"` — GF-constrained imputation cannot be applied directly.
+- `higher_plant_group` is also NA for all 261K.
+- However: 217,308 of these species share a genus with ≥1 measured/GF-imputed species → genus-mean proxy is available.
+- Only 44,101 species have neither genus-level nor GF-level data.
+
+### Forward plan (agreed between `phylogenetics-comparative-agent` and `biodiversity-science-guard` review framing)
+
+**Immediate (unblocked — Stage 10b):**
+- `tree_measured.nwk` is ready. Run `10b_pglmm_fit.R` (MCMCglmm, ~30–120 min). This requires family to be filled (now handled via `genus_family_lookup.csv`).
+
+**Near-term: GF inference for the 261K (proposed Stage 09f)**
+- For species with unknown GF but a known genus, infer a probable GF from the GF distribution of congeneric measured species.
+- Approach: if ≥ 80% of measured congeners share one GF → assign that GF with flag `gf_inferred_from_genus`; if no consensus → leave unknown.
+- This could unlock GF-constrained Tier 0 imputation for a substantial fraction of the 261K.
+- Biodiversity-science-guard concern: inferred GF must be flagged explicitly; must not overwrite known GF; must carry a confidence score; cited norm for genus-level GF transfer needed before publication.
+- Phylogenetics concern: GF inference from congeners assumes GF is phylogenetically conserved at genus level — reasonable for trees/shrubs (high conservatism), more suspect for herbs (polyphyletic across genera). Flag accordingly per GF.
+
+**After PGLMM runs (Stages 10c → 10d):**
+- 10c: BLUP prediction propagates family- and genus-level random effects to all 333K species regardless of GF knowledge. This is the primary imputation route for the 261K.
+- 10d: Family-holdout CV quantifies prediction accuracy, especially for the GF-unknown species.
+
+**Open science / provenance requirements flagged:**
+- `genus_family_lookup.csv` source must be cited as V.PhyloMaker2 / tips.info.WP (Jin & Qian 2022 — UNVERIFIED exact ref; run `citation("V.PhyloMaker2")` before submission).
+- GF inference step must carry an `imputation_basis` flag distinguishing: `measured`, `gf_imputed_direct`, `gf_inferred_genus`, `pglmm_blup`, `grand_mean_only`.
+- All 261K no-estimate species must remain explicit in output with their imputation basis documented — do not silently drop or silently impute.
+
