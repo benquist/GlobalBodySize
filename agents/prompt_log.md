@@ -2325,3 +2325,8 @@ Changes to `Literature_Data_To_BIENdb/MADcomm_BIEN_loading.Rmd` (bien-loading-ta
 - `chat_provenance_log.md` updated in Literature_Data_To_BIENdb/
 
 Render: exit 0, staging CSV regenerated with verified fixes.
+
+## 2026-05-13: Global_Plant_BodySize Stage 10 CV redesign
+- Prompt: Three specialist agents reviewed Stage 10d family-holdout CV; user approved synthesis and said "Lets implement this plan and start"
+- Actions: Fixed 10b (pr=TRUE in MCMCglmm); rewrote 10d with three CV modes (family/genus_extrap/genus_interp); committed baee496; updated Global_Plant_BodySize/chat_provenance_log.md
+- Key decisions: data_tier=T1 for held-out species; S3 RMSE labeled lower bound; R-hat via coda; calibration tables; stratified folds; write_cv_outputs() helper for DRY output pattern

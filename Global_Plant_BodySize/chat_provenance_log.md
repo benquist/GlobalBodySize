@@ -261,3 +261,42 @@ Of the 11,820 measured species: 8,256 flagged `ok`; 2,308 `herb_proxy_UNVALIDATE
 - GF inference step must carry an `imputation_basis` flag distinguishing: `measured`, `gf_imputed_direct`, `gf_inferred_genus`, `pglmm_blup`, `grand_mean_only`.
 - All 261K no-estimate species must remain explicit in output with their imputation basis documented — do not silently drop or silently impute.
 
+
+---
+## 2026-05-13: Stage 10b pr=TRUE fix + Stage 10d three-mode CV redesign
+
+**Session summary:**
+Three specialist agents (phylogenetics-comparative-agent, merow-ecology, stats-specialist) reviewed the existing single-mode family-holdout CV design and recommended a three-mode system. Their findings were synthesized and implemented.
+
+**Stage 10b fix:**
+- Added `pr = TRUE` to the MCMCglmm call in `10b_pglmm_fit.R`
+- Without this, `$Sol` contains only fixed effects, not per-level random effect posteriors
+- Family and genus BLUP CSVs would have been empty without this fix
+- Required for `genus_interp` CV mode and for Stage 10c BLUP prediction
+
+**Stage 10d redesign — three CV modes:**
+
+1. `CV_MODE=family` (default): Family-holdout, full MCMCglmm refit per fold, predict from fixed FE only (no family BLUP). Estimand: 44K species with no genus-level training data. Worst-case scenario.
+
+2. `CV_MODE=genus_extrap`: Strict genus-holdout, approximate shortcut (no refit). Load Stage 1 family BLUPs + FE + VC; zero genus BLUP; predict from FE + family BLUP. Estimand: 44K species with no congeners in training. Labeled as approximate — VC from full-data fit.
+
+3. `CV_MODE=genus_interp`: Within-genus holdout (~50% per eligible genus), full MCMCglmm refit with `pr=TRUE`, predict from FE + genus BLUP (from retained congeners) + family BLUP. Estimand: 217K species with congeners in training. This is the production prediction scenario.
+
+**Key design decisions from specialist review:**
+- `data_tier="T1"` for all held-out species — simulates production (261K target species have no allometric measurement)
+- RMSE stratified separately for S1/2 (resolved placement) vs. S3 (polytomy) — S3 is labeled as lower bound
+- Gelman-Rubin R-hat (via coda::gelman.diag) for N_CHAINS >= 3 (non-QUICK_CV runs)
+- Empirical PI calibration table at 10 nominal levels written per mode
+- Stratified fold assignment by genus size class and dominant growth form
+- Blomberg K computed once on Stage 1 residuals, stratified by placement scenario
+
+**Output files (5 per mode):**
+- `output/pglmm_cv_{mode}_fold_results.csv`
+- `output/pglmm_cv_{mode}_gf_summary.csv`
+- `output/pglmm_cv_{mode}_sizeclass_summary.csv`
+- `output/pglmm_cv_{mode}_scenario_summary.csv`
+- `output/pglmm_cv_{mode}_calibration.csv`
+- `output/pglmm_residual_blomberg_k.csv` (shared, computed once)
+
+**Commit:** baee496
+**Status:** Scripts updated; Stage 10b and 10d not yet run — requires full MCMCglmm fit (~30-120 min for 10b).
