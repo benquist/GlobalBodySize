@@ -1033,7 +1033,8 @@ scopeUI <- function(id) {
     div(class = "panel-body",
       uiOutput(ns("scope_display")),
       h4("Trait Coverage:"),
-      DTOutput(ns("scope_coverage"))
+      DTOutput(ns("scope_coverage")),
+      uiOutput(ns("reconciliation_panel"))
     )
   )
 }
@@ -1154,6 +1155,74 @@ scopeServer <- function(id, query_result) {
       diag <- query_result()$diagnostics
       req(!is.null(diag$coverage_by_trait))
       datatable(diag$coverage_by_trait, options = list(pageLength = 5), rownames = FALSE)
+    })
+
+    output$reconciliation_panel <- renderUI({
+      req(query_result())
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) return(NULL)
+
+      status_col    <- if ("scrubbed_taxonomic_status" %in% names(dat)) "scrubbed_taxonomic_status" else NULL
+      matched_col   <- if ("name_matched"   %in% names(dat)) "name_matched"   else NULL
+      submitted_col <- if ("name_submitted" %in% names(dat)) "name_submitted" else NULL
+
+      if (is.null(status_col)) {
+        return(div(class = "alert alert-info",
+          "Taxonomic reconciliation columns not available in this query result."))
+      }
+
+      status_tbl <- sort(table(as.character(dat[[status_col]]), useNA = "ifany"), decreasing = TRUE)
+      status_df  <- data.frame(
+        Status  = names(status_tbl),
+        Records = as.integer(status_tbl),
+        stringsAsFactors = FALSE
+      )
+
+      remap_ui <- NULL
+      if (!is.null(matched_col) && !is.null(submitted_col)) {
+        n_total   <- nrow(dat)
+        n_changed <- sum(!is.na(dat[[submitted_col]]) & !is.na(dat[[matched_col]]) &
+                         as.character(dat[[submitted_col]]) != as.character(dat[[matched_col]]),
+                         na.rm = TRUE)
+        remap_ui <- div(class = "col-sm-6",
+          div(class = if (n_changed > 0) "alert alert-warning" else "alert alert-success",
+            strong(sprintf("%s of %s records (%.1f%%)",
+              format(n_changed, big.mark = ","), format(n_total, big.mark = ","),
+              100 * n_changed / max(n_total, 1))),
+            " had submitted names remapped during BIEN taxonomic reconciliation.",
+            if (n_changed > 0)
+              p(class = "text-muted", style = "margin-top:6px; margin-bottom:0;",
+                "Review ", tags$code("name_submitted"), " vs. ", tags$code("name_matched"),
+                " columns in your download.")
+          )
+        )
+      }
+
+      tagList(
+        hr(),
+        h4("Taxonomic Reconciliation"),
+        p(class = "text-muted",
+          "Records show the BIEN scrubbing status of matched names. For genus/family queries, status is at the species level."),
+        div(class = "row",
+          div(class = "col-sm-6",
+            tags$table(class = "table table-condensed table-striped",
+              tags$thead(tags$tr(tags$th("Taxonomic status"), tags$th("Records"))),
+              tags$tbody(
+                lapply(seq_len(nrow(status_df)), function(i) {
+                  s   <- status_df$Status[i]
+                  cls <- if (grepl("accepted",   tolower(s))) "success"
+                         else if (grepl("synonym|not matched", tolower(s))) "warning"
+                         else ""
+                  tags$tr(class = cls,
+                    tags$td(s),
+                    tags$td(format(status_df$Records[i], big.mark = ",")))
+                })
+              )
+            )
+          ),
+          remap_ui
+        )
+      )
     })
     
     reactive({
@@ -1302,7 +1371,11 @@ provenanceUI <- function(id) {
     class = "panel panel-default",
     div(class = "panel-heading", h3("Step 7: Provenance & Reproducibility")),
     div(class = "panel-body",
-      uiOutput(ns("provenance_display"))
+      uiOutput(ns("provenance_display")),
+      hr(),
+      h4("Source Bibliography"),
+      p(class = "text-muted", "Unique source citations across all returned records."),
+      DTOutput(ns("source_bib"))
     )
   )
 }
@@ -1366,6 +1439,28 @@ provenanceServer <- function(id, query_result) {
       )
     })
     
+    output$source_bib <- renderDT({
+      req(query_result())
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) {
+        return(datatable(data.frame(note = "No data available."), rownames = FALSE,
+                         options = list(dom = "t", paging = FALSE)))
+      }
+      cite_col <- first_existing_col(dat, c("source_citation", "datasource"))
+      url_col  <- first_existing_col(dat, c("url_source"))
+      if (is.null(cite_col)) {
+        return(datatable(data.frame(note = "No source_citation column found in this query result."),
+                         rownames = FALSE, options = list(dom = "t", paging = FALSE)))
+      }
+      cols <- c(cite_col, if (!is.null(url_col)) url_col)
+      bib  <- unique(dat[, cols, drop = FALSE])
+      names(bib)[1] <- "Source citation"
+      if (!is.null(url_col)) names(bib)[2] <- "URL"
+      bib  <- bib[order(bib[["Source citation"]]), , drop = FALSE]
+      datatable(bib, rownames = FALSE, escape = TRUE,
+                options = list(pageLength = 10, scrollX = TRUE))
+    }, server = TRUE)
+
     reactive({
       req(query_result())
       diag <- query_result()$diagnostics
@@ -1904,12 +1999,14 @@ distributionsServer <- function(id, query_result) {
 
       sub <- dat[as.character(dat[[trait_col]]) == input$dist_trait, , drop = FALSE]
       # Apply unit filter when multiple units are present and user has selected one
+      pre_unit_n <- nrow(sub)
       unit_filter_val <- if (!is.null(input$dist_unit_filter) && nzchar(input$dist_unit_filter) &&
                               !is.null(unit_col)) input$dist_unit_filter else NULL
       if (!is.null(unit_filter_val) && !is.null(unit_col)) {
         unit_vals_sub <- tolower(str_squish(as.character(sub[[unit_col]])))
         sub <- sub[!is.na(unit_vals_sub) & unit_vals_sub == unit_filter_val, , drop = FALSE]
       }
+      unit_excluded_n <- pre_unit_n - nrow(sub)
       raw_vals <- suppressWarnings(as.numeric(as.character(sub[[value_col]])))
       keep <- !is.na(raw_vals) & is.finite(raw_vals)
       vals <- raw_vals[keep]
@@ -1953,7 +2050,8 @@ distributionsServer <- function(id, query_result) {
         missing_pct = missing_pct,
         unique_units = unique_units,
         source_tbl = source_tbl,
-        outlier_n = outlier_n
+        outlier_n = outlier_n,
+        unit_excluded_n = unit_excluded_n
       )
     })
 
@@ -2078,8 +2176,11 @@ distributionsServer <- function(id, query_result) {
       } else {
         paste("Units detected:", paste(sel$unique_units, collapse = ", "))
       }
-      sprintf("Used %d of %d rows (%d missing/non-numeric excluded; %.1f%% missing). %s",
-              sel$used_n, sel$total_n, sel$missing_n, sel$missing_pct, unit_msg)
+      unit_excl_msg <- if (!is.null(sel$unit_excluded_n) && sel$unit_excluded_n > 0) {
+        sprintf("; %d excluded by unit filter", sel$unit_excluded_n)
+      } else ""
+      sprintf("Used %d of %d rows (%d missing/non-numeric excluded%s; %.1f%% missing). %s",
+              sel$used_n, sel$total_n, sel$missing_n, unit_excl_msg, sel$missing_pct, unit_msg)
     })
 
     output$hist_plot <- renderPlot({
@@ -2212,7 +2313,10 @@ downloadGateServer <- function(id, query_result) {
             dat <- dat %>% filter(.data[[trait_col]] %in% selected_traits)
           }
         }
-        
+
+        # C6 prereq: guard against silent 0-row download during reactive settlement
+        req(nrow(dat) > 0)
+
         # Reorganize columns to surface plot metadata where present
         dat <- organize_columns_for_export(dat)
 
@@ -2264,6 +2368,18 @@ mapServer <- function(id, query_result) {
       if (is.null(lat_col) || is.null(lon_col)) return(NULL)
       
       mapped <- dat
+
+      # B6: detect precision from raw character BEFORE numeric coercion
+      count_dec <- function(x) {
+        x <- trimws(as.character(x))
+        ifelse(grepl("\\.", x), nchar(sub(".*\\.", "", x)), 0L)
+      }
+      mapped$.coord_decimals <- pmin(
+        count_dec(as.character(mapped[[lat_col]])),
+        count_dec(as.character(mapped[[lon_col]]))
+      )
+      mapped$.coord_precision_flag <- !is.na(mapped$.coord_decimals) & mapped$.coord_decimals <= 1
+
       mapped$.lat <- suppressWarnings(as.numeric(as.character(mapped[[lat_col]])))
       mapped$.lon <- suppressWarnings(as.numeric(as.character(mapped[[lon_col]])))
       mapped <- mapped[!is.na(mapped$.lat) & !is.na(mapped$.lon), , drop = FALSE]
@@ -2354,9 +2470,16 @@ mapServer <- function(id, query_result) {
       cap_note <- if (mapped_obs > MAP_MARKER_CAP) {
         sprintf(" A random sample of %s is displayed on the map.", format(MAP_MARKER_CAP, big.mark = ","))
       } else ""
+      n_low_prec <- if (".coord_precision_flag" %in% names(md$dat)) {
+        sum(md$dat$.coord_precision_flag, na.rm = TRUE)
+      } else 0L
+      prec_note <- if (n_low_prec > 0) {
+        sprintf(" %s observation(s) have ≤1 decimal-place coordinate precision (informational: may indicate gridded or coarsely georeferenced records).",
+                format(n_low_prec, big.mark = ","))
+      } else ""
       div(class = "alert alert-info", style = "margin-top: 10px;",
-        sprintf("%d of %d observations (%s%%) have valid coordinates.%s",
-                mapped_obs, total_obs, pct, cap_note))
+        sprintf("%d of %d observations (%s%%) have valid coordinates.%s%s",
+                mapped_obs, total_obs, pct, cap_note, prec_note))
     })
     
     reactive(list(ok = TRUE))
@@ -2448,6 +2571,11 @@ ui <- fluidPage(
         div(
           h1("Trait Data Portal: Data Visualizer & Download"),
           p("Query traits by species, genus, family, or trait type with full provenance tracking")
+        ),
+        div(style = "margin-left: auto; align-self: center;",
+          actionButton("open_help",
+            label = tagList(tags$i(class = "fa fa-question-circle"), " Help"),
+            class = "btn btn-default")
         )
       )
     ),
@@ -2465,8 +2593,7 @@ ui <- fluidPage(
       tabPanel("Step 5: Diagnostics", diagnosticsUI("diagnostics")),
       tabPanel("Step 6: Records", recordsUI("records")),
       tabPanel("Step 7: Provenance", provenanceUI("provenance")),
-      tabPanel("Step 8: Download", downloadGateUI("downloadGate")),
-      tabPanel("Help", helpUI("help"))
+      tabPanel("Step 8: Download", downloadGateUI("downloadGate"))
     ),
     
     hr(),
@@ -2659,7 +2786,16 @@ server <- function(input, output, session) {
   prov_result <- provenanceServer("provenance", trait_result)
   download_result <- downloadGateServer("downloadGate", trait_result)
   map_result <- mapServer("map", trait_result)
-  help_result <- helpServer("help")
+
+  observeEvent(input$open_help, {
+    showModal(modalDialog(
+      title = "Help & Ecological Caveats",
+      helpUI("help_modal"),
+      footer = modalButton("Close"),
+      size = "l",
+      easyClose = TRUE
+    ))
+  })
 }
 
 # ============================================================================

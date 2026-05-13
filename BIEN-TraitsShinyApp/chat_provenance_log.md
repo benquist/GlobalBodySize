@@ -276,3 +276,9 @@
 - Prompt summary: Implemented Tier 1 and Tier 2 changes in app_gateway.R. Tier 1: B2 (observation_type in core_cols), B5 (is_introduced in marker_cols), B7 (BIEN pkg version in manifests), C1 (flat panel headings), C2 (uniform blue tab borders), C3 (Map → Step 4b: Map). Tier 2: A1+A2 (log10-aware summary stats with corrected labels and local outlier recompute), C4 (query context strip), C5 (query_status Bootstrap alerts), C7 (rank-sensitive max_records hint), C8 (structured provenance dl/dd card). File parses clean. Tier 3 and HOLD items deferred.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+---
+- Date: 2026-05-13
+- Prompt summary: Implemented Tier 3+4 changes in app_gateway.R. B1 reconciliation panel, B3 source bibliography DT, B4 unit-excluded count in na_note, C9 Help moved to modal, B6 coordinate precision QA from character detection, C6 prereq guard (req(nrow(dat)>0)). Full C6 checkbox removal deferred. File parses clean.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
+- Completed by: GitHub Copilot
