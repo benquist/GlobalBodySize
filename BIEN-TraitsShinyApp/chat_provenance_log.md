@@ -1,5 +1,11 @@
 # Chat Provenance Log
 
+- Date: 2026-05-13
+- Prompt summary: @M design/usability/UX/information-content review of BIEN Traits app. Multi-agent audit: ecology-user (scientific workflow + bias), biodiversity-science-guard (taxonomic reconciliation, units, observation type, coordinate QA), scandinavian-design/design-atelier (UI structure, tab reduction, interaction model, visual system). Produced ranked improvement recommendations; no code changed.
+- Requested outcomes: Ranked set of recommended changes covering scientific correctness bugs, transparency improvements, UX restructuring, and visual design quick wins.
+- Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot (@m orchestrator)
+
 - Date: 2026-04-25
 - Prompt summary: Improve BIEN connection-capacity resilience in app_gateway.R with a minimal safe_bien_retry-only change.
 - Requested outcomes: In safe_bien_retry, stop immediate break on capacity errors; add capacity-specific backoff schedule c(8, 20, 40); for capacity errors retry with schedule until attempts exhausted then return last; preserve non-capacity sleep_sec * i behavior; run parse validation; report exact before/after snippet.
