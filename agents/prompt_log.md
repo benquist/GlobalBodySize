@@ -2302,3 +2302,12 @@ Action: Prompt logged; HTML committed and pushed.
 ## 2026-05-13 — C6 download_all checkbox removal (BIEN-TraitsShinyApp)
 User: Removed download_all checkboxInput and all 4 associated observeEvent sync blocks. Added Select All / Clear actionLinks above the trait selectInput. Derived is_all from setequal(sort(input$selected_traits), sort(all_traits)) && length(all_traits) > 0 in the trait_result reactive. Downstream consumers (downloadGateServer, provenanceServer) unchanged — they read qr$download_all from the reactive list which is now derived. req(nrow(dat) > 0) guard from C6-prereq remains in place. Parse OK, code-checker PASS.
 Action: Committed and pushed app_gateway.R. Deployed to shinyapps.io via deploy.R.
+
+## 2026-05-13 — MADcomm→BIEN: biotime.2018 + anderson.2011 + NEON coord fix
+User: "Lets add these for species occurrence records - neon.2018c neonUtilities download + coord join str_extract bug fix, plotID→siteID lat/lon join HIGH; biotime.2018 650MB zenodo download + needs plant filter Filter TAXA == 'Plants' before loading HIGH; anderson.2011 figshare download (suppdata), no coords Montana centroid, direct figshare URL LOW"
+Action: Added sections 4.9 (biotime.2018) and 4.10 (anderson.2011) to Literature_Data_To_BIENdb/MADcomm_BIEN_loading.Rmd. Added both to all_datasets list in combine-data chunk. Bugs found and fixed during integration:
+  - NEON: vst_perplotperyear no longer has plotSize column in current NEON release — switched to coordinateUncertainty; set plot_area_ha=NA_real_ to avoid numeric(0) crash; scoped to 8 cross-biome sites (HARV/OSBS/KONZ/CPER/SJER/NIWO/CLBJ/ORNL) 2017-2018 to avoid OOM on site="all"
+  - BioTIME: Zenodo URL changed from /record/ to /records/ (plural); TAXA values are "Terrestrial plants"/"Freshwater plants" not "Plants"; used data.table::fread with column select for memory-efficient 650MB read
+  - anderson.2011: figshare files endpoint (not versioned), year paste0("19",year) logic; Fort Keogh, MT centroid (46.41N, -105.84W); coord_uncertainty_m=10000
+Final staging CSV: 1,088,279 rows, 1,069,996 with coordinates, 10 datasets: adler.2007 (13,520), anderson.2011 (2,016), anderson.2012 (475), biotime.2018 (1,041,246 across 98 terrestrial/freshwater plant studies), chu.2016 (1,859), mcglinn.2010 (17,290), myster.2010 (741), neon.2018c (4,251), phillips.2003 (7,132).
+Files: Literature_Data_To_BIENdb/MADcomm_BIEN_loading.Rmd, Literature_Data_To_BIENdb/output/madcomm_bien_staging.csv, agents/prompt_log.md.
