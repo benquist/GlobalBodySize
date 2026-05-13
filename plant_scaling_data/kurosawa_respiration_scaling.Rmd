@@ -1936,6 +1936,194 @@ ggplot(ci_plot_df,
   )
 ```
 
+## Intraspecific slopes: n ≥ 10 and ≥ 2 orders of magnitude size range
+
+This subsection restricts the per-species intraspecific analysis to species
+that have (i) at least **10** individual measurements and (ii) a fresh-mass
+range spanning **≥ 2 orders of magnitude** (i.e., max − min log₁₀ fresh mass ≥ 2,
+equivalent to a 100-fold body-size span). These criteria select species for
+which within-species slopes are both well-powered and ecologically meaningful.
+
+```{r intraspecific-strict-slopes}
+# ── Build per-species stats including mass range ──────────────────────────────
+sp_intra_strict <- dat |>
+  group_by(species, family, life_form, plant_part) |>
+  filter(is.finite(log_mass), is.finite(log_resp)) |>
+  mutate(mass_range = max(log_mass) - min(log_mass)) |>
+  filter(n() >= 10, mass_range >= 2) |>          # n >= 10; >= 2 log10 units
+  nest() |>
+  mutate(
+    lm_fit    = map(data, ~ lm(log_resp ~ log_mass, data = .x)),
+    sma_fit   = map(data, ~ tryCatch(smatr::sma(log_resp ~ log_mass, data = .x,
+                                                 method = "SMA"),
+                                     error = function(e) NULL)),
+    n          = map_int(data, nrow),
+    mass_range = map_dbl(data, ~ max(.x$log_mass) - min(.x$log_mass)),
+    slope      = map_dbl(lm_fit, ~ coef(.x)[2]),
+    slope_se   = map_dbl(lm_fit, ~ summary(.x)$coefficients[2, 2]),
+    ci_lo      = map_dbl(lm_fit, ~ tryCatch(confint(.x)[2, 1], error = function(e) NA_real_)),
+    ci_hi      = map_dbl(lm_fit, ~ tryCatch(confint(.x)[2, 2], error = function(e) NA_real_)),
+    r2         = map_dbl(lm_fit, ~ summary(.x)$r.squared),
+    sma_slope  = map_dbl(sma_fit, ~ if (!is.null(.x)) coef(.x)[2] else NA_real_),
+    sma_ci_lo  = map_dbl(sma_fit, ~ if (!is.null(.x)) .x$coef[[1]][2, 2] else NA_real_),
+    sma_ci_hi  = map_dbl(sma_fit, ~ if (!is.null(.x)) .x$coef[[1]][2, 3] else NA_real_)
+  ) |>
+  select(-lm_fit, -sma_fit, -data) |>
+  ungroup()
+
+cat(sprintf("Species passing n >= 10 AND mass range >= 2 log10 units: %d\n",
+            nrow(sp_intra_strict)))
+cat(sprintf("  (dropped from n >= 3 full set: %d → %d species)\n",
+            nrow(sp_intra), nrow(sp_intra_strict)))
+
+if (nrow(sp_intra_strict) > 0) {
+  cat("\nOLS exponents (strict subset):\n")
+  cat("  Mean:  ", round(mean(sp_intra_strict$slope,     na.rm = TRUE), 3), "\n")
+  cat("  Median:", round(median(sp_intra_strict$slope,   na.rm = TRUE), 3), "\n")
+  cat("  IQR:   ", round(IQR(sp_intra_strict$slope,      na.rm = TRUE), 3), "\n")
+  cat("\nSMA exponents (strict subset):\n")
+  cat("  Mean:  ", round(mean(sp_intra_strict$sma_slope, na.rm = TRUE), 3), "\n")
+  cat("  Median:", round(median(sp_intra_strict$sma_slope, na.rm = TRUE), 3), "\n")
+  cat("  IQR:   ", round(IQR(sp_intra_strict$sma_slope,  na.rm = TRUE), 3), "\n")
+
+  # One-sample t-tests vs theoretical exponents
+  ts_ols_075  <- t.test(sp_intra_strict$slope,     mu = 0.75)
+  ts_ols_100  <- t.test(sp_intra_strict$slope,     mu = 1.00)
+  ts_sma_075  <- t.test(sp_intra_strict$sma_slope, mu = 0.75)
+  ts_sma_100  <- t.test(sp_intra_strict$sma_slope, mu = 1.00)
+
+  cat(sprintf("\nOLS mean = %.3f  [95%% CI: %.3f – %.3f]  n = %d\n",
+              ts_ols_075$estimate, ts_ols_075$conf.int[1], ts_ols_075$conf.int[2],
+              length(sp_intra_strict$slope[is.finite(sp_intra_strict$slope)])))
+  cat(sprintf("OLS vs H0=0.75: t = %.3f, df = %.1f, p = %.4f\n",
+              ts_ols_075$statistic, ts_ols_075$parameter, ts_ols_075$p.value))
+  cat(sprintf("OLS vs H0=1.00: t = %.3f, df = %.1f, p = %.4f\n",
+              ts_ols_100$statistic, ts_ols_100$parameter, ts_ols_100$p.value))
+
+  cat(sprintf("\nSMA mean = %.3f  [95%% CI: %.3f – %.3f]  n = %d\n",
+              ts_sma_075$estimate, ts_sma_075$conf.int[1], ts_sma_075$conf.int[2],
+              length(sp_intra_strict$sma_slope[is.finite(sp_intra_strict$sma_slope)])))
+  cat(sprintf("SMA vs H0=0.75: t = %.3f, df = %.1f, p = %.4f\n",
+              ts_sma_075$statistic, ts_sma_075$parameter, ts_sma_075$p.value))
+  cat(sprintf("SMA vs H0=1.00: t = %.3f, df = %.1f, p = %.4f\n",
+              ts_sma_100$statistic, ts_sma_100$parameter, ts_sma_100$p.value))
+} else {
+  cat("\n⚠ No species pass both criteria in the current dataset.\n")
+  cat("  (Demo data have narrow mass ranges by design; re-run with real Dryad data.)\n")
+}
+```
+
+```{r intraspecific-strict-histogram, fig.width=12, fig.height=8, fig.cap="Frequency distributions of intraspecific scaling exponents for the high-quality subset: species with ≥ 10 individuals spanning ≥ 2 orders of magnitude in fresh mass. Rows: OLS (top) and SMA (bottom). Columns: life form. Fill = plant part (Shoot = green, Root = amber). Red dashed = WBE ¾; blue dotted = isometric 1.0; grey solid = per-panel median."}
+if (nrow(sp_intra_strict) < 2) {
+  message("⚠ Too few species in strict subset for histogram (need ≥ 2). ",
+          "Re-run with real Dryad data.")
+} else {
+  strict_long <- sp_intra_strict |>
+    select(species, family, life_form, plant_part,
+           OLS = slope, SMA = sma_slope) |>
+    pivot_longer(cols = c(OLS, SMA),
+                 names_to = "method", values_to = "exponent") |>
+    filter(!is.na(exponent)) |>
+    mutate(method = factor(method, levels = c("OLS", "SMA")))
+
+  strict_panel_stats <- strict_long |>
+    group_by(method, life_form) |>
+    summarise(
+      median_exp = median(exponent, na.rm = TRUE),
+      n_sp       = n(),
+      .groups    = "drop"
+    )
+
+  print(
+    ggplot(strict_long, aes(x = exponent, fill = plant_part)) +
+      geom_histogram(bins = 20, alpha = 0.75, colour = "white") +
+      geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
+                 linewidth = 1) +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
+                 linewidth = 1) +
+      geom_vline(data = strict_panel_stats,
+                 aes(xintercept = median_exp),
+                 linetype = "solid", colour = "grey30", linewidth = 0.9,
+                 inherit.aes = FALSE) +
+      geom_label(data = strict_panel_stats,
+                 aes(x = median_exp, y = Inf,
+                     label = sprintf("med=%.2f\nn=%d", median_exp, n_sp)),
+                 vjust = 1.4, hjust = -0.08, size = 3.0, colour = "grey20",
+                 fill = "white", label.size = 0.2, inherit.aes = FALSE) +
+      facet_grid(method ~ life_form, scales = "free_y") +
+      scale_fill_manual(values = c(Shoot = "#4dac26", Root = "#b8860b")) +
+      labs(x = "Scaling exponent (log R ~ log Mass, within species)",
+           y = "Count",
+           fill = "Plant part",
+           title = "Intraspecific exponents — strict subset (n ≥ 10, range ≥ 2 log₁₀ units)",
+           subtitle = "Grey line = per-panel median. Red dashed = WBE ¾. Blue dotted = isometric 1.0.") +
+      theme(legend.position = "bottom")
+  )
+}
+```
+
+```{r intraspecific-strict-forest, fig.width=10, fig.height=7, fig.cap="Per-species 95% confidence intervals for intraspecific scaling exponents — strict subset (≥ 10 individuals, ≥ 2 log₁₀ units mass range). Circles = OLS, triangles = SMA, vertically dodged within each facet. Species sorted by ascending OLS slope. Red dashed = WBE ¾; blue dotted = isometric 1.0. Wider mass ranges generally yield narrower CIs."}
+if (nrow(sp_intra_strict) < 2) {
+  message("⚠ Too few species in strict subset for forest plot.")
+} else {
+  strict_ci_df <- sp_intra_strict |>
+    mutate(
+      facet_grp    = paste0(life_form, "\n", plant_part),
+      ols_sort_key = slope
+    ) |>
+    arrange(facet_grp, ols_sort_key) |>
+    mutate(sp_label = factor(species, levels = unique(species))) |>
+    pivot_longer(
+      cols      = c(slope, sma_slope),
+      names_to  = "method",
+      values_to = "est"
+    ) |>
+    mutate(
+      lo     = if_else(method == "slope", ci_lo,    sma_ci_lo),
+      hi     = if_else(method == "slope", ci_hi,    sma_ci_hi),
+      method = if_else(method == "slope", "OLS", "SMA"),
+      method = factor(method, levels = c("OLS", "SMA"))
+    ) |>
+    filter(!is.na(est), !is.na(lo), !is.na(hi))
+
+  print(
+    ggplot(strict_ci_df,
+           aes(x = est, y = sp_label, colour = method, shape = method)) +
+      geom_vline(xintercept = 0.75, linetype = "dashed", colour = "#d6604d",
+                 linewidth = 0.8) +
+      geom_vline(xintercept = 1.00, linetype = "dotted", colour = "#2166ac",
+                 linewidth = 0.8) +
+      geom_errorbarh(aes(xmin = lo, xmax = hi),
+                     height    = 0.30,
+                     linewidth = 0.55,
+                     alpha     = 0.8,
+                     position  = position_dodge(width = 0.55)) +
+      geom_point(size     = 2.4,
+                 position = position_dodge(width = 0.55)) +
+      facet_wrap(~ facet_grp, scales = "free_y", ncol = 2) +
+      scale_colour_manual(values = c(OLS = "#1a6faf", SMA = "#d95f02"),
+                          name   = "Method") +
+      scale_shape_manual(values  = c(OLS = 16, SMA = 17),
+                         name    = "Method") +
+      labs(
+        x        = expression(paste("Scaling exponent  ", beta,
+                                    "  (log R ~ log M, within species)")),
+        y        = NULL,
+        title    = "Intraspecific exponents — strict subset (n ≥ 10, ≥ 2 log₁₀ units)",
+        subtitle = "Sorted by OLS slope. Red dashed = WBE ¾, blue dotted = isometric 1.0."
+      ) +
+      theme_bw(base_size = 11) +
+      theme(
+        legend.position    = "bottom",
+        strip.background   = element_rect(fill = "grey92"),
+        axis.text.y        = element_text(size = 8, face = "italic"),
+        panel.grid.major.y = element_line(colour = "grey90", linewidth = 0.3),
+        panel.grid.minor   = element_blank()
+      )
+  )
+}
+```
+
 ## Inter- vs. intraspecific: Glazier comparison
 
 ```{r glazier-comparison}
