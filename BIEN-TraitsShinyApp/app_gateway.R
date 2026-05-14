@@ -95,14 +95,10 @@ extract_rank_token <- function(rank, taxon) {
 }
 
 safe_bien_call <- function(expr, timeout_sec = 120) {
-  timeout_sec <- suppressWarnings(as.numeric(timeout_sec))
-  if (is.na(timeout_sec) || !is.finite(timeout_sec) || timeout_sec <= 0) {
-    timeout_sec <- 120
-  }
-
-  setTimeLimit(elapsed = timeout_sec, transient = TRUE)
-  on.exit(setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE), add = TRUE)
-
+  # NOTE: setTimeLimit is intentionally NOT used here. In Shiny reactive contexts
+  # on shinyapps.io, setTimeLimit(transient=TRUE) can fire during subsequent
+  # reactive evaluations and kill the entire R session rather than just the
+  # current call. Rely on tryCatch alone; shinyapps.io enforces its own timeouts.
   tryCatch(expr, error = function(e) {
     structure(list(error = conditionMessage(e)), class = "bien_error")
   })
@@ -789,46 +785,49 @@ queryServer <- function(id) {
 
       key <- paste(mode, if (identical(mode, "taxa")) rank else "traits", sep = "::")
 
-      tryCatch({
-        choices <- rv$suggestion_cache[[key]]
-        if (is.null(choices) || length(choices) == 0) {
-          choices <- if (identical(mode, "traits")) {
+      # Load choices; if loading fails, always fall back so the dropdown still
+      # updates (an empty/failed tryCatch previously left the dropdown blank).
+      choices <- rv$suggestion_cache[[key]]
+      if (is.null(choices) || length(choices) == 0) {
+        choices <- tryCatch({
+          if (identical(mode, "traits")) {
             load_trait_suggestions()
           } else {
-            # Keep suggestion payloads small enough to avoid blocking rank switches.
             load_taxon_suggestions(rank = rank, max_choices = suggestion_cap_for_rank(rank))
           }
-          if (length(choices) > 0) {
-            rv$suggestion_cache[[key]] <- choices
-          }
+        }, error = function(e) {
+          warning("suggestion loading error: ", conditionMessage(e))
+          if (identical(mode, "traits")) character(0)
+          else { fb <- .bien_taxon_suggestion_fallback[[rank]]; if (is.null(fb)) character(0) else fb }
+        })
+        if (length(choices) > 0) {
+          rv$suggestion_cache[[key]] <- choices
         }
+      }
 
-        current <- input$taxon
-        selected <- if (!is.null(current) && nzchar(current) && current %in% choices) current else ""
-        placeholder <- if (identical(mode, "traits")) {
-          "Type to find BIEN trait names (accepted list)."
-        } else {
-          sprintf("Type to find accepted BIEN %s names.", rank)
-        }
+      current <- input$taxon
+      selected <- if (!is.null(current) && nzchar(current) && current %in% choices) current else ""
+      placeholder <- if (identical(mode, "traits")) {
+        "Type to find BIEN trait names (accepted list)."
+      } else {
+        sprintf("Type to find accepted BIEN %s names.", rank)
+      }
 
-        updateSelectizeInput(
-          session,
-          "taxon",
-          choices = choices,
-          selected = selected,
-          server = !identical(mode, "traits"),
-          options = list(
-            create = TRUE,
-            createOnBlur = TRUE,
-            maxOptions = 5000,
-            openOnFocus = TRUE,
-            minChars = 2,
-            placeholder = placeholder
-          )
+      updateSelectizeInput(
+        session,
+        "taxon",
+        choices = choices,
+        selected = selected,
+        server = !identical(mode, "traits"),
+        options = list(
+          create = TRUE,
+          createOnBlur = TRUE,
+          maxOptions = 5000,
+          openOnFocus = TRUE,
+          minChars = 2,
+          placeholder = placeholder
         )
-      }, error = function(e) {
-        warning("load_taxon_suggestions failed: ", conditionMessage(e))
-      })
+      )
     }, ignoreInit = FALSE)
     
     batch_species_list <- reactive({
