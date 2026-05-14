@@ -4,7 +4,7 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "dplyr", "tidyr", "stringr", "DT", "jsonlite", "leaflet")
+  required_packages <- c("shiny", "BIEN", "dplyr", "tidyr", "stringr", "DT", "jsonlite", "leaflet", "e1071")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
@@ -18,6 +18,7 @@ suppressPackageStartupMessages({
   library(DT)
   library(jsonlite)
   library(leaflet)
+  library(e1071)
 })
 
 .bien_trait_catalog_cache <- NULL
@@ -629,9 +630,21 @@ queryUI <- function(id) {
                          "Family" = "family", "Trait Only" = "trait-only"),
               selected = "species", width = "100%")
           )
-        ),
-        conditionalPanel(
-          condition = sprintf("input['%s'] == 'single'", ns("input_mode")),
+        )
+      ),
+      div(class = "row",
+        div(class = "col-sm-12",
+          div(class = "form-group",
+            radioButtons(ns("input_mode"), "Input mode:",
+              choices = c("Single taxon (autocomplete)" = "single",
+                         "Batch species list (paste or upload CSV)" = "batch"),
+              selected = "single", inline = TRUE)
+          )
+        )
+      ),
+      conditionalPanel(
+        condition = sprintf("input['%s'] == 'single'", ns("input_mode")),
+        div(class = "row",
           div(class = "col-sm-6",
             div(class = "form-group",
               tags$label("Taxon / Trait Name:", `for` = ns("taxon")),
@@ -659,16 +672,6 @@ queryUI <- function(id) {
                 "Autocomplete uses BIEN-backed suggestions. You can still type custom values."
               )
             )
-          )
-        )
-      ),
-      div(class = "row",
-        div(class = "col-sm-12",
-          div(class = "form-group",
-            radioButtons(ns("input_mode"), "Input mode:",
-              choices = c("Single taxon (autocomplete)" = "single",
-                         "Batch species list (paste or upload CSV)" = "batch"),
-              selected = "single", inline = TRUE)
           )
         )
       ),
@@ -1028,19 +1031,33 @@ queryServer <- function(id) {
 scopeUI <- function(id) {
   ns <- NS(id)
   div(
-    class = "panel panel-info",
+    class = "panel panel-default",
     div(class = "panel-heading", h3("Step 2: Availability & Scope")),
     div(class = "panel-body",
       uiOutput(ns("scope_display")),
+      uiOutput(ns("unit_het_detail")),
+      uiOutput(ns("genus_coverage_ui")),
       h4("Trait Coverage:"),
       DTOutput(ns("scope_coverage")),
-      uiOutput(ns("reconciliation_panel"))
+      tags$a(
+        href = paste0("#", ns("recon_collapse")),
+        `data-toggle` = "collapse",
+        class = "btn btn-xs btn-default",
+        style = "margin-bottom: 6px;",
+        "Show/Hide Taxonomic Reconciliation"
+      ),
+      div(
+        id = ns("recon_collapse"),
+        class = "collapse in",
+        uiOutput(ns("reconciliation_panel"))
+      )
     )
   )
 }
 
 scopeServer <- function(id, query_result) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
     output$scope_display <- renderUI({
       req(query_result())
       qr <- query_result()
@@ -1083,68 +1100,69 @@ scopeServer <- function(id, query_result) {
           )
         }
         ,
-        div(class = "panel panel-default",
-          div(class = "panel-heading", strong("Quick Insights")),
-          div(class = "panel-body",
-            {
-              trait_col_i <- first_existing_col(qr$data, c("trait_name", "trait", "measurementType"))
-              source_col_i <- first_existing_col(qr$data, c("source_citation", "datasource", "dataset"))
-              unit_col_i <- first_existing_col(qr$data, c("trait_unit", "unit", "units", "measurement_unit"))
-              
-              # Top 3 traits
-              top_traits_ui <- if (!is.null(trait_col_i)) {
-                top3 <- diag$coverage_by_trait
-                if (is.data.frame(top3) && nrow(top3) > 0) {
-                  top3 <- head(top3, 3)
-                  tags$p(strong("Top traits: "),
-                    paste(apply(top3, 1, function(r) paste0(r[[1]], " (", r[[2]], " records)")),
-                          collapse = "; "))
+        tags$a(
+          href = paste0("#", ns("insights_collapse")),
+          `data-toggle` = "collapse",
+          class = "btn btn-xs btn-default",
+          style = "margin-bottom: 6px;",
+          "Show/Hide Quick Insights"
+        ),
+        div(
+          id = ns("insights_collapse"),
+          class = "collapse in",
+          div(class = "panel panel-default",
+            div(class = "panel-heading", strong("Quick Insights")),
+            div(class = "panel-body",
+              {
+                trait_col_i <- first_existing_col(qr$data, c("trait_name", "trait", "measurementType"))
+                source_col_i <- first_existing_col(qr$data, c("source_citation", "datasource", "dataset"))
+                unit_col_i <- first_existing_col(qr$data, c("trait_unit", "unit", "units", "measurement_unit"))
+
+                # Source concentration
+                source_conc_ui <- if (!is.null(source_col_i)) {
+                  src_counts <- sort(table(as.character(qr$data[[source_col_i]])), decreasing = TRUE)
+                  src_counts <- src_counts[names(src_counts) != "" & !is.na(names(src_counts))]
+                  if (length(src_counts) > 0) {
+                    top_src <- names(src_counts)[[1]]
+                    top_pct <- round(100 * src_counts[[1]] / sum(src_counts), 1)
+                    top_src_display <- if (nchar(top_src) > 60) paste0(substr(top_src, 1, 57), "...") else top_src
+                    tags$p(strong("Source concentration: "),
+                      sprintf("Top source: %s \u2014 %.1f%% of records (across all returned traits).", top_src_display, top_pct),
+                      if (top_pct > 60) tags$span(class = "label label-warning", "Dominated by one source"))
+                  }
                 }
-              }
-              
-              # Source concentration
-              source_conc_ui <- if (!is.null(source_col_i)) {
-                src_counts <- sort(table(as.character(qr$data[[source_col_i]])), decreasing = TRUE)
-                src_counts <- src_counts[names(src_counts) != "" & !is.na(names(src_counts))]
-                if (length(src_counts) > 0) {
-                  top_src <- names(src_counts)[[1]]
-                  top_pct <- round(100 * src_counts[[1]] / sum(src_counts), 1)
-                  tags$p(strong("Source concentration: "),
-                    sprintf("Top source accounts for %.1f%% of records.", top_pct),
-                    if (top_pct > 60) tags$span(class = "label label-warning", "Dominated by one source"))
+
+                # Unit heterogeneity (O(N) group-by instead of O(T*N) per-trait subsetting)
+                unit_het_ui <- if (!is.null(trait_col_i) && !is.null(unit_col_i)) {
+                  n_mixed <- qr$data |>
+                    dplyr::mutate(.unit_clean = tolower(str_squish(as.character(.data[[unit_col_i]])))) |>
+                    dplyr::filter(!is.na(.unit_clean), nzchar(.unit_clean)) |>
+                    dplyr::group_by(.data[[trait_col_i]]) |>
+                    dplyr::summarise(.n_units = dplyr::n_distinct(.unit_clean), .groups = "drop") |>
+                    dplyr::filter(.n_units > 1) |>
+                    nrow()
+                  if (n_mixed > 0) {
+                    tags$p(strong("Unit heterogeneity: "),
+                      sprintf("%d trait(s) have mixed units \u2014 check before pooling values.", n_mixed),
+                      tags$span(class = "label label-danger", "Review units"))
+                  } else {
+                    tags$p(strong("Unit heterogeneity: "), "All traits appear to use consistent units.")
+                  }
                 }
-              }
-              
-              # Unit heterogeneity (O(N) group-by instead of O(T*N) per-trait subsetting)
-              unit_het_ui <- if (!is.null(trait_col_i) && !is.null(unit_col_i)) {
-                n_mixed <- qr$data |>
-                  dplyr::mutate(.unit_clean = tolower(str_squish(as.character(.data[[unit_col_i]])))) |>
-                  dplyr::filter(!is.na(.unit_clean), nzchar(.unit_clean)) |>
-                  dplyr::group_by(.data[[trait_col_i]]) |>
-                  dplyr::summarise(.n_units = dplyr::n_distinct(.unit_clean), .groups = "drop") |>
-                  dplyr::filter(.n_units > 1) |>
-                  nrow()
-                if (n_mixed > 0) {
-                  tags$p(strong("Unit heterogeneity: "),
-                    sprintf("%d trait(s) have mixed units \u2014 check before pooling values.", n_mixed),
-                    tags$span(class = "label label-danger", "Review units"))
-                } else {
-                  tags$p(strong("Unit heterogeneity: "), "All traits appear to use consistent units.")
+
+                # Truncation risk
+                trunc_ui <- if (!is.null(diag$records_not_returned) && !is.na(diag$records_not_returned) &&
+                                 diag$records_not_returned > 0) {
+                  pct_missing <- round(100 * diag$records_not_returned /
+                                        max(diag$total_available_records, 1), 1)
+                  tags$p(strong("Truncation risk: "),
+                    sprintf("%.1f%% of matching BIEN records were not returned (increase limit in Step 1 or use the R script to fetch all).", pct_missing),
+                    if (pct_missing > 50) tags$span(class = "label label-danger", "High truncation"))
                 }
+
+                tagList(source_conc_ui, unit_het_ui, trunc_ui)
               }
-              
-              # Truncation risk
-              trunc_ui <- if (!is.null(diag$records_not_returned) && !is.na(diag$records_not_returned) &&
-                               diag$records_not_returned > 0) {
-                pct_missing <- round(100 * diag$records_not_returned /
-                                      max(diag$total_available_records, 1), 1)
-                tags$p(strong("Truncation risk: "),
-                  sprintf("%.1f%% of matching BIEN records were not returned (increase limit in Step 1 or use the R script to fetch all).", pct_missing),
-                  if (pct_missing > 50) tags$span(class = "label label-danger", "High truncation"))
-              }
-              
-              tagList(top_traits_ui, source_conc_ui, unit_het_ui, trunc_ui)
-            }
+            )
           )
         )
       )
@@ -1199,6 +1217,15 @@ scopeServer <- function(id, query_result) {
       }
 
       tagList(
+        div(class = "alert alert-info",
+          tags$strong("Taxonomic backbone: "),
+          "BIEN applies the ",
+          tags$a(href = "https://tnrs.biendata.org/", target = "_blank", "Taxonomic Name Resolution Service (TNRS)"),
+          " to submitted names. Records are matched against accepted names using multiple authoritative sources including World Flora Online, Tropicos, The Plant List, and USDA PLANTS. ",
+          tags$code("name_submitted"), " is the verbatim input; ",
+          tags$code("name_matched"), " is the BIEN-reconciled accepted name; ",
+          tags$code("scrubbed_taxonomic_status"), " reflects the match outcome."
+        ),
         hr(),
         h4("Taxonomic Reconciliation"),
         p(class = "text-muted",
@@ -1222,9 +1249,110 @@ scopeServer <- function(id, query_result) {
           ),
           remap_ui
         )
+        ,
+        if (!is.null(submitted_col) && !is.null(matched_col)) {
+          recon_dt_tbl <- dat[, c(submitted_col, matched_col, status_col), drop = FALSE]
+          recon_dt_tbl <- unique(recon_dt_tbl)
+          names(recon_dt_tbl) <- c("name_submitted", "name_matched", "taxonomic_status")
+          recon_dt_tbl <- recon_dt_tbl[order(recon_dt_tbl$taxonomic_status, recon_dt_tbl$name_submitted), ]
+          tagList(
+            h4("Per-Name Reconciliation Audit"),
+            p(class = "text-muted",
+              "Each submitted name and its BIEN-matched equivalent. Review before interpreting results."),
+            DT::renderDataTable(
+              DT::datatable(recon_dt_tbl, rownames = FALSE,
+                options = list(pageLength = 10, scrollX = TRUE)),
+              server = TRUE
+            )
+          )
+        }
       )
     })
     
+    output$unit_het_detail <- renderUI({
+      req(query_result())
+      qr <- query_result()
+      dat <- qr$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) return(NULL)
+
+      trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      unit_col  <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit"))
+      if (is.null(trait_col) || is.null(unit_col)) return(NULL)
+
+      mixed_tbl <- dat |>
+        dplyr::mutate(.unit_clean = tolower(stringr::str_squish(as.character(.data[[unit_col]])))) |>
+        dplyr::filter(!is.na(.unit_clean), nzchar(.unit_clean)) |>
+        dplyr::group_by(trait = .data[[trait_col]], unit = .unit_clean) |>
+        dplyr::summarise(n_records = dplyr::n(), .groups = "drop") |>
+        dplyr::group_by(trait) |>
+        dplyr::mutate(n_units = dplyr::n_distinct(unit)) |>
+        dplyr::ungroup() |>
+        dplyr::filter(n_units > 1) |>
+        dplyr::arrange(dplyr::desc(n_records))
+
+      if (nrow(mixed_tbl) == 0) return(NULL)
+
+      tagList(
+        h4("Unit Heterogeneity Detail"),
+        p(class = "text-muted",
+          "Traits with more than one unit detected. Do not pool values across units without conversion."),
+        DT::renderDataTable(
+          DT::datatable(mixed_tbl, rownames = FALSE, options = list(pageLength = 8, scrollX = TRUE))
+        )
+      )
+    })
+
+    output$genus_coverage_ui <- renderUI({
+      req(query_result())
+      if (!identical(query_result()$rank, "genus")) return(NULL)
+      tagList(
+        hr(),
+        h4("Genus Species Coverage (Americas)"),
+        p(class = "text-muted",
+          "Estimate how many species in this genus have trait records in BIEN vs. total species in the genus.",
+          tags$strong(" Note: BIEN covers Americas flora only \u2014 Old World species in this genus will not appear.")),
+        actionButton(session$ns("estimate_coverage"), "Estimate Coverage (genus only)",
+                     class = "btn btn-default btn-sm"),
+        uiOutput(session$ns("genus_coverage_result"))
+      )
+    })
+
+    output$genus_coverage_result <- renderUI({
+      req(input$estimate_coverage)
+      genus_name <- query_result()$taxon
+      if (is.null(genus_name) || !nzchar(genus_name)) return(NULL)
+
+      withProgress(message = "Looking up genus species list in BIEN...", value = 0.5, {
+        tax_tbl <- tryCatch(
+          BIEN::BIEN_taxonomy_genus(genus = genus_name),
+          error = function(e) NULL
+        )
+      })
+
+      if (is.null(tax_tbl) || nrow(tax_tbl) == 0) {
+        return(div(class = "alert alert-warning",
+          "Could not retrieve genus species list from BIEN taxonomy. Check that the genus name is spelled correctly."))
+      }
+
+      dat <- query_result()$data
+      species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+      n_with_traits <- if (!is.null(species_col)) n_distinct(dat[[species_col]]) else NA_integer_
+      # C2 fix: use n_distinct accepted species, not nrow (which inflates for synonyms/infraspecific)
+      sp_col_bien <- first_existing_col(tax_tbl, c("scrubbed_species_binomial", "species_binomial", "species"))
+      n_in_bien <- if (!is.null(sp_col_bien)) {
+        dplyr::n_distinct(as.character(tax_tbl[[sp_col_bien]]), na.rm = TRUE)
+      } else nrow(tax_tbl)
+
+      pct <- if (!is.na(n_with_traits) && n_in_bien > 0) round(100 * n_with_traits / n_in_bien, 1) else NA_real_
+
+      div(class = "alert alert-info", style = "margin-top: 8px;",
+        strong(sprintf("%d of %d BIEN-listed species (%.1f%%)", n_with_traits, n_in_bien, pct)),
+        " in this genus have at least one trait record in your current query.",
+        p(class = "text-muted", style = "margin-bottom: 0; margin-top: 4px;",
+          "Americas-only scope: BIEN does not include Old World species. Coverage reflects sampled species within returned records.")
+      )
+    })
+
     reactive({
       req(query_result())
       list(
@@ -1242,10 +1370,10 @@ scopeServer <- function(id, query_result) {
 diagnosticsUI <- function(id) {
   ns <- NS(id)
   div(
-    class = "panel panel-warning",
-    div(class = "panel-heading", h3("Step 5: Diagnostics & Preview")),
+    class = "panel panel-default",
+    div(class = "panel-heading", h3("Diagnostics & Quality")),
     div(class = "panel-body",
-      uiOutput(ns("diagnostics_display")),
+      DTOutput(ns("trait_diag_dt")),
       h4("Data Preview (first 10 rows):"),
       DTOutput(ns("diagnostics_preview"))
     )
@@ -1254,39 +1382,61 @@ diagnosticsUI <- function(id) {
 
 diagnosticsServer <- function(id, query_result) {
   moduleServer(id, function(input, output, session) {
-    output$diagnostics_display <- renderUI({
+    output$trait_diag_dt <- renderDT({
       req(query_result())
       qr <- query_result()
-      
-      if (nrow(qr$data) == 0) {
-        return(p("Run query first to see diagnostics.", style = "color: #666;"))
-      }
-      
-      diag <- qr$diagnostics
-      if (is.null(diag)) return(p("Diagnostics not yet available.", style = "color: #666;"))
-      
-      tagList(
-        div(class = "row",
-          div(class = "col-sm-4",
-            div(class = "panel panel-default",
-              div(class = "panel-heading", "Total Records"),
-              div(class = "panel-body", h3(diag$total_records, style = "margin: 0;"))
-            )
-          ),
-          div(class = "col-sm-4",
-            div(class = "panel panel-default",
-              div(class = "panel-heading", "Unique Species"),
-              div(class = "panel-body", h3(diag$unique_species, style = "margin: 0;"))
-            )
-          ),
-          div(class = "col-sm-4",
-            div(class = "panel panel-default",
-              div(class = "panel-heading", "Trait Types"),
-              div(class = "panel-body", h3(diag$unique_traits, style = "margin: 0;"))
-            )
-          )
+      dat <- qr$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) return(NULL)
+
+      trait_col  <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      value_col  <- first_existing_col(dat, c("trait_value", "value", "measurement"))
+      unit_col   <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit"))
+      species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+
+      if (is.null(trait_col) || is.null(value_col)) return(NULL)
+
+      tbl <- dat |>
+        dplyr::group_by(trait_name = .data[[trait_col]]) |>
+        dplyr::summarise(
+          n_records   = dplyr::n(),
+          n_species   = if (!is.null(species_col)) dplyr::n_distinct(.data[[species_col]]) else NA_integer_,
+          pct_missing = {
+            vals <- suppressWarnings(as.numeric(as.character(.data[[value_col]])))
+            round(100 * mean(is.na(vals)), 1)
+          },
+          n_units     = if (!is.null(unit_col)) dplyr::n_distinct(.data[[unit_col]]) else NA_integer_,
+          cv_pct      = {
+            vals <- suppressWarnings(as.numeric(as.character(.data[[value_col]])))
+            vals <- vals[!is.na(vals) & is.finite(vals)]
+            if (!is.null(unit_col) && dplyr::n_distinct(.data[[unit_col]]) == 1 && length(vals) > 1 && mean(vals) != 0) {
+              round(100 * stats::sd(vals) / abs(mean(vals)), 1)
+            } else NA_real_
+          },
+          n_iqr_outliers = {
+            vals <- suppressWarnings(as.numeric(as.character(.data[[value_col]])))
+            vals <- vals[!is.na(vals) & is.finite(vals)]
+            if (length(vals) >= 4) {
+              q <- stats::quantile(vals, c(0.25, 0.75), na.rm = TRUE, names = FALSE)
+              iqr_v <- diff(q)
+              sum(vals < (q[1] - 1.5 * iqr_v) | vals > (q[2] + 1.5 * iqr_v), na.rm = TRUE)
+            } else 0L
+          },
+          .groups = "drop"
+        ) |>
+        dplyr::arrange(dplyr::desc(n_records))
+
+      DT::datatable(
+        tbl,
+        rownames = FALSE,
+        options = list(pageLength = 10, scrollX = TRUE),
+        caption = "Per-trait diagnostics. CV shown only when single unit is active. Flag rows with high missingness or multiple units."
+      ) |>
+        DT::formatStyle("pct_missing",
+          backgroundColor = DT::styleInterval(c(20, 50), c("white", "#fff3cd", "#f8d7da"))
+        ) |>
+        DT::formatStyle("n_units",
+          backgroundColor = DT::styleInterval(1, c("white", "#f8d7da"))
         )
-      )
     })
 
     output$diagnostics_preview <- renderDT({
@@ -1318,7 +1468,7 @@ recordsUI <- function(id) {
   ns <- NS(id)
   div(
     class = "panel panel-default",
-    div(class = "panel-heading", h3("Step 6: Complete Record Set")),
+    div(class = "panel-heading", h3("Complete Record Set")),
     div(class = "panel-body",
       uiOutput(ns("records_display")),
       DTOutput(ns("records_table"))
@@ -1371,6 +1521,7 @@ provenanceUI <- function(id) {
     class = "panel panel-default",
     div(class = "panel-heading", h3("Step 7: Provenance & Reproducibility")),
     div(class = "panel-body",
+      uiOutput(ns("dl_buttons_top")),
       uiOutput(ns("provenance_display")),
       hr(),
       h4("Source Bibliography"),
@@ -1382,6 +1533,16 @@ provenanceUI <- function(id) {
 
 provenanceServer <- function(id, query_result) {
   moduleServer(id, function(input, output, session) {
+    output$dl_buttons_top <- renderUI({
+      req(query_result())
+      if (nrow(query_result()$data) == 0) return(NULL)
+      div(style = "margin-bottom: 12px;",
+        downloadButton(session$ns("dl_manifest"), "Download Manifest (JSON)"),
+        " ",
+        downloadButton(session$ns("dl_script"), "Download R Script")
+      )
+    })
+
     output$provenance_display <- renderUI({
       req(query_result())
       qr <- query_result()
@@ -1544,6 +1705,15 @@ provenanceServer <- function(id, query_result) {
           }
         }
 
+        selected_traits_r <- if (!is.null(query_result()$selected_traits) &&
+                                  length(query_result()$selected_traits) > 0 &&
+                                  !isTRUE(query_result()$download_all)) {
+          trait_strs <- paste0(sprintf('"%s"', query_result()$selected_traits), collapse = ", ")
+          sprintf("dat <- dat[dat$trait_name %%in%% c(%s), ]", trait_strs)
+        } else {
+          "# All traits retained (no Step 3 filter applied)"
+        }
+
         script <- c(
           "# Reproducible BIEN query script generated by BIEN Trait Data Gateway",
           sprintf("# Generated: %s", ts),
@@ -1555,6 +1725,7 @@ provenanceServer <- function(id, query_result) {
           sprintf("max_records <- %d", max_records),
           "",
           sprintf("dat <- %s", call_line),
+          selected_traits_r,
           "write.csv(dat, 'bien_gateway_export.csv', row.names = FALSE)",
           "cat('Rows:', nrow(dat), '\\n')"
         )
@@ -1589,11 +1760,14 @@ traitSelectUI <- function(id) {
     class = "panel panel-primary",
     div(class = "panel-heading", h3("Step 3: Select Traits To Download")),
     div(class = "panel-body",
-      uiOutput(ns("selector_controls")),
       h4("Traits Returned By Query:"),
       DTOutput(ns("trait_summary")),
+      uiOutput(ns("selector_controls")),
       h4("Species x Trait Coverage Matrix (top 50 species):"),
-      DTOutput(ns("species_trait_matrix"))
+      DTOutput(ns("species_trait_matrix")),
+      h4("Species Trait Coverage Summary"),
+      p(class = "text-muted", "Percentage of all queried species with at least one record per trait (denominator = all species in query result, not just top 50)."),
+      tableOutput(ns("species_coverage_summary"))
     )
   )
 }
@@ -1616,6 +1790,19 @@ traitSelectServer <- function(id, query_result) {
         summarise(
           n_records = n(),
           n_species = if (!is.null(species_col)) n_distinct(.data[[species_col]]) else NA_integer_,
+          dominant_unit = {
+            if (!is.null(unit_col <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit")))) {
+              u <- tolower(stringr::str_squish(as.character(.data[[unit_col]])))
+              u <- u[!is.na(u) & nzchar(u)]
+              if (length(u) > 0) names(sort(table(u), decreasing = TRUE))[[1]] else NA_character_
+            } else NA_character_
+          },
+          n_units = {
+            if (!is.null(unit_col <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit")))) {
+              u <- tolower(stringr::str_squish(as.character(.data[[unit_col]])))
+              n_distinct(u[!is.na(u) & nzchar(u)])
+            } else NA_integer_
+          },
           .groups = "drop"
         ) %>%
         rename(trait_name = 1) %>%
@@ -1695,11 +1882,23 @@ traitSelectServer <- function(id, query_result) {
     output$trait_summary <- renderDT({
       tbl <- trait_summary_tbl()
       req(nrow(tbl) > 0)
+      if ("n_units" %in% names(tbl)) {
+        tbl$units_flag <- ifelse(
+          !is.na(tbl$n_units) & tbl$n_units > 1,
+          paste0('<span class="label label-danger">', tbl$n_units, ' units</span>'),
+          as.character(ifelse(is.na(tbl$n_units), "", tbl$n_units))
+        )
+        display_tbl <- tbl[, c("trait_name", "n_records", "n_species", "dominant_unit", "units_flag"), drop = FALSE]
+        names(display_tbl)[names(display_tbl) == "units_flag"] <- "units"
+      } else {
+        display_tbl <- tbl
+      }
       datatable(
-        tbl,
-        options = list(pageLength = 8),
+        display_tbl,
+        options = list(pageLength = 8, scrollX = TRUE),
         selection = list(mode = "multiple", target = "row"),
-        rownames = FALSE
+        rownames = FALSE,
+        escape = FALSE
       )
     })
 
@@ -1768,6 +1967,39 @@ traitSelectServer <- function(id, query_result) {
                           total_available = total_avail,
                           max_records = max_rec)
     })
+
+    output$species_coverage_summary <- renderTable({
+      req(query_result())
+      dat <- query_result()$data
+      if (!is.data.frame(dat) || nrow(dat) == 0) return(NULL)
+
+      trait_col   <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+      if (is.null(trait_col) || is.null(species_col)) return(NULL)
+
+      all_species <- unique(as.character(dat[[species_col]]))
+      all_species <- all_species[!is.na(all_species) & nzchar(all_species)]
+      n_all <- length(all_species)
+      if (n_all == 0) return(NULL)
+
+      dat |>
+        dplyr::group_by(trait = .data[[trait_col]]) |>
+        dplyr::summarise(
+          n_species_with_trait = dplyr::n_distinct(.data[[species_col]]),
+          .groups = "drop"
+        ) |>
+        dplyr::mutate(
+          pct_queried_species = round(100 * n_species_with_trait / n_all, 1),
+          denominator = n_all
+        ) |>
+        dplyr::rename(
+          "Trait" = trait,
+          "Species with trait" = n_species_with_trait,
+          "% of queried species" = pct_queried_species,
+          "Total queried species" = denominator
+        ) |>
+        dplyr::arrange(dplyr::desc(`% of queried species`))
+    }, striped = TRUE, bordered = TRUE, width = "100%")
 
     reactive({
       req(query_result())
@@ -1862,7 +2094,7 @@ traitSelectServer <- function(id, query_result) {
 distributionsUI <- function(id) {
   ns <- NS(id)
   div(
-    class = "panel panel-info",
+    class = "panel panel-default",
     div(class = "panel-heading", h3("Step 4: Trait Distributions")),
     div(class = "panel-body",
       uiOutput(ns("caveat_banner")),
@@ -1871,11 +2103,22 @@ distributionsUI <- function(id) {
           uiOutput(ns("dist_controls")),
           uiOutput(ns("scope_badge")),
           h4("Summary Statistics"),
-          tableOutput(ns("summary_stats"))
+          tableOutput(ns("summary_stats")),
+          uiOutput(ns("skewness_hint"))
         ),
         div(class = "col-sm-8",
           plotOutput(ns("hist_plot"), height = "360px"),
-          textOutput(ns("na_note"))
+          textOutput(ns("na_note")),
+          uiOutput(ns("categorical_freq_table")),
+          hr(),
+          h5("User-Defined Plausibility Range"),
+          p(class = "text-muted",
+            "Draw vertical reference lines on the histogram. For common traits, suggested defaults are pre-populated \u2014 ",
+            tags$strong("verify these values for your specific taxa and units before use.")),
+          fluidRow(
+            column(6, numericInput(ns("range_lo"), "Lower bound:", value = NA, width = "100%")),
+            column(6, numericInput(ns("range_hi"), "Upper bound:", value = NA, width = "100%"))
+          )
         )
       ),
       h4("Source Breakdown"),
@@ -1994,6 +2237,8 @@ distributionsServer <- function(id, query_result) {
       }
       unit_excluded_n <- pre_unit_n - nrow(sub)
       raw_vals <- suppressWarnings(as.numeric(as.character(sub[[value_col]])))
+      pct_numeric <- if (length(raw_vals) > 0) mean(!is.na(raw_vals), na.rm = TRUE) else 0
+      is_categorical <- pct_numeric < 0.1
       keep <- !is.na(raw_vals) & is.finite(raw_vals)
       vals <- raw_vals[keep]
       total_n <- length(raw_vals)
@@ -2037,7 +2282,9 @@ distributionsServer <- function(id, query_result) {
         unique_units = unique_units,
         source_tbl = source_tbl,
         outlier_n = outlier_n,
-        unit_excluded_n = unit_excluded_n
+        unit_excluded_n = unit_excluded_n,
+        pct_numeric = pct_numeric,
+        is_categorical = is_categorical
       )
     })
 
@@ -2134,7 +2381,10 @@ distributionsServer <- function(id, query_result) {
           paste0("Max", scale_sfx),
           paste0("5th percentile", scale_sfx),
           paste0("95th percentile", scale_sfx),
-          outlier_label
+          outlier_label,
+          "N species (contributing)",
+          if (length(sel$unique_units) == 1) "CV (%)" else "CV (%) \u2014 unit filter required",
+          paste0("Skewness", scale_sfx)
         ),
         value = c(
           length(plot_vals),
@@ -2146,7 +2396,26 @@ distributionsServer <- function(id, query_result) {
           round(max(plot_vals, na.rm = TRUE), 4),
           round(stats::quantile(plot_vals, 0.05, na.rm = TRUE, names = FALSE), 4),
           round(stats::quantile(plot_vals, 0.95, na.rm = TRUE, names = FALSE), 4),
-          local_outlier_n
+          local_outlier_n,
+          # N contributing species
+          {
+            req_dat <- query_result()$data
+            trait_col_s <- first_existing_col(req_dat, c("trait_name", "trait", "measurementType"))
+            species_col_s <- first_existing_col(req_dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+            value_col_s <- first_existing_col(req_dat, c("trait_value", "value", "measurement"))
+            if (!is.null(trait_col_s) && !is.null(species_col_s) && !is.null(value_col_s) && !is.null(input$dist_trait)) {
+              sub_s <- req_dat[as.character(req_dat[[trait_col_s]]) == input$dist_trait, , drop = FALSE]
+              sub_s_num <- suppressWarnings(as.numeric(as.character(sub_s[[value_col_s]])))
+              sub_s_sp <- as.character(sub_s[[species_col_s]])[!is.na(sub_s_num) & is.finite(sub_s_num)]
+              n_distinct(sub_s_sp[!is.na(sub_s_sp)])
+            } else NA_integer_
+          },
+          # CV — only meaningful when unit filter is active (single unit)
+          if (length(sel$unique_units) == 1 && mean(plot_vals, na.rm = TRUE) != 0) {
+            round(100 * sd(plot_vals, na.rm = TRUE) / abs(mean(plot_vals, na.rm = TRUE)), 2)
+          } else NA_real_,
+          # Skewness via e1071
+          if (length(plot_vals) >= 3) round(e1071::skewness(plot_vals, type = 2, na.rm = TRUE), 4) else NA_real_
         ),
         check.names = FALSE,
         stringsAsFactors = FALSE
@@ -2169,9 +2438,39 @@ distributionsServer <- function(id, query_result) {
               sel$used_n, sel$total_n, sel$missing_n, unit_excl_msg, sel$missing_pct, unit_msg)
     })
 
+    output$skewness_hint <- renderUI({
+      sel <- tryCatch(dist_selected(), error = function(e) NULL)
+      if (is.null(sel) || length(sel$vals) < 3) return(NULL)
+
+      use_log <- isTRUE(input$dist_log10)
+      plot_vals <- if (use_log) {
+        v <- sel$vals[sel$vals > 0]
+        if (length(v) < 3) return(NULL)
+        log10(v)
+      } else {
+        sel$vals
+      }
+
+      skew_val <- tryCatch(e1071::skewness(plot_vals, type = 2, na.rm = TRUE), error = function(e) NA_real_)
+      if (is.na(skew_val) || abs(skew_val) <= 2) return(NULL)
+
+      div(
+        class = "alert alert-info",
+        style = "margin-top: 6px;",
+        tags$strong("High skewness detected \u2014 consider log10 scale."),
+        sprintf(" Skewness = %.2f. Log10 transformation can improve histogram readability for right-skewed trait data.", skew_val)
+      )
+    })
+
     output$hist_plot <- renderPlot({
       sel <- dist_selected()
       vals <- sel$vals
+
+      if (isTRUE(sel$is_categorical)) {
+        plot.new()
+        text(0.5, 0.5, "Categorical trait detected \u2014 no numeric histogram available.\nSee frequency table below.", cex = 1.1)
+        return(invisible(NULL))
+      }
 
       if (length(vals) == 0) {
         plot.new()
@@ -2195,11 +2494,37 @@ distributionsServer <- function(id, query_result) {
         col = "#7fb8e6",
         border = "#2f79b7",
         main = paste("Distribution:", input$dist_trait),
-        xlab = if (isTRUE(input$dist_log10)) "log10(trait value)" else "Trait value",
+        xlab = if (isTRUE(input$dist_log10)) {
+          unit_label_log <- if (!is.null(input$dist_unit_filter) && nzchar(input$dist_unit_filter)) {
+            input$dist_unit_filter
+          } else {
+            sel_l <- dist_selected()
+            if (length(sel_l$unique_units) == 1) sel_l$unique_units[[1]] else ""
+          }
+          if (nzchar(unit_label_log)) paste0("log10(", input$dist_trait, " [", unit_label_log, "])") else paste0("log10(", input$dist_trait, ")")
+        } else {
+          unit_label <- if (!is.null(input$dist_unit_filter) && nzchar(input$dist_unit_filter)) {
+            input$dist_unit_filter
+          } else {
+            sel <- dist_selected()
+            if (length(sel$unique_units) == 1) sel$unique_units[[1]] else "trait value"
+          }
+          paste0(input$dist_trait, " [", unit_label, "]")
+        },
         ylab = "Frequency"
       )
 
       rug(vals, col = "#1f5b8f")
+
+      # S10: draw user-defined plausibility range lines
+      range_lo <- input$range_lo
+      range_hi <- input$range_hi
+      if (!is.null(range_lo) && !is.na(range_lo) && is.finite(range_lo)) {
+        abline(v = range_lo, col = "#d9534f", lty = 2, lwd = 1.5)
+      }
+      if (!is.null(range_hi) && !is.na(range_hi) && is.finite(range_hi)) {
+        abline(v = range_hi, col = "#d9534f", lty = 2, lwd = 1.5)
+      }
 
       if (isTRUE(input$dist_show_density) && length(vals) > 1) {
         d <- density(vals, na.rm = TRUE)
@@ -2216,6 +2541,60 @@ distributionsServer <- function(id, query_result) {
                         options = list(dom = "t", paging = FALSE, searching = FALSE)))
       }
       datatable(tbl, rownames = FALSE, options = list(pageLength = 8))
+    })
+
+    observeEvent(input$dist_trait, {
+      trait <- input$dist_trait
+      if (is.null(trait) || !nzchar(trait)) return()
+      defaults <- list(
+        "whole plant height"            = list(lo = 0.01,   hi = 100),
+        "stem wood density"             = list(lo = 0.1,    hi = 1.2),
+        "leaf area"                     = list(lo = 0.1,    hi = 100000),
+        "leaf nitrogen content per leaf dry mass" = list(lo = 5,  hi = 70),
+        "seed mass"                     = list(lo = 0.0001, hi = 100)
+      )
+      matched <- NULL
+      for (nm in names(defaults)) {
+        if (grepl(nm, tolower(trait), fixed = TRUE)) {
+          matched <- defaults[[nm]]
+          break
+        }
+      }
+      if (!is.null(matched)) {
+        updateNumericInput(session, "range_lo", value = matched$lo)
+        updateNumericInput(session, "range_hi", value = matched$hi)
+      } else {
+        updateNumericInput(session, "range_lo", value = NA)
+        updateNumericInput(session, "range_hi", value = NA)
+      }
+    }, ignoreInit = TRUE)
+
+    output$categorical_freq_table <- renderUI({
+      sel <- tryCatch(dist_selected(), error = function(e) NULL)
+      if (is.null(sel) || !isTRUE(sel$is_categorical)) return(NULL)
+
+      req(query_result())
+      dat <- query_result()$data
+      trait_col <- first_existing_col(dat, c("trait_name", "trait", "measurementType"))
+      value_col <- first_existing_col(dat, c("trait_value", "value", "measurement"))
+      if (is.null(trait_col) || is.null(value_col) || is.null(input$dist_trait)) return(NULL)
+
+      sub <- dat[as.character(dat[[trait_col]]) == input$dist_trait, , drop = FALSE]
+      vals_raw <- as.character(sub[[value_col]])
+      freq_tbl <- sort(table(vals_raw[!is.na(vals_raw) & nzchar(vals_raw)]), decreasing = TRUE)
+      freq_df <- data.frame(
+        value = names(freq_tbl),
+        n_records = as.integer(freq_tbl),
+        pct = round(100 * as.integer(freq_tbl) / sum(freq_tbl), 1),
+        stringsAsFactors = FALSE
+      )
+
+      tagList(
+        h4("Categorical Value Frequency"),
+        DT::renderDataTable(
+          DT::datatable(freq_df, rownames = FALSE, options = list(pageLength = 10))
+        )
+      )
     })
 
     reactive(list(ok = TRUE))
@@ -2329,8 +2708,8 @@ mapUI <- function(id) {
     div(class = "panel-heading", h3("Map: Trait Observations")),
     div(class = "panel-body",
       uiOutput(ns("map_controls")),
-      leaflet::leafletOutput(ns("map_plot"), height = "500px"),
-      uiOutput(ns("map_summary"))
+      uiOutput(ns("map_summary")),
+      leaflet::leafletOutput(ns("map_plot"), height = "500px")
     )
   )
 }
@@ -2386,7 +2765,9 @@ mapServer <- function(id, query_result) {
       trait_choices <- if (!is.null(md$trait_col)) {
         sort(unique(as.character(md$dat[[md$trait_col]])))
       } else character(0)
-      
+
+      trait_filter_active <- !is.null(input$map_trait) && nzchar(input$map_trait)
+
       tagList(
         div(class = "alert alert-info",
           sprintf("Mapping %d observations with valid coordinates.", nrow(md$dat))),
@@ -2394,6 +2775,23 @@ mapServer <- function(id, query_result) {
           selectInput(session$ns("map_trait"), "Color by trait:",
             choices = c("All traits" = "", trait_choices), selected = "", width = "320px")
         }
+        ,
+        if (trait_filter_active && !is.null(md$unit_col <- first_existing_col(md$dat, c("trait_unit", "unit", "units", "measurement_unit")))) {
+          trait_sub <- if (!is.null(md$trait_col)) {
+            md$dat[as.character(md$dat[[md$trait_col]]) == input$map_trait, , drop = FALSE]
+          } else md$dat
+          unit_col_map <- first_existing_col(trait_sub, c("trait_unit", "unit", "units", "measurement_unit"))
+          if (!is.null(unit_col_map)) {
+            sub_units <- sort(unique(tolower(stringr::str_squish(as.character(trait_sub[[unit_col_map]])))))
+            sub_units <- sub_units[!is.na(sub_units) & nzchar(sub_units)]
+            if (length(sub_units) > 1) {
+              selectInput(session$ns("map_unit_filter"), "Filter to unit (required for color scale):",
+                choices = sub_units, selected = sub_units[[1]], width = "320px")
+            }
+          }
+        }
+        ,
+        uiOutput(session$ns("map_color_note"))
       )
     })
     
@@ -2417,10 +2815,49 @@ mapServer <- function(id, query_result) {
         return(leaflet::leaflet() |> leaflet::addTiles() |> leaflet::setView(-100, 20, 2))
       }
       
+      # C1 fix: apply unit filter to data BEFORE computing color scale
+      unit_col_for_filter <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit"))
+      if (!is.null(input$map_unit_filter) && nzchar(input$map_unit_filter) && !is.null(unit_col_for_filter)) {
+        dat <- dat[tolower(stringr::str_squish(as.character(dat[[unit_col_for_filter]]))) == input$map_unit_filter, , drop = FALSE]
+      }
+
+      if (nrow(dat) == 0) {
+        return(leaflet::leaflet() |> leaflet::addTiles() |> leaflet::setView(-100, 20, 2))
+      }
+
       if (nrow(dat) > MAP_MARKER_CAP) {
         dat <- dat[sample.int(nrow(dat), MAP_MARKER_CAP), , drop = FALSE]
       }
-      
+
+      # S3: color by numeric trait value when exactly one trait is selected and unit filter is active
+      value_col_map <- md$value_col
+      trait_filter_active <- !is.null(trait_filter) && nzchar(trait_filter)
+      unit_filter_active <- !is.null(input$map_unit_filter) && nzchar(input$map_unit_filter)
+      use_color_scale <- trait_filter_active && unit_filter_active && !is.null(value_col_map)
+
+      color_pal <- NULL
+      color_vals <- NULL
+      n_excluded_nonnumeric <- 0L
+
+      if (use_color_scale && !is.null(md$value_col)) {
+        raw_numeric <- suppressWarnings(as.numeric(as.character(dat[[md$value_col]])))
+        n_excluded_nonnumeric <- sum(is.na(raw_numeric), na.rm = TRUE)
+        numeric_range <- range(raw_numeric, na.rm = TRUE)
+        if (is.finite(numeric_range[1]) && is.finite(numeric_range[2]) &&
+            numeric_range[1] != numeric_range[2] && sum(!is.na(raw_numeric)) > 0) {
+          color_pal <- leaflet::colorNumeric("viridis", domain = numeric_range, na.color = "#cccccc")
+          color_vals <- raw_numeric
+        } else {
+          use_color_scale <- FALSE
+        }
+      }
+
+      fill_colors <- if (use_color_scale && !is.null(color_pal)) {
+        color_pal(color_vals)
+      } else {
+        rep("#2f79b7", nrow(dat))
+      }
+
       # Build popup text (vectorized: avoids per-row data frame extraction)
       sp_esc <- htmltools::htmlEscape(if (!is.null(md$species_col)) as.character(dat[[md$species_col]]) else rep("unknown", nrow(dat)))
       tr_esc <- htmltools::htmlEscape(if (!is.null(md$trait_col))   as.character(dat[[md$trait_col]])   else rep("", nrow(dat)))
@@ -2438,13 +2875,21 @@ mapServer <- function(id, query_result) {
         leaflet::addCircleMarkers(
           lng = ~.lon, lat = ~.lat,
           radius = 5,
-          color = "#2f79b7",
-          fillColor = "#2f79b7",
+          color = fill_colors,
+          fillColor = fill_colors,
           fillOpacity = 0.65,
           stroke = TRUE,
           weight = 1,
           popup = popup_txt
-        )
+        ) |>
+        (function(m) {
+          if (use_color_scale && !is.null(color_pal)) {
+            m <- leaflet::addLegend(m, "bottomright", pal = color_pal, values = color_vals,
+              title = htmltools::htmlEscape(if (!is.null(md$value_col)) md$value_col else "value"),
+              opacity = 0.85, na.label = "Non-numeric")
+          }
+          m
+        })()
     })
     
     output$map_summary <- renderUI({
@@ -2467,7 +2912,32 @@ mapServer <- function(id, query_result) {
         sprintf("%d of %d observations (%s%%) have valid coordinates.%s%s",
                 mapped_obs, total_obs, pct, cap_note, prec_note))
     })
-    
+
+    output$map_color_note <- renderUI({
+      trait_filter <- input$map_trait
+      unit_filter <- input$map_unit_filter
+      if (is.null(trait_filter) || !nzchar(trait_filter)) return(NULL)
+      if (is.null(unit_filter) || !nzchar(unit_filter)) {
+        return(div(class = "alert alert-info", style = "margin-top: 4px; padding: 6px 10px;",
+          "Select a unit filter above to enable color-coded trait values on the map."))
+      }
+      md <- map_data()
+      if (is.null(md)) return(NULL)
+      dat_filt <- md$dat
+      if (!is.null(md$trait_col)) {
+        dat_filt <- dat_filt[as.character(dat_filt[[md$trait_col]]) == trait_filter, , drop = FALSE]
+      }
+      if (!is.null(md$value_col)) {
+        raw_numeric <- suppressWarnings(as.numeric(as.character(dat_filt[[md$value_col]])))
+        n_excl <- sum(is.na(raw_numeric), na.rm = TRUE)
+        if (n_excl > 0) {
+          return(div(class = "alert alert-warning", style = "margin-top: 4px; padding: 6px 10px;",
+            sprintf("%d non-numeric record(s) excluded from color scale (shown in grey).", n_excl)))
+        }
+      }
+      NULL
+    })
+
     reactive(list(ok = TRUE))
   })
 }
@@ -2490,8 +2960,7 @@ helpUI <- function(id) {
         tags$li(tags$b("Traits:"), " Choose which traits to include in your download. The species-by-trait matrix shows data coverage at a glance."),
         tags$li(tags$b("Distributions:"), " Explore numeric trait distributions. Use the unit filter when multiple units are present."),
         tags$li(tags$b("Map:"), " View coordinate-bearing observations on an interactive map."),
-        tags$li(tags$b("Diagnostics:"), " Summary statistics for the returned dataset."),
-        tags$li(tags$b("Records:"), " Browse the complete record set."),
+        tags$li(tags$b("Records & Quality:"), " Summary statistics and complete record set for the returned dataset."),
         tags$li(tags$b("Provenance:"), " Download a query manifest and reproducible R script."),
         tags$li(tags$b("Download:"), " Review the data-use acknowledgement and export your CSV.")
       ),
@@ -2568,6 +3037,8 @@ ui <- fluidPage(
 
     uiOutput("query_context_strip"),
 
+    uiOutput("workflow_breadcrumb"),
+
     tabsetPanel(
       id = "workflow_tabs",
       type = "tabs",
@@ -2575,9 +3046,11 @@ ui <- fluidPage(
       tabPanel("Step 2: Scope", scopeUI("scope")),
       tabPanel("Step 3: Traits", traitSelectUI("traitSelect")),
       tabPanel("Step 4: Distributions", distributionsUI("distributions")),
-      tabPanel("Step 4b: Map", mapUI("map")),
-      tabPanel("Step 5: Diagnostics", diagnosticsUI("diagnostics")),
-      tabPanel("Step 6: Records", recordsUI("records")),
+      tabPanel("Step 5: Map", mapUI("map")),
+      tabPanel("Step 6: Records & Quality",
+        diagnosticsUI("diagnostics"),
+        recordsUI("records")
+      ),
       tabPanel("Step 7: Provenance", provenanceUI("provenance")),
       tabPanel("Step 8: Download", downloadGateUI("downloadGate"))
     ),
@@ -2764,6 +3237,31 @@ server <- function(input, output, session) {
       format(nrow(qr$data), big.mark = ","), " records"
     )
   })
+
+  output$workflow_breadcrumb <- renderUI({
+    active_tab <- input$workflow_tabs
+    tabs <- c(
+      "Step 1: Query",
+      "Step 2: Scope",
+      "Step 3: Traits",
+      "Step 4: Distributions",
+      "Step 5: Map",
+      "Step 6: Records & Quality",
+      "Step 7: Provenance",
+      "Step 8: Download"
+    )
+    items <- lapply(tabs, function(t) {
+      if (!is.null(active_tab) && t == active_tab) {
+        tags$li(class = "active", t)
+      } else {
+        tags$li(t)
+      }
+    })
+    div(style = "margin-bottom: 8px;",
+      tags$ol(class = "breadcrumb", style = "margin-bottom: 4px; font-size: 12px;", items)
+    )
+  })
+
   scope_result <- scopeServer("scope", query_result)
   trait_result <- traitSelectServer("traitSelect", query_result)
   distributions_result <- distributionsServer("distributions", trait_result)

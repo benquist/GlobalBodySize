@@ -1,5 +1,26 @@
 # Chat Provenance Log
 
+- Date: 2026-05-14
+- Prompt summary: @M multi-agent peer review of the 20 UX + scientific communication recommendations produced on 2026-05-13. Agents consulted: coder (technical feasibility), biodiversity-science-guard (science norms + BIEN-specific ecology), uncertainty-feedback-guard (implementation risk classification), taxonomy-reconciliation (reconciliation audit). No code was changed — review and critique of recommendations only.
+- Key findings:
+  - **Immediate / LOW risk (implement as-is):** D2, D3, D5, D6, D7, D8, D9 (pure layout/label changes); S1 (unit on x-axis — one string change, preserve log10 branch, use input$dist_unit_filter not raw column); S4 (trait×unit×N table — all data already available); S8 (dominant_unit + n_units + badge in trait DT — highest science-safety payoff per uncertainty-feedback-guard).
+  - **Technical corrections to original recommendations:** S1 must take unit from active filter, not raw column; S2 (completeness fraction) is impossible at family rank — genus only, with mandatory Americas-scope caveat; S3 (map coloring) requires single-trait + unit-filter enforcement gate + explicit dropped-NA disclosure before implementing; S5 (skewness) needs e1071 or moments (new dependency), CV must be gated on unit filter, log10 suggestion must be text-only not auto-check; S9 (% species covered) has DT type-collision that breaks formatStyle — render as separate tableOutput below the DT; S10 (plausibility overlays) cannot be implemented without a curated, versioned, cited trait-plausibility table.
+  - **Science corrections to original recommendations:** S2 denominator is BIEN Americas-only — Old World species are outside scope, not missing data; S3 categorical traits become silent NA on coercion; D4 collapsing QA alerts is NOT acceptable if truncation/scope warnings are defaulted closed; S5 CV invalid for mixed-unit datasets; S6 top-source label is dataset-level, not per-trait — add "across all returned traits" qualifier; S9 denominator is ambiguous (top-50 vs. all queried species — must specify).
+  - **Six recommendations requiring user decisions before implementation:** D4 (collapse QA alerts — which panels are collapsible?), S2 (completeness fraction — Americas caveat language acceptable?), S3 (map coloring — acceptable NA% threshold? enforce single-trait gate?), S5 (add e1071 dependency?), S9 (denominator for % species covered?), S10 (build curated plausibility table, use user-defined ranges, or defer?).
+  - **New critical findings not in the original 20 recommendations (taxonomy-reconciliation + biodiversity-science-guard):**
+    1. **R script download missing Step 3 trait filter** — downloaded script does not reproduce the user's actual trait subset; most concrete reproducibility failure in the app. Fix: inject `filter(trait_name %in% selected_traits)` into `dl_script`.
+    2. **No per-name reconciliation DT** — users see "X% remapped" aggregate but never see which specific names were remapped and to what; Step 8 checkbox ("I have reviewed taxonomic reconciliation") is not backed by an actual review tool.
+    3. **"Not matched" records included in coverage statistics** without quarantine — inflates apparent coverage counts.
+    4. **Verbatim input name lost** — `normalize_taxon_name()` runs before API call; original user string is not stored or recoverable.
+    5. **No backbone disclosure** — TNRS/TPL/WCSP/USDA-PLANTS version and per-record source not disclosed anywhere; cross-session reproducibility undefined.
+    6. **Categorical trait detection missing** — all S-series stats (CV, skewness, pct_missing) will give wrong results for categorical traits (growth form, phenology, etc.) without a numeric vs. categorical classifier.
+    7. **Batch-mode per-species cap not disclosed** — max_records divided equally per species regardless of available records; silent resampling that affects comparative analyses.
+  - **Taxonomy-reconciliation agent provided concrete R code for 5 fixes:** per-name audit DT, verbatim input storage, backbone disclosure block, quarantine of "Not matched" from compute_diagnostics, quality-gate rate labels.
+  - **Revised implementation priority order:** (Tier 1 — no decisions needed) D2, D3, D5, D6, D7, D8, D9, S1, S4, S8; (Tier 2 — critical new additions) per-name reconciliation DT, verbatim input storage, backbone disclosure, quarantine Not-matched from coverage stats; (Tier 3) fix R script download to include Step 3 trait filter; (Tier 4 — after user decisions) D4, S2, S3, S5, S9; (Deferred) S10.
+- Requested outcomes: Peer review of the 20 recommendations by four specialist agents; agreement/disagreement/additions recorded.
+- Files changed: BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot (@m orchestrator)
+
 - Date: 2026-05-13
 - Prompt summary: @M design/usability/UX/information-content review of BIEN Traits app. Multi-agent audit: ecology-user (scientific workflow + bias), biodiversity-science-guard (taxonomic reconciliation, units, observation type, coordinate QA), scandinavian-design/design-atelier (UI structure, tab reduction, interaction model, visual system). Produced ranked improvement recommendations; no code changed.
 - Requested outcomes: Ranked set of recommended changes covering scientific correctness bugs, transparency improvements, UX restructuring, and visual design quick wins.
@@ -288,3 +309,50 @@
 - Prompt summary: C6 full implementation: removed download_all checkbox, added Select All/Clear actionLinks, derived is_all from selected_traits set equality. Code-checker PASS.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
 - Completed by: GitHub Copilot
+
+- Date: 2026-05-14
+- Prompt summary: @M oversaw full implementation of all 20 UX/science recommendations (D1-D10, S1-S10) plus 4 critical new gap fixes (A1-A4) in BIEN-TraitsShinyApp/app_gateway.R. Delegated to coder (3 batches), biodiversity-science-guard, and optimizer agents.
+- Agents invoked: coder (x3 batches), biodiversity-science-guard, optimizer
+- Decisions made by @M on 6 HIGH-uncertainty items:
+  - D4: Collapse only supplementary panels (Quick Insights, reconciliation); truncation/scope warnings always visible; Bootstrap 3 native collapse (no shinyBS).
+  - S2: On-demand "Estimate Coverage" button (genus only) with mandatory Americas-scope caveat; BIEN_taxonomy_genus() called on-demand only.
+  - S3: Block color mapping unless single-trait AND unit-filter active; show excluded non-numeric count; implemented after S4+S8.
+  - S5: Add e1071 to required_packages; CV gated on unit filter; skewness as text hint only (no auto-check of log10 box).
+  - S9: Separate tableOutput below species×trait DT; denominator = all queried species (not just top-50).
+  - S10: User-defined range inputs (numericInput min/max); 5 named traits get pre-populated suggested defaults, clearly labeled "suggested defaults — verify for your taxa and units."
+- Changes implemented:
+  - D1: Merged diagnostics + records into single "Step 6: Records & Quality" tab.
+  - D2: Renamed "Step 4b: Map" → "Step 5: Map"; updated helpUI steps list.
+  - D3: Moved radioButtons(input_mode) above taxon autocomplete conditionalPanel.
+  - D4: Quick Insights + reconciliation wrapped in Bootstrap 3 collapse divs with toggle buttons.
+  - D5: Trait coverage DT shown before selector controls in traitSelectUI.
+  - D6: Download buttons added to top of provenanceUI panel-body.
+  - D7: map_summary uiOutput moved above leafletOutput in mapUI.
+  - D8+S6: Removed top_traits_ui from Quick Insights tagList; source_conc_ui now exposes top source name (truncated 60 chars) with "across all returned traits" qualifier.
+  - D9: scopeUI, distributionsUI → panel-default; diagnosticsUI → panel-default.
+  - D10: Breadcrumb fluidRow added above tabsetPanel, reading input$workflow_tabs to highlight active step.
+  - S1: Histogram x-axis now shows "trait [unit]" (or "log10(trait [unit])" in log mode), sourcing unit from active unit filter.
+  - S2: "Estimate Coverage (genus only)" actionButton added to scopeUI; BIEN_taxonomy_genus() called on-demand with withProgress(); Americas-only caveat displayed.
+  - S3: Map markers now colored by viridis scale when single-trait + unit-filter active; unit filter applied to data before color scale computation; legend added; excluded non-numeric count shown.
+  - S4: unit_het_detail DTOutput added to scopeUI showing traits with mixed units and n_records per trait×unit combination.
+  - S5: e1071 added to required_packages + library(); summary stats table extended with N contributing species, CV (gated on unit filter), skewness; text hint fires when |skew| > 2.
+  - S7: KPI boxes replaced with per-trait diagnostic DT (n_records, n_species, pct_missing, n_units, cv_pct, n_iqr_outliers) with DT formatStyle flagging.
+  - S8: trait_summary_tbl reactive now computes dominant_unit and n_units; DT renders red "X units" badge for mixed-unit traits.
+  - S9: Species coverage summary tableOutput added below species×trait matrix; denominator = all queried species.
+  - S10: numericInput range_lo/range_hi below histogram; 5 trait defaults pre-populated; abline drawn in renderPlot when non-NA.
+  - A1: dl_script handler now injects trait filter step when Step 3 selection is active.
+  - A2: Categorical trait detection (pct_numeric < 0.1); histogram suppressed; frequency table shown instead.
+  - A3: Per-name reconciliation DT (name_submitted vs name_matched vs taxonomic_status) added to reconciliation_panel.
+  - A4: TNRS backbone disclosure alert added as first element of reconciliation_panel.
+- Biodiversity-science-guard found and fixed 2 CRITICALs:
+  - C1: S3 map unit filter was not actually applied to data before color scale computation — fixed.
+  - C2: S2 genus coverage denominator used nrow(tax_tbl) instead of n_distinct accepted species — fixed.
+  - 5 WARNINGs addressed: W1 (BGCI attribution replaced with accurate TNRS/WFO/Tropicos sources); W2 (plant height default hi raised from 50→100m); W3 (leaf N default hi raised from 50→70 mg/g); W4 (leaf area default hi raised from 20000→100000 mm²); W5 (log10 xlab now includes unit).
+- Optimizer found 4 WARNINGs (no CRITICALs — push safe for low-concurrency deployment):
+  - S4b + A3: nested renderDataTable inside renderUI (observer leak risk over long sessions — known limitation).
+  - S7: triple as.numeric coercion in summarise (minor performance; not incorrect).
+  - S2: BIEN_taxonomy_genus() is blocking; safe for low-concurrency; would need future/promises for high-concurrency.
+- Parse verified: PARSE OK
+- Requested outcomes: Full implementation of all 20 recommendations + 4 critical gaps; science-guard and optimizer review; all criticals resolved; push.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
+- Completed by: GitHub Copilot (@m orchestrator)

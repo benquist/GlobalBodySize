@@ -2400,3 +2400,7 @@ Images applied (card → Wikimedia image):
 - NAU 2023 forests / emissions → Rainforest Fatu Hiva (tropical canopy carbon sink)
 - Phys.org Jul 2014 efficient theory → WWF Terrestrial Ecoregions of the World map (global biodiversity data)
 Files: enquistlab-site-migration/_pages/news.md, agents/prompt_log.md.
+
+## 2026-05-14 — Implement all 20 BIEN Traits Shiny app recommendations (D1-D10, S1-S10) plus 4 critical gap fixes (A1-A4)
+User: Implement all 20 BIEN Traits Shiny app recommendations (D1-D10, S1-S10) plus 4 critical gap fixes (A1-A4). Overseen by @M with coder, biodiversity-science-guard, and optimizer agents. [2026-05-14]
+Action: Full implementation of all 20 UX/science recommendations plus 4 additional gaps in BIEN-TraitsShinyApp/app_gateway.R. @M orchestrated coder (3 batches), biodiversity-science-guard, and optimizer agents. Biodiversity-science-guard found and resolved 2 CRITICALs (S3 unit filter not applied to map data; S2 genus coverage denominator used wrong N) and 5 WARNINGs (BGCI attribution, plant height/leaf N/leaf area defaults, log10 xlab). Optimizer found 4 WARNINGs, no CRITICALs — push-safe. Parse confirmed clean. Files: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md.
