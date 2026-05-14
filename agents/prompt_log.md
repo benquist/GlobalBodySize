@@ -2383,3 +2383,20 @@ Action: Fetched metadata for all three. Confirmed Enquist prominently mentioned 
 ## 2026-05-14 — Add images to text-only news cards
 User: Add photos next to news stories that have no photo.
 Action: Batch-fetched OG/twitter images for all 19 text-only news cards. Verified HTTP 200 + image content-type for each candidate URL. Converted 8 cards to image cards: EurekAlert Mar 2022 (EurekAlert CDN thumbnail), Forbes Nov 2019 (Forbes imageio CDN), Phys.org Sep 2019 boreal (scx2.b-cdn.net), EurekAlert Sep 2014 (EurekAlert CDN thumbnail), Nature Nov 2006 Biology's big idea (Springer Nature media Figa), Nature Sep 2001 All creatures great and small (Springer Nature media Figa), Nature Jun 2011 Species spellchecker (Springer Nature media Figb), Nature Jun 2009 Cyberinfrastructure (Springer Nature media Figc). 11 cards remain text-only (genuinely no accessible article-specific image: NYT 1999, SFI Medium 2019, Wired 2007/2008/2011, Science 2001/2009, ScienceDaily 2019, Time 2020, NAU 2023, Phys.org 2014 theory). Pushed commit 18c662d to enquistlab.github.io main.
+
+## 2026-05-14 — Add Wikimedia Commons images to remaining 11 text-only news cards
+User: For the cards that are text only — search the web for acceptable and best matched images that would match the story.
+Action: Selected and verified Wikimedia Commons CC-licensed images for all 11 remaining text-only news cards. All 11 URLs verified HTTP 200 (960px thumbnails; 800px returns 400). Applied via multi_replace_string_in_file converting news-card--text-only articles to image cards. Pushed commit 76df2c3 to EnquistLab/enquistlab.github.io main.
+Images applied (card → Wikimedia image):
+- NYT Jan 1999 'Of Mice and Elephants' → African Bush Elephant (body size scaling)
+- SFI Medium 2019 'Scaling Mathematics of Life' → Romanesco broccoli (biological fractal scaling)
+- Wired Oct 2011 Kleiber energy requirement → Ruby-Throated Hummingbird (highest vertebrate metabolic rate)
+- Science Oct 2009 Ecological Structure → Kelp forest Monterey (structured marine community)
+- Wired Oct 2008 Pound for Pound → Blue whale Balaenoptera musculus (metabolic invariance across body size)
+- Wired Feb 2007 What We Don't Know → Milky Way night sky (big open questions in science)
+- Science Sep 2001 All Fired Up metabolic rate → Animal mitochondrion diagram (universal metabolic rate engine)
+- ScienceDaily Nov 2019 rare plants → Dionaea muscipula venus flytrap (iconic rare endemic plant)
+- Time Apr 2020 pandemic wildlife habitats → Pipistrellus pipistrellus bat (zoonotic reservoir)
+- NAU 2023 forests / emissions → Rainforest Fatu Hiva (tropical canopy carbon sink)
+- Phys.org Jul 2014 efficient theory → WWF Terrestrial Ecoregions of the World map (global biodiversity data)
+Files: enquistlab-site-migration/_pages/news.md, agents/prompt_log.md.
