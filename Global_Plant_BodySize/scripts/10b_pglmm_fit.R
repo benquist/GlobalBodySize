@@ -107,6 +107,8 @@ meas[, data_tier    := paste0("T", agb_best_tier)]
 
 ## Recode higher_plant_group: collapse rare groups to "other" to avoid
 ## sparse-level problems in MCMC
+## Coerce to character first — all-NA columns are read as logical by data.table
+meas[, higher_plant_group := as.character(higher_plant_group)]
 hpg_n <- meas[, .N, by = higher_plant_group]
 rare_hpg <- hpg_n[N < 20, higher_plant_group]
 meas[higher_plant_group %in% rare_hpg | is.na(higher_plant_group),
@@ -135,19 +137,35 @@ message("[10b] Tree pruned to fitted species: ", length(tree_fit$tip.label), " t
 
 ## ---- Compute sparse inverse A matrix ---------------------------------------
 message("[10b] Computing sparse inverse A matrix (Ainv) from tree...")
+## inverseA requires unique tip AND node labels; V.PhyloMaker2 node labels
+## are often non-unique or duplicated after keep.tip — drop them safely
+tree_fit$node.label <- NULL
 Ainv <- inverseA(tree_fit, nodes = "TIPS", scale = TRUE)$Ainv
 message("[10b] Ainv computed: ", nrow(Ainv), " x ", ncol(Ainv), " sparse matrix")
 
 ## ---- Set priors ------------------------------------------------------------
-## Count fixed effect levels
+## Count fixed effect levels; drop any predictor with < 2 levels (can't fit contrasts)
 gf_levels  <- unique(meas_fit$growth_form_canonical)
 tier_levels <- unique(meas_fit$data_tier)
 hpg_levels  <- unique(meas_fit$higher_plant_group)
-n_fixed <- 1 + (length(gf_levels) - 1) + (length(tier_levels) - 1) + (length(hpg_levels) - 1)
-message("[10b] Estimated fixed effect parameters: ~", n_fixed)
+use_hpg <- length(hpg_levels) >= 2
+message("[10b] Fixed effect levels:")
 message("  growth_form levels  : ", length(gf_levels))
 message("  data_tier levels    : ", length(tier_levels))
-message("  higher_plant_group  : ", length(hpg_levels))
+message("  higher_plant_group  : ", length(hpg_levels),
+        if (!use_hpg) " (DROPPED — single level)" else "")
+
+fixed_formula <- if (use_hpg) {
+  log10_agb_kg ~ growth_form_canonical + data_tier + higher_plant_group
+} else {
+  log10_agb_kg ~ growth_form_canonical + data_tier
+}
+
+## Compute n_fixed from model.matrix to ensure prior dimension exactly matches
+## what MCMCglmm will use — avoids "mu prior is the wrong dimension" error.
+X_design <- model.matrix(fixed_formula, data = as.data.frame(meas_fit))
+n_fixed  <- ncol(X_design)
+message("[10b] Fixed effect parameters (from model.matrix): ", n_fixed)
 
 prior_s1 <- list(
   ## Fixed effects: Normal(0, 4) — covers ±4 log10 kg orders of magnitude
@@ -173,6 +191,11 @@ NITT   <- 600000L
 BURNIN <- 100000L
 THIN   <- 100L
 
+## MCMCglmm's `family` argument conflicts with a data column also named `family`.
+## Rename the taxonomic family column to tax_family and drop the original.
+meas_fit[, tax_family := family]
+meas_fit[, family := NULL]
+
 message("[10b] Fitting MCMCglmm (nitt=", NITT, ", burnin=", BURNIN, ", thin=", THIN, ")...")
 message("[10b] Expected posterior samples: ", (NITT - BURNIN) / THIN)
 message("[10b] NOTE: This may take 30-120 minutes on a laptop. Progress printed every 1000 iterations.")
@@ -180,8 +203,8 @@ message("[10b] NOTE: This may take 30-120 minutes on a laptop. Progress printed 
 t_start <- proc.time()
 
 model_s1 <- MCMCglmm(
-  log10_agb_kg ~ growth_form_canonical + data_tier + higher_plant_group,
-  random   = ~ animal + family + genus,
+  fixed_formula,
+  random   = ~ animal + tax_family + genus,
   family   = "gaussian",
   ginverse = list(animal = Ainv),
   data     = as.data.frame(meas_fit),
@@ -216,16 +239,16 @@ vc_summary <- data.table(
 )
 
 ## Compute Pagel's lambda: V_phylo / (V_phylo + V_family + V_genus + V_R)
-v_a    <- vc_summary[component == "animal.animal",     post_mean]
-v_fam  <- vc_summary[component == "family.family",     post_mean]
-v_gen  <- vc_summary[component == "genus.genus",       post_mean]
+v_a    <- vc_summary[component == "animal.animal",         post_mean]
+v_fam  <- vc_summary[component == "tax_family.tax_family", post_mean]
+v_gen  <- vc_summary[component == "genus.genus",           post_mean]
 v_r    <- vc_summary[component == "units",             post_mean]
 v_tot  <- v_a + v_fam + v_gen + v_r
 lambda_post_mean <- v_a / v_tot
 
 ## Per-draw lambda
 lambda_draws <- vcv_post[, "animal.animal"] /
-  (vcv_post[, "animal.animal"] + vcv_post[, "family.family"] +
+  (vcv_post[, "animal.animal"] + vcv_post[, "tax_family.tax_family"] +
    vcv_post[, "genus.genus"]  + vcv_post[, "units"])
 
 lambda_row <- data.table(
@@ -240,7 +263,7 @@ vc_summary <- rbind(vc_summary, lambda_row)
 
 message("\n[10b] === Variance components (posterior means) ===")
 message(sprintf("  V_phylo  (animal)  : %.4f  [%.4f, %.4f]", v_a,   vc_summary[component=="animal.animal",   post_ci_lo], vc_summary[component=="animal.animal",   post_ci_hi]))
-message(sprintf("  V_family           : %.4f  [%.4f, %.4f]", v_fam, vc_summary[component=="family.family",   post_ci_lo], vc_summary[component=="family.family",   post_ci_hi]))
+message(sprintf("  V_family           : %.4f  [%.4f, %.4f]", v_fam, vc_summary[component=="tax_family.tax_family", post_ci_lo], vc_summary[component=="tax_family.tax_family", post_ci_hi]))
 message(sprintf("  V_genus            : %.4f  [%.4f, %.4f]", v_gen, vc_summary[component=="genus.genus",     post_ci_lo], vc_summary[component=="genus.genus",     post_ci_hi]))
 message(sprintf("  V_residual         : %.4f  [%.4f, %.4f]", v_r,   vc_summary[component=="units",           post_ci_lo], vc_summary[component=="units",           post_ci_hi]))
 message(sprintf("  Pagel lambda       : %.4f  [%.4f, %.4f]",
@@ -271,8 +294,9 @@ message("[10b] Fixed effects written: output/pglmm_fixed_effects.csv")
 ## BLUPs are in Sol columns matching "^family\\." and "^genus\\."
 ## These are the key outputs needed for Stage 2 prediction (10c).
 
-family_cols <- grep("^family\\.", colnames(sol_post), value = TRUE)
-genus_cols  <- grep("^genus\\.",  colnames(sol_post), value = TRUE)
+## Note: random term is 'tax_family' (not 'family') to avoid MCMCglmm clash
+family_cols <- grep("^tax_family\\.", colnames(sol_post), value = TRUE)
+genus_cols  <- grep("^genus\\.",     colnames(sol_post), value = TRUE)
 
 if (length(family_cols) == 0 || length(genus_cols) == 0) {
   ## Random effect BLUPs are sometimes stored separately
@@ -282,7 +306,7 @@ if (length(family_cols) == 0 || length(genus_cols) == 0) {
 
 ## Helper: extract BLUP table from Sol columns matching a prefix
 extract_blups <- function(sol_mat, prefix) {
-  cols <- grep(paste0("^", prefix, "\\."), colnames(sol_mat), value = TRUE)
+  cols <- grep(paste0("^", prefix, "\\."), colnames(sol_mat), value = TRUE, fixed = FALSE)
   if (length(cols) == 0) return(NULL)
   level_names <- sub(paste0("^", prefix, "\\."), "", cols)
   data.table(
@@ -294,7 +318,7 @@ extract_blups <- function(sol_mat, prefix) {
   )
 }
 
-family_blups <- extract_blups(sol_post, "family")
+family_blups <- extract_blups(sol_post, "tax_family")
 genus_blups  <- extract_blups(sol_post, "genus")
 
 if (!is.null(family_blups)) {
