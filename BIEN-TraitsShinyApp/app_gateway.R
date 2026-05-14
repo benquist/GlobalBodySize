@@ -4,7 +4,7 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "dplyr", "tidyr", "stringr", "DT", "jsonlite", "leaflet", "e1071")
+  required_packages <- c("shiny", "BIEN", "callr", "dplyr", "tidyr", "stringr", "DT", "jsonlite", "leaflet", "e1071")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
@@ -19,6 +19,7 @@ suppressPackageStartupMessages({
   library(jsonlite)
   library(leaflet)
   library(e1071)
+  library(callr)
 })
 
 .bien_trait_catalog_cache <- NULL
@@ -557,6 +558,42 @@ query_bien_total_records <- function(rank, taxon, timeout_sec = 120) {
   as.integer(cnt$total_records[[1]])
 }
 
+# Run a BIEN trait query in a callr subprocess so the subprocess can be killed
+# on timeout without crashing the parent Shiny session.
+# Returns the raw data.frame on success, or a bien_error list on failure/timeout.
+# Only handles species/genus/family ranks — trait-only stays in main process.
+run_bien_query_safe <- function(rank, taxon, max_records, timeout_sec = 45) {
+  if (rank == "trait-only") return(NULL)  # caller handles this case
+  tryCatch({
+    callr::r(
+      func = function(rank, taxon, max_records) {
+        suppressPackageStartupMessages(library(BIEN))
+        if (rank == "species") {
+          BIEN::BIEN_trait_species(species = taxon, all.taxonomy = TRUE,
+                                   source.citation = TRUE, limit = max_records)
+        } else if (rank == "genus") {
+          BIEN::BIEN_trait_genus(genus = taxon, all.taxonomy = TRUE,
+                                  source.citation = TRUE, limit = max_records)
+        } else if (rank == "family") {
+          BIEN::BIEN_trait_family(family = taxon, all.taxonomy = TRUE,
+                                   source.citation = TRUE, limit = max_records)
+        }
+      },
+      args    = list(rank = rank, taxon = taxon, max_records = max_records),
+      timeout = timeout_sec
+    )
+  }, error = function(e) {
+    msg <- conditionMessage(e)
+    if (grepl("timed? ?out|R session.*exited|process.*killed", msg, ignore.case = TRUE)) {
+      msg <- sprintf(
+        "Query timed out after %ds. BIEN may be slow \u2014 try reducing max records or querying a single species within %s.",
+        timeout_sec, taxon
+      )
+    }
+    structure(list(error = msg), class = "bien_error")
+  })
+}
+
 # Add diagnostic summary statistics
 compute_diagnostics <- function(dat, query_rank, query_taxon, total_available = NA_integer_, max_records = NA_integer_) {
   if (!is.data.frame(dat) || nrow(dat) == 0) {
@@ -818,7 +855,7 @@ queryServer <- function(id) {
         "taxon",
         choices = choices,
         selected = selected,
-        server = !identical(mode, "traits"),
+        server = identical(mode, "taxa") && identical(rank, "species"),
         options = list(
           create = TRUE,
           createOnBlur = TRUE,
@@ -937,21 +974,76 @@ queryServer <- function(id) {
         if (is.na(max_records) || max_records < 100) max_records <- 5000
         max_records <- min(max_records, 50000)
 
-        withProgress(message = "Querying BIEN...",
-                     detail = "This may take 30\u201360 seconds",
-                     value = 0.3, {
-          dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
-                                   max_records = max_records, timeout_sec = 120)
+        # Step 1: Fast pre-flight count to validate taxon and give user feedback.
+        # COUNT queries are index-only and typically return in 3-8 seconds.
+        # Abort before the expensive data fetch if the taxon has no records.
+        total_pre <- NA_integer_
+        if (!identical(input$rank, "trait-only")) {
+          withProgress(message = "Checking BIEN availability...",
+                       detail = taxon_clean, value = 0.15, {
+            total_pre <- tryCatch(
+              query_bien_total_records(rank = input$rank, taxon = taxon_clean, timeout_sec = 20),
+              error = function(e) NA_integer_
+            )
+          })
+          if (!is.na(total_pre) && total_pre == 0L) {
+            rv$error_msg <- sprintf(
+              paste0("No trait records found for \u2018%s\u2019 in BIEN. ",
+                     "The name may not be recognised or this taxon has no measured traits. ",
+                     "Check spelling or try a related genus."),
+              taxon_clean
+            )
+            return()
+          }
+        }
+
+        # Step 2: Run the full trait data query.
+        # For species/genus/family: use callr subprocess (45s hard timeout) so a
+        # hung BIEN query cannot kill the Shiny session.
+        # For trait-only: use existing path (complex multi-trait expansion).
+        withProgress(
+          message = if (!is.na(total_pre))
+            sprintf("Fetching %s trait records for %s\u2026", format(total_pre, big.mark=","), taxon_clean)
+          else
+            "Querying BIEN\u2026",
+          detail = "This may take up to 45 seconds",
+          value = 0.3, {
+
+          if (!identical(input$rank, "trait-only")) {
+            raw <- run_bien_query_safe(
+              rank       = input$rank,
+              taxon      = taxon_clean,
+              max_records = max_records,
+              timeout_sec = 45
+            )
+            if (inherits(raw, "bien_error")) {
+              dat <- data.frame()
+              attr(dat, "bien_error") <- raw$error
+            } else if (!is.data.frame(raw)) {
+              dat <- data.frame()
+              attr(dat, "bien_error") <- "BIEN returned an unexpected response format"
+            } else {
+              dat <- ensure_unique_names(raw)
+              dat <- enrich_plot_metadata(dat)
+              dat$query_rank      <- input$rank
+              dat$query_taxon     <- taxon_clean
+              dat$query_timestamp <- Sys.time()
+            }
+          } else {
+            dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
+                                     max_records = max_records, timeout_sec = 120)
+          }
+
           bien_err <- attr(dat, "bien_error", exact = TRUE)
-          incProgress(0.7, message = "Processing results...")
+          incProgress(0.7, message = "Processing results\u2026")
           rv$effective_taxon <- taxon_clean
-          rv$query_data <- dat
-          rv$diagnostics <- compute_diagnostics(
+          rv$query_data      <- dat
+          rv$diagnostics     <- compute_diagnostics(
             dat,
             input$rank,
             taxon_clean,
-            total_available = NA_integer_,
-            max_records = max_records
+            total_available = if (!is.na(total_pre)) total_pre else NA_integer_,
+            max_records     = max_records
           )
           rv$error_msg <- if (is.character(bien_err) && nzchar(bien_err)) {
             paste("BIEN query error:", format_bien_error(bien_err, context = "query"))
@@ -963,10 +1055,10 @@ queryServer <- function(id) {
         })
         refresh_counts <- TRUE
       }, error = function(e) {
-        rv$query_data <- data.frame()
-        rv$diagnostics <- NULL
+        rv$query_data      <- data.frame()
+        rv$diagnostics     <- NULL
         rv$effective_taxon <- ""
-        rv$error_msg <- paste("Error:", conditionMessage(e))
+        rv$error_msg       <- paste("Error:", conditionMessage(e))
       })
     })
 
