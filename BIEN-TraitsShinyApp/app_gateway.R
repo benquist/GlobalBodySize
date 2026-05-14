@@ -3274,15 +3274,45 @@ helpUI <- function(id) {
       ),
       hr(),
       h4("How to Cite"),
-      p("When using BIEN trait data in publications:"),
+      p("When using BIEN trait data in publications, please cite all of the following:"),
       tags$ol(
-        tags$li("Cite the BIEN R package: Maitner et al. (2018). The bien r package: A tool to access the Botanical Information and Ecology Network (BIEN) database. Methods in Ecology and Evolution, 9(2), 373\u2013379."),
-        tags$li("Cite individual data sources using the ", tags$code("source_citation"), " and ", tags$code("url_source"), " columns in your downloaded CSV."),
-        tags$li("Include the query manifest (downloaded from the Provenance tab) as a supplementary data file to document your exact query parameters.")
+        tags$li(
+          tags$b("BIEN R package: "),
+          "Maitner BS et al. (2018). \u201cThe BIEN R package: A tool to access the Botanical Information and Ecology Network (BIEN) database.\u201d ",
+          tags$em("Methods in Ecology and Evolution"), ", 9(2), 373\u2013379. ",
+          tags$a(href = "https://doi.org/10.1111/2041-210X.12861", target = "_blank", "doi: 10.1111/2041-210X.12861")
+        ),
+        tags$li(
+          tags$b("BIEN project (database \u0026 informatics ecosystem): "),
+          "Enquist BJ et al. (2026). \u201cBIEN: A biodiversity informatics ecosystem advancing open and reproducible workflows for plant observation, plot, and trait data.\u201d ",
+          tags$em("Methods in Ecology and Evolution"), " (early view). ",
+          "doi: pending \u2014 run ", tags$code("citation(\"BIEN\")"), " in R for the current package citation."
+        ),
+        tags$li(
+          tags$b("Primary data sources: "),
+          "Cite each original dataset using the ", tags$code("source_citation"), " and ", tags$code("url_source"),
+          " columns in your downloaded CSV. Run ", tags$code("unique(dat$source_citation)"),
+          " in R to list all sources in your dataset."
+        ),
+        tags$li(
+          tags$b("Query manifest: "),
+          "Include the query manifest downloaded from the Provenance tab as a supplementary file to document your exact query parameters."
+        )
+      ),
+      hr(),
+      h4("Additional Resources"),
+      tags$ul(
+        tags$li(tags$a(href = "https://biendata.org", target = "_blank", "biendata.org"), " \u2014 BIEN project website, data access portal, and documentation."),
+        tags$li(tags$a(href = "https://cran.r-project.org/package=BIEN", target = "_blank", "BIEN on CRAN"), " \u2014 R package page with function reference and vignettes."),
+        tags$li(tags$a(href = "https://github.com/bmaitner/RBIEN", target = "_blank", "RBIEN on GitHub"), " \u2014 source code, issue tracker, and development updates."),
+        tags$li(tags$a(href = "https://tnrs.biendata.org", target = "_blank", "TNRS (Taxonomic Name Resolution Service)"), " \u2014 tool used to standardise all names in BIEN; submit your own name lists here."),
+        tags$li("Run ", tags$code("?BIEN_trait_species"), ", ", tags$code("?BIEN_trait_genus"), ", or ", tags$code("?BIEN_trait_trait"),
+                " in R for full argument documentation.")
       ),
       hr(),
       p(class = "text-muted",
-        "Learn more about BIEN at ", tags$a(href = "https://biendata.org", target = "_blank", "biendata.org"), ".")
+        "Questions or data issues? Contact the BIEN team at ",
+        tags$a(href = "https://biendata.org", target = "_blank", "biendata.org"), ".")
     )
   )
 }
