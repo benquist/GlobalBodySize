@@ -2480,3 +2480,7 @@ Action: Implemented Fix 2 (bake taxon lists at deploy time). Created tools/build
 ## 2026-05-14 — Replace ecophysiology SVG diagrams with CC-BY paper figures
 User: Replace 4 simple SVG diagrams in the ecophysiology section of enquistlab.github.io/research/ with real figures from cited papers. Use CC-BY only. For sub-section 3 (Community Carbon & Water), use both figures.
 Action: Downloaded 5 figures: Matos et al. 2025 Nature Plants Fig 2 (CC-BY); Michaletz et al. 2016 Nature Plants Fig 2 (CC-BY); fluxible tent_peru.jpg field photo (Gaudard, Enquist et al. 2025); Halbritter et al. 2025 Scientific Data Fig 1 (CC-BY); Brummer et al. 2021 J R Soc Interface Fig 1 rendered from arXiv preprint at 220 DPI, cropped to panels a+b (published paper CC-BY). Copied to assets/img/ecophysiology/. Updated research.md: replaced all 4 SVG <img> src paths and captions; sub-section 3 received two stacked figures (tent photo + Halbritter Fig 1). Pushed commit b66cb84 to EnquistLab/enquistlab.github.io main.
+
+## 2026-05-14 — Add Quanta Magazine shark scaling story to lab news
+User: Add https://www.quantamagazine.org/shark-data-suggests-animals-scale-like-geometric-objects-20251027/ to lab website news and press.
+Action: Added October 2025 Quanta Magazine article "Shark data suggests animals scale like geometric objects" as first card in Scaling & Functional Ecology section and to the Recent strip in enquistlab-site-migration/_pages/news.md. Pushed commit 3bad17e.
