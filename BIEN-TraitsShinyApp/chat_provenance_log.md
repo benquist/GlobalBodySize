@@ -356,3 +356,16 @@
 - Requested outcomes: Full implementation of all 20 recommendations + 4 critical gaps; science-guard and optimizer review; all criticals resolved; push.
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R; BIEN-TraitsShinyApp/chat_provenance_log.md; agents/prompt_log.md
 - Completed by: GitHub Copilot (@m orchestrator)
+
+## 2026-05-14 — R script download panel in Step 8 Download tab
+
+- **Prompt**: Add a downloadable, commented R script to the Download tab as a separate entity, with citations for the BIEN R package (Maitner et al. 2018) and the BIEN project (Enquist et al. 2026).
+- **Agents**: @M (supervisor), coder, biodiversity-science-guard
+- **Changes to `BIEN-TraitsShinyApp/app_gateway.R`**:
+  - `downloadGateUI`: Added new `panel panel-default` card "Reproducible R Code" above the existing Step 8 acknowledgement panel, containing a live code preview (`uiOutput("r_code_preview")`) and a download button (`uiOutput("dl_r_script_btn")`).
+  - `downloadGateServer`: Added `.build_r_script()` local helper (mirrors provenanceServer logic); `output$r_code_preview` (scrollable `<pre>` block, 320px max-height); `output$dl_r_script_btn` (conditional download button); `output$dl_r_script` downloadHandler (filename: `bien_query_YYYYMMDD_HHMMSS.R`).
+  - `provenanceServer` `output$dl_script`: Already had full 6-section script body from previous session — no changes needed.
+- **Citation fix (biodiversity-science-guard CRITICAL)**:
+  - Enquist et al. (2026) had wrong journal (GEB → MEE), wrong title, wrong DOI namespace. Fixed in both `provenanceServer` and `downloadGateServer` to: "BIEN: A biodiversity informatics ecosystem advancing open and reproducible workflows for plant observation, plot, and trait data." *Methods in Ecology and Evolution* (early view). doi: pending.
+  - Maitner et al. 2018 citation confirmed accurate (journal, pages, DOI).
+- **Parse**: PARSE OK

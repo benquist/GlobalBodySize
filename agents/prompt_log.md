@@ -2420,3 +2420,7 @@ Files: Global_Plant_BodySize/scripts/10b_pglmm_fit.R, agents/prompt_log.md.
 User: update (stats-specialist.agent.md open)
 Action: Added model field (claude-sonnet-4-5). Expanded tools list to name key R packages (lme4, MCMCglmm, brms, nlme, ape, phytools) and Python libraries. Added three new expertise areas: (1) phylogenetic comparative methods (PGLS, PGLMM, MCMCglmm, Pagel's lambda, Blomberg's K); (2) BLUP estimation (Henderson marginal-shrinkage, REML, shrinkage by group size); (3) Bayesian MCMC diagnostics (ESS, Gelman-Rubin R-hat, trace plots, prior spec, posterior predictive checks); (4) variance components / G- and R-structures / sparse inverse covariance matrices.
 Files: agents/stats-specialist.agent.md, agents/prompt_log.md.
+
+## 2026-05-14 — BIEN-TraitsShinyApp: R script download panel in Step 8
+User: Add downloadable commented R code to the Download tab as a separate panel, with BIEN package citation (Maitner et al. 2018) and Enquist et al. (2026).
+Action: @M orchestrated coder + biodiversity-science-guard. Added "Reproducible R Code" panel-default card to downloadGateUI with live code preview + download button. Added .build_r_script() helper + output$r_code_preview/dl_r_script_btn/dl_r_script to downloadGateServer. biodiversity-science-guard CRITICAL: fixed Enquist 2026 citation (wrong journal GEB→MEE, wrong title, wrong DOI prefix) in both provenanceServer and downloadGateServer. PARSE OK. Pushed.
