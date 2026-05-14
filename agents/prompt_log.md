@@ -2432,3 +2432,7 @@ Action: Applied all 14 items from design-atelier audit. SCSS: team-card hover up
 ## 2026-05-14 — people/alumni: profile photo avatars from Google Scholar
 User: Add photos to alumni cards using public web sources.
 Action: Created _data/alumni_photos.yml (36 entries, Google Scholar profile photos — self-uploaded by each person to their own public Scholar profile). Added SCSS: .alumni-card--has-photo (flex layout), .alumni-card__avatar (50px circle, border, object-fit cover), .alumni-card__body (min-width:0). Updated all 7 alumni card loops in people.md via Python regex: each card now looks up site.data.alumni_photos by name, conditionally adds .alumni-card--has-photo class and renders the avatar img with onerror=hide fallback and a flex body wrapper. Cards without a photo entry render unchanged. Pushed commit b72f11f to enquistlab.github.io.
+
+## 2026-05-14 — Gallery restore: Field Landscapes + Science in Action photos
+User: The 21 uncaptioned Flickr-dump images and 25+ people/Science-in-Action photos are fine to add back.
+Action: Restored the Field Landscapes section (28 images from assets/img/wordpress/) removed in commit 2bc24d8. Also restored 28 Science-in-Action/People photos that had been removed as uncaptioned/unidentifiable. All files confirmed present on disk before restore. Pushed commit 91e71ef.
