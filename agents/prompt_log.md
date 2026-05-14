@@ -2452,3 +2452,7 @@ Root causes found: (1) safe_bien_call() used setTimeLimit(transient=TRUE) — in
 ## 2026-05-14 — BIEN-TraitsShinyApp: fix fatal hang + genus autocomplete
 User: App at benquist.shinyapps.io/bien-traits-shinyapp hanging and crashing on trait search; genus autocomplete missing late-alphabet entries.
 Action: (1) Removed callr::r() subprocess approach from run_bien_query_safe — replaced with direct query_bien_traits() for all ranks; callr removed from package requirements. (2) Changed updateSelectizeInput server parameter to TRUE for genus and family (was client-side only for species). (3) Expanded .bien_taxon_suggestion_fallback$genus with T-Z entries. Filed under @M orchestration.
+
+## 2026-05-14 — BIEN-TraitsShinyApp: root-cause fix — 5 blocking BIEN calls → 1
+User: App still crashing after first fix attempt. Deeper diagnosis revealed safe_bien_call timeout_sec parameter is a dead argument (never enforced). safe_bien_retry had capacity_backoff of [8,20,40]s and a bug where capacity_attempts=max(attempts,4) silently overrode attempts, causing 68s of sleep per call. Each query made 5 sequential blocking BIEN DB calls: (1) pre-flight SQL fetch, (2) pre-flight COUNT, (3) main data fetch, (4) post-query COUNT refresh SQL, (5) post-query COUNT refresh execute — each with no real timeout, together exceeding shinyapps.io session limits.
+Action: Removed pre-flight count block, removed needs_count_refresh observer, simplified safe_bien_retry to 2 attempts + 0.5s backoff. Net: 1 BIEN call per query instead of 5. Deployed.

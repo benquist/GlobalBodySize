@@ -381,3 +381,20 @@
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
 - Deployment: Rscript BIEN-TraitsShinyApp/deploy.R → benquist.shinyapps.io/bien-traits-shinyapp
 - Completed by: GitHub Copilot (@m orchestrator)
+
+- Date: 2026-05-14
+- Prompt summary: Root-cause fix — 5 blocking BIEN DB calls reduced to 1 per query; safe_bien_retry backoff corrected.
+- Root causes:
+  1. `safe_bien_retry()` had `capacity_backoff = c(8, 20, 40)` seconds and a bug where `capacity_attempts = max(attempts, 4)` silently overrode the `attempts` argument, causing the function to always loop 4+ times regardless of the caller's intent — up to 68 seconds of sleep before giving up.
+  2. `safe_bien_call()` accepted a `timeout_sec` parameter but never enforced it — the argument was dead code.
+  3. Each user query triggered 5 sequential blocking BIEN DB calls: (1) pre-flight SQL fetch, (2) pre-flight COUNT, (3) main data fetch, (4) post-query COUNT refresh SQL, (5) post-query COUNT refresh execute — none with a real timeout, together exceeding shinyapps.io session/connection limits.
+- Changes to `BIEN-TraitsShinyApp/app_gateway.R`:
+  - `safe_bien_retry`: simplified to 2 attempts, 0.5s fixed backoff. Removed `capacity_attempts`, `capacity_backoff`, and all associated logic.
+  - Removed entire pre-flight count block (`query_bien_total_records` call before main query).
+  - Removed `needs_count_refresh` observer (two more blocking BIEN calls triggered after every query).
+  - Removed `refresh_counts` reactive value and all references.
+  - Removed vestigial `total_pre` variable.
+  - Net effect: 1 BIEN DB call per query instead of 5; retry logic uses 0.5s backoff instead of up to 68s of sleep.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
+- Deployment: Rscript BIEN-TraitsShinyApp/deploy.R → benquist.shinyapps.io/bien-traits-shinyapp
+- Completed by: GitHub Copilot (always gate)

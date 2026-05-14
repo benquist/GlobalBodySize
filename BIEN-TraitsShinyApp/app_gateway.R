@@ -129,27 +129,13 @@ format_bien_error <- function(err_msg, context = c("query", "suggestions")) {
   as.character(err_msg)
 }
 
-safe_bien_retry <- function(call_fn, timeout_sec = 120, attempts = 3, sleep_sec = 1) {
+safe_bien_retry <- function(call_fn, timeout_sec = 120, attempts = 2, sleep_sec = 0.5) {
   last <- NULL
-  capacity_backoff <- c(8, 20, 40)
   attempts <- max(1L, as.integer(attempts))
-  capacity_attempts <- max(attempts, length(capacity_backoff) + 1L)
-  for (i in seq_len(capacity_attempts)) {
+  for (i in seq_len(attempts)) {
     last <- safe_bien_call(call_fn(), timeout_sec = timeout_sec)
-    if (!inherits(last, "bien_error")) {
-      return(last)
-    }
-    if (is_bien_connection_slot_error(last$error)) {
-      if (i < capacity_attempts) {
-        Sys.sleep(capacity_backoff[min(i, length(capacity_backoff))])
-        next
-      }
-      return(last)
-    }
-    if (i >= attempts) {
-      return(last)
-    }
-    Sys.sleep(sleep_sec * i)
+    if (!inherits(last, "bien_error")) return(last)
+    if (i < attempts) Sys.sleep(sleep_sec * i)
   }
   last
 }
@@ -762,7 +748,6 @@ queryServer <- function(id) {
       is_querying = FALSE,
       error_msg = "",
       suggestion_cache = list(),
-      needs_count_refresh = FALSE,
       batch_species = character(0),
       effective_taxon = ""
     ) -> rv
@@ -879,7 +864,6 @@ queryServer <- function(id) {
       }
 
       rv$is_querying <- TRUE
-      refresh_counts <- FALSE
 
       # Visually disable button and show spinner via plain JS message
       session$sendCustomMessage("queryBtnState", list(
@@ -895,7 +879,6 @@ queryServer <- function(id) {
           loading  = FALSE
         ))
         rv$is_querying <- FALSE
-        rv$needs_count_refresh <- isTRUE(refresh_counts)
       }, add = TRUE)
 
       if (identical(mode, "batch")) {
@@ -925,7 +908,6 @@ queryServer <- function(id) {
         rv$diagnostics <- compute_diagnostics(dat, "species", paste(species_vec, collapse = "; "),
                                               total_available = NA_integer_, max_records = max_records)
         rv$error_msg <- if (nrow(dat) == 0) "No records returned for any of the provided species." else ""
-        refresh_counts <- FALSE
         return()
       }
 
@@ -939,39 +921,13 @@ queryServer <- function(id) {
         if (is.na(max_records) || max_records < 100) max_records <- 5000
         max_records <- min(max_records, 50000)
 
-        # Step 1: Fast pre-flight count to validate taxon and give user feedback.
-        # COUNT queries are index-only and typically return in 3-8 seconds.
-        # Abort before the expensive data fetch if the taxon has no records.
-        total_pre <- NA_integer_
-        if (!identical(input$rank, "trait-only")) {
-          withProgress(message = "Checking BIEN availability...",
-                       detail = taxon_clean, value = 0.15, {
-            total_pre <- tryCatch(
-              query_bien_total_records(rank = input$rank, taxon = taxon_clean, timeout_sec = 20),
-              error = function(e) NA_integer_
-            )
-          })
-          if (!is.na(total_pre) && total_pre == 0L) {
-            rv$error_msg <- sprintf(
-              paste0("No trait records found for \u2018%s\u2019 in BIEN. ",
-                     "The name may not be recognised or this taxon has no measured traits. ",
-                     "Check spelling or try a related genus."),
-              taxon_clean
-            )
-            return()
-          }
-        }
-
         # Step 2: Run the full trait data query.
         # All ranks (species/genus/family/trait-only) use query_bien_traits() via
         # safe_bien_retry + tryCatch. callr subprocess approach was removed because
         # shinyapps.io sandboxing prevents reliable child-process spawning.
         withProgress(
-          message = if (!is.na(total_pre))
-            sprintf("Fetching %s trait records for %s\u2026", format(total_pre, big.mark=","), taxon_clean)
-          else
-            "Querying BIEN\u2026",
-          detail = "This may take up to 45 seconds",
+          message = sprintf("Querying BIEN for %s\u2026", taxon_clean),
+          detail = "This may take 30\u201360 seconds",
           value = 0.3, {
 
           dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
@@ -985,7 +941,7 @@ queryServer <- function(id) {
             dat,
             input$rank,
             taxon_clean,
-            total_available = if (!is.na(total_pre)) total_pre else NA_integer_,
+            total_available = NA_integer_,
             max_records     = max_records
           )
           rv$error_msg <- if (is.character(bien_err) && nzchar(bien_err)) {
@@ -996,7 +952,6 @@ queryServer <- function(id) {
             ""
           }
         })
-        refresh_counts <- TRUE
       }, error = function(e) {
         rv$query_data      <- data.frame()
         rv$diagnostics     <- NULL
@@ -1005,25 +960,7 @@ queryServer <- function(id) {
       })
     })
 
-    observe({
-      req(rv$needs_count_refresh)
-      rv$needs_count_refresh <- FALSE
-      qr <- rv$query_data
-      diag <- rv$diagnostics
-      if (!is.data.frame(qr) || nrow(qr) == 0 || is.null(diag)) return()
-      total_available <- query_bien_total_records(
-        rank = diag$query_rank,
-        taxon = diag$query_taxon,
-        timeout_sec = 25
-      )
-      rv$diagnostics <- compute_diagnostics(
-        qr,
-        diag$query_rank,
-        diag$query_taxon,
-        total_available = total_available,
-        max_records = diag$limit_used
-      )
-    })
+
     
     output$max_records_hint <- renderUI({
       rank <- input$rank
