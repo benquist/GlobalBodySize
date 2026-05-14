@@ -25,9 +25,35 @@ suppressPackageStartupMessages({
 .bien_taxon_suggestion_cache <- list()
 
 .bien_taxon_suggestion_fallback <- list(
-  genus = c("Pinus", "Quercus", "Abies", "Picea", "Populus", "Salix", "Acer", "Arctostaphylos"),
+  genus = c(
+    "Abies", "Acacia", "Acer", "Alnus", "Arctostaphylos",
+    "Betula", "Bursera",
+    "Carpinus", "Ceanothus", "Cecropia", "Celtis", "Cornus",
+    "Diospyros",
+    "Erica", "Eriogonum", "Eucalyptus",
+    "Fagus", "Ficus", "Fraxinus",
+    "Gaultheria",
+    "Heteromeles", "Hibiscus",
+    "Ilex",
+    "Juniperus",
+    "Litsea",
+    "Mahonia", "Mimosa", "Myrica",
+    "Nothofagus",
+    "Ocotea", "Olea",
+    "Pinus", "Picea", "Populus", "Prosopis", "Prunus",
+    "Quercus",
+    "Rhododendron", "Rhus", "Robinia",
+    "Salix", "Salvia", "Sequoia",
+    "Tilia",
+    "Ulmus", "Umbellularia",
+    "Vaccinium", "Viburnum",
+    "Washingtonia",
+    "Xylosma",
+    "Yucca",
+    "Zanthoxylum"
+  ),
   species = c("Pinus ponderosa", "Quercus agrifolia", "Populus tremuloides"),
-  family = c("Pinaceae", "Fagaceae", "Salicaceae")
+  family = c("Pinaceae", "Fagaceae", "Salicaceae", "Fabaceae", "Rosaceae")
 )
 
 # ============================================================================
@@ -288,20 +314,24 @@ load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120)
   )
   if (is.null(sql)) return(character(0))
 
-  bien_sql <- tryCatch(
-    get(".BIEN_sql", envir = asNamespace("BIEN")),
-    error = function(e) NULL
-  )
-  if (is.null(bien_sql)) return(character(0))
-  out <- safe_bien_retry(function() {
-    bien_sql(query = sql, fetch.query = FALSE)
-  }, timeout_sec = timeout_sec, attempts = 2)
-
   fallback_vals <- .bien_taxon_suggestion_fallback[[rank]]
   if (is.null(fallback_vals)) fallback_vals <- character(0)
 
   cached_vals <- .bien_taxon_suggestion_cache[[rank]]
   if (is.null(cached_vals)) cached_vals <- character(0)
+
+  bien_sql <- tryCatch(
+    get(".BIEN_sql", envir = asNamespace("BIEN")),
+    error = function(e) NULL
+  )
+  if (is.null(bien_sql)) {
+    warning("load_taxon_suggestions: .BIEN_sql not available, returning fallback for rank=", rank)
+    if (length(cached_vals) > 0) return(cached_vals)
+    return(fallback_vals)
+  }
+  out <- safe_bien_retry(function() {
+    bien_sql(query = sql, fetch.query = FALSE)
+  }, timeout_sec = timeout_sec, attempts = 2)
 
   if (inherits(out, "bien_error") || !is.data.frame(out) || nrow(out) == 0 || !"taxon" %in% names(out)) {
     if (length(cached_vals) > 0) {
@@ -759,42 +789,46 @@ queryServer <- function(id) {
 
       key <- paste(mode, if (identical(mode, "taxa")) rank else "traits", sep = "::")
 
-      choices <- rv$suggestion_cache[[key]]
-      if (is.null(choices) || length(choices) == 0) {
-        choices <- if (identical(mode, "traits")) {
-          load_trait_suggestions()
+      tryCatch({
+        choices <- rv$suggestion_cache[[key]]
+        if (is.null(choices) || length(choices) == 0) {
+          choices <- if (identical(mode, "traits")) {
+            load_trait_suggestions()
+          } else {
+            # Keep suggestion payloads small enough to avoid blocking rank switches.
+            load_taxon_suggestions(rank = rank, max_choices = suggestion_cap_for_rank(rank))
+          }
+          if (length(choices) > 0) {
+            rv$suggestion_cache[[key]] <- choices
+          }
+        }
+
+        current <- input$taxon
+        selected <- if (!is.null(current) && nzchar(current) && current %in% choices) current else ""
+        placeholder <- if (identical(mode, "traits")) {
+          "Type to find BIEN trait names (accepted list)."
         } else {
-          # Keep suggestion payloads small enough to avoid blocking rank switches.
-          load_taxon_suggestions(rank = rank, max_choices = suggestion_cap_for_rank(rank))
+          sprintf("Type to find accepted BIEN %s names.", rank)
         }
-        if (length(choices) > 0) {
-          rv$suggestion_cache[[key]] <- choices
-        }
-      }
 
-      current <- input$taxon
-      selected <- if (!is.null(current) && nzchar(current) && current %in% choices) current else ""
-      placeholder <- if (identical(mode, "traits")) {
-        "Type to find BIEN trait names (accepted list)."
-      } else {
-        sprintf("Type to find accepted BIEN %s names.", rank)
-      }
-
-      updateSelectizeInput(
-        session,
-        "taxon",
-        choices = choices,
-        selected = selected,
-        server = !identical(mode, "traits"),
-        options = list(
-          create = TRUE,
-          createOnBlur = TRUE,
-          maxOptions = 5000,
-          openOnFocus = TRUE,
-          minChars = 2,
-          placeholder = placeholder
+        updateSelectizeInput(
+          session,
+          "taxon",
+          choices = choices,
+          selected = selected,
+          server = !identical(mode, "traits"),
+          options = list(
+            create = TRUE,
+            createOnBlur = TRUE,
+            maxOptions = 5000,
+            openOnFocus = TRUE,
+            minChars = 2,
+            placeholder = placeholder
+          )
         )
-      )
+      }, error = function(e) {
+        warning("load_taxon_suggestions failed: ", conditionMessage(e))
+      })
     }, ignoreInit = FALSE)
     
     batch_species_list <- reactive({
