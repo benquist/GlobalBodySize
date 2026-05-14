@@ -2464,3 +2464,7 @@ User: Add a new Ecophysiology section to the research page with four sub-section
 User: App still crashing after two previous fix attempts.
 Diagnosis: rsconnect::showLogs() revealed the actual error: "Error in : object 'unit_col' not found" in trait_summary_tbl reactive. Root cause: dplyr 1.1+ (R 4.6.0 on shinyapps.io) captures all summarise() quosures before evaluation, so `unit_col <- first_existing_col(dat, ...)` assignments *inside* summarise() blocks were invisible to subsequent expressions in the same call. Previous fixes (callr removal, retry backoff) addressed real issues but were not the crash cause.
 Fix: (1) Pre-computed unit_col before the summarise() block in trait_summary_tbl; (2) Used .env$unit_col, .env$species_col, .env$value_col pronouns in all summarise() expressions in trait_diag_dt to explicitly reference the calling environment. Deployed commit df22499.
+
+## 2026-05-14 — BIEN-TraitsShinyApp: Fix A — base R aggregation replaces dplyr summarise()
+User: After two failed dplyr fix attempts (.env not found on shinyapps.io R 4.6.0), debate three fixes and implement Fix A.
+Action: Replaced both crashing reactives in app_gateway.R — trait_summary_tbl (~line 1955) and trait_diag_dt renderDT (~line 1394) — with base R split() + vapply() aggregation. No tidy-eval, no .data[[]], no .env$ pronouns. Eliminates the entire failure category. Parse OK. Deployed image 14933056. New container 16:52:17 boot clean.

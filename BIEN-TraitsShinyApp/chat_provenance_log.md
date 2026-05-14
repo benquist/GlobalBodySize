@@ -398,3 +398,6 @@
 - Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
 - Deployment: Rscript BIEN-TraitsShinyApp/deploy.R → benquist.shinyapps.io/bien-traits-shinyapp
 - Completed by: GitHub Copilot (always gate)
+
+## 2026-05-14 — Fix A: base R aggregation
+Replaced dplyr summarise() blocks in trait_summary_tbl and trait_diag_dt with split()/vapply(). Removes tidy-eval/.env crash on R 4.6.0. Deployed image 14933056.

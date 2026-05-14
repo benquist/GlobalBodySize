@@ -1404,35 +1404,46 @@ diagnosticsServer <- function(id, query_result) {
 
       if (is.null(trait_col) || is.null(value_col)) return(NULL)
 
-      tbl <- dat |>
-        dplyr::group_by(trait_name = .data[[trait_col]]) |>
-        dplyr::summarise(
-          n_records   = dplyr::n(),
-          n_species   = if (!is.null(.env$species_col)) dplyr::n_distinct(.data[[.env$species_col]]) else NA_integer_,
-          pct_missing = {
-            vals <- suppressWarnings(as.numeric(as.character(.data[[.env$value_col]])))
-            round(100 * mean(is.na(vals)), 1)
-          },
-          n_units     = if (!is.null(.env$unit_col)) dplyr::n_distinct(.data[[.env$unit_col]]) else NA_integer_,
-          cv_pct      = {
-            vals <- suppressWarnings(as.numeric(as.character(.data[[.env$value_col]])))
-            vals <- vals[!is.na(vals) & is.finite(vals)]
-            if (!is.null(.env$unit_col) && dplyr::n_distinct(.data[[.env$unit_col]]) == 1 && length(vals) > 1 && mean(vals) != 0) {
-              round(100 * stats::sd(vals) / abs(mean(vals)), 1)
-            } else NA_real_
-          },
-          n_iqr_outliers = {
-            vals <- suppressWarnings(as.numeric(as.character(.data[[value_col]])))
-            vals <- vals[!is.na(vals) & is.finite(vals)]
-            if (length(vals) >= 4) {
-              q <- stats::quantile(vals, c(0.25, 0.75), na.rm = TRUE, names = FALSE)
-              iqr_v <- diff(q)
-              sum(vals < (q[1] - 1.5 * iqr_v) | vals > (q[2] + 1.5 * iqr_v), na.rm = TRUE)
-            } else 0L
-          },
-          .groups = "drop"
-        ) |>
-        dplyr::arrange(dplyr::desc(n_records))
+      # Base R aggregation (no dplyr data-mask) to avoid tidy-eval/.env issues on shinyapps.io
+      trait_vec <- as.character(dat[[trait_col]])
+      groups <- split(seq_len(nrow(dat)), trait_vec)
+      species_vals <- if (!is.null(species_col)) as.character(dat[[species_col]]) else NULL
+      unit_vals    <- if (!is.null(unit_col))    as.character(dat[[unit_col]])    else NULL
+      value_num    <- suppressWarnings(as.numeric(as.character(dat[[value_col]])))
+
+      tbl <- data.frame(
+        trait_name  = names(groups),
+        n_records   = lengths(groups),
+        n_species   = if (is.null(species_vals)) NA_integer_
+                      else vapply(groups, function(i) length(unique(species_vals[i])), 1L),
+        pct_missing = vapply(groups, function(i) round(100 * mean(is.na(value_num[i])), 1), numeric(1)),
+        n_units     = if (is.null(unit_vals)) NA_integer_
+                      else vapply(groups, function(i) {
+                        u <- unit_vals[i]; u <- u[!is.na(u) & nzchar(u)]
+                        length(unique(u))
+                      }, 1L),
+        cv_pct      = vapply(groups, function(i) {
+          vals <- value_num[i]; vals <- vals[!is.na(vals) & is.finite(vals)]
+          if (!is.null(unit_vals)) {
+            u <- unit_vals[i]; u <- u[!is.na(u) & nzchar(u)]
+            n_u <- length(unique(u))
+          } else n_u <- 1L
+          if (n_u == 1L && length(vals) > 1 && mean(vals) != 0) {
+            round(100 * stats::sd(vals) / abs(mean(vals)), 1)
+          } else NA_real_
+        }, numeric(1)),
+        n_iqr_outliers = vapply(groups, function(i) {
+          vals <- value_num[i]; vals <- vals[!is.na(vals) & is.finite(vals)]
+          if (length(vals) >= 4) {
+            q <- stats::quantile(vals, c(0.25, 0.75), na.rm = TRUE, names = FALSE)
+            iqr_v <- diff(q)
+            as.integer(sum(vals < (q[1] - 1.5 * iqr_v) | vals > (q[2] + 1.5 * iqr_v), na.rm = TRUE))
+          } else 0L
+        }, integer(1)),
+        stringsAsFactors = FALSE,
+        row.names = NULL
+      )
+      tbl <- tbl[order(-tbl$n_records), , drop = FALSE]
 
       DT::datatable(
         tbl,
@@ -1962,28 +1973,33 @@ traitSelectServer <- function(id, query_result) {
 
       species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
       unit_col    <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit"))
-      out <- dat %>%
-        group_by(.data[[trait_col]]) %>%
-        summarise(
-          n_records = n(),
-          n_species = if (!is.null(.env$species_col)) n_distinct(.data[[.env$species_col]]) else NA_integer_,
-          dominant_unit = {
-            if (!is.null(.env$unit_col)) {
-              u <- tolower(stringr::str_squish(as.character(.data[[.env$unit_col]])))
-              u <- u[!is.na(u) & nzchar(u)]
-              if (length(u) > 0) names(sort(table(u), decreasing = TRUE))[[1]] else NA_character_
-            } else NA_character_
-          },
-          n_units = {
-            if (!is.null(.env$unit_col)) {
-              u <- tolower(stringr::str_squish(as.character(.data[[.env$unit_col]])))
-              n_distinct(u[!is.na(u) & nzchar(u)])
-            } else NA_integer_
-          },
-          .groups = "drop"
-        ) %>%
-        rename(trait_name = 1) %>%
-        arrange(desc(n_records))
+
+      # Base R aggregation (no dplyr data-mask) to avoid tidy-eval/.env issues on shinyapps.io
+      trait_vec <- as.character(dat[[trait_col]])
+      groups <- split(seq_len(nrow(dat)), trait_vec)
+      species_vals <- if (!is.null(species_col)) as.character(dat[[species_col]]) else NULL
+      unit_vals    <- if (!is.null(unit_col))    as.character(dat[[unit_col]])    else NULL
+
+      out <- data.frame(
+        trait_name = names(groups),
+        n_records  = lengths(groups),
+        n_species  = if (is.null(species_vals)) NA_integer_
+                     else vapply(groups, function(i) length(unique(species_vals[i])), 1L),
+        dominant_unit = if (is.null(unit_vals)) NA_character_
+                        else vapply(groups, function(i) {
+                          u <- tolower(stringr::str_squish(unit_vals[i]))
+                          u <- u[!is.na(u) & nzchar(u)]
+                          if (length(u) > 0) names(sort(table(u), decreasing = TRUE))[[1]] else NA_character_
+                        }, character(1)),
+        n_units    = if (is.null(unit_vals)) NA_integer_
+                     else vapply(groups, function(i) {
+                       u <- tolower(stringr::str_squish(unit_vals[i]))
+                       length(unique(u[!is.na(u) & nzchar(u)]))
+                     }, 1L),
+        stringsAsFactors = FALSE,
+        row.names = NULL
+      )
+      out <- out[order(-out$n_records), , drop = FALSE]
       out
     })
 
