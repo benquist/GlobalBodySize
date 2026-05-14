@@ -1408,16 +1408,16 @@ diagnosticsServer <- function(id, query_result) {
         dplyr::group_by(trait_name = .data[[trait_col]]) |>
         dplyr::summarise(
           n_records   = dplyr::n(),
-          n_species   = if (!is.null(species_col)) dplyr::n_distinct(.data[[species_col]]) else NA_integer_,
+          n_species   = if (!is.null(.env$species_col)) dplyr::n_distinct(.data[[.env$species_col]]) else NA_integer_,
           pct_missing = {
-            vals <- suppressWarnings(as.numeric(as.character(.data[[value_col]])))
+            vals <- suppressWarnings(as.numeric(as.character(.data[[.env$value_col]])))
             round(100 * mean(is.na(vals)), 1)
           },
-          n_units     = if (!is.null(unit_col)) dplyr::n_distinct(.data[[unit_col]]) else NA_integer_,
+          n_units     = if (!is.null(.env$unit_col)) dplyr::n_distinct(.data[[.env$unit_col]]) else NA_integer_,
           cv_pct      = {
-            vals <- suppressWarnings(as.numeric(as.character(.data[[value_col]])))
+            vals <- suppressWarnings(as.numeric(as.character(.data[[.env$value_col]])))
             vals <- vals[!is.na(vals) & is.finite(vals)]
-            if (!is.null(unit_col) && dplyr::n_distinct(.data[[unit_col]]) == 1 && length(vals) > 1 && mean(vals) != 0) {
+            if (!is.null(.env$unit_col) && dplyr::n_distinct(.data[[.env$unit_col]]) == 1 && length(vals) > 1 && mean(vals) != 0) {
               round(100 * stats::sd(vals) / abs(mean(vals)), 1)
             } else NA_real_
           },
@@ -1961,21 +1961,22 @@ traitSelectServer <- function(id, query_result) {
       if (is.null(trait_col)) return(data.frame())
 
       species_col <- first_existing_col(dat, c("scrubbed_species_binomial", "species", "scientific_name"))
+      unit_col    <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit"))
       out <- dat %>%
         group_by(.data[[trait_col]]) %>%
         summarise(
           n_records = n(),
-          n_species = if (!is.null(species_col)) n_distinct(.data[[species_col]]) else NA_integer_,
+          n_species = if (!is.null(.env$species_col)) n_distinct(.data[[.env$species_col]]) else NA_integer_,
           dominant_unit = {
-            if (!is.null(unit_col <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit")))) {
-              u <- tolower(stringr::str_squish(as.character(.data[[unit_col]])))
+            if (!is.null(.env$unit_col)) {
+              u <- tolower(stringr::str_squish(as.character(.data[[.env$unit_col]])))
               u <- u[!is.na(u) & nzchar(u)]
               if (length(u) > 0) names(sort(table(u), decreasing = TRUE))[[1]] else NA_character_
             } else NA_character_
           },
           n_units = {
-            if (!is.null(unit_col <- first_existing_col(dat, c("trait_unit", "unit", "units", "measurement_unit")))) {
-              u <- tolower(stringr::str_squish(as.character(.data[[unit_col]])))
+            if (!is.null(.env$unit_col)) {
+              u <- tolower(stringr::str_squish(as.character(.data[[.env$unit_col]])))
               n_distinct(u[!is.na(u) & nzchar(u)])
             } else NA_integer_
           },
