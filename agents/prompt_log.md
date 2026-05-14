@@ -2363,3 +2363,7 @@ Action: Verified Enquist authorship by fetching and grepping each article body. 
 - Biodiversity Informatics & BIEN: "Scientists use air-based maps of plant chemistry to improve carbon cycling models in hyperdiverse tropical forests" (Dec 2019, image lookingattro.jpg, after Apr 2020 Time)
 - Science Culture & Synthesis: "Ecologists need 'efficient theory' to make sense of all the data" (Jul 2014, text-only, after Apr 2024 Phys.org)
 Pushed commit 2e65e61 to EnquistLab/enquistlab.github.io main.
+
+## 2026-05-14 — Arctic and Alpine tab deep audit
+User: Deeper dive on Arctic and Alpine publications tab at enquistlab.github.io/publications/.
+Action: Audited all 17 currently matching papers (arctic, alpine, tundra, svalbard, subalpine, afromontane, norway, puna, mountain plant). Tested 20 candidate matchers across all publications. Genuinely missed paper: Vandvik et al. (2020) "Plant traits and vegetation data from climate warming experiments along an 1100 m elevation gradient in Gongga Mountains, China" (Scientific Data) — score 0 under current matchers. Added `{ pattern: /\bGongga\b/i, weight: 2 }` — zero false positives across full publication list. Other candidate matchers (elevation gradient, montane, grassland, temperature gradient, Vandvik-author, Halbritter-author) were rejected: elevation gradient caught 7 tropical papers; Vandvik/Halbritter as author matchers would add general trait papers and pedagogy papers not relevant to arctic/alpine. Tab now covers 18 papers.
