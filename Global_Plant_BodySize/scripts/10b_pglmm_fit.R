@@ -68,6 +68,10 @@ suppressPackageStartupMessages({
 
 set.seed(2026)
 
+## QUICK_TEST env-var: set to any non-empty value for a fast end-to-end check
+## (subsamples to 500 species, 12K iterations). E.g.: QUICK_TEST=1 Rscript ...
+quick_test <- nchar(Sys.getenv("QUICK_TEST")) > 0
+
 message("=== Stage 10b: MCMCglmm PGLMM fit (Stage 1 — measured species) ===")
 
 ## ---- Load data -------------------------------------------------------------
@@ -131,6 +135,15 @@ if (sum(!in_tree) > 0) {
 
 meas_fit <- meas[in_tree]
 
+## QUICK_TEST: subsample to 500 species so pr=TRUE initializes in <1 min
+## (pr=TRUE with 11K animal levels requires initializing a ~12K-column Sol
+##  matrix which can hang for hours; 500 species tests the full pipeline quickly)
+if (quick_test) {
+  set.seed(42L)
+  meas_fit <- meas_fit[sample(.N, min(500L, .N))]
+  message("[10b] QUICK_TEST: subsampled to ", nrow(meas_fit), " species")
+}
+
 ## Prune tree to exactly the fitted species
 tree_fit <- keep.tip(tree_m, meas_fit$animal)
 message("[10b] Tree pruned to fitted species: ", length(tree_fit$tip.label), " tips")
@@ -185,11 +198,18 @@ prior_s1 <- list(
 ## ---- Fit MCMCglmm ----------------------------------------------------------
 ## MCMC settings: 600,000 iterations, 100,000 burnin, thin every 100
 ## → 5,000 posterior samples stored
-## For a quick test run, set nitt=10000, burnin=2000, thin=10
+## For a quick test run: QUICK_TEST=1 Rscript scripts/10b_pglmm_fit.R
 
-NITT   <- 600000L
-BURNIN <- 100000L
-THIN   <- 100L
+if (quick_test) {
+  NITT   <- 12000L
+  BURNIN <-  2000L
+  THIN   <-    10L
+  message("[10b] QUICK_TEST mode: nitt=", NITT, ", burnin=", BURNIN, ", thin=", THIN)
+} else {
+  NITT   <- 600000L
+  BURNIN <- 100000L
+  THIN   <- 100L
+}
 
 ## MCMCglmm's `family` argument conflicts with a data column also named `family`.
 ## Rename the taxonomic family column to tax_family and drop the original.
@@ -227,10 +247,17 @@ message("[10b] Model saved: output/pglmm_stage1_model.rds")
 ## ---- Variance components and lambda ----------------------------------------
 ## Extract posterior means and 95% CIs for VCV (variance-covariance) chains
 
-vcv_post <- model_s1$VCV  ## columns: animal, family, genus, units (residual)
+vcv_post  <- model_s1$VCV  ## mcmc object; use varnames() not colnames()
+vcv_names <- varnames(vcv_post)  ## e.g. c("animal", "tax_family", "genus", "units")
+
+## Detect actual column names (robust to MCMCglmm version differences)
+vcol_animal <- grep("^animal",     vcv_names, value = TRUE)[1]
+vcol_fam    <- grep("^tax_family", vcv_names, value = TRUE)[1]
+vcol_gen    <- grep("^genus",      vcv_names, value = TRUE)[1]
+vcol_res    <- grep("^units",      vcv_names, value = TRUE)[1]
 
 vc_summary <- data.table(
-  component    = colnames(vcv_post),
+  component    = vcv_names,
   post_mean    = apply(vcv_post, 2, mean),
   post_sd      = apply(vcv_post, 2, sd),
   post_ci_lo   = apply(vcv_post, 2, quantile, 0.025),
@@ -239,17 +266,17 @@ vc_summary <- data.table(
 )
 
 ## Compute Pagel's lambda: V_phylo / (V_phylo + V_family + V_genus + V_R)
-v_a    <- vc_summary[component == "animal.animal",         post_mean]
-v_fam  <- vc_summary[component == "tax_family.tax_family", post_mean]
-v_gen  <- vc_summary[component == "genus.genus",           post_mean]
-v_r    <- vc_summary[component == "units",             post_mean]
+v_a    <- vc_summary[component == vcol_animal, post_mean]
+v_fam  <- vc_summary[component == vcol_fam,    post_mean]
+v_gen  <- vc_summary[component == vcol_gen,    post_mean]
+v_r    <- vc_summary[component == vcol_res,    post_mean]
 v_tot  <- v_a + v_fam + v_gen + v_r
 lambda_post_mean <- v_a / v_tot
 
 ## Per-draw lambda
-lambda_draws <- vcv_post[, "animal.animal"] /
-  (vcv_post[, "animal.animal"] + vcv_post[, "tax_family.tax_family"] +
-   vcv_post[, "genus.genus"]  + vcv_post[, "units"])
+lambda_draws <- vcv_post[, vcol_animal] /
+  (vcv_post[, vcol_animal] + vcv_post[, vcol_fam] +
+   vcv_post[, vcol_gen]   + vcv_post[, vcol_res])
 
 lambda_row <- data.table(
   component  = "lambda_pagel",
@@ -262,10 +289,10 @@ lambda_row <- data.table(
 vc_summary <- rbind(vc_summary, lambda_row)
 
 message("\n[10b] === Variance components (posterior means) ===")
-message(sprintf("  V_phylo  (animal)  : %.4f  [%.4f, %.4f]", v_a,   vc_summary[component=="animal.animal",   post_ci_lo], vc_summary[component=="animal.animal",   post_ci_hi]))
-message(sprintf("  V_family           : %.4f  [%.4f, %.4f]", v_fam, vc_summary[component=="tax_family.tax_family", post_ci_lo], vc_summary[component=="tax_family.tax_family", post_ci_hi]))
-message(sprintf("  V_genus            : %.4f  [%.4f, %.4f]", v_gen, vc_summary[component=="genus.genus",     post_ci_lo], vc_summary[component=="genus.genus",     post_ci_hi]))
-message(sprintf("  V_residual         : %.4f  [%.4f, %.4f]", v_r,   vc_summary[component=="units",           post_ci_lo], vc_summary[component=="units",           post_ci_hi]))
+message(sprintf("  V_phylo  (animal)  : %.4f  [%.4f, %.4f]", v_a,   vc_summary[component==vcol_animal, post_ci_lo], vc_summary[component==vcol_animal, post_ci_hi]))
+message(sprintf("  V_family           : %.4f  [%.4f, %.4f]", v_fam, vc_summary[component==vcol_fam,    post_ci_lo], vc_summary[component==vcol_fam,    post_ci_hi]))
+message(sprintf("  V_genus            : %.4f  [%.4f, %.4f]", v_gen, vc_summary[component==vcol_gen,    post_ci_lo], vc_summary[component==vcol_gen,    post_ci_hi]))
+message(sprintf("  V_residual         : %.4f  [%.4f, %.4f]", v_r,   vc_summary[component==vcol_res,    post_ci_lo], vc_summary[component==vcol_res,    post_ci_hi]))
 message(sprintf("  Pagel lambda       : %.4f  [%.4f, %.4f]",
   lambda_post_mean, lambda_row$post_ci_lo, lambda_row$post_ci_hi))
 message(sprintf("  Phylogenetic signal: %s",
@@ -277,8 +304,9 @@ message("[10b] Variance components written: output/pglmm_variance_components.csv
 
 ## ---- Fixed effects summary -------------------------------------------------
 sol_post <- model_s1$Sol
+sol_names <- varnames(sol_post)  ## use varnames() for mcmc objects
 fe_summary <- data.table(
-  parameter  = colnames(sol_post),
+  parameter  = sol_names,
   post_mean  = apply(sol_post, 2, mean),
   post_sd    = apply(sol_post, 2, sd),
   post_ci_lo = apply(sol_post, 2, quantile, 0.025),
@@ -295,8 +323,8 @@ message("[10b] Fixed effects written: output/pglmm_fixed_effects.csv")
 ## These are the key outputs needed for Stage 2 prediction (10c).
 
 ## Note: random term is 'tax_family' (not 'family') to avoid MCMCglmm clash
-family_cols <- grep("^tax_family\\.", colnames(sol_post), value = TRUE)
-genus_cols  <- grep("^genus\\.",     colnames(sol_post), value = TRUE)
+family_cols <- grep("^tax_family\\.", sol_names, value = TRUE)
+genus_cols  <- grep("^genus\\.",     sol_names, value = TRUE)
 
 if (length(family_cols) == 0 || length(genus_cols) == 0) {
   ## Random effect BLUPs are sometimes stored separately
@@ -306,7 +334,8 @@ if (length(family_cols) == 0 || length(genus_cols) == 0) {
 
 ## Helper: extract BLUP table from Sol columns matching a prefix
 extract_blups <- function(sol_mat, prefix) {
-  cols <- grep(paste0("^", prefix, "\\."), colnames(sol_mat), value = TRUE, fixed = FALSE)
+  snames <- varnames(sol_mat)  ## varnames() for mcmc objects
+  cols <- grep(paste0("^", prefix, "\\."), snames, value = TRUE, fixed = FALSE)
   if (length(cols) == 0) return(NULL)
   level_names <- sub(paste0("^", prefix, "\\."), "", cols)
   data.table(
@@ -340,7 +369,7 @@ message("\n[10b] === Chain diagnostics ===")
 message("Gelman-Rubin R-hat requires multiple chains — not computed for single chain.")
 message("Check trace plots and effective sample sizes:")
 
-eff_samps <- apply(vcv_post, 2, effectiveSize)
+eff_samps <- setNames(apply(vcv_post, 2, effectiveSize), vcv_names)
 for (nm in names(eff_samps)) {
   flag <- if (eff_samps[nm] < 200) " <<< LOW — consider longer chain" else ""
   message(sprintf("  ESS %-20s %.0f%s", nm, eff_samps[nm], flag))

@@ -163,6 +163,7 @@ meas[, animal       := gsub(" ", "_", species_name)]
 
 hpg_n    <- meas[, .N, by = higher_plant_group]
 rare_hpg <- hpg_n[N < 20, higher_plant_group]
+meas[, higher_plant_group := as.character(higher_plant_group)]
 meas[higher_plant_group %in% rare_hpg | is.na(higher_plant_group), higher_plant_group := "other"]
 
 meas <- meas[animal %in% tree_m$tip.label]
@@ -280,7 +281,8 @@ if (file.exists("output/pglmm_stage1_model.rds") &&
 
   message("\n[10d] Computing Blomberg K on Stage 1 residuals (stratified by scenario)...")
   model_s1_k <- readRDS("output/pglmm_stage1_model.rds")
-  sol_k      <- colMeans(model_s1_k$Sol)
+  ## varnames() required for mcmc objects — colnames() returns NULL in MCMCglmm v2.36
+  sol_k <- setNames(colMeans(as.matrix(model_s1_k$Sol)), varnames(model_s1_k$Sol))
 
   meas[, fitted_k := fe_prediction(sol_k, growth_form_canonical, data_tier, higher_plant_group)]
   meas[, resid_k  := log10_agb_kg - fitted_k]
@@ -329,19 +331,28 @@ if (file.exists("output/pglmm_stage1_model.rds") &&
 ## HELPER: fit one or more MCMCglmm chains
 ## ============================================================================
 fit_chains <- function(train_dt, tree_in, n_chains, nitt, burnin, thin, fold_id, pr_flag=FALSE) {
+  train_dt[, higher_plant_group := as.character(higher_plant_group)]
   hpg_n_f    <- train_dt[, .N, by=higher_plant_group]
   rare_f     <- hpg_n_f[N < 5, higher_plant_group]
-  train_dt[higher_plant_group %in% rare_f, higher_plant_group := "other"]
+  train_dt[higher_plant_group %in% rare_f | is.na(higher_plant_group), higher_plant_group := "other"]
 
   tree_tr <- tryCatch(keep.tip(tree_in, train_dt$animal[train_dt$animal %in% tree_in$tip.label]),
                        error=function(e) NULL)
   if (is.null(tree_tr) || length(tree_tr$tip.label) < 10) return(NULL)
   train_fit <- train_dt[animal %in% tree_tr$tip.label]
+  train_fit[, tax_family := family]  # avoid conflict with MCMCglmm family argument
+  train_fit[, family := NULL]
+  tree_tr$node.label <- NULL   # V.PhyloMaker2 node labels non-unique after keep.tip
   Ainv_cv   <- inverseA(tree_tr, nodes="TIPS", scale=TRUE)$Ainv
 
-  np <- 1 + (uniqueN(train_fit$growth_form_canonical)-1) +
-            (uniqueN(train_fit$data_tier)-1) +
-            (uniqueN(train_fit$higher_plant_group)-1)
+  use_hpg_f <- uniqueN(train_fit$higher_plant_group) >= 2
+  fixed_f <- if (use_hpg_f) {
+    log10_agb_kg ~ growth_form_canonical + data_tier + higher_plant_group
+  } else {
+    log10_agb_kg ~ growth_form_canonical + data_tier
+  }
+  ## Use model.matrix to get exact n_fixed — avoids "mu prior wrong dimension" error
+  np <- ncol(model.matrix(fixed_f, data=as.data.frame(train_fit)))
   prior_cv <- list(
     B = list(mu=rep(0,np), V=diag(np)*4),
     G = list(G1=list(V=1,nu=1), G2=list(V=1,nu=1), G3=list(V=1,nu=1)),
@@ -353,8 +364,8 @@ fit_chains <- function(train_dt, tree_in, n_chains, nitt, burnin, thin, fold_id,
     set.seed(2026 + fold_id * 100 + ch)
     chains[[ch]] <- tryCatch(
       MCMCglmm(
-        log10_agb_kg ~ growth_form_canonical + data_tier + higher_plant_group,
-        random   = ~ animal + family + genus,
+        fixed_f,
+        random   = ~ animal + tax_family + genus,
         family   = "gaussian",
         ginverse = list(animal=Ainv_cv),
         data     = as.data.frame(train_fit),
@@ -379,8 +390,11 @@ fit_chains <- function(train_dt, tree_in, n_chains, nitt, burnin, thin, fold_id,
     }
   }
 
-  sol_pool <- do.call(rbind, lapply(valid, function(m) as.matrix(m$Sol)))
-  vcv_pool <- do.call(rbind, lapply(valid, function(m) as.matrix(m$VCV)))
+  ## as.matrix() on mcmc objects may lose varnames in MCMCglmm v2.36;
+  ## explicitly name from varnames() so downstream lookups by name work.
+  mcmc_mat <- function(x) { m <- as.matrix(x); if (is.null(colnames(m))) colnames(m) <- varnames(x); m }
+  sol_pool <- do.call(rbind, lapply(valid, function(m) mcmc_mat(m$Sol)))
+  vcv_pool <- do.call(rbind, lapply(valid, function(m) mcmc_mat(m$VCV)))
   list(sol_mean=colMeans(sol_pool), vcv_mean=colMeans(vcv_pool),
        rhat_flag=rhat_flag, n_train=nrow(train_fit))
 }
@@ -414,7 +428,7 @@ if (CV_MODE == "family") {
     if (is.null(res)) { message("[10d] Fold ", f, " failed — skipping"); next }
 
     test[, predicted := fe_prediction(res$sol_mean, growth_form_canonical, data_tier, higher_plant_group)]
-    test[, pred_sd   := sqrt(res$vcv_mean["units"] + res$vcv_mean["family.family"])]
+    test[, pred_sd   := sqrt(res$vcv_mean["units"] + res$vcv_mean["tax_family"])]
 
     m <- compute_metrics(test)
     elapsed <- (proc.time()-t0)["elapsed"]/60
@@ -454,10 +468,10 @@ if (CV_MODE == "genus_extrap") {
 
   sol_named    <- setNames(fe_dt$post_mean, fe_dt$parameter)
   fam_blup_vec <- setNames(fam_blup$blup_mean, fam_blup$level)
-  v_fam <- vc_dt[component=="family.family", post_mean]
-  v_gen <- vc_dt[component=="genus.genus",   post_mean]
-  v_r   <- vc_dt[component=="units",         post_mean]
-  if (length(v_fam)==0) stop("[10d] family.family VC not found. Did 10b run with pr=TRUE?")
+  v_fam <- vc_dt[component=="tax_family", post_mean]
+  v_gen <- vc_dt[component=="genus",      post_mean]
+  v_r   <- vc_dt[component=="units",      post_mean]
+  if (length(v_fam)==0) stop("[10d] tax_family VC not found. Did 10b complete successfully?")
 
   ## Stratified genus-fold assignment by family then size class
   gen_info <- meas[, .(family=family[1], n_meas=.N), by=genus]
@@ -564,8 +578,8 @@ if (CV_MODE == "genus_interp") {
       sub("^genus\\.", "", grep("^genus\\.", names(sol_mean), value=TRUE))
     )
     fam_blup_vec <- setNames(
-      sol_mean[grep("^family\\.", names(sol_mean))],
-      sub("^family\\.", "", grep("^family\\.", names(sol_mean), value=TRUE))
+      sol_mean[grep("^tax_family\\.", names(sol_mean))],
+      sub("^tax_family\\.", "", grep("^tax_family\\.", names(sol_mean), value=TRUE))
     )
 
     test[, predicted := {
