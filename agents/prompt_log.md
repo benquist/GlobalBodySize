@@ -2444,3 +2444,7 @@ Action: design-atelier produced full implementation-ready brief. Implemented all
 ## 2026-05-14 — Fix Xylosma genus search crash and empty dropdown
 User: Xylosma does not appear in genus pull-down menu; app crashes and disconnects when searching for it.
 Action: Found two root causes: (1) load_taxon_suggestions returned character(0) instead of fallback when .BIEN_sql was unavailable — fixed by moving fallback_vals/cached_vals before the null-sql guard; (2) genus fallback list had only 8 genera (A–S), none starting with X — expanded to 52 genera spanning A–Z including Xylosma; (3) observeEvent calling load_taxon_suggestions was not wrapped in tryCatch — added crash protection. Committed ab29f23, deployed to https://benquist.shinyapps.io/bien-traits-shinyapp/.
+
+## 2026-05-14 — Fix app crash on any search (setTimeLimit) + Xylosma autofill
+User: App crashes on any search; Xylosma still not in autofill dropdown.
+Root causes found: (1) safe_bien_call() used setTimeLimit(transient=TRUE) — in Shiny reactive contexts on shinyapps.io this fires during subsequent reactive evaluations, killing the entire R session rather than just the current call; removed setTimeLimit entirely. (2) observeEvent tryCatch was wrapping updateSelectizeInput — so when load_taxon_suggestions errored, the dropdown never updated (stayed blank); restructured so choices loading is tryCatch'd but updateSelectizeInput always fires with fallback. Committed a8c9b2f, deployed.
