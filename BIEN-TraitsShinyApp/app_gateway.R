@@ -325,9 +325,13 @@ load_taxon_suggestions <- function(rank, max_choices = 50000, timeout_sec = 120)
 }
 
 suggestion_cap_for_rank <- function(rank) {
-  if (identical(rank, "species")) return(1500L)
-  if (identical(rank, "genus")) return(2500L)
-  if (identical(rank, "family")) return(300L)
+  # Caps must cover the full set of accepted taxa in BIEN Americas.
+  # BIEN has ~100k+ species, ~5000 genera, ~500 families.
+  # Genus and family are small enough to load fully; species is capped at
+  # 50000 (covers common taxa; users can still type any name manually via create=TRUE).
+  if (identical(rank, "species")) return(50000L)
+  if (identical(rank, "genus"))   return(10000L)
+  if (identical(rank, "family"))  return(1000L)
   500L
 }
 
@@ -785,7 +789,7 @@ queryServer <- function(id) {
         options = list(
           create = TRUE,
           createOnBlur = TRUE,
-          maxOptions = 2000,
+          maxOptions = 5000,
           openOnFocus = TRUE,
           minChars = 2,
           placeholder = placeholder
