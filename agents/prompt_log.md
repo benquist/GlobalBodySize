@@ -2353,3 +2353,13 @@ Action: Fetched article titles — EurekAlert: "Increased heat and drought stunt
 ## 2026-05-14 — Add four more news stories to enquistlab.github.io/news/
 User: Add (3) Time Apr 2020 wildlife/pandemics; (4) Eos Nov 2020 protected areas/climate; (5) Forbes Nov 2019 rare plants extinction; (6) EurekAlert Sep 2014 meteorite/forests.
 Action: Fetched titles. (3) "Want to Stop the Next Pandemic? Protect Wildlife Habitats" — placed text-only card in Biodiversity Informatics & BIEN after Jun 2020 Phys.org pandemics card. (4) "Protected Areas Are Not Safe from Climate Change" — placed with Eos giraffes-elephants image in Forest Conservation & Carbon after Sep 2021 Amazon fires card. (5) "Rare Plant Species Face Extinction Due To World Population Growth And Climate Change" — placed text-only card in Climate Change & Biodiversity after ScienceDaily Nov 2019 card. (6) "Meteorite that doomed the dinosaurs helped the forests bloom" — placed text-only card at end of Forest Conservation & Carbon section. Pushed commit 068170f.
+
+## 2026-05-14 — Add 8 Phys.org Enquist articles to enquistlab.github.io/news/ (Phase 3)
+User: Searched Phys.org for Brian Enquist coverage; approved all 8 found articles for addition.
+Action: Verified Enquist authorship by fetching and grepping each article body. Added 8 cards across 5 sections:
+- Climate Change & Biodiversity: "From the tropics to the boreal, temperature drives ecosystem functioning" (Sep 2019, text-only, after Forbes Nov 2019); "A new approach to biodiversity resurrects old questions" (Oct 2014, image 8-anewapproach.jpg, after 2018 UA News)
+- Forest Conservation & Carbon: "These nine measures reveal how forests are controlled by climate" (Dec 2018, image forest.jpg, after Nov 2020 Eos); "North American forests unlikely to save us from climate change" (Jul 2016, image 4-northamerica.jpg, after Dec 2018)
+- Scaling & Functional Ecology: "Size and age of plants impact their productivity more than climate" (Jul 2014, image sizeandageof.png, after 2015 UA News); "One tree's architecture reveals secrets of a forest" (Aug 2013, image onetreesarch.jpg, after Jul 2014)
+- Biodiversity Informatics & BIEN: "Scientists use air-based maps of plant chemistry to improve carbon cycling models in hyperdiverse tropical forests" (Dec 2019, image lookingattro.jpg, after Apr 2020 Time)
+- Science Culture & Synthesis: "Ecologists need 'efficient theory' to make sense of all the data" (Jul 2014, text-only, after Apr 2024 Phys.org)
+Pushed commit 2e65e61 to EnquistLab/enquistlab.github.io main.
