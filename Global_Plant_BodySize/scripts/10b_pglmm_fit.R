@@ -201,14 +201,16 @@ prior_s1 <- list(
 ## For a quick test run: QUICK_TEST=1 Rscript scripts/10b_pglmm_fit.R
 
 if (quick_test) {
-  NITT   <- 12000L
-  BURNIN <-  2000L
-  THIN   <-    10L
+  NITT          <- 12000L
+  BURNIN        <-  2000L
+  THIN          <-    10L
+  N_BLUP_DRAWS  <-    50L   ## posterior draws for analytic BLUP uncertainty
   message("[10b] QUICK_TEST mode: nitt=", NITT, ", burnin=", BURNIN, ", thin=", THIN)
 } else {
-  NITT   <- 600000L
-  BURNIN <- 100000L
-  THIN   <- 100L
+  NITT          <- 600000L
+  BURNIN        <- 100000L
+  THIN          <- 100L
+  N_BLUP_DRAWS  <- 200L    ## posterior draws for analytic BLUP uncertainty
 }
 
 ## MCMCglmm's `family` argument conflicts with a data column also named `family`.
@@ -232,7 +234,10 @@ model_s1 <- MCMCglmm(
   nitt     = NITT,
   burnin   = BURNIN,
   thin     = THIN,
-  pr       = TRUE,   ## Save per-level RE posterior samples in Sol (required for BLUP extraction)
+  pr       = FALSE,  ## pr=FALSE: Sol stores only FE posteriors (much faster init).
+                     ## Family/genus BLUPs computed analytically post-hoc via
+                     ## Henderson marginal-shrinkage formula — see BLUP section below.
+                     ## Animal BLUPs are zero for unmeasured species (not needed in 10c).
   verbose  = TRUE
 )
 
@@ -318,51 +323,111 @@ fe_summary <- data.table(
 fwrite(fe_summary, "output/pglmm_fixed_effects.csv")
 message("[10b] Fixed effects written: output/pglmm_fixed_effects.csv")
 
-## ---- Extract family and genus BLUPs ----------------------------------------
-## BLUPs are in Sol columns matching "^family\\." and "^genus\\."
-## These are the key outputs needed for Stage 2 prediction (10c).
+## ---- Analytic family and genus BLUPs (Henderson marginal-shrinkage) --------
+## With pr=FALSE, Sol contains only fixed-effect posteriors. Family and genus
+## BLUPs are computed analytically using the Henderson (1973) marginal formula:
+##
+##   û_fam_j = [σ²_fam / (σ²_fam + σ²_other/n_j)] × r̄_j
+##
+## where r̄_j = mean FE residual for family j (y - Xβ),
+##       σ²_other = σ²_animal + σ²_genus + σ²_residual,
+##       n_j = number of measured species in family j.
+##
+## Genus BLUPs use a partial residual that first removes the family BLUP:
+##   û_gen_k = [σ²_gen / (σ²_gen + σ²_partial/m_k)] × r̄*_k
+##
+## Uncertainty is propagated by repeating across N_BLUP_DRAWS VCV posterior
+## draws, yielding posterior distributions of BLUPs with proper shrinkage.
+##
+## This is statistically correct for identity-covariance REs and consistent
+## with the fitted VCV estimates. Animal BLUPs are zero for unmeasured species
+## (not needed in Stage 10c) and are not computed.
+##
+## Reference:
+##   Robinson GK (1991) That BLUP is a good thing: the estimation of random
+##   effects. Statistical Science 6(1):15-51.
+##   https://doi.org/10.1214/ss/1177011926
 
-## Note: random term is 'tax_family' (not 'family') to avoid MCMCglmm clash
-family_cols <- grep("^tax_family\\.", sol_names, value = TRUE)
-genus_cols  <- grep("^genus\\.",     sol_names, value = TRUE)
+message("[10b] Computing analytic family + genus BLUPs (", N_BLUP_DRAWS, " posterior draws)...")
 
-if (length(family_cols) == 0 || length(genus_cols) == 0) {
-  ## Random effect BLUPs are sometimes stored separately
-  message("[10b] NOTE: RE BLUPs not in Sol — extracting from model$Sol directly")
-  message("      Check MCMCglmm version; structure may differ. Proceeding...")
+## Build model matrix and extract FE + VCV posterior matrices
+X_fit    <- model.matrix(fixed_formula, data = as.data.frame(meas_fit))
+y_fit    <- meas_fit$log10_agb_kg
+fam_vec  <- meas_fit$tax_family
+gen_vec  <- meas_fit$genus
+
+## Sol with pr=FALSE contains only FE columns — matrix() to strip mcmc class
+sol_mat  <- matrix(as.numeric(sol_post), nrow = nrow(sol_post),
+                   dimnames = list(NULL, sol_names))
+fe_cols  <- sol_names  ## all cols are FE when pr=FALSE
+
+vcv_mat  <- matrix(as.numeric(vcv_post), nrow = nrow(vcv_post),
+                   dimnames = list(NULL, vcv_names))
+
+families <- sort(unique(fam_vec))
+genera   <- sort(unique(gen_vec))
+n_post   <- nrow(vcv_mat)
+set.seed(2026)
+draw_idx <- sample(n_post, min(N_BLUP_DRAWS, n_post))
+
+fam_blup_mat <- matrix(NA_real_, nrow = length(draw_idx), ncol = length(families),
+                       dimnames = list(NULL, families))
+gen_blup_mat <- matrix(NA_real_, nrow = length(draw_idx), ncol = length(genera),
+                       dimnames = list(NULL, genera))
+
+for (d in seq_along(draw_idx)) {
+  i    <- draw_idx[d]
+  beta <- sol_mat[i, fe_cols]
+  r    <- y_fit - as.vector(X_fit %*% beta)
+
+  v_a   <- vcv_mat[i, vcol_animal]
+  v_fam <- vcv_mat[i, vcol_fam]
+  v_gen <- vcv_mat[i, vcol_gen]
+  v_r   <- vcv_mat[i, vcol_res]
+
+  v_other_fam <- v_gen + v_a + v_r
+
+  ## Family BLUPs
+  fam_shrink <- vapply(families, function(fj) {
+    idx_j <- which(fam_vec == fj)
+    n_j   <- length(idx_j)
+    r_bar <- mean(r[idx_j])
+    (v_fam / (v_fam + v_other_fam / n_j)) * r_bar
+  }, numeric(1))
+  fam_blup_mat[d, ] <- fam_shrink
+
+  ## Genus BLUPs: partial residual after removing family BLUP
+  r_star <- r - fam_shrink[fam_vec]
+  v_other_gen <- v_a + v_r
+
+  gen_shrink <- vapply(genera, function(gk) {
+    idx_k <- which(gen_vec == gk)
+    m_k   <- length(idx_k)
+    r_bar <- mean(r_star[idx_k])
+    (v_gen / (v_gen + v_other_gen / m_k)) * r_bar
+  }, numeric(1))
+  gen_blup_mat[d, ] <- gen_shrink
 }
 
-## Helper: extract BLUP table from Sol columns matching a prefix
-extract_blups <- function(sol_mat, prefix) {
-  snames <- varnames(sol_mat)  ## varnames() for mcmc objects
-  cols <- grep(paste0("^", prefix, "\\."), snames, value = TRUE, fixed = FALSE)
-  if (length(cols) == 0) return(NULL)
-  level_names <- sub(paste0("^", prefix, "\\."), "", cols)
-  data.table(
-    level      = level_names,
-    blup_mean  = apply(sol_mat[, cols, drop = FALSE], 2, mean),
-    blup_sd    = apply(sol_mat[, cols, drop = FALSE], 2, sd),
-    blup_ci_lo = apply(sol_mat[, cols, drop = FALSE], 2, quantile, 0.025),
-    blup_ci_hi = apply(sol_mat[, cols, drop = FALSE], 2, quantile, 0.975)
-  )
-}
+family_blups <- data.table(
+  level      = families,
+  blup_mean  = colMeans(fam_blup_mat, na.rm = TRUE),
+  blup_sd    = apply(fam_blup_mat, 2, sd,       na.rm = TRUE),
+  blup_ci_lo = apply(fam_blup_mat, 2, quantile, 0.025, na.rm = TRUE),
+  blup_ci_hi = apply(fam_blup_mat, 2, quantile, 0.975, na.rm = TRUE)
+)
+genus_blups <- data.table(
+  level      = genera,
+  blup_mean  = colMeans(gen_blup_mat, na.rm = TRUE),
+  blup_sd    = apply(gen_blup_mat, 2, sd,       na.rm = TRUE),
+  blup_ci_lo = apply(gen_blup_mat, 2, quantile, 0.025, na.rm = TRUE),
+  blup_ci_hi = apply(gen_blup_mat, 2, quantile, 0.975, na.rm = TRUE)
+)
 
-family_blups <- extract_blups(sol_post, "tax_family")
-genus_blups  <- extract_blups(sol_post, "genus")
-
-if (!is.null(family_blups)) {
-  fwrite(family_blups, "output/pglmm_family_blups.csv")
-  message("[10b] Family BLUPs written: ", nrow(family_blups), " families")
-} else {
-  message("[10b] WARNING: Family BLUPs not extracted — check model Sol structure")
-}
-
-if (!is.null(genus_blups)) {
-  fwrite(genus_blups, "output/pglmm_genus_blups.csv")
-  message("[10b] Genus BLUPs written: ", nrow(genus_blups), " genera")
-} else {
-  message("[10b] WARNING: Genus BLUPs not extracted — check model Sol structure")
-}
+fwrite(family_blups, "output/pglmm_family_blups.csv")
+message("[10b] Family BLUPs written: ", nrow(family_blups), " families")
+fwrite(genus_blups, "output/pglmm_genus_blups.csv")
+message("[10b] Genus BLUPs written: ", nrow(genus_blups), " genera")
 
 ## ---- Chain diagnostics (basic) ---------------------------------------------
 message("\n[10b] === Chain diagnostics ===")
