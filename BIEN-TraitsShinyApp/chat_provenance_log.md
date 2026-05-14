@@ -369,3 +369,15 @@
   - Enquist et al. (2026) had wrong journal (GEB → MEE), wrong title, wrong DOI namespace. Fixed in both `provenanceServer` and `downloadGateServer` to: "BIEN: A biodiversity informatics ecosystem advancing open and reproducible workflows for plant observation, plot, and trait data." *Methods in Ecology and Evolution* (early view). doi: pending.
   - Maitner et al. 2018 citation confirmed accurate (journal, pages, DOI).
 - **Parse**: PARSE OK
+
+- Date: 2026-05-14
+- Prompt summary: Fix fatal hang + genus autocomplete missing late-alphabet entries. App was hanging/crashing on any trait search and Xylosma/T-Z genera were absent from dropdown.
+- Root causes:
+  1. `run_bien_query_safe()` used `callr::r()` subprocess — on shinyapps.io this caused the app to hang indefinitely waiting for a subprocess that never returned; all query ranks (species/genus/family/trait-only) now route directly through `query_bien_traits()`.
+  2. `callr` removed from `required_packages` and `library()` calls.
+  3. `updateSelectizeInput` for genus and family switched to `server=TRUE` (matching species) so late-alphabet choices load correctly.
+  4. `.bien_taxon_suggestion_fallback$genus` expanded with T–Z entries (Taxus, Tilia, Ulmus, Vaccinium, Viburnum, Vitis, Xylosma, Yucca, Zamia, Zanthoxylum, etc.).
+  5. Stale callr comment updated to reflect removal.
+- Files changed: BIEN-TraitsShinyApp/app_gateway.R, BIEN-TraitsShinyApp/chat_provenance_log.md, agents/prompt_log.md
+- Deployment: Rscript BIEN-TraitsShinyApp/deploy.R → benquist.shinyapps.io/bien-traits-shinyapp
+- Completed by: GitHub Copilot (@m orchestrator)

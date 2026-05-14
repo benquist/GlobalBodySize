@@ -2448,3 +2448,7 @@ Action: Found two root causes: (1) load_taxon_suggestions returned character(0) 
 ## 2026-05-14 — Fix app crash on any search (setTimeLimit) + Xylosma autofill
 User: App crashes on any search; Xylosma still not in autofill dropdown.
 Root causes found: (1) safe_bien_call() used setTimeLimit(transient=TRUE) — in Shiny reactive contexts on shinyapps.io this fires during subsequent reactive evaluations, killing the entire R session rather than just the current call; removed setTimeLimit entirely. (2) observeEvent tryCatch was wrapping updateSelectizeInput — so when load_taxon_suggestions errored, the dropdown never updated (stayed blank); restructured so choices loading is tryCatch'd but updateSelectizeInput always fires with fallback. Committed a8c9b2f, deployed.
+
+## 2026-05-14 — BIEN-TraitsShinyApp: fix fatal hang + genus autocomplete
+User: App at benquist.shinyapps.io/bien-traits-shinyapp hanging and crashing on trait search; genus autocomplete missing late-alphabet entries.
+Action: (1) Removed callr::r() subprocess approach from run_bien_query_safe — replaced with direct query_bien_traits() for all ranks; callr removed from package requirements. (2) Changed updateSelectizeInput server parameter to TRUE for genus and family (was client-side only for species). (3) Expanded .bien_taxon_suggestion_fallback$genus with T-Z entries. Filed under @M orchestration.

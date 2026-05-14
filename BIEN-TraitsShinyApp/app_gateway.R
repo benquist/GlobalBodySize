@@ -4,7 +4,7 @@
 #           mandatory pre-download checklist, full provenance tracking
 
 suppressPackageStartupMessages({
-  required_packages <- c("shiny", "BIEN", "callr", "dplyr", "tidyr", "stringr", "DT", "jsonlite", "leaflet", "e1071")
+  required_packages <- c("shiny", "BIEN", "dplyr", "tidyr", "stringr", "DT", "jsonlite", "leaflet", "e1071")
   missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_packages) > 0) {
     stop(paste0("Missing packages: ", paste(missing_packages, collapse = ", ")))
@@ -19,7 +19,6 @@ suppressPackageStartupMessages({
   library(jsonlite)
   library(leaflet)
   library(e1071)
-  library(callr)
 })
 
 .bien_trait_catalog_cache <- NULL
@@ -27,31 +26,31 @@ suppressPackageStartupMessages({
 
 .bien_taxon_suggestion_fallback <- list(
   genus = c(
-    "Abies", "Acacia", "Acer", "Alnus", "Arctostaphylos",
-    "Betula", "Bursera",
-    "Carpinus", "Ceanothus", "Cecropia", "Celtis", "Cornus",
-    "Diospyros",
-    "Erica", "Eriogonum", "Eucalyptus",
-    "Fagus", "Ficus", "Fraxinus",
-    "Gaultheria",
-    "Heteromeles", "Hibiscus",
-    "Ilex",
-    "Juniperus",
-    "Litsea",
-    "Mahonia", "Mimosa", "Myrica",
-    "Nothofagus",
-    "Ocotea", "Olea",
-    "Pinus", "Picea", "Populus", "Prosopis", "Prunus",
+    "Abies", "Acacia", "Acer", "Alnus", "Amaranthus", "Arctostaphylos", "Arbutus", "Arachis",
+    "Betula", "Bursera", "Brahea", "Bauhinia",
+    "Carpinus", "Ceanothus", "Cecropia", "Celtis", "Cornus", "Cactus", "Castanea",
+    "Diospyros", "Datura", "Dalbergia",
+    "Erica", "Eriogonum", "Eucalyptus", "Erythrina",
+    "Fagus", "Ficus", "Fraxinus", "Fouquieria",
+    "Gaultheria", "Guaiacum",
+    "Helianthus", "Heteromeles", "Hibiscus", "Hymenaea",
+    "Ilex", "Inga",
+    "Juniperus", "Jatropha",
+    "Larrea", "Litsea", "Lupinus", "Lysiloma",
+    "Mahonia", "Mimosa", "Myrica", "Mangifera",
+    "Nothofagus", "Neea",
+    "Ocotea", "Olea", "Opuntia",
+    "Pinus", "Picea", "Populus", "Prosopis", "Prunus", "Parkinsonia", "Persea", "Piptochaetium",
     "Quercus",
-    "Rhododendron", "Rhus", "Robinia",
-    "Salix", "Salvia", "Sequoia",
-    "Tilia",
+    "Rhododendron", "Rhus", "Robinia", "Rhamnus",
+    "Salix", "Salvia", "Sequoia", "Senna", "Swietenia", "Styrax",
+    "Tilia", "Tabebuia", "Terminalia", "Trema", "Trichilia",
     "Ulmus", "Umbellularia",
-    "Vaccinium", "Viburnum",
+    "Vaccinium", "Viburnum", "Vitis",
     "Washingtonia",
     "Xylosma",
-    "Yucca",
-    "Zanthoxylum"
+    "Yucca", "Xylia",
+    "Zanthoxylum", "Zea"
   ),
   species = c("Pinus ponderosa", "Quercus agrifolia", "Populus tremuloides"),
   family = c("Pinaceae", "Fagaceae", "Salicaceae", "Fabaceae", "Rosaceae")
@@ -558,41 +557,7 @@ query_bien_total_records <- function(rank, taxon, timeout_sec = 120) {
   as.integer(cnt$total_records[[1]])
 }
 
-# Run a BIEN trait query in a callr subprocess so the subprocess can be killed
-# on timeout without crashing the parent Shiny session.
-# Returns the raw data.frame on success, or a bien_error list on failure/timeout.
-# Only handles species/genus/family ranks — trait-only stays in main process.
-run_bien_query_safe <- function(rank, taxon, max_records, timeout_sec = 45) {
-  if (rank == "trait-only") return(NULL)  # caller handles this case
-  tryCatch({
-    callr::r(
-      func = function(rank, taxon, max_records) {
-        suppressPackageStartupMessages(library(BIEN))
-        if (rank == "species") {
-          BIEN::BIEN_trait_species(species = taxon, all.taxonomy = TRUE,
-                                   source.citation = TRUE, limit = max_records)
-        } else if (rank == "genus") {
-          BIEN::BIEN_trait_genus(genus = taxon, all.taxonomy = TRUE,
-                                  source.citation = TRUE, limit = max_records)
-        } else if (rank == "family") {
-          BIEN::BIEN_trait_family(family = taxon, all.taxonomy = TRUE,
-                                   source.citation = TRUE, limit = max_records)
-        }
-      },
-      args    = list(rank = rank, taxon = taxon, max_records = max_records),
-      timeout = timeout_sec
-    )
-  }, error = function(e) {
-    msg <- conditionMessage(e)
-    if (grepl("timed? ?out|R session.*exited|process.*killed", msg, ignore.case = TRUE)) {
-      msg <- sprintf(
-        "Query timed out after %ds. BIEN may be slow \u2014 try reducing max records or querying a single species within %s.",
-        timeout_sec, taxon
-      )
-    }
-    structure(list(error = msg), class = "bien_error")
-  })
-}
+
 
 # Add diagnostic summary statistics
 compute_diagnostics <- function(dat, query_rank, query_taxon, total_available = NA_integer_, max_records = NA_integer_) {
@@ -855,7 +820,7 @@ queryServer <- function(id) {
         "taxon",
         choices = choices,
         selected = selected,
-        server = identical(mode, "taxa") && identical(rank, "species"),
+        server = identical(mode, "taxa") && rank %in% c("species", "genus", "family"),
         options = list(
           create = TRUE,
           createOnBlur = TRUE,
@@ -998,9 +963,9 @@ queryServer <- function(id) {
         }
 
         # Step 2: Run the full trait data query.
-        # For species/genus/family: use callr subprocess (45s hard timeout) so a
-        # hung BIEN query cannot kill the Shiny session.
-        # For trait-only: use existing path (complex multi-trait expansion).
+        # All ranks (species/genus/family/trait-only) use query_bien_traits() via
+        # safe_bien_retry + tryCatch. callr subprocess approach was removed because
+        # shinyapps.io sandboxing prevents reliable child-process spawning.
         withProgress(
           message = if (!is.na(total_pre))
             sprintf("Fetching %s trait records for %s\u2026", format(total_pre, big.mark=","), taxon_clean)
@@ -1009,30 +974,8 @@ queryServer <- function(id) {
           detail = "This may take up to 45 seconds",
           value = 0.3, {
 
-          if (!identical(input$rank, "trait-only")) {
-            raw <- run_bien_query_safe(
-              rank       = input$rank,
-              taxon      = taxon_clean,
-              max_records = max_records,
-              timeout_sec = 45
-            )
-            if (inherits(raw, "bien_error")) {
-              dat <- data.frame()
-              attr(dat, "bien_error") <- raw$error
-            } else if (!is.data.frame(raw)) {
-              dat <- data.frame()
-              attr(dat, "bien_error") <- "BIEN returned an unexpected response format"
-            } else {
-              dat <- ensure_unique_names(raw)
-              dat <- enrich_plot_metadata(dat)
-              dat$query_rank      <- input$rank
-              dat$query_taxon     <- taxon_clean
-              dat$query_timestamp <- Sys.time()
-            }
-          } else {
-            dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
-                                     max_records = max_records, timeout_sec = 120)
-          }
+          dat <- query_bien_traits(rank = input$rank, taxon = taxon_clean,
+                                   max_records = max_records, timeout_sec = 120)
 
           bien_err <- attr(dat, "bien_error", exact = TRUE)
           incProgress(0.7, message = "Processing results\u2026")
