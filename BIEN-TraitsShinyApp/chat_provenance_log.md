@@ -401,3 +401,9 @@
 
 ## 2026-05-14 — Fix A: base R aggregation
 Replaced dplyr summarise() blocks in trait_summary_tbl and trait_diag_dt with split()/vapply(). Removes tidy-eval/.env crash on R 4.6.0. Deployed image 14933056.
+
+## 2026-05-14 — Late-alphabet autocomplete fix (Fix 2 — prebuilt RDS)
+- Added tools/build_taxon_lists.R; generates data/taxon_{species,genus,family}.rds + taxon_lists_built_on.txt by querying BIEN's bien_taxonomy table without LIMIT and without 'Accepted' filter.
+- Patched app_gateway.R: load_taxon_suggestions() now reads prebuilt RDS first; live SQL remains as fallback when RDS missing; hardcoded list still serves as final backstop.
+- Root cause: prior genus cap (10000) with ORDER BY alphabetically truncated the 25,311-genus universe before X.
+- Deployed image 14934134; startup log shows prebuilt lists loaded (genus_n=25311). Refresh tools/build_taxon_lists.R when BIEN taxonomy updates.

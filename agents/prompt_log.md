@@ -2472,3 +2472,7 @@ Fix: (1) Pre-computed unit_col before the summarise() block in trait_summary_tbl
 ## 2026-05-14 — BIEN-TraitsShinyApp: Fix A — base R aggregation replaces dplyr summarise()
 User: After two failed dplyr fix attempts (.env not found on shinyapps.io R 4.6.0), debate three fixes and implement Fix A.
 Action: Replaced both crashing reactives in app_gateway.R — trait_summary_tbl (~line 1955) and trait_diag_dt renderDT (~line 1394) — with base R split() + vapply() aggregation. No tidy-eval, no .data[[]], no .env$ pronouns. Eliminates the entire failure category. Parse OK. Deployed image 14933056. New container 16:52:17 boot clean.
+
+## 2026-05-14 — BIEN Traits app: late-alphabet autocomplete fix (Fix 2 — prebuilt RDS)
+User: Lets go with 2. PLease then update the shiny app when done.
+Action: Implemented Fix 2 (bake taxon lists at deploy time). Created tools/build_taxon_lists.R to query bien_taxonomy without LIMIT/Accepted filter; produced data/taxon_species.rds (464,348), data/taxon_genus.rds (25,311), data/taxon_family.rds (1,302) plus taxon_lists_built_on.txt provenance stamp. Patched load_taxon_suggestions() in app_gateway.R to consult prebuilt RDS first (live SQL remains as fallback). Root cause confirmed: BIEN has 25,311 genera, prior cap was 10,000 with ORDER BY — alphabetically truncated before X. Verified end-to-end locally (Xylosma %in% load_taxon_suggestions('genus') == TRUE). Deployed image 14934134; live logs confirm "Pre-built taxon lists: ... genus_n: 25311 ..." at startup. Bundle size ~3.2 MB.
