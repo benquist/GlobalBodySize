@@ -244,7 +244,7 @@ server <- function(input, output, session) {
     switch(rv$status,
       idle      = "Ready. Load a polygon and click Run Analysis.",
       running   = "Stage 1: Querying BIEN species checklist\u2026",
-      listing   = paste0("Preliminary list ready (\u2248", nrow(rv$species_df), " species). Stage 2: loading occurrence counts\u2026"),
+      listing   = paste0("Polygon species list ready (\u2248", nrow(rv$species_df), " species). Stage 2: loading occurrence counts\u2026"),
       enriching = paste0(nrow(rv$species_df), " species with occurrence tiers. Stage 3: range overlap analysis running\u2026"),
       partial   = paste0(nrow(rv$species_df), " species. Range overlap analysis still running\u2026"),
       done      = paste0("Complete. ", nrow(rv$species_df), " species."),
@@ -383,10 +383,9 @@ server <- function(input, output, session) {
   # ── Async analysis — Three-stage design ─────────────────────────────────────
   #
   # Stage 1 (Worker 1): query_species_list_fast()
-  #   Uses BIEN_list_country() per overlapping country (pre-indexed, seconds).
-  #   Returns a superset — all country species, not just polygon-interior ones.
-  #   Populates an immediate preliminary table so the user sees something fast.
-  #   Falls back to BIEN_list_sf() only if country lookup returns 0 species.
+  #   Uses BIEN_list_sf() — a PostGIS spatial intersection against the drawn polygon.
+  #   Returns only species documented within the polygon boundary (not a country superset).
+  #   Populates an immediate species table so the user sees something fast.
   #
   # Stage 2 (Worker 2): fetch_bien_occurrences_raw() → query_bien_occurrences()
   #   Full BIEN_occurrence_sf() call — server-side polygon intersection (minutes).
@@ -425,11 +424,9 @@ server <- function(input, output, session) {
       detail  = "BIEN_list_sf \u2014 typically 5\u201330 seconds."
     )
 
-    # ---- Stage 1 (Worker 1): fast country-level checklist ----------------------
-    # query_species_list_fast() uses BIEN_list_country() per overlapping country,
-    # which queries pre-indexed political-unit tables and returns in seconds.
-    # The result is a superset (whole country, not just polygon interior);
-    # Stage 2 refines with spatially precise occurrence records.
+    # ---- Stage 1 (Worker 1): polygon-specific species checklist ----------------
+    # query_species_list_fast() uses BIEN_list_sf() — a PostGIS spatial
+    # intersection that returns only species documented within the polygon boundary.
     # Stage 1 is non-fatal: if it fails, Stage 2 still supplies the species list.
     promises::future_promise({
       options(bien_cfg = cfg_snap)  # restore CFG in worker session

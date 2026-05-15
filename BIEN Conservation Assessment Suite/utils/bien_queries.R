@@ -271,66 +271,27 @@ get_bien_occurrence_points <- function(occ_raw) {
 }
 
 
-# ── Stage 1 — Fast species checklist via country-level lookup ─────────────────
-# BIEN_list_country() queries pre-indexed political-unit tables and returns in
-# seconds regardless of polygon size. Returns a country-level superset; Stage 2
-# provides spatially precise polygon-interior refinement.
-# Falls back to BIEN_list_sf() only if every country lookup returns 0 species.
+# ── Stage 1 — Polygon-specific species checklist via BIEN_list_sf ────────────
+# BIEN_list_sf() performs a PostGIS spatial intersection against the drawn
+# polygon, returning only species documented within the polygon boundary.
+# This is spatially precise: no country-level superset is returned.
+# Stage 2 (BIEN_occurrence_sf) further refines with occurrence counts and
+# native-status filtering.
 # Returns: character vector of scrubbed_species_binomial, or NULL on failure.
 query_species_list_fast <- function(polygon_sf) {
-  CFG <- getOption("bien_cfg")
+  aoi <- .prepare_aoi_for_bien(polygon_sf)
 
-  # Identify which countries overlap the polygon via rnaturalearth
-  countries_sf <- tryCatch(
-    rnaturalearth::ne_countries(returnclass = "sf", scale = "medium"),
-    error = function(e) NULL
+  res <- tryCatch(
+    BIEN::BIEN_list_sf(sf = aoi, cultivated = FALSE, new.world = NULL),
+    error = function(e) { warning("BIEN_list_sf failed: ", conditionMessage(e)); NULL }
   )
 
-  country_names <- NULL
+  if (is.null(res) || nrow(res) == 0) return(NULL)
 
-  if (!is.null(countries_sf)) {
-    poly_union <- sf::st_union(sf::st_transform(polygon_sf, 4326))
-    hits <- suppressMessages(suppressWarnings(
-      sf::st_intersects(sf::st_transform(countries_sf, 4326), poly_union, sparse = FALSE)[, 1]
-    ))
-    country_names <- unique(countries_sf$name_long[hits])
-    country_names <- country_names[!is.na(country_names) & nchar(country_names) > 0]
-  }
+  nm_col <- intersect(c("scrubbed_species_binomial", "species"), names(res))[1]
+  if (is.na(nm_col)) return(NULL)
 
-  species_vec <- character(0)
-
-  # Country-level lookup (fast, seconds)
-  if (!is.null(country_names) && length(country_names) > 0) {
-    for (cn in country_names) {
-      res <- tryCatch(
-        BIEN::BIEN_list_country(country = cn, cultivated = FALSE, new.world = NULL),
-        error = function(e) NULL
-      )
-      if (!is.null(res) && nrow(res) > 0) {
-        nm_col <- intersect(c("scrubbed_species_binomial", "species"), names(res))[1]
-        if (!is.na(nm_col)) {
-          species_vec <- c(species_vec, res[[nm_col]])
-        }
-      }
-    }
-  }
-
-  # Fallback: BIEN_list_sf (slower spatial query)
-  if (length(species_vec) == 0) {
-    message("[Stage1] Country lookup returned 0 species — falling back to BIEN_list_sf")
-    aoi <- .prepare_aoi_for_bien(polygon_sf)
-    res <- tryCatch(
-      BIEN::BIEN_list_sf(sf = aoi, cultivated = FALSE, new.world = NULL),
-      error = function(e) { warning("BIEN_list_sf failed: ", conditionMessage(e)); NULL }
-    )
-    if (!is.null(res) && nrow(res) > 0) {
-      nm_col <- intersect(c("scrubbed_species_binomial", "species"), names(res))[1]
-      if (!is.na(nm_col)) species_vec <- unique(stats::na.omit(res[[nm_col]]))
-    }
-  }
-
-  if (length(species_vec) == 0) return(NULL)
-  unique(stats::na.omit(species_vec))
+  unique(stats::na.omit(res[[nm_col]]))
 }
 
 fetch_bien_occurrences_raw <- function(polygon_sf,
