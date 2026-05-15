@@ -18,11 +18,12 @@
 #   B2 — geometry must be valid (st_make_valid if needed)
 #   B3 — no antimeridian crossing (lon span > 180°)
 #   B4 — vertex cap: auto-simplify above 5000 vertices to avoid server timeout
+#   B5 — Americas domain check: bbox must overlap CFG$BIEN_AMERICAS_BBOX
 #   B6 — reproject to WGS84 / EPSG:4326 if needed
 
 #' Prepare a polygon for BIEN_*_sf calls: WGS84, valid, single union.
 #' Block B guards: s2 enabled, valid geometry, no antimeridian crossing,
-#' vertex cap with auto-simplify notification.
+#' B5 Americas domain overlap, vertex cap with auto-simplify notification.
 .prepare_aoi_for_bien <- function(polygon_sf) {
   # B1: assert s2 is on
   if (!isTRUE(sf::sf_use_s2())) {
@@ -51,6 +52,26 @@
   bb <- sf::st_bbox(aoi_sf)
   if (bb["xmax"] - bb["xmin"] > 180) {
     stop("AOI appears to cross the antimeridian (lon span > 180 deg). Split into hemisphere pieces and retry.")
+  }
+  # B5: BIEN Americas domain check
+  # BIEN's occurrence and range data cover the New World (Americas).
+  # If the AOI's bounding box has no overlap with the declared Americas domain,
+  # the PostGIS spatial scan will still run to completion (minutes) and return
+  # zero records. Refuse the query immediately to avoid the wasted round-trip.
+  CFG_local <- tryCatch(getOption("bien_cfg"), error = function(e) NULL)
+  if (!is.null(CFG_local) && !is.null(CFG_local$BIEN_AMERICAS_BBOX)) {
+    dom <- CFG_local$BIEN_AMERICAS_BBOX
+    no_overlap <- (bb["xmax"] <= dom$xmin || bb["xmin"] >= dom$xmax ||
+                   bb["ymax"] <= dom$ymin || bb["ymin"] >= dom$ymax)
+    if (no_overlap) {
+      stop(sprintf(
+        paste0("AOI bounding box [%.2f, %.2f] lon / [%.2f, %.2f] lat has no overlap ",
+               "with the BIEN Americas domain (lon %.0f to %.0f, lat %.0f to %.0f). ",
+               "BIEN does not contain occurrence data for this region."),
+        bb["xmin"], bb["xmax"], bb["ymin"], bb["ymax"],
+        dom$xmin, dom$xmax, dom$ymin, dom$ymax
+      ))
+    }
   }
   # B4: vertex cap
   n_vert <- tryCatch(nrow(sf::st_coordinates(aoi_sf)), error = function(e) NA_integer_)
@@ -300,32 +321,48 @@ fetch_bien_occurrences_raw <- function(polygon_sf,
   CFG <- getOption("bien_cfg")
   polygon_sf <- .prepare_aoi_for_bien(polygon_sf)
 
+  # Use BIEN_occurrence_box() instead of BIEN_occurrence_sf():
+  #   BIEN_occurrence_sf sends the full polygon geometry for a server-side
+  #   ST_Intersects() PostGIS spatial scan (~5-20 min on the NCEAS vegbiendev
+  #   server regardless of result count — the index walk is the bottleneck).
+  #   BIEN_occurrence_box sends a simple lat/lon bounding box that maps to a
+  #   B-tree range scan (seconds), then we clip to the exact polygon boundary
+  #   client-side with sf::st_within(). For compact polygons the bbox overshoot
+  #   is small; client-side clip is geodesically precise with sf_use_s2=TRUE.
+  #
+  # Apply BIEN_API_TIMEOUT_SEC via R's download timeout option (best-effort;
+  # does not affect PostgreSQL connection waits but limits HTTP-layer stalls).
+  bb       <- sf::st_bbox(polygon_sf)
+  prev_to  <- getOption("timeout", default = 60L)
+  timeout_sec <- if (!is.null(CFG) && !is.null(CFG$BIEN_API_TIMEOUT_SEC))
+    CFG$BIEN_API_TIMEOUT_SEC else 180L
+  on.exit(options(timeout = prev_to), add = TRUE)
+  options(timeout = timeout_sec)
+
   raw <- tryCatch({
-    occ_call <- function() {
-      BIEN::BIEN_occurrence_sf(
-        sf                   = polygon_sf,
-        cultivated           = FALSE,
-        new.world            = NULL,
-        all.taxonomy         = FALSE,
-        native.status        = TRUE,
-        natives.only         = natives_only,
-        observation.type     = FALSE,
-        political.boundaries = FALSE,
-        collection.info      = FALSE,
-        only.geovalid        = geo_valid_only
-      )
-    }
-    occ_call()
+    BIEN::BIEN_occurrence_box(
+      min.lat              = bb["ymin"],
+      max.lat              = bb["ymax"],
+      min.lon              = bb["xmin"],
+      max.lon              = bb["xmax"],
+      cultivated           = FALSE,
+      new.world            = NULL,
+      all.taxonomy         = FALSE,
+      native.status        = TRUE,
+      natives.only         = natives_only,
+      observation.type     = FALSE,
+      political.boundaries = FALSE,
+      collection.info      = FALSE,
+      only.geovalid        = geo_valid_only
+    )
   }, error = function(e) {
-    warning("BIEN_occurrence_sf failed: ", conditionMessage(e))
+    warning("BIEN_occurrence_box failed: ", conditionMessage(e))
     NULL
   })
 
-  # Client-side polygon clip: BIEN_occurrence_sf nominally performs a server-side
-  # PostGIS spatial intersection, but the BIEN API has historically queried against
-  # the bounding box of the polygon in some versions, returning records outside the
-  # exact polygon boundary. We apply a client-side st_within filter as a defensive
-  # safeguard to guarantee only records inside the drawn polygon are returned.
+  # Client-side polygon clip: BIEN_occurrence_box queries by bounding box so
+  # records outside the exact polygon boundary must be excluded here.
+  # sf::st_within with sf_use_s2=TRUE is geodesically precise.
   if (!is.null(raw) && nrow(raw) > 0 &&
       "latitude" %in% names(raw) && "longitude" %in% names(raw)) {
     valid_coords <- !is.na(raw$latitude) & !is.na(raw$longitude)

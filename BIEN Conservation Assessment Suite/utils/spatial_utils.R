@@ -69,14 +69,16 @@ validate_polygon <- function(polygon_sf) {
   if (isTRUE(!is.na(centroid[1, "X"])) && isTRUE(!is.na(centroid[1, "Y"]))) {
     lon <- centroid[1, "X"]
     lat <- centroid[1, "Y"]
-    bb  <- CFG$BIEN_AMERICAS_BBOX
-    outside <- isTRUE(lon < bb$xmin) || isTRUE(lon > bb$xmax) ||
-               isTRUE(lat < bb$ymin) || isTRUE(lat > bb$ymax)
-    if (outside) {
-      errors_out <- c(errors_out, sprintf(
-        "Polygon centroid (lon %.4f, lat %.4f) is outside the BIEN Americas domain (lon %d to %d, lat %d to %d).",
-        lon, lat, bb$xmin, bb$xmax, bb$ymin, bb$ymax
-      ))
+    bb  <- if (!is.null(CFG)) CFG$BIEN_AMERICAS_BBOX else NULL
+    if (!is.null(bb) && !is.null(bb$xmin) && !is.null(bb$ymax)) {
+      outside <- lon < bb$xmin || lon > bb$xmax ||
+                 lat < bb$ymin || lat > bb$ymax
+      if (isTRUE(outside)) {
+        errors_out <- c(errors_out, sprintf(
+          "Polygon centroid (lon %.4f, lat %.4f) is outside the BIEN Americas domain (lon %d to %d, lat %d to %d). BIEN has no occurrence data for this region.",
+          lon, lat, bb$xmin, bb$xmax, bb$ymin, bb$ymax
+        ))
+      }
     }
   }
 
