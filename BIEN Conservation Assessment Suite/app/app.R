@@ -32,9 +32,9 @@ rm(.f)
 
 # Ensure async plan is active even if global.R partially failed.
 # plan() is idempotent; re-declaring it is cheap and safe.
-future::plan(future::multisession, workers = 2)
+future::plan(future::multisession, workers = 3)
 message("[BIEN-app] Active future plan: ", paste(class(future::plan())[1:2], collapse = " / "),
-        " | workers requested: 2")
+        " | workers requested: 3")
 # ─────────────────────────────────────────────────────────────────────────────
 
 ui <- fluidPage(
@@ -306,7 +306,8 @@ server <- function(input, output, session) {
       td <- tempfile(); dir.create(td)
       # Zip Slip mitigation: inspect manifest before extracting
       manifest <- tryCatch(unzip(input$shapefile_zip$datapath, list = TRUE), error = function(e) NULL)
-      if (is.null(manifest) || any(grepl("..", manifest$Name, fixed = TRUE))) return(NULL)
+      if (is.null(manifest) || any(grepl("..", manifest$Name, fixed = TRUE)) ||
+          any(grepl("^/", manifest$Name))) return(NULL)
       ok <- tryCatch({ unzip(input$shapefile_zip$datapath, exdir = td); TRUE },
                      error = function(e) FALSE)
       if (!ok) return(NULL)
@@ -320,7 +321,8 @@ server <- function(input, output, session) {
       if (grepl("\\.kmz$", input$kml_file$name, ignore.case = TRUE)) {
         td <- tempfile(); dir.create(td)
         manifest <- tryCatch(unzip(kml_path, list = TRUE), error = function(e) NULL)
-        if (is.null(manifest) || any(grepl("..", manifest$Name, fixed = TRUE))) return(NULL)
+        if (is.null(manifest) || any(grepl("..", manifest$Name, fixed = TRUE)) ||
+            any(grepl("^/", manifest$Name))) return(NULL)
         ok <- tryCatch({ unzip(kml_path, exdir = td); TRUE }, error = function(e) FALSE)
         if (!ok) return(NULL)
         kml_files <- list.files(td, pattern = "\\.kml$", recursive = TRUE, full.names = TRUE, ignore.case = TRUE)
@@ -472,7 +474,7 @@ server <- function(input, output, session) {
       # Stage 2 failure: keep Stage 1 table visible if it exists; otherwise error state.
       if (is.null(rv$species_df)) rv$status <- "error"
       else if (!rv$status %in% c("enriching", "done")) rv$status <- "done"
-      if (!include_ranges) progress$close()
+      progress$close()
       showNotification(paste("Occurrence query failed:", e$message), type = "error", duration = NULL)
     })
 
@@ -520,6 +522,10 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$run_query, {
+    if (rv$status %in% c("running", "listing", "enriching", "partial")) {
+      showNotification("Analysis already in progress. Please wait.", type = "warning")
+      return()
+    }
     poly <- get_polygon()
 
     if (is.null(poly)) {
@@ -572,6 +578,10 @@ server <- function(input, output, session) {
 
   observeEvent(input$confirm_proceed, {
     removeModal()
+    if (rv$status %in% c("running", "listing", "enriching", "partial")) {
+      showNotification("Analysis already in progress. Please wait.", type = "warning")
+      return()
+    }
     poly <- rv$pending_polygon
     if (!is.null(poly)) {
       rv$polygon <- poly
@@ -758,7 +768,10 @@ server <- function(input, output, session) {
     content = function(file) {
       df  <- rv$species_df
       sl  <- rv$session_log
-      if (is.null(df) || is.null(sl)) return(NULL)
+      if (is.null(df) || is.null(sl)) {
+        showNotification("No results available to download.", type = "warning")
+        return()
+      }
       dwc <- build_dwc_csv(df, sl)
       write.csv(dwc, file, row.names = FALSE)
     }
@@ -772,9 +785,17 @@ server <- function(input, output, session) {
       df   <- rv$species_df
       sl   <- rv$session_log
       poly <- rv$polygon
-      if (is.null(df) || is.null(sl)) return(NULL)
+      if (is.null(df) || is.null(sl)) {
+        showNotification("No results available to download.", type = "warning")
+        return()
+      }
+      template_src <- "../report_template/report.Rmd"
+      if (!file.exists(template_src)) {
+        showNotification("Report template not found; HTML download unavailable.", type = "error")
+        return()
+      }
       tmp <- file.path(tempdir(), "report.Rmd")
-      file.copy("../report_template/report.Rmd", tmp, overwrite = TRUE)
+      file.copy(template_src, tmp, overwrite = TRUE)
       rmarkdown::render(
         tmp,
         output_file = file,

@@ -90,17 +90,15 @@ query_bien_ranges <- function(polygon_sf) {
       crop.ranges         = FALSE,
       include.gid         = FALSE
     )
-  }, TimeoutException = function(e) {
-    stop("BIEN range query timed out. Try a smaller polygon or retry later.")
   }, error = function(e) {
-    warning("BIEN_ranges_sf failed: ", conditionMessage(e))
+    warning("BIEN_ranges_sf failed (possible timeout or network error): ", conditionMessage(e))
     return(NULL)
   })
 
   if (is.null(ranges) || nrow(ranges) == 0) return(NULL)
 
   if (!inherits(ranges, "sf")) {
-    warning("BIEN_ranges_box did not return an sf object.")
+    warning("BIEN_ranges_sf did not return an sf object.")
     return(NULL)
   }
 
@@ -273,35 +271,22 @@ get_bien_occurrence_points <- function(occ_raw) {
 }
 
 
-#' Fetch raw BIEN occurrence records via PostGIS server-side polygon
-#' intersection (BIEN_occurrence_sf). Polygon-clipping is done server-side;
-#' no client-side bbox + clip step is required.
-#'
-#' Key parameter choices:
-#'   native.status = TRUE   — adds native_status column (used for majority-vote flag in Stage 2)
-#'   natives.only  = FALSE  — includes introduced species (user sees full flora, not curated native list)
-#'   only.geovalid = TRUE   — drops records flagged as coordinate-invalid by BIEN QA
-#'   cultivated    = FALSE  — excludes garden/plantation records
-fetch_bien_occurrences_raw <- function(polygon_sf) {
-  # Stage 1 fast path: use political-unit lookups (country + state) which hit
-  # pre-indexed BIEN tables and return in seconds regardless of polygon size.
-  # Returns a superset of AOI species (broader than the exact polygon); Stage 2
-  # refines with spatially-filtered occurrence records.
+# ── Stage 1 — Fast species checklist via country-level lookup ─────────────────
+# BIEN_list_country() queries pre-indexed political-unit tables and returns in
+# seconds regardless of polygon size. Returns a country-level superset; Stage 2
+# provides spatially precise polygon-interior refinement.
+# Falls back to BIEN_list_sf() only if every country lookup returns 0 species.
+# Returns: character vector of scrubbed_species_binomial, or NULL on failure.
+query_species_list_fast <- function(polygon_sf) {
   CFG <- getOption("bien_cfg")
 
-  # Ensure WGS84 for bbox extraction
-  poly_wgs <- tryCatch(sf::st_transform(polygon_sf, 4326), error = function(e) polygon_sf)
-  bb <- sf::st_bbox(poly_wgs)
-
-  # Resolve overlapping countries and states via rnaturalearth or BIEN political lookup
-  # Use BIEN_list_country + BIEN_list_state — both are sub-second queries.
+  # Identify which countries overlap the polygon via rnaturalearth
   countries_sf <- tryCatch(
     rnaturalearth::ne_countries(returnclass = "sf", scale = "medium"),
     error = function(e) NULL
   )
 
   country_names <- NULL
-  state_names   <- NULL
 
   if (!is.null(countries_sf)) {
     poly_union <- sf::st_union(sf::st_transform(polygon_sf, 4326))
@@ -309,7 +294,6 @@ fetch_bien_occurrences_raw <- function(polygon_sf) {
       sf::st_intersects(sf::st_transform(countries_sf, 4326), poly_union, sparse = FALSE)[, 1]
     ))
     country_names <- unique(countries_sf$name_long[hits])
-    # Strip any NAs
     country_names <- country_names[!is.na(country_names) & nchar(country_names) > 0]
   }
 
@@ -331,12 +315,12 @@ fetch_bien_occurrences_raw <- function(polygon_sf) {
     }
   }
 
-  # If no country lookup succeeded, fall back to BIEN_list_sf (slow but correct)
+  # Fallback: BIEN_list_sf (slower spatial query)
   if (length(species_vec) == 0) {
-    message("[Stage1] Country lookup empty — falling back to BIEN_list_sf")
-    polygon_sf <- .prepare_aoi_for_bien(polygon_sf)
+    message("[Stage1] Country lookup returned 0 species — falling back to BIEN_list_sf")
+    aoi <- .prepare_aoi_for_bien(polygon_sf)
     res <- tryCatch(
-      BIEN::BIEN_list_sf(sf = polygon_sf, cultivated = FALSE, new.world = NULL),
+      BIEN::BIEN_list_sf(sf = aoi, cultivated = FALSE, new.world = NULL),
       error = function(e) { warning("BIEN_list_sf failed: ", conditionMessage(e)); NULL }
     )
     if (!is.null(res) && nrow(res) > 0) {
@@ -378,19 +362,3 @@ fetch_bien_occurrences_raw <- function(polygon_sf) {
   # no client-side bbox-then-clip step required.
   raw
 }
-
-# ── Stage 1 — Fast species checklist via country-level lookup ─────────────────
-# BIEN_list_country() queries pre-indexed political-unit tables and returns
-# in seconds regardless of polygon size. This is dramatically faster than
-# BIEN_list_sf() for large remote AOIs where the PostGIS spatial intersection
-# would take 10+ minutes.
-#
-# The result is a country-level superset: all species recorded anywhere in the
-# overlapping country/countries. Stage 2 (BIEN_occurrence_sf) provides the
-# spatially precise polygon-interior refinement.
-#
-# Falls back to BIEN_list_sf() only if every country lookup returns 0 species
-# (this guards against BIEN coverage gaps in non-standard country names).
-#
-# Returns: character vector of scrubbed_species_binomial, or NULL on failure.
-query_species_list_fast <- function(polygon_sf) {
