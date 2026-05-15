@@ -339,26 +339,44 @@ fetch_bien_occurrences_raw <- function(polygon_sf,
   on.exit(options(timeout = prev_to), add = TRUE)
   options(timeout = timeout_sec)
 
+  # BIEN_occurrence_box parameter notes:
+  #   - only.geovalid is NOT a valid parameter for BIEN_occurrence_box (causes
+  #     "unused argument" error). Geo-validity is already hardcoded in the SQL
+  #     as "AND is_geovalid = 1", so all returned records are geo-validated.
+  #   - native.status=TRUE adds the native_status column via a server-side JOIN.
+  #     When natives.only=TRUE, all returned records are already native per the
+  #     WHERE clause; the JOIN is redundant and slow. Skip it and add a synthetic
+  #     native_status="native" column below so downstream logic stays intact.
+  #   - min.long / max.long: note the BIEN function uses ".long" not ".lon";
+  #     R partial-matches "min.lon" → "min.long" but we use explicit names here.
+  need_native_status_col <- !natives_only   # only fetch the JOIN col when querying all species
   raw <- tryCatch({
     BIEN::BIEN_occurrence_box(
       min.lat              = bb["ymin"],
       max.lat              = bb["ymax"],
-      min.lon              = bb["xmin"],
-      max.lon              = bb["xmax"],
+      min.long             = bb["xmin"],
+      max.long             = bb["xmax"],
       cultivated           = FALSE,
       new.world            = NULL,
       all.taxonomy         = FALSE,
-      native.status        = TRUE,
+      native.status        = need_native_status_col,
       natives.only         = natives_only,
       observation.type     = FALSE,
       political.boundaries = FALSE,
-      collection.info      = FALSE,
-      only.geovalid        = geo_valid_only
+      collection.info      = FALSE
     )
   }, error = function(e) {
     warning("BIEN_occurrence_box failed: ", conditionMessage(e))
     NULL
   })
+
+  # When natives_only=TRUE, native.status=FALSE was used (no JOIN) so the
+  # native_status column is absent. Add it synthetically so query_bien_occurrences()
+  # majority-vote logic correctly labels all records as "likely_native".
+  if (natives_only && !is.null(raw) && nrow(raw) > 0 &&
+      !"native_status" %in% names(raw)) {
+    raw$native_status <- "native"
+  }
 
   # Client-side polygon clip: BIEN_occurrence_box queries by bounding box so
   # records outside the exact polygon boundary must be excluded here.
