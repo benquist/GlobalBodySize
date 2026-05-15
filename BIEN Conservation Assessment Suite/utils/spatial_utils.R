@@ -27,7 +27,7 @@ validate_polygon <- function(polygon_sf) {
                lat < BIEN_AMERICAS_BBOX$ymin || lat > BIEN_AMERICAS_BBOX$ymax
     if (outside) {
       errors_out <- c(errors_out, sprintf(
-        "Polygon centroid (lon %.4f, lat %.4f) is outside the BIEN Americas domain (lon %d to %d, lat %d to %d). BIEN data covers only the Americas.",
+        "Polygon centroid (lon %.4f, lat %.4f) is outside the BIEN Americas domain (lon %d to %d, lat %d to %d).",
         lon, lat,
         BIEN_AMERICAS_BBOX$xmin, BIEN_AMERICAS_BBOX$xmax,
         BIEN_AMERICAS_BBOX$ymin, BIEN_AMERICAS_BBOX$ymax
@@ -36,12 +36,12 @@ validate_polygon <- function(polygon_sf) {
   }
 
   list(
-    valid            = length(errors_out) == 0,
-    warnings         = warnings_out,
-    errors           = errors_out,
-    area_km2         = area_km2,
-    centroid         = centroid,
-    elevation_check  = "Not checked (Phase 1 — no elevation raster loaded)"
+    valid           = length(errors_out) == 0,
+    warnings        = warnings_out,
+    errors          = errors_out,
+    area_km2        = area_km2,
+    centroid        = centroid,
+    elevation_check = "Not checked (Phase 1 — no elevation raster loaded)"
   )
 }
 
@@ -58,7 +58,7 @@ build_session_log <- function(polygon_sf, polygon_source, n_bbox, n_final, ancho
     error = function(e) NA_real_
   )
 
-  wkt <- tryCatch(sf::st_as_text(sf::st_geometry(polygon_sf)), error = function(e) "")
+  wkt    <- tryCatch(sf::st_as_text(sf::st_geometry(polygon_sf)), error = function(e) "")
   sha256 <- digest::digest(wkt, algo = "sha256")
 
   list(
@@ -80,7 +80,11 @@ build_session_log <- function(polygon_sf, polygon_source, n_bbox, n_final, ancho
 
 
 build_dwc_csv <- function(species_df, session_log) {
-  n <- nrow(species_df)
+  # DwC basisOfRecord: "Occurrence" is the broadest valid term for aggregated BIEN records
+  # (which mix herbarium vouchers, plot observations, etc. with no per-record basisOfRecord
+  # available via the BIEN API). Using "Occurrence" rather than the more specific but
+  # factually incorrect "HumanObservation" (which implies a living organism observed directly).
+  basis <- "Occurrence"
 
   data.frame(
     scientificName    = species_df$accepted_name,
@@ -88,22 +92,35 @@ build_dwc_csv <- function(species_df, session_log) {
     acceptedNameUsage = species_df$accepted_name,
     taxonomicStatus   = "accepted",
     family            = species_df$family,
-    occurrenceStatus  = "present (modeled \u2014 not field-verified)",
-    basisOfRecord     = "MachineLearning",
+    occurrenceStatus  = "present",
+    occurrenceRemarks = paste0(
+      "Modeled predicted presence (BIEN MaxEnt SDM). Not field-verified. ",
+      "data_support_n=", species_df$data_support_n,
+      "; overlap_pct_polygon=", round(species_df$overlap_pct_polygon, 2),
+      "%; overlap_pct_range=", round(species_df$overlap_pct_range, 2), "%."
+    ),
+    basisOfRecord     = basis,
+    informationWithheld = "BIEN range polygon is a MaxEnt binary output (MTP threshold). No AUC, Boyce Index, or training record count is available via the BIEN API. data_support_n reflects BIEN polygon-clipped occurrence density, not SDM training support.",
+    establishmentMeans = dplyr::case_when(
+      species_df$native_status_flag == "likely_introduced" ~ "introduced",
+      species_df$native_status_flag == "likely_native"     ~ "native",
+      TRUE                                                  ~ NA_character_
+    ),
     dataSource        = "Botanical Information and Ecology Network (BIEN)",
     decimalLatitude   = session_log$polygon_centroid_lat,
     decimalLongitude  = session_log$polygon_centroid_lon,
     country           = NA_character_,
-    establishmentMeans = NA_character_,
     datasetName       = paste0("BIEN Conservation Assessment Suite v", session_log$app_version),
     rightsHolder      = "Botanical Information and Ecology Network (BIEN)",
     accessRights      = "See BIEN data use policy: https://bien.nceas.ucsb.edu",
     modified          = session_log$query_timestamp_utc,
-    confidence_tier   = species_df$confidence_tier,
-    data_support_n    = species_df$data_support_n,
-    overlap_pct       = species_df$overlap_pct,
-    bien_pkg_version  = session_log$bien_package_version,
-    query_timestamp   = session_log$query_timestamp_utc,
-    stringsAsFactors  = FALSE
+    confidence_tier       = species_df$confidence_tier,
+    data_support_n        = species_df$data_support_n,
+    overlap_pct_polygon   = species_df$overlap_pct_polygon,
+    overlap_pct_range     = species_df$overlap_pct_range,
+    native_status_flag    = species_df$native_status_flag,
+    bien_pkg_version      = session_log$bien_package_version,
+    query_timestamp       = session_log$query_timestamp_utc,
+    stringsAsFactors      = FALSE
   )
 }

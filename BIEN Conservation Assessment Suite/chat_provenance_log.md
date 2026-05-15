@@ -70,3 +70,39 @@
 **Action:** Project folder `BIEN Conservation Assessment Suite/` created with README, chat_provenance_log, data/, app/, modules/, utils/, report_template/, www/, docs/ scaffold.
 
 **Status:** Design phase — no code written yet. Awaiting user direction on which app to build first.
+
+---
+
+## 2026-05-15 — Phase 2: async rewrite, science overhaul, and DwC correction
+
+**Request:** User approved "Both" — implement full performance fix (Option A) and full scientific correctness overhaul (Option B) as recommended by three-agent audit (optimizer, biodiversity-informatics-checker, merow-ecology) conducted at end of previous session.
+
+**Agents consulted:** coder, code-checker (fixes applied), always (gate)
+
+**Root cause addressed:** `do_analysis()` was synchronous, blocking R's event loop via `withProgress()`. Despite `plan(multisession)` in global.R, no `future_promise()` was used anywhere. For a 1.77M ha Amazonian polygon, the per-row vapply `st_intersection()` loop blocked for 35 sec–8 min + BIEN_occurrence_box() added 2–15 min more → browser WebSocket timeout → frozen tab.
+
+**Changes implemented (Option A — Performance):**
+- `utils/bien_queries.R`: replaced per-row vapply `st_intersection()` loop with single vectorized `sf::st_intersection(ranges, poly_union)` + `tapply()` aggregation (10–100× speedup expected for large Amazonian AOIs)
+- `app/app.R`: converted `do_analysis()` to `run_analysis()` using `promises::future_promise({...}) %...>% (...) %...!% (...)` pattern; BIEN API calls run in background multisession worker; rv$* writes happen only in `.then()` callback on main session thread
+- `utils/bien_queries.R`: dropped unneeded `BIEN_occurrence_box()` flags (`all.taxonomy`, `observation.type`, `political.boundaries`); kept `native.status=TRUE`
+- `utils/bien_queries.R`: added occurrence deduplication by `(scrubbed_species_binomial, round(lat,3), round(lon,3))` before counting
+
+**Changes implemented (Option B — Scientific correctness):**
+- `utils/bien_queries.R`: added `overlap_pct_polygon` = intersection_area / polygon_area × 100 (fraction of AOI covered by species range); retained `overlap_pct_range` = intersection / range_area × 100 (endemism indicator); both exposed in output and DT table
+- `utils/bien_queries.R`: added polygon clipping of occurrence records (not just bbox) via `st_intersects(occ_sf, polygon_sf)` in `fetch_bien_occurrences_raw()`
+- `utils/bien_queries.R`: added `native_status_flag` computation per species (majority-vote from `native_status` column): "likely_native" / "likely_introduced" / "status_unavailable"
+- `utils/confidence_utils.R`: tier logic now uses `overlap_pct_polygon`; raised Low threshold to `n_occ>=2 AND/OR overlap_pct_polygon>=2%`; exposes both overlap metrics in result dataframe
+- `utils/spatial_utils.R`: fixed `basisOfRecord` from invalid `"MachineLearning"` → `"Occurrence"` (valid DwC term for mixed/unknown BIEN record types); fixed `occurrenceStatus` → `"present"`; added `occurrenceRemarks` with modeled-presence caveat; set `establishmentMeans` from `native_status_flag`; added `overlap_pct_polygon`, `overlap_pct_range`, `native_status_flag` columns to DwC CSV
+- `app/global.R`: updated `ANCHOR_SPECIES`: added *Cedrelinga cateniformis* (terra firme non-palm, good western Amazonia BIEN coverage); replaced *Cecropia latiloba* (taxonomically noisy) and *Virola surinamensis* with *Swietenia macrophylla* (CITES-listed, well-documented, stable taxonomy)
+- `app/app.R`: added SDM overestimation banner on Species List tab (cites Calabrese et al. 2014, GEB 23:1365–1372); added `native_status_flag` alerts (red danger for likely_introduced, orange warning for status_unavailable); added `% AOI covered` and `% Range in AOI` as distinct table columns with column caption clarification
+- `www/disclaimer.html`: added mandatory government-submission disclaimer block (red border, verbatim boilerplate text with 6 Amazonian limitations, field verification statement) above existing warning box; updated column definitions to match new table
+
+**Code-checker critical findings and resolutions:**
+- CRITICAL (FIXED): `if (!all(sf::st_is_valid(ranges)))` crashes on NA validity → fixed to `if (any(!sf::st_is_valid(ranges), na.rm = TRUE))`
+- CRITICAL/SECURITY (FIXED): Zip Slip path traversal in shapefile upload → fixed with zip manifest inspection before extraction (`any(grepl("..", manifest$Name, fixed=TRUE)) → return(NULL)`)
+- HIGH (FIXED): `rv$polygon` never set in upload modes → fixed by assigning `rv$polygon <- poly` in `observeEvent(input$run_query)` and `observeEvent(input$confirm_proceed)` before `run_analysis()` call
+- HIGH/DwC (FIXED): `basisOfRecord="HumanObservation"` incorrect for aggregated BIEN records (mixes herbarium vouchers + plot obs) → changed to `"Occurrence"` universally
+
+**Syntax check:** All 5 R files pass `parse()` with no errors.
+**Runtime check:** App starts cleanly on port 7781 (confirmed "Listening on http://127.0.0.1:7781").
+**Status:** COMPLETE — ready for git commit.

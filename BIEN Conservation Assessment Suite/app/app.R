@@ -1,3 +1,21 @@
+## ── explicit bootstrap in case global.R failed silently ──────────────────────
+library(shiny)
+library(bslib)
+library(dplyr)
+library(sf)
+library(leaflet)
+library(leaflet.extras)
+library(DT)
+library(jsonlite)
+library(digest)
+library(promises)
+library(future)
+
+for (.f in list.files("../modules", pattern = "\\.R$", full.names = TRUE)) source(.f)
+for (.f in list.files("../utils",   pattern = "\\.R$", full.names = TRUE)) source(.f)
+rm(.f)
+## ─────────────────────────────────────────────────────────────────────────────
+
 ui <- fluidPage(
   theme = bslib::bs_theme(bootswatch = "flatly"),
 
@@ -10,6 +28,10 @@ ui <- fluidPage(
                            border-radius:4px; font-weight:bold; }
       .anchor-badge-fail { background:#c0392b; color:#fff; padding:3px 10px;
                            border-radius:4px; font-weight:bold; }
+      .sdm-overestimate-banner { background:#fff3cd; border:1px solid #ffc107;
+                                 border-left:6px solid #e67e22; border-radius:4px;
+                                 padding:10px 16px; margin-bottom:12px; font-size:0.9em; }
+      .native-warn { color:#c0392b; font-weight:bold; }
     "))
   ),
 
@@ -17,7 +39,7 @@ ui <- fluidPage(
     sidebarPanel(
       width = 3,
       h4("BIEN Flora Scout"),
-      p("Phase 1 — Conservation Assessment Suite", class = "text-muted",
+      p("Phase 1 \u2014 Conservation Assessment Suite", class = "text-muted",
         style = "font-size:0.88em; margin-top:-8px;"),
       hr(),
 
@@ -38,8 +60,7 @@ ui <- fluidPage(
         ),
         conditionalPanel(
           condition = "input.file_type == 'geojson'",
-          fileInput("geojson_file", "Upload GeoJSON",
-                    accept = c(".geojson", ".json"))
+          fileInput("geojson_file", "Upload GeoJSON", accept = c(".geojson", ".json"))
         ),
         conditionalPanel(
           condition = "input.file_type == 'shapefile'",
@@ -48,7 +69,7 @@ ui <- fluidPage(
         conditionalPanel(
           condition = "input.file_type == 'pilot'",
           div(class = "alert alert-info", style = "font-size:0.85em; padding:8px;",
-            "Loads the Alto Japur\u00e1 (Brazil) pilot study area. Reflects BIEN data coverage for western Amazonia.")
+            "Loads the Alto Japur\u00e1 (Brazil) pilot study area.")
         )
       ),
 
@@ -67,13 +88,9 @@ ui <- fluidPage(
       conditionalPanel(
         condition = "output.results_ready",
         downloadButton("dl_csv", "Download Species List (CSV)",
-          class = "btn-success btn-sm",
-          style = "width:100%; margin-bottom:6px;"
-        ),
+          class = "btn-success btn-sm", style = "width:100%; margin-bottom:6px;"),
         downloadButton("dl_html", "Download Report (HTML)",
-          class = "btn-info btn-sm",
-          style = "width:100%;"
-        )
+          class = "btn-info btn-sm", style = "width:100%;")
       )
     ),
 
@@ -86,6 +103,17 @@ ui <- fluidPage(
           uiOutput("map_info_box")
         ),
         tabPanel("Species List",
+          br(),
+          div(class = "sdm-overestimate-banner",
+            tags$strong("\u26a0 Stacked SDM richness note:"),
+            " Stacking binary range predictions systematically",
+            tags$strong(" overestimates"), " local species richness",
+            " (Calabrese et al. 2014, GEB 23:1365\u20131372).",
+            " Treat this list as an ", tags$strong("upper bound"), ", not a confirmed inventory.",
+            " Confidence tiers are heuristic thresholds, not calibrated probability classes.",
+            " High / Moderate tiers indicate stronger data support, not certainty of presence."
+          ),
+          uiOutput("native_status_summary"),
           br(),
           uiOutput("tier_summary_bar"),
           DT::DTOutput("species_table")
@@ -126,14 +154,14 @@ server <- function(input, output, session) {
   output$status_text <- renderText({
     switch(rv$status,
       idle    = "Ready. Load a polygon and click Run Analysis.",
-      running = "Analysis running\u2026 please wait.",
+      running = "Analysis running\u2026 please wait (2\u20135 min for large AOIs).",
       done    = paste0("Complete. ", nrow(rv$species_df), " species predicted."),
       error   = "Analysis failed. Check inputs and try again."
     )
   })
 
   observeEvent(input$main_map_draw_new_feature, {
-    feat <- input$main_map_draw_new_feature
+    feat        <- input$main_map_draw_new_feature
     geojson_str <- jsonlite::toJSON(feat, auto_unbox = TRUE)
     poly <- tryCatch({
       p <- sf::st_read(geojson_str, quiet = TRUE)
@@ -151,32 +179,27 @@ server <- function(input, output, session) {
   })
 
   get_polygon <- reactive({
-    if (input$input_mode == "draw") {
-      return(rv$polygon)
-    }
+    if (input$input_mode == "draw") return(rv$polygon)
 
-    ft   <- input$file_type
+    ft <- input$file_type
     poly <- NULL
 
     if (ft == "geojson") {
       req(input$geojson_file)
-      poly <- tryCatch(
-        sf::st_read(input$geojson_file$datapath, quiet = TRUE),
-        error = function(e) NULL
-      )
+      poly <- tryCatch(sf::st_read(input$geojson_file$datapath, quiet = TRUE),
+                       error = function(e) NULL)
     } else if (ft == "shapefile") {
       req(input$shapefile_zip)
-      td <- tempfile()
-      dir.create(td)
+      td <- tempfile(); dir.create(td)
+      # Zip Slip mitigation: inspect manifest before extracting
+      manifest <- tryCatch(unzip(input$shapefile_zip$datapath, list = TRUE), error = function(e) NULL)
+      if (is.null(manifest) || any(grepl("..", manifest$Name, fixed = TRUE))) return(NULL)
       ok <- tryCatch({ unzip(input$shapefile_zip$datapath, exdir = td); TRUE },
                      error = function(e) FALSE)
       if (!ok) return(NULL)
       shp_files <- list.files(td, pattern = "\\.shp$", recursive = TRUE, full.names = TRUE)
       if (length(shp_files) == 0) return(NULL)
-      poly <- tryCatch(
-        sf::st_read(shp_files[1], quiet = TRUE),
-        error = function(e) NULL
-      )
+      poly <- tryCatch(sf::st_read(shp_files[1], quiet = TRUE), error = function(e) NULL)
     } else if (ft == "pilot") {
       pilot_path <- "../data/Japura_AOI_Nov2025_mapshaper.json"
       if (!file.exists(pilot_path)) return(NULL)
@@ -190,16 +213,10 @@ server <- function(input, output, session) {
     }
 
     if (is.null(poly)) return(NULL)
-
     poly <- tryCatch(sf::st_transform(poly, 4326), error = function(e) poly)
-
     geom_types <- unique(as.character(sf::st_geometry_type(poly)))
     if (!any(geom_types %in% c("POLYGON", "MULTIPOLYGON"))) return(NULL)
-
-    if (!all(sf::st_is_valid(poly))) {
-      poly <- sf::st_make_valid(poly)
-    }
-
+    if (!all(sf::st_is_valid(poly))) poly <- sf::st_make_valid(poly)
     poly
   })
 
@@ -213,36 +230,43 @@ server <- function(input, output, session) {
     )
   }
 
-  do_analysis <- function(poly, source_label) {
-    withProgress(message = "Querying BIEN\u2026", value = 0, {
-      rv$status  <- "running"
-      rv$polygon <- poly
+  # ── Async analysis ─────────────────────────────────────────────────────────
+  # BIEN API calls run in a background multisession worker.
+  # rv$* writes happen only in the .then() callback on the main session thread.
+  run_analysis <- function(poly, source_label) {
+    rv$status <- "running"
 
-      setProgress(0.15, detail = "Fetching species range maps\u2026")
-      ranges_sf <- query_bien_ranges(poly)
+    progress <- shiny::Progress$new(session, min = 0, max = 1)
+    progress$set(message = "Connecting to BIEN\u2026", value = 0.05,
+                 detail  = "Fetching range maps and occurrence records (2\u20135 min).")
 
-      setProgress(0.40, detail = "Fetching occurrence records\u2026")
-      occ_raw    <- fetch_bien_occurrences_raw(poly)
-      occ_counts <- query_bien_occurrences(occ_raw)
-      occ_points <- get_bien_occurrence_points(occ_raw)
-      rv$occ_points <- occ_points
-
-      setProgress(0.65, detail = "Assigning confidence tiers\u2026")
-      species_df <- assign_confidence_tiers(ranges_sf, occ_counts)
-
-      setProgress(0.82, detail = "Checking anchor species\u2026")
-      anchor_result   <- check_anchor_species(species_df)
+    promises::future_promise({
+      # Runs in background R worker — no rv$ access here
+      list(
+        ranges_sf = query_bien_ranges(poly),
+        occ_raw   = fetch_bien_occurrences_raw(poly)
+      )
+    }) %...>% (function(result) {
+      # Back on main session thread
+      progress$set(value = 0.75, message = "Processing results\u2026",
+                   detail = "Assigning confidence tiers.")
+      occ_counts     <- query_bien_occurrences(result$occ_raw)
+      occ_points     <- get_bien_occurrence_points(result$occ_raw)
+      rv$occ_points  <- occ_points
+      species_df     <- assign_confidence_tiers(result$ranges_sf, occ_counts)
+      anchor_result  <- check_anchor_species(species_df)
       rv$anchor_result <- anchor_result
-
-      n_bbox  <- if (!is.null(ranges_sf)) nrow(ranges_sf) else 0L
+      n_bbox  <- if (!is.null(result$ranges_sf)) nrow(result$ranges_sf) else 0L
       n_final <- if (!is.null(species_df)) nrow(species_df) else 0L
-
       session_log    <- build_session_log(poly, source_label, n_bbox, n_final, anchor_result)
       rv$species_df  <- species_df
       rv$session_log <- session_log
       rv$status      <- "done"
-
-      setProgress(1, detail = "Complete.")
+      progress$close()
+    }) %...!% (function(e) {
+      rv$status <- "error"
+      progress$close()
+      showNotification(paste("Analysis error:", e$message), type = "error", duration = NULL)
     })
   }
 
@@ -251,7 +275,7 @@ server <- function(input, output, session) {
 
     if (is.null(poly)) {
       showNotification(
-        "No study area polygon loaded. Upload a file or draw a polygon on the map.",
+        "No study area polygon loaded. Upload a file or draw on the map.",
         type = "error"
       )
       return()
@@ -264,11 +288,10 @@ server <- function(input, output, session) {
     if (has_errors || has_warnings) {
       rv$pending_polygon <- poly
       modal_body <- tagList()
-
       if (has_errors) {
         modal_body <- tagList(modal_body,
           div(class = "alert alert-danger",
-            tags$strong("Errors (blocking — analysis cannot proceed):"),
+            tags$strong("Errors (blocking):"),
             tags$ul(lapply(validation$errors, tags$li))
           )
         )
@@ -281,66 +304,51 @@ server <- function(input, output, session) {
           )
         )
       }
-
       showModal(modalDialog(
-        title      = "Polygon Validation",
+        title     = "Polygon Validation",
         modal_body,
-        footer     = tagList(
-          if (!has_errors) {
-            actionButton("confirm_proceed", "Proceed Anyway", class = "btn-warning")
-          },
+        footer    = tagList(
+          if (!has_errors) actionButton("confirm_proceed", "Proceed Anyway",
+                                        class = "btn-warning"),
           modalButton("Cancel")
         ),
-        easyClose  = FALSE
+        easyClose = FALSE
       ))
       return()
     }
 
-    tryCatch(
-      do_analysis(poly, source_label_current()),
-      error = function(e) {
-        rv$status <- "error"
-        showNotification(paste("Analysis error:", e$message), type = "error", duration = NULL)
-      }
-    )
+    rv$polygon <- poly
+    run_analysis(poly, source_label_current())
   })
 
   observeEvent(input$confirm_proceed, {
     removeModal()
     poly <- rv$pending_polygon
     if (!is.null(poly)) {
-      tryCatch(
-        do_analysis(poly, source_label_current()),
-        error = function(e) {
-          rv$status <- "error"
-          showNotification(paste("Analysis error:", e$message), type = "error", duration = NULL)
-        }
-      )
+      rv$polygon <- poly
+      run_analysis(poly, source_label_current())
     }
   })
 
-  output$main_map <- leaflet::renderLeaflet({
-    make_base_map()
-  })
+  # ── Map outputs ─────────────────────────────────────────────────────────────
+  output$main_map <- leaflet::renderLeaflet({ make_base_map() })
 
   observe({
     poly      <- rv$polygon
     map_proxy <- leaflet::leafletProxy("main_map", session)
-    map_proxy %>% leaflet::clearGroup("polygon")
+    leaflet::clearGroup(map_proxy, "polygon")
     if (!is.null(poly)) {
       add_polygon_layer(map_proxy, poly)
       bb <- sf::st_bbox(poly)
-      map_proxy %>% leaflet::fitBounds(bb["xmin"], bb["ymin"], bb["xmax"], bb["ymax"])
+      leaflet::fitBounds(map_proxy, bb["xmin"], bb["ymin"], bb["xmax"], bb["ymax"])
     }
   })
 
   observe({
     map_proxy <- leaflet::leafletProxy("main_map", session)
-    map_proxy %>% leaflet::clearGroup("heatmap")
+    leaflet::clearGroup(map_proxy, "heatmap")
     pts <- rv$occ_points
-    if (!is.null(pts) && nrow(pts) > 0) {
-      add_heatmap_layer(map_proxy, pts)
-    }
+    if (!is.null(pts) && nrow(pts) > 0) add_heatmap_layer(map_proxy, pts)
   })
 
   output$map_info_box <- renderUI({
@@ -360,167 +368,173 @@ server <- function(input, output, session) {
     )
   })
 
-  output$species_table <- DT::renderDT({
-    req(rv$species_df)
+  # ── Species list outputs ─────────────────────────────────────────────────────
+  output$native_status_summary <- renderUI({
     df <- rv$species_df
-
-    DT::datatable(
-      df,
-      rownames = FALSE,
-      colnames = c("Species", "Family", "Confidence Tier",
-                   "Occurrence Records", "Range Overlap (%)", "IUCN Status"),
-      filter   = "top",
-      options  = list(
-        pageLength      = 25,
-        searchHighlight = TRUE,
-        order           = list(list(2L, "asc")),
-        columnDefs      = list(list(className = "dt-center", targets = 2:5))
-      )
-    ) %>%
-      DT::formatRound("overlap_pct", digits = 2) %>%
-      DT::formatStyle(
-        "confidence_tier",
-        target          = "row",
-        backgroundColor = DT::styleEqual(
-          c("High",        "Moderate",     "Low",          "Very Low"),
-          c("lightgreen",  "lightyellow",  "lightsalmon",  "lightgrey")
-        )
-      )
-  })
-
-  output$tier_summary_bar <- renderUI({
-    req(rv$species_df)
-    df     <- rv$species_df
-    counts <- table(df$confidence_tier)
-
-    tiers  <- c("High", "Moderate", "Low", "Very Low")
-    colors <- c(High = "#90EE90", Moderate = "#FFFFE0", Low = "#FFA07A", "Very Low" = "#D3D3D3")
-
-    boxes <- lapply(tiers, function(t) {
-      n <- if (t %in% names(counts)) as.integer(counts[[t]]) else 0L
-      div(class = "tier-box", style = paste0("background:", colors[t], ";"),
-        paste0(t, ": ", n)
-      )
-    })
-
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    n_introduced <- sum(df$native_status_flag == "likely_introduced", na.rm = TRUE)
+    n_unavail    <- sum(df$native_status_flag == "status_unavailable", na.rm = TRUE)
     tagList(
-      div(style = "padding:10px 0;",
-        h5("Species by Confidence Tier:"),
-        do.call(tagList, boxes)
-      ),
-      p(class = "text-muted", style = "font-size:0.85em; margin-top:6px;",
-        "High/Moderate tiers have stronger data support (range overlap AND occurrence records). Low/Very Low are more speculative."
-      ),
-      hr()
+      if (n_introduced > 0)
+        div(class = "alert alert-danger",
+          tags$strong(paste0("\u26a0 ", n_introduced, " species flagged as likely introduced")),
+          " based on majority-vote native_status from BIEN occurrence records.",
+          " Review before including in a native-flora inventory."
+        ),
+      if (n_unavail > 0)
+        div(class = "alert alert-warning",
+          paste0(n_unavail, " species have no native_status data available in BIEN",
+                 " for the queried area. Native/introduced status cannot be determined for these taxa.")
+        )
     )
   })
 
-  output$anchor_check_ui <- renderUI({
-    req(rv$anchor_result)
-    result  <- rv$anchor_result
-    n_pass  <- sum(result)
-    n_total <- length(result)
-
-    rows <- lapply(names(result), function(sp) {
-      pass <- result[[sp]]
-      badge_class <- if (pass) "anchor-badge-pass" else "anchor-badge-fail"
-      tags$tr(
-        tags$td(tags$em(sp)),
-        tags$td(span(class = badge_class, if (pass) "PASS" else "FAIL"))
+  output$tier_summary_bar <- renderUI({
+    df <- rv$species_df
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    tier_counts <- table(factor(df$confidence_tier,
+                                levels = c("High","Moderate","Low","Very Low")))
+    tier_colors <- c(High = "#27ae60", Moderate = "#f39c12",
+                     Low  = "#e67e22", `Very Low` = "#95a5a6")
+    boxes <- lapply(names(tier_counts), function(t) {
+      div(class = "tier-box",
+          style = sprintf("background:%s; color:%s;",
+                          tier_colors[t],
+                          if (t == "Very Low") "#333" else "#fff"),
+          t, br(), strong(tier_counts[[t]])
       )
     })
+    do.call(div, c(boxes, list(style = "margin-bottom:10px;")))
+  })
 
-    all_fail_alert <- if (n_pass == 0) {
-      div(class = "alert alert-danger mt-2",
-        tags$strong(
-          "Plausibility check FAILED \u2014 BIEN coverage appears insufficient for this region.",
-          " All predictions should be treated as highly speculative."
-        )
+  output$species_table <- DT::renderDT({
+    df <- rv$species_df
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+
+    display <- data.frame(
+      Species         = df$accepted_name,
+      Family          = df$family,
+      Tier            = df$confidence_tier,
+      `N Occ (polygon)` = df$data_support_n,
+      `% AOI covered`   = round(df$overlap_pct_polygon, 1),
+      `% Range in AOI`  = round(df$overlap_pct_range,   1),
+      `Native Status`   = df$native_status_flag,
+      IUCN            = df$iucn_status,
+      stringsAsFactors = FALSE,
+      check.names = FALSE
+    )
+
+    DT::datatable(
+      display,
+      rownames = FALSE,
+      filter   = "top",
+      options  = list(pageLength = 25, scrollX = TRUE,
+                      columnDefs = list(list(width = "180px", targets = 0))),
+      caption  = htmltools::tags$caption(
+        style = "caption-side:bottom; font-size:0.82em; color:#666;",
+        paste0("N Occ (polygon): occurrence records clipped to drawn polygon (deduplicated). ",
+               "% AOI covered: fraction of the assessment area predicted suitable (used for tiers). ",
+               "% Range in AOI: fraction of species total range inside AOI (endemism indicator). ",
+               "Tiers are heuristic, not calibrated probability classes.")
       )
-    } else NULL
-
-    tagList(
-      h5("Anchor Species Plausibility Check"),
-      p(class = "text-muted", style = "font-size:0.88em;",
-        paste0(
-          "These 5 ecologically characteristic Amazonian species serve as a plausibility check. ",
-          "Their presence in the predicted list reflects BIEN\u2019s data coverage for this region. ",
-          n_pass, " of ", n_total, " present."
+    ) %>%
+      DT::formatStyle(
+        "Tier",
+        backgroundColor = DT::styleEqual(
+          c("High",       "Moderate",    "Low",         "Very Low"),
+          c("lightgreen", "lightyellow", "lightsalmon", "lightgrey")
         )
-      ),
-      tags$table(
-        class = "table table-sm table-bordered",
-        style = "max-width:520px;",
-        tags$thead(
-          tags$tr(tags$th("Species"), tags$th("In Predicted List"))
-        ),
-        tags$tbody(rows)
-      ),
-      all_fail_alert
+      ) %>%
+      DT::formatStyle(
+        "Native Status",
+        color = DT::styleEqual("likely_introduced", "red"),
+        fontWeight = DT::styleEqual("likely_introduced", "bold")
+      )
+  }, server = TRUE)
+
+  # ── Data Quality tab ─────────────────────────────────────────────────────────
+  output$anchor_check_ui <- renderUI({
+    ar <- rv$anchor_result
+    if (is.null(ar)) return(div(class = "alert alert-info", "Run analysis to see anchor species check."))
+
+    items <- lapply(names(ar), function(sp) {
+      if (isTRUE(ar[[sp]])) {
+        span(class = "anchor-badge-pass", sp, " \u2714")
+      } else {
+        span(class = "anchor-badge-fail", sp, " \u2718")
+      }
+    })
+
+    all_pass <- all(unlist(ar))
+    tagList(
+      h5("Plausibility Gate \u2014 Anchor Species"),
+      p(style = "font-size:0.88em; color:#555;",
+        "These wide-ranging western Amazonian species are expected to appear in any valid",
+        " Alto Japur\u00e1 query. A FAIL indicates a spatial, CRS, or BIEN coverage issue",
+        " rather than true absence."),
+      div(style = "margin:8px 0;", do.call(tagList, items)),
+      div(
+        class = if (all_pass) "alert alert-success" else "alert alert-danger",
+        if (all_pass)
+          "\u2714 All anchor species detected — polygon and BIEN data appear consistent."
+        else
+          "\u2718 One or more anchor species missing. Interpret results with caution."
+      )
     )
   })
 
   output$occ_density_hist <- renderPlot({
-    req(rv$species_df)
     df <- rv$species_df
-    if (nrow(df) == 0) {
-      plot.new()
-      text(0.5, 0.5, "No species to display.", cex = 1.4, col = "grey50")
-      return(invisible())
-    }
-    old_par <- par(mar = c(5, 4, 4, 2))
-    on.exit(par(old_par), add = TRUE)
-    hist(
-      log10(df$data_support_n + 1),
-      main   = "Occurrence Record Counts per Predicted Species",
-      xlab   = expression(log[10](occurrence~records + 1)),
-      ylab   = "Number of species",
-      col    = "steelblue",
-      border = "white",
-      breaks = 20
-    )
-    mtext(
-      "Note: Low counts may reflect collection gaps rather than true rarity (BIEN sampling is uneven).",
-      side = 1, line = 4, cex = 0.78, col = "grey40"
-    )
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    par(mar = c(4, 4, 2, 1))
+    hist(log10(df$data_support_n + 1),
+         breaks = 20,
+         col    = "#3498db",
+         border = "white",
+         main   = "Distribution of Occurrence Record Counts (log\u2081\u2080 scale)",
+         xlab   = "log\u2081\u2080(N occurrences in polygon + 1)",
+         ylab   = "Number of species")
+    abline(v = log10(c(2, 5, 20) + 1), col = c("#e67e22","#f39c12","#27ae60"),
+           lty = 2, lwd = 1.5)
+    legend("topright",
+           legend = c("Low threshold (n=2)", "Moderate threshold (n=5)", "High threshold (n=20)"),
+           col    = c("#e67e22","#f39c12","#27ae60"), lty = 2, lwd = 1.5, cex = 0.8)
   })
 
+  # ── Downloads ────────────────────────────────────────────────────────────────
   output$dl_csv <- downloadHandler(
     filename = function() {
-      lbl <- if (!is.null(rv$session_log)) {
-        gsub("[^a-zA-Z0-9]", "_", rv$session_log$polygon_source)
-      } else "polygon"
-      paste0("BIEN_species_list_", lbl, "_", format(Sys.Date(), "%Y%m%d"), ".csv")
+      paste0("BIEN_flora_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
     },
     content = function(file) {
-      req(rv$species_df, rv$session_log)
-      dwc <- build_dwc_csv(rv$species_df, rv$session_log)
-      write.csv(dwc, file, row.names = FALSE, fileEncoding = "UTF-8")
+      df  <- rv$species_df
+      sl  <- rv$session_log
+      if (is.null(df) || is.null(sl)) return(NULL)
+      dwc <- build_dwc_csv(df, sl)
+      write.csv(dwc, file, row.names = FALSE)
     }
   )
 
   output$dl_html <- downloadHandler(
     filename = function() {
-      lbl <- if (!is.null(rv$session_log)) {
-        gsub("[^a-zA-Z0-9]", "_", rv$session_log$polygon_source)
-      } else "polygon"
-      paste0("BIEN_report_", lbl, "_", format(Sys.Date(), "%Y%m%d"), ".html")
+      paste0("BIEN_report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".html")
     },
     content = function(file) {
-      req(rv$species_df, rv$session_log, rv$polygon)
+      df   <- rv$species_df
+      sl   <- rv$session_log
+      poly <- rv$polygon
+      if (is.null(df) || is.null(sl)) return(NULL)
+      tmp <- file.path(tempdir(), "report.Rmd")
+      file.copy("../report_template/report.Rmd", tmp, overwrite = TRUE)
       rmarkdown::render(
-        input       = "../report_template/report.Rmd",
+        tmp,
         output_file = file,
-        params      = list(
-          species_df  = rv$species_df,
-          session_log = rv$session_log,
-          polygon     = rv$polygon
-        ),
-        envir  = new.env(parent = globalenv()),
-        quiet  = TRUE
+        params      = list(species_df = df, session_log = sl, polygon = poly),
+        envir       = new.env(parent = globalenv()),
+        quiet       = TRUE
       )
     }
   )
 }
 
-shinyApp(ui = ui, server = server)
+shinyApp(ui, server)

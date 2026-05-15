@@ -1,6 +1,10 @@
 #' bien_queries.R — Wrapped, error-handled BIEN API calls
 #' All functions return NULL with a warning on API failure.
 
+#' Query BIEN range polygons and compute overlap metrics with user polygon.
+#' Returns the ranges sf with two new columns:
+#'   overlap_pct_range   = intersection_area / range_area * 100
+#'   overlap_pct_polygon = intersection_area / polygon_area * 100
 query_bien_ranges <- function(polygon_sf) {
   bbox <- sf::st_bbox(polygon_sf)
 
@@ -23,45 +27,78 @@ query_bien_ranges <- function(polygon_sf) {
     return(NULL)
   }
 
-  if (!sf::st_crs(ranges) == sf::st_crs(polygon_sf)) {
-    ranges <- tryCatch(
-      sf::st_transform(ranges, sf::st_crs(polygon_sf)),
-      error = function(e) ranges
-    )
+  # Ensure same CRS before intersection
+  target_crs <- sf::st_crs(4326)
+  if (!isTRUE(sf::st_crs(ranges) == target_crs)) {
+    ranges <- tryCatch(sf::st_transform(ranges, target_crs), error = function(e) ranges)
+  }
+  if (!isTRUE(sf::st_crs(polygon_sf) == target_crs)) {
+    polygon_sf <- tryCatch(sf::st_transform(polygon_sf, target_crs), error = function(e) polygon_sf)
   }
 
+  # Coarse filter: keep only ranges whose bbox overlaps polygon
   intersects <- tryCatch(
     sf::st_intersects(ranges, polygon_sf, sparse = FALSE)[, 1],
     error = function(e) rep(FALSE, nrow(ranges))
   )
   ranges <- ranges[intersects, ]
-
   if (nrow(ranges) == 0) return(NULL)
 
-  overlap_pct <- vapply(seq_len(nrow(ranges)), function(i) {
-    tryCatch({
-      range_i <- ranges[i, ]
-      if (!sf::st_is_valid(range_i)) range_i <- sf::st_make_valid(range_i)
-      intersection <- suppressWarnings(sf::st_intersection(range_i, polygon_sf))
-      if (is.null(intersection) || nrow(intersection) == 0) return(0)
-      geom_types <- as.character(sf::st_geometry_type(intersection))
-      intersection <- intersection[geom_types %in% c("POLYGON", "MULTIPOLYGON"), ]
-      if (nrow(intersection) == 0) return(0)
-      range_area <- as.numeric(sf::st_area(range_i))
-      if (range_area <= 0) return(0)
-      sum(as.numeric(sf::st_area(intersection))) / range_area * 100
-    }, error = function(e) 0)
-  }, numeric(1))
+  # Validate geometry bulk (na.rm=TRUE guards against NA validity for degenerate geometries)
+  if (any(!sf::st_is_valid(ranges), na.rm = TRUE)) ranges <- sf::st_make_valid(ranges)
 
-  ranges$overlap_pct <- overlap_pct
+  # Pre-compute areas
+  poly_union   <- sf::st_union(polygon_sf)
+  polygon_area <- as.numeric(sf::st_area(poly_union))
+  range_areas  <- as.numeric(sf::st_area(ranges))
+
+  # Tag rows before bulk intersection (tapply key)
+  ranges$.row_id <- seq_len(nrow(ranges))
+
+  # Single vectorized intersection call (GEOS spatial index)
+  inter <- suppressWarnings(
+    sf::st_intersection(ranges[, ".row_id"], poly_union)
+  )
+
+  # Keep only area-bearing geometry types
+  if (!is.null(inter) && nrow(inter) > 0) {
+    inter_types <- as.character(sf::st_geometry_type(inter))
+    inter <- inter[inter_types %in% c("POLYGON", "MULTIPOLYGON",
+                                      "GEOMETRYCOLLECTION"), ]
+  }
+
+  # Aggregate intersection areas by original row id
+  overlap_pct_range   <- rep(0, nrow(ranges))
+  overlap_pct_polygon <- rep(0, nrow(ranges))
+
+  if (!is.null(inter) && nrow(inter) > 0) {
+    inter_areas     <- as.numeric(sf::st_area(inter))
+    inter_area_by_id <- tapply(inter_areas, inter$.row_id, sum)
+    matched_ids     <- as.integer(names(inter_area_by_id))
+
+    valid_range <- range_areas[matched_ids] > 0
+    overlap_pct_range[matched_ids[valid_range]] <-
+      inter_area_by_id[valid_range] / range_areas[matched_ids[valid_range]] * 100
+    if (polygon_area > 0) {
+      overlap_pct_polygon[matched_ids] <-
+        as.numeric(inter_area_by_id) / polygon_area * 100
+    }
+  }
+
+  ranges$.row_id          <- NULL
+  ranges$overlap_pct_range   <- overlap_pct_range
+  ranges$overlap_pct_polygon <- overlap_pct_polygon
   ranges
 }
 
 
+#' Summarise pre-fetched occurrence data.frame into per-species counts.
+#' Input occ_raw must already be clipped to the polygon (from fetch_bien_occurrences_raw).
 query_bien_occurrences <- function(occ_raw) {
   if (is.null(occ_raw) || nrow(occ_raw) == 0) {
     return(data.frame(species = character(), n_occurrences = integer(),
-                      family = character(), stringsAsFactors = FALSE))
+                      family = character(), native_status_flag = character(),
+                      stringsAsFactors = FALSE))
   }
 
   occ <- occ_raw[!is.na(occ_raw$latitude) & !is.na(occ_raw$longitude), ]
@@ -82,10 +119,19 @@ query_bien_occurrences <- function(occ_raw) {
 
   if (nrow(occ) == 0) {
     return(data.frame(species = character(), n_occurrences = integer(),
-                      family = character(), stringsAsFactors = FALSE))
+                      family = character(), native_status_flag = character(),
+                      stringsAsFactors = FALSE))
   }
 
+  # Deduplicate by rounded coordinates to remove duplicate aggregation-pipeline records
+  occ <- occ[!duplicated(data.frame(
+    sp  = occ$scrubbed_species_binomial,
+    lat = round(occ$latitude,  3),
+    lon = round(occ$longitude, 3)
+  )), ]
+
   family_col <- if ("scrubbed_family" %in% names(occ)) "scrubbed_family" else NULL
+  has_native  <- "native_status" %in% names(occ)
 
   counts <- occ %>%
     dplyr::filter(!is.na(scrubbed_species_binomial)) %>%
@@ -95,8 +141,18 @@ query_bien_occurrences <- function(occ_raw) {
       family = if (!is.null(family_col)) {
         fam_vals <- .data[[family_col]]
         fam_vals <- fam_vals[!is.na(fam_vals)]
-        if (length(fam_vals) == 0) NA_character_ else names(sort(table(fam_vals), decreasing = TRUE))[1]
+        if (length(fam_vals) == 0) NA_character_
+        else names(sort(table(fam_vals), decreasing = TRUE))[1]
       } else NA_character_,
+      native_status_flag = if (has_native) {
+        ns <- .data[["native_status"]]
+        n_nat  <- sum(ns == "native",     na.rm = TRUE)
+        n_int  <- sum(ns == "introduced", na.rm = TRUE)
+        n_na   <- sum(is.na(ns))
+        if (n_na == dplyr::n()) "status_unavailable"
+        else if (n_int > n_nat) "likely_introduced"
+        else "likely_native"
+      } else "status_unavailable",
       .groups = "drop"
     )
 
@@ -104,9 +160,7 @@ query_bien_occurrences <- function(occ_raw) {
 }
 
 
-#' Subsample a pre-fetched occurrence data.frame for heatmap rendering.
-#' Accepts the raw occurrence data.frame already fetched by query_bien_occurrences_raw()
-#' to avoid a duplicate BIEN API call.
+#' Subsample pre-fetched occurrence data.frame for heatmap rendering.
 get_bien_occurrence_points <- function(occ_raw) {
   if (is.null(occ_raw) || nrow(occ_raw) == 0) return(NULL)
 
@@ -127,27 +181,46 @@ get_bien_occurrence_points <- function(occ_raw) {
   occ
 }
 
-#' Fetch raw BIEN occurrence records for a polygon bounding box.
-#' Returns the unfiltered data.frame; callers should process with
-#' query_bien_occurrences() (for counts) or get_bien_occurrence_points() (for heatmap).
+
+#' Fetch raw BIEN occurrence records for a polygon bounding box, then clip
+#' to the actual polygon. Returns filtered data.frame ready for downstream use.
 fetch_bien_occurrences_raw <- function(polygon_sf) {
   bbox <- sf::st_bbox(polygon_sf)
 
-  tryCatch({
+  raw <- tryCatch({
     BIEN::BIEN_occurrence_box(
-      min.lat              = bbox["ymin"],
-      max.lat              = bbox["ymax"],
-      min.lon              = bbox["xmin"],
-      max.lon              = bbox["xmax"],
-      cultivated           = FALSE,
-      all.taxonomy         = TRUE,
-      native.status        = TRUE,
-      natives.only         = FALSE,
-      observation.type     = TRUE,
-      political.boundaries = TRUE
+      min.lat       = bbox["ymin"],
+      max.lat       = bbox["ymax"],
+      min.lon       = bbox["xmin"],
+      max.lon       = bbox["xmax"],
+      cultivated    = FALSE,
+      native.status = TRUE,   # retain for native_status_flag
+      natives.only  = FALSE   # must be FALSE — native_status NA for most Amazonian records
     )
   }, error = function(e) {
     warning("BIEN_occurrence_box failed: ", conditionMessage(e))
     NULL
   })
+
+  if (is.null(raw) || nrow(raw) == 0) return(raw)
+
+  # Clip to the actual polygon, not just the bounding box
+  has_coords <- !is.na(raw$latitude) & !is.na(raw$longitude)
+  if (any(has_coords)) {
+    occ_sf <- sf::st_as_sf(
+      raw[has_coords, ],
+      coords = c("longitude", "latitude"),
+      crs    = 4326,
+      remove = FALSE
+    )
+    target_crs <- sf::st_crs(polygon_sf)
+    if (!isTRUE(sf::st_crs(occ_sf) == target_crs)) {
+      occ_sf <- sf::st_transform(occ_sf, target_crs)
+    }
+    inside  <- lengths(sf::st_intersects(occ_sf, polygon_sf)) > 0
+    clipped <- raw[has_coords, ][inside, ]
+    raw     <- rbind(clipped, raw[!has_coords, ])
+  }
+
+  raw
 }
