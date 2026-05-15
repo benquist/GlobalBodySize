@@ -1,7 +1,7 @@
 # app.R — BIEN Flora Explora: Conservation Assessment Suite
 # Main Shiny UI + server. Implements the three-stage async query architecture:
-#   Stage 1 — BIEN_list_country: fast political-unit checklist (seconds)
-#   Stage 2 — BIEN_occurrence_sf: full occurrence records (minutes)
+#   Stage 1 — BIEN_list_sf: polygon-specific species checklist (seconds)
+#   Stage 2 — BIEN_occurrence_sf: full occurrence records + client-side polygon clip (minutes)
 #   Stage 3 — BIEN_ranges_sf: range overlap analysis (slow, optional)
 #
 # Stages 1 and 2 run concurrently in separate future workers.
@@ -227,7 +227,7 @@ server <- function(input, output, session) {
     occ_points      = NULL,   # subsampled points for heatmap (≤5000 rows)
     anchor_result   = NULL,   # named logical vector from check_anchor_species()
     pending_polygon = NULL,   # polygon held for user confirmation on validation warnings
-    status          = "idle", # one of: idle / running / listing / enriching / partial / done / error
+    status          = "idle", # one of: idle / running / enriching / partial / done / error
     started_at      = NULL    # POSIXct: when Run Analysis was clicked (for elapsed timer)
   )
 
@@ -243,9 +243,8 @@ server <- function(input, output, session) {
   output$status_text <- renderText({
     switch(rv$status,
       idle      = "Ready. Load a polygon and click Run Analysis.",
-      running   = "Stage 1: Querying BIEN species checklist\u2026",
-      listing   = paste0("Polygon species list ready (\u2248", nrow(rv$species_df), " species). Stage 2: loading occurrence counts\u2026"),
-      enriching = paste0(nrow(rv$species_df), " species with occurrence tiers. Stage 3: range overlap analysis running\u2026"),
+      running   = "Querying occurrence records within polygon\u2026",
+      enriching = paste0(nrow(rv$species_df), " species found. Range overlap analysis running\u2026"),
       partial   = paste0(nrow(rv$species_df), " species. Range overlap analysis still running\u2026"),
       done      = paste0("Complete. ", nrow(rv$species_df), " species."),
       error     = "Analysis failed. Check inputs and try again."
@@ -253,12 +252,12 @@ server <- function(input, output, session) {
   })
 
   # Expose running state to UI conditionalPanel + JS
-  output$is_running <- reactive({ rv$status %in% c("running", "listing", "enriching", "partial") })
+  output$is_running <- reactive({ rv$status %in% c("running", "enriching", "partial") })
   outputOptions(output, "is_running", suspendWhenHidden = FALSE)
 
   # Prominent running banner with live elapsed-time counter
   output$running_banner <- renderUI({
-    if (!rv$status %in% c("running", "listing", "enriching", "partial")) return(NULL)
+    if (!rv$status %in% c("running", "enriching", "partial")) return(NULL)
     elapsed_tick()  # take a dependency so this re-renders every second
     secs <- if (!is.null(rv$started_at))
       as.integer(difftime(Sys.time(), rv$started_at, units = "secs"))
@@ -266,15 +265,11 @@ server <- function(input, output, session) {
     mm <- sprintf("%02d:%02d", secs %/% 60, secs %% 60)
     msg <- switch(rv$status,
       running   = list(
-        strong  = "Stage 1 of 3: Querying BIEN species checklist\u2026",
-        detail  = "BIEN_list_sf — typically 5\u201330 seconds. Species table will appear shortly."
-      ),
-      listing   = list(
-        strong  = "Stage 2 of 3: Loading occurrence records\u2026",
-        detail  = "Preliminary species list shown. Occurrence counts and heatmap loading in background."
+        strong  = "Stage 1 of 2: Querying BIEN occurrence records\u2026",
+        detail  = "BIEN_occurrence_sf \u2014 polygon-specific PostGIS query. Results will appear when complete."
       ),
       enriching = list(
-        strong  = "Stage 3 of 3: Range overlap analysis running\u2026",
+        strong  = "Stage 2 of 2: Range overlap analysis running\u2026",
         detail  = "Occurrence-based tiers shown. Table will update with range overlap columns when complete."
       ),
       partial   = list(
@@ -386,6 +381,9 @@ server <- function(input, output, session) {
   #   Uses BIEN_list_sf() — a PostGIS spatial intersection against the drawn polygon.
   #   Returns only species documented within the polygon boundary (not a country superset).
   #   Populates an immediate species table so the user sees something fast.
+  #   Stage 2 (BIEN_occurrence_sf) overwrites this with occurrence counts and confidence tiers;
+  #   a client-side st_within clip in fetch_bien_occurrences_raw() further guarantees
+  #   that all returned records fall inside the polygon.
   #
   # Stage 2 (Worker 2): fetch_bien_occurrences_raw() → query_bien_occurrences()
   #   Full BIEN_occurrence_sf() call — server-side polygon intersection (minutes).
@@ -419,53 +417,15 @@ server <- function(input, output, session) {
 
     progress <- shiny::Progress$new(session, min = 0, max = 1)
     progress$set(
-      message = "Stage 1: Querying BIEN species checklist\u2026",
+      message = "Stage 1 of 2: Querying occurrence records\u2026",
       value   = 0.05,
-      detail  = "BIEN_list_sf \u2014 typically 5\u201330 seconds."
+      detail  = "BIEN_occurrence_sf \u2014 polygon-specific PostGIS query."
     )
 
-    # ---- Stage 1 (Worker 1): polygon-specific species checklist ----------------
-    # query_species_list_fast() uses BIEN_list_sf() — a PostGIS spatial
-    # intersection that returns only species documented within the polygon boundary.
-    # Stage 1 is non-fatal: if it fails, Stage 2 still supplies the species list.
-    promises::future_promise({
-      options(bien_cfg = cfg_snap)  # restore CFG in worker session
-      query_species_list_fast(poly)
-    }, seed = TRUE) %...>% (function(species_vec) {
-      progress$set(value = 0.25,
-                   message = "Checklist ready. Loading occurrence records\u2026",
-                   detail  = "Stage 2 running in background \u2014 table will update with counts.")
-      if (!is.null(species_vec) && length(species_vec) > 0) {
-        # Build a minimal species data.frame from the checklist names only.
-        # n_occurrences = 0 because occurrence data is not yet available.
-        # assign_confidence_tiers() will assign Very Low tier to these rows;
-        # they will be overwritten by Stage 2 with real occurrence-based tiers.
-        occ_df_s1 <- data.frame(
-          species            = species_vec,
-          n_occurrences      = 0L,
-          family             = NA_character_,
-          native_status_flag = "status_unavailable",
-          stringsAsFactors   = FALSE
-        )
-        species_df_s1  <- assign_confidence_tiers(NULL, occ_df_s1)
-        anchor_result  <- check_anchor_species(species_df_s1)
-        rv$anchor_result <- anchor_result
-        rv$session_log <- build_session_log(poly, source_label, 0L, nrow(species_df_s1), anchor_result)
-        rv$species_df  <- species_df_s1
-      }
-      rv$status <- "listing"   # signal UI: Stage 2 is now running
-    }) %...!% (function(e) {
-      # Stage 1 failure is non-fatal: Stage 2 will supply occurrence-based species
-      warning("Stage 1 BIEN_list_sf failed: ", e$message)
-      rv$status <- "listing"
-    })
-
-    # ---- Stage 2 (Worker 2): full occurrence records — always runs ------------
+    # ---- Stage 1 (Worker 1): full occurrence records — always runs ------------
     # BIEN_occurrence_sf() performs a server-side PostGIS polygon intersection,
-    # returning all occurrence records inside the user's polygon.
-    # This is the authoritative spatial refinement step. It overwrites the
-    # Stage 1 table with per-species occurrence counts, heatmap points,
-    # and occurrence-based confidence tiers.
+    # returning occurrence records inside the user's polygon with native-status
+    # and geo-validation filters applied. This is the sole species-list source.
     promises::future_promise({
       options(bien_cfg = cfg_snap)  # restore CFG in worker session
       fetch_bien_occurrences_raw(poly,
@@ -492,14 +452,13 @@ server <- function(input, output, session) {
         progress$close()
       }
     }) %...!% (function(e) {
-      # Stage 2 failure: keep Stage 1 table visible if it exists; otherwise error state.
-      if (is.null(rv$species_df)) rv$status <- "error"
-      else if (!rv$status %in% c("enriching", "done")) rv$status <- "done"
+      # Stage 1 failure: no species data available — set error state.
+      rv$status <- "error"
       progress$close()
       showNotification(paste("Occurrence query failed:", e$message), type = "error", duration = NULL)
     })
 
-    # ---- Stage 3 (Worker 3): range overlap — optional, user-activated ----------
+    # ---- Stage 2 (Worker 2): range overlap — optional, user-activated ----------
     # BIEN_ranges_sf() returns SDM-derived range polygons via a PostGIS intersection.
     # Client-side st_intersection() then computes overlap_pct_polygon (fraction of
     # the AOI predicted suitable) and overlap_pct_range (fraction of species total
@@ -543,7 +502,7 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$run_query, {
-    if (rv$status %in% c("running", "listing", "enriching", "partial")) {
+    if (rv$status %in% c("running", "enriching", "partial")) {
       showNotification("Analysis already in progress. Please wait.", type = "warning")
       return()
     }
@@ -599,7 +558,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$confirm_proceed, {
     removeModal()
-    if (rv$status %in% c("running", "listing", "enriching", "partial")) {
+    if (rv$status %in% c("running", "enriching", "partial")) {
       showNotification("Analysis already in progress. Please wait.", type = "warning")
       return()
     }
