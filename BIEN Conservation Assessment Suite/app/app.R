@@ -127,6 +127,25 @@ ui <- fluidPage(
         class = "btn-primary btn-lg",
         style = "width:100%; margin-top:12px;"
       ),
+      div(style = "margin-top:10px; padding:8px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6;",
+        tags$small(tags$strong("Occurrence filters (Stage 2):")),
+        div(style = "margin-top:4px;",
+          checkboxInput("include_nonnative",
+            label = tags$span(style="font-size:0.85em;",
+              "Include non-native / introduced species"
+            ),
+            value = FALSE
+          )
+        ),
+        div(
+          checkboxInput("include_geounvalidated",
+            label = tags$span(style="font-size:0.85em;",
+              "Include geo-unvalidated records"
+            ),
+            value = FALSE
+          )
+        )
+      ),
       div(style = "margin-top:8px;",
         checkboxInput("include_ranges",
           label = tags$span(style="font-size:0.85em;",
@@ -387,8 +406,11 @@ server <- function(input, output, session) {
     rv$started_at <- Sys.time()
     rv$occ_raw    <- NULL
     rv$occ_counts <- NULL
+    rv$occ_points <- NULL
 
-    include_ranges <- isTRUE(input$include_ranges)
+    include_ranges        <- isTRUE(input$include_ranges)
+    natives_only_snap     <- !isTRUE(input$include_nonnative)    # default TRUE (native only)
+    geo_valid_only_snap   <- !isTRUE(input$include_geounvalidated)  # default TRUE (geo-valid only)
 
     # Snapshot CFG on the main thread before launching workers.
     # Workers cannot access Shiny session globals directly; they need the
@@ -449,7 +471,9 @@ server <- function(input, output, session) {
     # and occurrence-based confidence tiers.
     promises::future_promise({
       options(bien_cfg = cfg_snap)  # restore CFG in worker session
-      fetch_bien_occurrences_raw(poly)
+      fetch_bien_occurrences_raw(poly,
+                                 natives_only   = natives_only_snap,
+                                 geo_valid_only = geo_valid_only_snap)
     }, seed = TRUE) %...>% (function(occ_raw) {
       progress$set(value = 0.65, message = "Occurrence records ready. Processing\u2026", detail = "")
       occ_counts    <- query_bien_occurrences(occ_raw)   # deduplicate + summarise per-species

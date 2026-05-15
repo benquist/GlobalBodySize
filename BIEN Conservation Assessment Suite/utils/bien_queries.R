@@ -333,7 +333,9 @@ query_species_list_fast <- function(polygon_sf) {
   unique(stats::na.omit(species_vec))
 }
 
-fetch_bien_occurrences_raw <- function(polygon_sf) {
+fetch_bien_occurrences_raw <- function(polygon_sf,
+                                       natives_only  = TRUE,
+                                       geo_valid_only = TRUE) {
   CFG <- getOption("bien_cfg")
   polygon_sf <- .prepare_aoi_for_bien(polygon_sf)
 
@@ -345,11 +347,11 @@ fetch_bien_occurrences_raw <- function(polygon_sf) {
         new.world            = NULL,
         all.taxonomy         = FALSE,
         native.status        = TRUE,
-        natives.only         = FALSE,
+        natives.only         = natives_only,
         observation.type     = FALSE,
         political.boundaries = FALSE,
         collection.info      = FALSE,
-        only.geovalid        = TRUE
+        only.geovalid        = geo_valid_only
       )
     }
     occ_call()
