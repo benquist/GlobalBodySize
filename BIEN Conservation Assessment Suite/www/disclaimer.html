@@ -50,9 +50,10 @@
       </li>
       <li>
         <span class="warning-title">Stacked SDM Overestimation.</span>
-        Stacking binary SDM predictions overestimates local richness (Calabrese et al. 2014,
-        <em>Global Ecology and Biogeography</em> 23:1365–1372). The species count is an
-        upper bound.
+        Stacking binary SDM predictions tends to overestimate local species richness
+        (Calabrese et al. 2014, <em>Global Ecology and Biogeography</em> 23(1):99&ndash;112;
+        DOI: 10.1111/geb.12102). The species count is best treated as an upper bound;
+        false-positive predictions are expected per species at the binary threshold.
       </li>
       <li>
         <span class="warning-title">Confidence Tiers Are Heuristic.</span>
@@ -79,12 +80,17 @@
         a measure of occupancy.
       </li>
       <li>
-        <span class="warning-title">Amazonian Range Maps Are Coarse.</span>
-        Range polygons in Amazonia are over-predicted because of sparse, river- and
-        road-biased sampling (ter Steege et al. 2011, <em>Ecography</em> 34:737&ndash;747;
-        ter Steege et al. 2020, <em>Scientific Reports</em> 10:10130). The predicted
-        species list should be treated as a <strong>lower bound on potential composition</strong>,
-        with both commission and omission errors expected.
+        <span class="warning-title">Amazonian Range Maps Are Coarse and Sampling Is Biased.</span>
+        Botanical records in western Amazonia are concentrated along navigable rivers and
+        roads. Interior terra firme is severely undersampled. MaxEnt models trained on
+        such biased occurrence data will over-predict along river corridors and under-predict
+        for interior species. The 2013 Amazonian tree census revealed that fewer than 1%
+        of tree species account for half of all individual trees, underscoring the non-uniform
+        structure of Amazonian diversity data (ter Steege et al. 2013,
+        <em>Science</em> 342:1243092; DOI: 10.1126/science.1243092). The predicted
+        species list should be treated as a <strong>first-approximation screen</strong>,
+        with both commission errors (false presences from overfit SDMs) and omission
+        errors (unsampled species) expected.
       </li>
       <li>
         <span class="warning-title">Taxonomy Follows BIEN Scrubbed Names.</span>
@@ -103,7 +109,7 @@
       <li><strong>% Range in AOI</strong>: Fraction of the species' total Americas-wide range that falls inside the AOI. An endemism indicator — high values suggest narrow-range species.</li>
       <li><strong>Native Status</strong>: Majority-vote from BIEN native_status field. "likely_native" / "likely_introduced" / "status_unavailable."</li>
     </ul>
-    <p>BIEN R package: Maitner et al. (2018), <em>Methods in Ecology and Evolution</em>, 9(2):373–379. DOI: 10.1111/2041-210X.12861 <em>(verify before citing)</em>.</p>
+    <p>BIEN R package: Maitner et al. (2018), <em>Methods in Ecology and Evolution</em>, 9(2):373–379. DOI: <a href="https://doi.org/10.1111/2041-210X.12861" target="_blank">10.1111/2041-210X.12861</a>.</p>
     <p><a href="https://bien.nceas.ucsb.edu" target="_blank">https://bien.nceas.ucsb.edu</a></p>
   </div>
 
