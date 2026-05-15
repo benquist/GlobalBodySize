@@ -1,11 +1,45 @@
+# spatial_utils.R — Polygon validation, session provenance logging, DwC CSV export
+#
+# validate_polygon(): pre-flight checks on user-uploaded polygon before BIEN queries.
+# build_session_log(): generates a SHA-256-fingerprinted provenance record for audit trails.
+# build_dwc_csv():     formats query results as a Darwin Core-compliant data.frame for CSV export.
+
+# ── Polygon validation ────────────────────────────────────────────────────────
+# Checks:
+#   B5 — area bounds (MIN_POLYGON_AREA_KM2 warning, MAX_POLYGON_AREA_KM2 hard error)
+#   B7 — disjoint feature detection (warns if multiple features >25 km centroid separation)
+#        These will be unioned for the BIEN query; user may want to query separately.
+#   Americas bbox — polygon centroid must be within the BIEN domain (lon -170 to -34, lat -55 to 55)
 validate_polygon <- function(polygon_sf) {
+  CFG <- getOption("bien_cfg")
   warnings_out <- character()
   errors_out   <- character()
 
-  area_km2 <- tryCatch(
-    sum(as.numeric(sf::st_area(polygon_sf))) / 1e6,
-    error = function(e) NA_real_
+  # B5: carry units through area math; convert at boundary only
+  area_units_km2 <- tryCatch(
+    units::set_units(sum(sf::st_area(polygon_sf)), "km^2"),
+    error = function(e) NULL
   )
+  area_km2 <- if (!is.null(area_units_km2)) as.numeric(area_units_km2) else NA_real_
+
+  # B7: multi-feature detection — flag disjoint pieces (centroid > 25 km apart)
+  n_features <- nrow(polygon_sf)
+  if (isTRUE(!is.na(n_features)) && isTRUE(n_features > 1)) {
+    cents <- tryCatch(suppressWarnings(sf::st_centroid(sf::st_geometry(polygon_sf))),
+                      error = function(e) NULL)
+    if (!is.null(cents) && length(cents) > 1) {
+      d_km <- tryCatch(
+        as.numeric(units::set_units(max(sf::st_distance(cents)), "km")),
+        error = function(e) NA_real_
+      )
+      if (isTRUE(!is.na(d_km)) && isTRUE(d_km > 25)) {
+        warnings_out <- c(warnings_out, sprintf(
+          "Upload contains %d disjoint features (max centroid distance %.1f km). They will be unioned for the BIEN query. To analyze separately, upload one feature at a time.",
+          n_features, d_km
+        ))
+      }
+    }
+  }
 
   centroid <- tryCatch(
     sf::st_coordinates(sf::st_centroid(sf::st_union(polygon_sf))),
@@ -13,34 +47,35 @@ validate_polygon <- function(polygon_sf) {
                                dimnames = list(NULL, c("X", "Y")))
   )
 
-  if (!is.na(area_km2) && area_km2 < MIN_POLYGON_AREA_KM2) {
+  if (isTRUE(!is.na(area_km2)) && isTRUE(area_km2 < CFG$MIN_POLYGON_AREA_KM2)) {
     warnings_out <- c(warnings_out, sprintf(
       "Study area is %.1f km\u00b2, below the recommended minimum of %d km\u00b2. Results may be unreliable for small areas.",
-      area_km2, MIN_POLYGON_AREA_KM2
+      area_km2, CFG$MIN_POLYGON_AREA_KM2
     ))
   }
 
-  # F3: hard upper-area guard prevents accidental hemisphere-spanning queries
-  # that would stall BIEN's PostgreSQL backend. MAX_POLYGON_AREA_KM2 is set in global.R.
-  if (!is.na(area_km2) && exists("MAX_POLYGON_AREA_KM2") && area_km2 > MAX_POLYGON_AREA_KM2) {
+  # Hard upper-area guard prevents accidental hemisphere-spanning queries.
+  # Raised to 500,000 km² to support large legitimate conservation units
+  # (e.g. Alto Japurá ~250,000 km²). Antimeridian check in .prepare_aoi_for_bien
+  # provides the safety backstop against truly pathological polygons.
+  if (isTRUE(!is.na(area_km2)) && isTRUE(area_km2 > CFG$MAX_POLYGON_AREA_KM2)) {
     errors_out <- c(errors_out, sprintf(
       "Study area is %s km\u00b2, above the maximum supported size of %s km\u00b2. Split the area into smaller regions and run them separately. Very large polygons stall the BIEN API and produce unreliable richness estimates.",
       formatC(area_km2, format = "d", big.mark = ","),
-      formatC(MAX_POLYGON_AREA_KM2, format = "d", big.mark = ",")
+      formatC(CFG$MAX_POLYGON_AREA_KM2, format = "d", big.mark = ",")
     ))
   }
 
-  if (!is.na(centroid[1, "X"])) {
+  if (isTRUE(!is.na(centroid[1, "X"])) && isTRUE(!is.na(centroid[1, "Y"]))) {
     lon <- centroid[1, "X"]
     lat <- centroid[1, "Y"]
-    outside <- lon < BIEN_AMERICAS_BBOX$xmin || lon > BIEN_AMERICAS_BBOX$xmax ||
-               lat < BIEN_AMERICAS_BBOX$ymin || lat > BIEN_AMERICAS_BBOX$ymax
+    bb  <- CFG$BIEN_AMERICAS_BBOX
+    outside <- isTRUE(lon < bb$xmin) || isTRUE(lon > bb$xmax) ||
+               isTRUE(lat < bb$ymin) || isTRUE(lat > bb$ymax)
     if (outside) {
       errors_out <- c(errors_out, sprintf(
         "Polygon centroid (lon %.4f, lat %.4f) is outside the BIEN Americas domain (lon %d to %d, lat %d to %d).",
-        lon, lat,
-        BIEN_AMERICAS_BBOX$xmin, BIEN_AMERICAS_BBOX$xmax,
-        BIEN_AMERICAS_BBOX$ymin, BIEN_AMERICAS_BBOX$ymax
+        lon, lat, bb$xmin, bb$xmax, bb$ymin, bb$ymax
       ))
     }
   }
@@ -56,7 +91,12 @@ validate_polygon <- function(polygon_sf) {
 }
 
 
+# ── Session provenance log ────────────────────────────────────────────────────
+# SHA-256 fingerprints the polygon WKT so any modification to the geometry is
+# detectable in the exported CSV or HTML report. This supports reproducibility
+# audits: the same polygon should always produce the same fingerprint.
 build_session_log <- function(polygon_sf, polygon_source, n_bbox, n_final, anchor_result) {
+  CFG <- getOption("bien_cfg")
   centroid <- tryCatch(
     sf::st_coordinates(sf::st_centroid(sf::st_union(polygon_sf))),
     error = function(e) matrix(c(NA_real_, NA_real_), nrow = 1,
@@ -84,11 +124,22 @@ build_session_log <- function(polygon_sf, polygon_source, n_bbox, n_final, ancho
     n_species_after_intersection = n_final,
     anchor_check                 = anchor_result,
     r_version                    = paste(R.version$major, R.version$minor, sep = "."),
-    app_version                  = APP_VERSION
+    app_version                  = CFG$APP_VERSION
   )
 }
 
 
+
+# ── Darwin Core CSV export ────────────────────────────────────────────────────
+# Maps BIEN Flora Explora columns to Darwin Core (DwC) standard terms.
+# Notable choices:
+#   basisOfRecord = "Occurrence" — BIEN aggregates herbarium vouchers, plot records,
+#     and remote sensing inferences. "HumanObservation" would be factually incorrect
+#     for SDM-inferred presences. "Occurrence" is the broadest correct term.
+#   occurrenceRemarks — encodes confidence tier evidence so downstream users
+#     understand data support behind each record.
+#   informationWithheld — explicitly flags that SDM model fit statistics (AUC,
+#     Boyce Index, training n) are not available via the BIEN API.
 build_dwc_csv <- function(species_df, session_log) {
   # DwC basisOfRecord: "Occurrence" is the broadest valid term for aggregated BIEN records
   # (which mix herbarium vouchers, plot observations, etc. with no per-record basisOfRecord

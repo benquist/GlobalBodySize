@@ -69,6 +69,24 @@
         flagged "status_unavailable" cannot be classified from available data.
       </li>
       <li>
+        <span class="warning-title">Range Overlap Is Geometric, Not Probabilistic.</span>
+        Per-species "% AOI covered" and "% Range in AOI" are computed by PostGIS
+        intersection between the user AOI and the species' BIEN range polygon
+        (server-side via <code>BIEN_ranges_sf()</code> / <code>BIEN_occurrence_sf()</code>;
+        Maitner et al. 2018, <em>Methods in Ecology and Evolution</em> 9:373&ndash;379;
+        DOI: 10.1111/2041-210X.12861). These are <strong>geometric overlap</strong>
+        with the hypothesized range extent, not probability of presence and not
+        a measure of occupancy.
+      </li>
+      <li>
+        <span class="warning-title">Amazonian Range Maps Are Coarse.</span>
+        Range polygons in Amazonia are over-predicted because of sparse, river- and
+        road-biased sampling (ter Steege et al. 2011, <em>Ecography</em> 34:737&ndash;747;
+        ter Steege et al. 2020, <em>Scientific Reports</em> 10:10130). The predicted
+        species list should be treated as a <strong>lower bound on potential composition</strong>,
+        with both commission and omission errors expected.
+      </li>
+      <li>
         <span class="warning-title">Taxonomy Follows BIEN Scrubbed Names.</span>
         Names may differ from Plants of the World Online, Flora Neotropica, or other
         authorities. Check synonymy before citing.

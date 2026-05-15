@@ -1,37 +1,99 @@
-#' bien_queries.R — Wrapped, error-handled BIEN API calls
-#' All functions return NULL with a warning on API failure.
+# bien_queries.R — Wrapped, error-handled BIEN API calls
+#
+# All functions return NULL (with a warning) on API failure so the
+# calling stage can degrade gracefully rather than crash the app.
+#
+# BIEN query architecture:
+#   query_species_list_fast()  — Stage 1: country-level checklist (seconds)
+#   fetch_bien_occurrences_raw() — Stage 2: full occurrences via PostGIS (minutes)
+#   query_bien_occurrences()   — Stage 2: summarise raw occurrences to per-species counts
+#   get_bien_occurrence_points() — Stage 2: subsample for heatmap (≤5000 pts)
+#   query_bien_ranges()        — Stage 3: SDM range polygons + overlap geometry (slow)
+#   .prepare_aoi_for_bien()    — Internal: validate + reproject polygon before any BIEN call
 
-#' Query BIEN range polygons and compute overlap metrics with user polygon.
-#' Returns the ranges sf with two new columns:
+# ── Internal helper ───────────────────────────────────────────────────────────
+# Prepare a polygon for BIEN_*_sf calls: WGS84, valid, single-feature union.
+# Implements the Block B guards:
+#   B1 — s2 must be enabled (geodesic area and intersection)
+#   B2 — geometry must be valid (st_make_valid if needed)
+#   B3 — no antimeridian crossing (lon span > 180°)
+#   B4 — vertex cap: auto-simplify above 5000 vertices to avoid server timeout
+#   B6 — reproject to WGS84 / EPSG:4326 if needed
+
+#' Prepare a polygon for BIEN_*_sf calls: WGS84, valid, single union.
+#' Block B guards: s2 enabled, valid geometry, no antimeridian crossing,
+#' vertex cap with auto-simplify notification.
+.prepare_aoi_for_bien <- function(polygon_sf) {
+  # B1: assert s2 is on
+  if (!isTRUE(sf::sf_use_s2())) {
+    stop("sf_use_s2() is FALSE; refusing to query BIEN. Restart R or set sf::sf_use_s2(TRUE).")
+  }
+  # CRS reproject (B6)
+  current_crs <- sf::st_crs(polygon_sf)
+  if (!isTRUE(current_crs == sf::st_crs(4326))) {
+    epsg <- if (!is.null(current_crs$epsg)) current_crs$epsg else "unknown"
+    polygon_sf <- sf::st_transform(polygon_sf, 4326)
+    if (requireNamespace("shiny", quietly = TRUE) && !is.null(shiny::getDefaultReactiveDomain())) {
+      shiny::showNotification(
+        sprintf("Transformed AOI from EPSG:%s to EPSG:4326 for BIEN query.", epsg),
+        type = "message"
+      )
+    }
+  }
+  # B2: validate
+  if (any(!sf::st_is_valid(polygon_sf), na.rm = TRUE)) {
+    polygon_sf <- sf::st_make_valid(polygon_sf)
+  }
+  # Union to single feature for BIEN
+  aoi <- sf::st_union(polygon_sf)
+  aoi_sf <- sf::st_sf(geometry = aoi)
+  # B3: antimeridian
+  bb <- sf::st_bbox(aoi_sf)
+  if (bb["xmax"] - bb["xmin"] > 180) {
+    stop("AOI appears to cross the antimeridian (lon span > 180 deg). Split into hemisphere pieces and retry.")
+  }
+  # B4: vertex cap
+  n_vert <- tryCatch(nrow(sf::st_coordinates(aoi_sf)), error = function(e) NA_integer_)
+  if (!is.na(n_vert) && n_vert > 5000) {
+    area_m2 <- as.numeric(sf::st_area(aoi_sf))
+    tol <- sqrt(area_m2) / 1000
+    aoi_sf <- sf::st_simplify(aoi_sf, dTolerance = tol, preserveTopology = TRUE)
+    if (any(!sf::st_is_valid(aoi_sf), na.rm = TRUE)) aoi_sf <- sf::st_make_valid(aoi_sf)
+    if (requireNamespace("shiny", quietly = TRUE) && !is.null(shiny::getDefaultReactiveDomain())) {
+      shiny::showNotification(
+        sprintf("AOI had %d vertices (cap 5000). Auto-simplified for BIEN query.", n_vert),
+        type = "warning"
+      )
+    }
+  }
+  aoi_sf
+}
+
+#' Query BIEN range polygons via PostGIS server-side polygon intersection
+#' (BIEN_ranges_sf). Returns the ranges sf with two new columns:
 #'   overlap_pct_range   = intersection_area / range_area * 100
 #'   overlap_pct_polygon = intersection_area / polygon_area * 100
 query_bien_ranges <- function(polygon_sf) {
-  bbox <- sf::st_bbox(polygon_sf)
+  CFG <- getOption("bien_cfg")
+  polygon_sf <- .prepare_aoi_for_bien(polygon_sf)
 
-  # F2: bounded BIEN call. Falls back to no-timeout if R.utils unavailable.
-  timeout_sec <- if (exists("BIEN_API_TIMEOUT_SEC")) BIEN_API_TIMEOUT_SEC else 180
-
+  # Single-step: BIEN_ranges_sf with species.names.only=FALSE returns range geometries
+  # directly via a PostGIS spatial-intersection query — no per-species shapefile downloads.
+  # This replaces the previous two-step (get names via species.names.only=TRUE, then
+  # BIEN_ranges_load_species) which was downloading one shapefile per species and
+  # caused 80+ min runtimes on large polygons.
   ranges <- tryCatch({
-    if (requireNamespace("R.utils", quietly = TRUE)) {
-      R.utils::withTimeout({
-        BIEN::BIEN_ranges_box(
-          min.lat = bbox["ymin"], max.lat = bbox["ymax"],
-          min.lon = bbox["xmin"], max.lon = bbox["xmax"]
-        )
-      }, timeout = timeout_sec, onTimeout = "error")
-    } else {
-      BIEN::BIEN_ranges_box(
-        min.lat = bbox["ymin"], max.lat = bbox["ymax"],
-        min.lon = bbox["xmin"], max.lon = bbox["xmax"]
-      )
-    }
+    BIEN::BIEN_ranges_sf(
+      sf                  = polygon_sf,
+      species.names.only  = FALSE,
+      return.species.list = FALSE,
+      crop.ranges         = FALSE,
+      include.gid         = FALSE
+    )
   }, TimeoutException = function(e) {
-    stop(sprintf("BIEN range query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
+    stop("BIEN range query timed out. Try a smaller polygon or retry later.")
   }, error = function(e) {
-    if (inherits(e, "TimeoutException") || grepl("timeout", conditionMessage(e), ignore.case = TRUE)) {
-      stop(sprintf("BIEN range query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
-    }
-    warning("BIEN_ranges_box failed: ", conditionMessage(e))
+    warning("BIEN_ranges_sf failed: ", conditionMessage(e))
     return(NULL)
   })
 
@@ -109,6 +171,7 @@ query_bien_ranges <- function(polygon_sf) {
 
 #' Summarise pre-fetched occurrence data.frame into per-species counts.
 #' Input occ_raw must already be clipped to the polygon (from fetch_bien_occurrences_raw).
+#' Returns one row per accepted species with n_occurrences, family, and native_status_flag.
 query_bien_occurrences <- function(occ_raw) {
   if (is.null(occ_raw) || nrow(occ_raw) == 0) {
     return(data.frame(species = character(), n_occurrences = integer(),
@@ -116,9 +179,13 @@ query_bien_occurrences <- function(occ_raw) {
                       stringsAsFactors = FALSE))
   }
 
+  # Drop records with NULL coordinates and likely coordinate-reference artifacts
+  # (exact (0,0) indicates a failed geocode, not Gulf-of-Guinea occurrences).
   occ <- occ_raw[!is.na(occ_raw$latitude) & !is.na(occ_raw$longitude), ]
   occ <- occ[!(abs(occ$latitude) < 0.001 & abs(occ$longitude) < 0.001), ]
 
+  # Drop non-Accepted taxonomic status (synonyms, hybrids, unresolved).
+  # This reduces false richness from multiple names for the same taxon.
   if ("scrubbed_taxonomic_status" %in% names(occ)) {
     n_before <- nrow(occ)
     occ <- occ[!is.na(occ$scrubbed_taxonomic_status) &
@@ -138,11 +205,14 @@ query_bien_occurrences <- function(occ_raw) {
                       stringsAsFactors = FALSE))
   }
 
-  # Deduplicate by rounded coordinates to remove duplicate aggregation-pipeline records
-  occ <- occ[!duplicated(data.frame(
-    sp  = occ$scrubbed_species_binomial,
-    lat = round(occ$latitude,  3),
-    lon = round(occ$longitude, 3)
+  # Deduplicate by rounded coordinates to remove duplicate aggregation-pipeline records.
+  # paste() string key is significantly faster than constructing a data.frame for
+  # !duplicated() on 1M+ rows (avoids a full N-row object allocation).
+  occ <- occ[!duplicated(paste(
+    occ$scrubbed_species_binomial,
+    round(occ$latitude,  3L),
+    round(occ$longitude, 3L),
+    sep = "\x1f"
   )), ]
 
   family_col <- if ("scrubbed_family" %in% names(occ)) "scrubbed_family" else NULL
@@ -153,12 +223,16 @@ query_bien_occurrences <- function(occ_raw) {
     dplyr::group_by(species = scrubbed_species_binomial) %>%
     dplyr::summarise(
       n_occurrences = dplyr::n(),
+      # scrubbed_family is taxonomically invariant per scrubbed_species_binomial;
+      # first non-NA value is equivalent to modal and avoids O(n) table() per group.
       family = if (!is.null(family_col)) {
         fam_vals <- .data[[family_col]]
         fam_vals <- fam_vals[!is.na(fam_vals)]
-        if (length(fam_vals) == 0) NA_character_
-        else names(sort(table(fam_vals), decreasing = TRUE))[1]
+        if (length(fam_vals) == 0L) NA_character_ else fam_vals[1L]
       } else NA_character_,
+      # Majority-vote native status: flag a species as likely_introduced only if
+      # introduced records outnumber native records. NA-dominated columns become
+      # status_unavailable rather than silently misclassifying.
       native_status_flag = if (has_native) {
         ns <- .data[["native_status"]]
         n_nat  <- sum(ns == "native",     na.rm = TRUE)
@@ -176,6 +250,8 @@ query_bien_occurrences <- function(occ_raw) {
 
 
 #' Subsample pre-fetched occurrence data.frame for heatmap rendering.
+#' Leaflet heatmap performance degrades significantly above ~5000 points.
+#' Returns up to 5000 spatially valid occurrence rows (random sample).
 get_bien_occurrence_points <- function(occ_raw) {
   if (is.null(occ_raw) || nrow(occ_raw) == 0) return(NULL)
 
@@ -197,63 +273,124 @@ get_bien_occurrence_points <- function(occ_raw) {
 }
 
 
-#' Fetch raw BIEN occurrence records for a polygon bounding box, then clip
-#' to the actual polygon. Returns filtered data.frame ready for downstream use.
+#' Fetch raw BIEN occurrence records via PostGIS server-side polygon
+#' intersection (BIEN_occurrence_sf). Polygon-clipping is done server-side;
+#' no client-side bbox + clip step is required.
+#'
+#' Key parameter choices:
+#'   native.status = TRUE   — adds native_status column (used for majority-vote flag in Stage 2)
+#'   natives.only  = FALSE  — includes introduced species (user sees full flora, not curated native list)
+#'   only.geovalid = TRUE   — drops records flagged as coordinate-invalid by BIEN QA
+#'   cultivated    = FALSE  — excludes garden/plantation records
 fetch_bien_occurrences_raw <- function(polygon_sf) {
-  bbox <- sf::st_bbox(polygon_sf)
+  # Stage 1 fast path: use political-unit lookups (country + state) which hit
+  # pre-indexed BIEN tables and return in seconds regardless of polygon size.
+  # Returns a superset of AOI species (broader than the exact polygon); Stage 2
+  # refines with spatially-filtered occurrence records.
+  CFG <- getOption("bien_cfg")
 
-  # F2: bounded BIEN call. Falls back to no-timeout if R.utils unavailable.
-  timeout_sec <- if (exists("BIEN_API_TIMEOUT_SEC")) BIEN_API_TIMEOUT_SEC else 180
+  # Ensure WGS84 for bbox extraction
+  poly_wgs <- tryCatch(sf::st_transform(polygon_sf, 4326), error = function(e) polygon_sf)
+  bb <- sf::st_bbox(poly_wgs)
+
+  # Resolve overlapping countries and states via rnaturalearth or BIEN political lookup
+  # Use BIEN_list_country + BIEN_list_state — both are sub-second queries.
+  countries_sf <- tryCatch(
+    rnaturalearth::ne_countries(returnclass = "sf", scale = "medium"),
+    error = function(e) NULL
+  )
+
+  country_names <- NULL
+  state_names   <- NULL
+
+  if (!is.null(countries_sf)) {
+    poly_union <- sf::st_union(sf::st_transform(polygon_sf, 4326))
+    hits <- suppressMessages(suppressWarnings(
+      sf::st_intersects(sf::st_transform(countries_sf, 4326), poly_union, sparse = FALSE)[, 1]
+    ))
+    country_names <- unique(countries_sf$name_long[hits])
+    # Strip any NAs
+    country_names <- country_names[!is.na(country_names) & nchar(country_names) > 0]
+  }
+
+  species_vec <- character(0)
+
+  # Country-level lookup (fast, seconds)
+  if (!is.null(country_names) && length(country_names) > 0) {
+    for (cn in country_names) {
+      res <- tryCatch(
+        BIEN::BIEN_list_country(country = cn, cultivated = FALSE, new.world = NULL),
+        error = function(e) NULL
+      )
+      if (!is.null(res) && nrow(res) > 0) {
+        nm_col <- intersect(c("scrubbed_species_binomial", "species"), names(res))[1]
+        if (!is.na(nm_col)) {
+          species_vec <- c(species_vec, res[[nm_col]])
+        }
+      }
+    }
+  }
+
+  # If no country lookup succeeded, fall back to BIEN_list_sf (slow but correct)
+  if (length(species_vec) == 0) {
+    message("[Stage1] Country lookup empty — falling back to BIEN_list_sf")
+    polygon_sf <- .prepare_aoi_for_bien(polygon_sf)
+    res <- tryCatch(
+      BIEN::BIEN_list_sf(sf = polygon_sf, cultivated = FALSE, new.world = NULL),
+      error = function(e) { warning("BIEN_list_sf failed: ", conditionMessage(e)); NULL }
+    )
+    if (!is.null(res) && nrow(res) > 0) {
+      nm_col <- intersect(c("scrubbed_species_binomial", "species"), names(res))[1]
+      if (!is.na(nm_col)) species_vec <- unique(stats::na.omit(res[[nm_col]]))
+    }
+  }
+
+  if (length(species_vec) == 0) return(NULL)
+  unique(stats::na.omit(species_vec))
+}
+
+fetch_bien_occurrences_raw <- function(polygon_sf) {
+  CFG <- getOption("bien_cfg")
+  polygon_sf <- .prepare_aoi_for_bien(polygon_sf)
 
   raw <- tryCatch({
-    if (requireNamespace("R.utils", quietly = TRUE)) {
-      R.utils::withTimeout({
-        BIEN::BIEN_occurrence_box(
-          min.lat       = bbox["ymin"], max.lat = bbox["ymax"],
-          min.lon       = bbox["xmin"], max.lon = bbox["xmax"],
-          cultivated    = FALSE,
-          native.status = TRUE,
-          natives.only  = FALSE
-        )
-      }, timeout = timeout_sec, onTimeout = "error")
-    } else {
-      BIEN::BIEN_occurrence_box(
-        min.lat       = bbox["ymin"], max.lat = bbox["ymax"],
-        min.lon       = bbox["xmin"], max.lon = bbox["xmax"],
-        cultivated    = FALSE,
-        native.status = TRUE,
-        natives.only  = FALSE
+    occ_call <- function() {
+      BIEN::BIEN_occurrence_sf(
+        sf                   = polygon_sf,
+        cultivated           = FALSE,
+        new.world            = NULL,
+        all.taxonomy         = FALSE,
+        native.status        = TRUE,
+        natives.only         = FALSE,
+        observation.type     = FALSE,
+        political.boundaries = FALSE,
+        collection.info      = FALSE,
+        only.geovalid        = TRUE
       )
     }
-  }, TimeoutException = function(e) {
-    stop(sprintf("BIEN occurrence query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
+    occ_call()
   }, error = function(e) {
-    if (inherits(e, "TimeoutException") || grepl("timeout", conditionMessage(e), ignore.case = TRUE)) {
-      stop(sprintf("BIEN occurrence query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
-    }
-    warning("BIEN_occurrence_box failed: ", conditionMessage(e))
+    warning("BIEN_occurrence_sf failed: ", conditionMessage(e))
     NULL
   })
 
-  if (is.null(raw) || nrow(raw) == 0) return(raw)
-
-  # Clip to the actual polygon, not just the bounding box
-  has_coords <- !is.na(raw$latitude) & !is.na(raw$longitude)
-  if (any(has_coords)) {
-    occ_sf <- sf::st_as_sf(
-      raw[has_coords, ],
-      coords = c("longitude", "latitude"),
-      crs    = 4326,
-      remove = FALSE
-    )
-    target_crs <- sf::st_crs(polygon_sf)
-    if (!isTRUE(sf::st_crs(occ_sf) == target_crs)) {
-      occ_sf <- sf::st_transform(occ_sf, target_crs)
-    }
-    inside  <- lengths(sf::st_intersects(occ_sf, polygon_sf)) > 0
-    clipped <- raw[has_coords, ][inside, ]
-    raw     <- rbind(clipped, raw[!has_coords, ])
-  }
-
+  # BIEN_occurrence_sf returns server-side polygon-clipped occurrences;
+  # no client-side bbox-then-clip step required.
   raw
 }
+
+# ── Stage 1 — Fast species checklist via country-level lookup ─────────────────
+# BIEN_list_country() queries pre-indexed political-unit tables and returns
+# in seconds regardless of polygon size. This is dramatically faster than
+# BIEN_list_sf() for large remote AOIs where the PostGIS spatial intersection
+# would take 10+ minutes.
+#
+# The result is a country-level superset: all species recorded anywhere in the
+# overlapping country/countries. Stage 2 (BIEN_occurrence_sf) provides the
+# spatially precise polygon-interior refinement.
+#
+# Falls back to BIEN_list_sf() only if every country lookup returns 0 species
+# (this guards against BIEN coverage gaps in non-standard country names).
+#
+# Returns: character vector of scrubbed_species_binomial, or NULL on failure.
+query_species_list_fast <- function(polygon_sf) {

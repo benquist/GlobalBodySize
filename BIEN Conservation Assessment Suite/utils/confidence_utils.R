@@ -1,6 +1,27 @@
-#' assign_confidence_tiers — join range and occurrence evidence; assign tiers.
-#' Uses overlap_pct_polygon (fraction of the AOI predicted suitable) for tier logic.
-#' Also retains overlap_pct_range (endemism metric) as a display column.
+# confidence_utils.R — Confidence tier assignment and anchor species plausibility gate
+#
+# assign_confidence_tiers(): merges range overlap and occurrence counts into a single
+# species data.frame, then assigns each species to one of four confidence tiers based
+# on the combined evidence. The tier system is designed for conservation triage in
+# regions where BIEN data coverage is heterogeneous.
+#
+# check_anchor_species(): a binary plausibility gate that checks whether well-known
+# western Amazonian indicator species appear in the query results. A FAIL does not
+# mean those species are absent — it may indicate a CRS mismatch, a BIEN coverage
+# gap, or that the polygon does not include suitable habitat. See CFG$ANCHOR_SPECIES.
+
+#' Merge range overlap and occurrence evidence; assign confidence tiers.
+#'
+#' Tier thresholds (both overlap_pct_polygon and n_occurrences are used):
+#'   High      — n_occ ≥ 20  AND overlap_pct_polygon ≥ 25%  (strong dual evidence)
+#'   Moderate  — n_occ ≥ 5   AND overlap_pct_polygon ≥ 10%  (moderate dual evidence)
+#'   Low       — n_occ ≥ 2   OR  overlap_pct_polygon ≥ 2%   (any credible evidence)
+#'   Very Low  — all remaining (checklist-only, no occurrence evidence)
+#'
+#' overlap_pct_polygon: fraction of the AOI predicted suitable by the range model.
+#' overlap_pct_range:   fraction of the species' global range inside the AOI (endemism proxy).
+#'
+#' Both range columns are retained as display columns regardless of tier calculation.
 assign_confidence_tiers <- function(ranges_sf, occ_counts_df) {
 
   if (!is.null(ranges_sf) && nrow(ranges_sf) > 0 && inherits(ranges_sf, "sf")) {
@@ -64,8 +85,10 @@ assign_confidence_tiers <- function(ranges_sf, occ_counts_df) {
   merged$family[is.na(merged$family)]                           <- NA_character_
   merged$native_status_flag[is.na(merged$native_status_flag)]   <- "status_unavailable"
 
-  # Tier logic uses overlap_pct_polygon (fraction of AOI covered by species range)
-  # Raised "Low" threshold: n_occ >= 2 AND/OR overlap_polygon >= 2%
+  # Tier logic: dual-evidence (range + occurrence) promotes a species to High or Moderate;
+  # single-evidence OR threshold gives Low. Very Low is the default for checklist-only
+  # species returned by Stage 1 with no occurrence records in the polygon.
+  # Thresholds were calibrated against the Alto Japurá pilot dataset (250,000 km² AOI).
   merged$confidence_tier <- dplyr::case_when(
     merged$n_occurrences >= 20 & merged$overlap_pct_polygon >= 25 ~ "High",
     merged$n_occurrences >= 5  & merged$overlap_pct_polygon >= 10 ~ "Moderate",
@@ -97,9 +120,14 @@ assign_confidence_tiers <- function(ranges_sf, occ_counts_df) {
 }
 
 
+#' Anchor species plausibility gate.
+#' Returns a named logical vector (TRUE = species found, FALSE = not found).
+#' A FAIL on a western Amazonian indicator species should trigger a user-visible
+#' warning in the Data Quality tab, prompting review of the input polygon and CRS.
 check_anchor_species <- function(species_df) {
+  CFG <- getOption("bien_cfg")
   if (is.null(species_df) || nrow(species_df) == 0) {
-    return(setNames(rep(FALSE, length(ANCHOR_SPECIES)), ANCHOR_SPECIES))
+    return(setNames(rep(FALSE, length(CFG$ANCHOR_SPECIES)), CFG$ANCHOR_SPECIES))
   }
-  setNames(ANCHOR_SPECIES %in% species_df$accepted_name, ANCHOR_SPECIES)
+  setNames(CFG$ANCHOR_SPECIES %in% species_df$accepted_name, CFG$ANCHOR_SPECIES)
 }

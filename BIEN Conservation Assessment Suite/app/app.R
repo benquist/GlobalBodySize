@@ -1,4 +1,15 @@
-## ── explicit bootstrap in case global.R failed silently ──────────────────────
+# app.R — BIEN Flora Explora: Conservation Assessment Suite
+# Main Shiny UI + server. Implements the three-stage async query architecture:
+#   Stage 1 — BIEN_list_country: fast political-unit checklist (seconds)
+#   Stage 2 — BIEN_occurrence_sf: full occurrence records (minutes)
+#   Stage 3 — BIEN_ranges_sf: range overlap analysis (slow, optional)
+#
+# Stages 1 and 2 run concurrently in separate future workers.
+# The UI updates progressively as each stage completes.
+
+# ── Package bootstrap (explicit, in case global.R failed silently) ────────────
+# global.R is auto-sourced by Shiny before app.R, but we re-declare packages
+# here as a defensive measure so the app never silently degrades.
 library(shiny)
 library(bslib)
 library(dplyr)
@@ -14,16 +25,17 @@ if (!requireNamespace("R.utils", quietly = TRUE)) {
   warning("R.utils not installed; BIEN call timeouts will be disabled.")
 }
 
-for (.f in list.files("../modules", pattern = "\\.R$", full.names = TRUE)) source(.f)
-for (.f in list.files("../utils",   pattern = "\\.R$", full.names = TRUE)) source(.f)
+# Re-source modules and utils (idempotent; no-op if already loaded)
+for (.f in list.files("../modules", pattern = "\\.R$", full.names = TRUE)) sys.source(.f, envir = globalenv())
+for (.f in list.files("../utils",   pattern = "\\.R$", full.names = TRUE)) sys.source(.f, envir = globalenv())
 rm(.f)
 
-## F1: ensure async plan is active even if global.R partially failed.
-## Re-declaring plan() is idempotent and cheap.
+# Ensure async plan is active even if global.R partially failed.
+# plan() is idempotent; re-declaring it is cheap and safe.
 future::plan(future::multisession, workers = 2)
 message("[BIEN-app] Active future plan: ", paste(class(future::plan())[1:2], collapse = " / "),
         " | workers requested: 2")
-## ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 
 ui <- fluidPage(
   theme = bslib::bs_theme(bootswatch = "flatly"),
@@ -41,6 +53,30 @@ ui <- fluidPage(
                                  border-left:6px solid #e67e22; border-radius:4px;
                                  padding:10px 16px; margin-bottom:12px; font-size:0.9em; }
       .native-warn { color:#c0392b; font-weight:bold; }
+
+      /* Visible 'analysis running' indicators */
+      .running-banner {
+        background: linear-gradient(90deg, #1abc9c 0%, #16a085 100%);
+        color:#fff; padding:18px 24px; border-radius:8px; margin-bottom:14px;
+        font-size:1.1em; box-shadow:0 2px 8px rgba(0,0,0,0.15);
+        display:flex; align-items:center; gap:14px;
+      }
+      .running-banner .spinner {
+        width:28px; height:28px; border:4px solid rgba(255,255,255,0.35);
+        border-top-color:#fff; border-radius:50%;
+        animation: bien-spin 1s linear infinite; flex-shrink:0;
+      }
+      @keyframes bien-spin { to { transform: rotate(360deg); } }
+      .running-banner .elapsed { font-weight:bold; font-size:1.15em; margin-left:auto;
+                                  background:rgba(0,0,0,0.18); padding:4px 12px; border-radius:4px; }
+      .status-running { color:#16a085; font-weight:bold; }
+      .status-partial { color:#e67e22; font-weight:bold; }
+      .status-done    { color:#27ae60; font-weight:bold; }
+      .status-error   { color:#c0392b; font-weight:bold; }
+      .btn-primary[disabled], .btn-primary.disabled {
+        background:#7f8c8d !important; border-color:#7f8c8d !important;
+        cursor:not-allowed !important;
+      }
     "))
   ),
 
@@ -63,6 +99,7 @@ ui <- fluidPage(
           choices = c(
             "GeoJSON (.geojson/.json)" = "geojson",
             "Shapefile (.zip)"         = "shapefile",
+            "KML / KMZ (.kml/.kmz)"   = "kml",
             "Pilot: Alto Japur\u00e1 (example)" = "pilot"
           ),
           selected = "geojson"
@@ -76,6 +113,10 @@ ui <- fluidPage(
           fileInput("shapefile_zip", "Upload shapefile (.zip)", accept = ".zip")
         ),
         conditionalPanel(
+          condition = "input.file_type == 'kml'",
+          fileInput("kml_file", "Upload KML or KMZ", accept = c(".kml", ".kmz"))
+        ),
+        conditionalPanel(
           condition = "input.file_type == 'pilot'",
           div(class = "alert alert-info", style = "font-size:0.85em; padding:8px;",
             "Loads the Alto Japur\u00e1 (Brazil) pilot study area.")
@@ -85,6 +126,15 @@ ui <- fluidPage(
       actionButton("run_query", "Run Analysis",
         class = "btn-primary btn-lg",
         style = "width:100%; margin-top:12px;"
+      ),
+      div(style = "margin-top:8px;",
+        checkboxInput("include_ranges",
+          label = tags$span(style="font-size:0.85em;",
+            "Include range overlap analysis ",
+            tags$em("(slow, ~20–60 min)")
+          ),
+          value = FALSE
+        )
       ),
 
       hr(),
@@ -105,6 +155,7 @@ ui <- fluidPage(
 
     mainPanel(
       width = 9,
+      uiOutput("running_banner"),
       tabsetPanel(
         tabPanel("Map",
           br(),
@@ -145,15 +196,25 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+  # rv holds all app state. Writing to rv from .then() callbacks is safe
+  # because Shiny's promise integration guarantees callbacks run on the
+  # main session thread (no concurrent writes to rv from workers).
   rv <- reactiveValues(
-    polygon         = NULL,
-    species_df      = NULL,
-    session_log     = NULL,
-    occ_points      = NULL,
-    anchor_result   = NULL,
-    pending_polygon = NULL,
-    status          = "idle"
+    polygon         = NULL,   # validated sf polygon from user input
+    species_df      = NULL,   # current species data.frame (updated by each stage)
+    session_log     = NULL,   # provenance metadata for CSV/HTML export
+    occ_raw         = NULL,   # raw BIEN_occurrence_sf output (Stage 2)
+    occ_counts      = NULL,   # per-species occurrence summary from Stage 2
+    occ_points      = NULL,   # subsampled points for heatmap (≤5000 rows)
+    anchor_result   = NULL,   # named logical vector from check_anchor_species()
+    pending_polygon = NULL,   # polygon held for user confirmation on validation warnings
+    status          = "idle", # one of: idle / running / listing / enriching / partial / done / error
+    started_at      = NULL    # POSIXct: when Run Analysis was clicked (for elapsed timer)
   )
+
+  # 1-second reactive timer — drives the elapsed-time display in the running banner.
+  # Takes a dependency in running_banner's renderUI so it re-renders every second.
+  elapsed_tick <- reactiveTimer(1000)
 
   output$results_ready <- reactive({
     !is.null(rv$species_df) && nrow(rv$species_df) > 0
@@ -162,10 +223,53 @@ server <- function(input, output, session) {
 
   output$status_text <- renderText({
     switch(rv$status,
-      idle    = "Ready. Load a polygon and click Run Analysis.",
-      running = "Analysis running\u2026 please wait (2\u20135 min for large AOIs).",
-      done    = paste0("Complete. ", nrow(rv$species_df), " species predicted."),
-      error   = "Analysis failed. Check inputs and try again."
+      idle      = "Ready. Load a polygon and click Run Analysis.",
+      running   = "Stage 1: Querying BIEN species checklist\u2026",
+      listing   = paste0("Preliminary list ready (\u2248", nrow(rv$species_df), " species). Stage 2: loading occurrence counts\u2026"),
+      enriching = paste0(nrow(rv$species_df), " species with occurrence tiers. Stage 3: range overlap analysis running\u2026"),
+      partial   = paste0(nrow(rv$species_df), " species. Range overlap analysis still running\u2026"),
+      done      = paste0("Complete. ", nrow(rv$species_df), " species."),
+      error     = "Analysis failed. Check inputs and try again."
+    )
+  })
+
+  # Expose running state to UI conditionalPanel + JS
+  output$is_running <- reactive({ rv$status %in% c("running", "listing", "enriching", "partial") })
+  outputOptions(output, "is_running", suspendWhenHidden = FALSE)
+
+  # Prominent running banner with live elapsed-time counter
+  output$running_banner <- renderUI({
+    if (!rv$status %in% c("running", "listing", "enriching", "partial")) return(NULL)
+    elapsed_tick()  # take a dependency so this re-renders every second
+    secs <- if (!is.null(rv$started_at))
+      as.integer(difftime(Sys.time(), rv$started_at, units = "secs"))
+    else 0L
+    mm <- sprintf("%02d:%02d", secs %/% 60, secs %% 60)
+    msg <- switch(rv$status,
+      running   = list(
+        strong  = "Stage 1 of 3: Querying BIEN species checklist\u2026",
+        detail  = "BIEN_list_sf — typically 5\u201330 seconds. Species table will appear shortly."
+      ),
+      listing   = list(
+        strong  = "Stage 2 of 3: Loading occurrence records\u2026",
+        detail  = "Preliminary species list shown. Occurrence counts and heatmap loading in background."
+      ),
+      enriching = list(
+        strong  = "Stage 3 of 3: Range overlap analysis running\u2026",
+        detail  = "Occurrence-based tiers shown. Table will update with range overlap columns when complete."
+      ),
+      partial   = list(
+        strong  = "Range overlap analysis running\u2026",
+        detail  = "Occurrence-based tiers shown. Table will update when complete. Do not refresh."
+      )
+    )
+    div(class = "running-banner",
+      div(class = "spinner"),
+      div(
+        tags$div(tags$strong(msg$strong)),
+        tags$div(style = "font-size:0.85em; opacity:0.92; margin-top:2px;", msg$detail)
+      ),
+      div(class = "elapsed", "\u23f1 ", mm)
     )
   })
 
@@ -175,7 +279,7 @@ server <- function(input, output, session) {
     poly <- tryCatch({
       p <- sf::st_read(geojson_str, quiet = TRUE)
       p <- sf::st_transform(p, 4326)
-      if (!all(sf::st_is_valid(p))) p <- sf::st_make_valid(p)
+      if (!isTRUE(all(sf::st_is_valid(p)))) p <- sf::st_make_valid(p)
       p
     }, error = function(e) {
       showNotification(paste("Error parsing drawn polygon:", e$message), type = "error")
@@ -209,6 +313,21 @@ server <- function(input, output, session) {
       shp_files <- list.files(td, pattern = "\\.shp$", recursive = TRUE, full.names = TRUE)
       if (length(shp_files) == 0) return(NULL)
       poly <- tryCatch(sf::st_read(shp_files[1], quiet = TRUE), error = function(e) NULL)
+    } else if (ft == "kml") {
+      req(input$kml_file)
+      kml_path <- input$kml_file$datapath
+      # KMZ = zipped KML; extract first .kml from archive
+      if (grepl("\\.kmz$", input$kml_file$name, ignore.case = TRUE)) {
+        td <- tempfile(); dir.create(td)
+        manifest <- tryCatch(unzip(kml_path, list = TRUE), error = function(e) NULL)
+        if (is.null(manifest) || any(grepl("..", manifest$Name, fixed = TRUE))) return(NULL)
+        ok <- tryCatch({ unzip(kml_path, exdir = td); TRUE }, error = function(e) FALSE)
+        if (!ok) return(NULL)
+        kml_files <- list.files(td, pattern = "\\.kml$", recursive = TRUE, full.names = TRUE, ignore.case = TRUE)
+        if (length(kml_files) == 0) return(NULL)
+        kml_path <- kml_files[1]
+      }
+      poly <- tryCatch(sf::st_read(kml_path, quiet = TRUE), error = function(e) NULL)
     } else if (ft == "pilot") {
       pilot_path <- "../data/Japura_AOI_Nov2025_mapshaper.json"
       if (!file.exists(pilot_path)) return(NULL)
@@ -225,7 +344,7 @@ server <- function(input, output, session) {
     poly <- tryCatch(sf::st_transform(poly, 4326), error = function(e) poly)
     geom_types <- unique(as.character(sf::st_geometry_type(poly)))
     if (!any(geom_types %in% c("POLYGON", "MULTIPOLYGON"))) return(NULL)
-    if (!all(sf::st_is_valid(poly))) poly <- sf::st_make_valid(poly)
+    if (!isTRUE(all(sf::st_is_valid(poly)))) poly <- sf::st_make_valid(poly)
     poly
   })
 
@@ -234,49 +353,170 @@ server <- function(input, output, session) {
     switch(input$file_type,
       geojson   = "GeoJSON upload",
       shapefile = "Shapefile upload",
+      kml       = "KML/KMZ upload",
       pilot     = "Pilot polygon (Alto Japur\u00e1)",
       "Unknown"
     )
   }
 
-  # ── Async analysis ─────────────────────────────────────────────────────────
-  # BIEN API calls run in a background multisession worker.
-  # rv$* writes happen only in the .then() callback on the main session thread.
+  # ── Async analysis — Three-stage design ─────────────────────────────────────
+  #
+  # Stage 1 (Worker 1): query_species_list_fast()
+  #   Uses BIEN_list_country() per overlapping country (pre-indexed, seconds).
+  #   Returns a superset — all country species, not just polygon-interior ones.
+  #   Populates an immediate preliminary table so the user sees something fast.
+  #   Falls back to BIEN_list_sf() only if country lookup returns 0 species.
+  #
+  # Stage 2 (Worker 2): fetch_bien_occurrences_raw() → query_bien_occurrences()
+  #   Full BIEN_occurrence_sf() call — server-side polygon intersection (minutes).
+  #   Provides spatially precise occurrence counts and enables the heatmap.
+  #   Overwrites Stage 1 table with occurrence-based confidence tiers.
+  #
+  # Stage 3 (Worker 3, optional): query_bien_ranges()
+  #   BIEN_ranges_sf() — returns range polygons with overlap percentages (slow).
+  #   Only activated when the user checks "Include range overlap analysis."
+  #   Updates the table with overlap_pct_polygon and overlap_pct_range columns.
+  #
+  # All rv$* writes happen in .then() / %...>% callbacks on the main session
+  # thread, NOT inside the worker futures. This is the correct async pattern
+  # for Shiny: futures compute, callbacks update state.
   run_analysis <- function(poly, source_label) {
-    rv$status <- "running"
+    rv$status     <- "running"
+    rv$started_at <- Sys.time()
+    rv$occ_raw    <- NULL
+    rv$occ_counts <- NULL
+
+    include_ranges <- isTRUE(input$include_ranges)
+
+    # Snapshot CFG on the main thread before launching workers.
+    # Workers cannot access Shiny session globals directly; they need the
+    # snapshot passed in through their closure or set via options() inside
+    # the worker body (first line: options(bien_cfg = cfg_snap)).
+    cfg_snap       <- getOption("bien_cfg")
 
     progress <- shiny::Progress$new(session, min = 0, max = 1)
-    progress$set(message = "Connecting to BIEN\u2026", value = 0.05,
-                 detail  = "Fetching range maps and occurrence records (2\u20135 min).")
+    progress$set(
+      message = "Stage 1: Querying BIEN species checklist\u2026",
+      value   = 0.05,
+      detail  = "BIEN_list_sf \u2014 typically 5\u201330 seconds."
+    )
 
+    # ---- Stage 1 (Worker 1): fast country-level checklist ----------------------
+    # query_species_list_fast() uses BIEN_list_country() per overlapping country,
+    # which queries pre-indexed political-unit tables and returns in seconds.
+    # The result is a superset (whole country, not just polygon interior);
+    # Stage 2 refines with spatially precise occurrence records.
+    # Stage 1 is non-fatal: if it fails, Stage 2 still supplies the species list.
     promises::future_promise({
-      # Runs in background R worker — no rv$ access here
-      list(
-        ranges_sf = query_bien_ranges(poly),
-        occ_raw   = fetch_bien_occurrences_raw(poly)
-      )
-    }) %...>% (function(result) {
-      # Back on main session thread
-      progress$set(value = 0.75, message = "Processing results\u2026",
-                   detail = "Assigning confidence tiers.")
-      occ_counts     <- query_bien_occurrences(result$occ_raw)
-      occ_points     <- get_bien_occurrence_points(result$occ_raw)
-      rv$occ_points  <- occ_points
-      species_df     <- assign_confidence_tiers(result$ranges_sf, occ_counts)
-      anchor_result  <- check_anchor_species(species_df)
-      rv$anchor_result <- anchor_result
-      n_bbox  <- if (!is.null(result$ranges_sf)) nrow(result$ranges_sf) else 0L
-      n_final <- if (!is.null(species_df)) nrow(species_df) else 0L
-      session_log    <- build_session_log(poly, source_label, n_bbox, n_final, anchor_result)
-      rv$species_df  <- species_df
-      rv$session_log <- session_log
-      rv$status      <- "done"
-      progress$close()
+      options(bien_cfg = cfg_snap)  # restore CFG in worker session
+      query_species_list_fast(poly)
+    }, seed = TRUE) %...>% (function(species_vec) {
+      progress$set(value = 0.25,
+                   message = "Checklist ready. Loading occurrence records\u2026",
+                   detail  = "Stage 2 running in background \u2014 table will update with counts.")
+      if (!is.null(species_vec) && length(species_vec) > 0) {
+        # Build a minimal species data.frame from the checklist names only.
+        # n_occurrences = 0 because occurrence data is not yet available.
+        # assign_confidence_tiers() will assign Very Low tier to these rows;
+        # they will be overwritten by Stage 2 with real occurrence-based tiers.
+        occ_df_s1 <- data.frame(
+          species            = species_vec,
+          n_occurrences      = 0L,
+          family             = NA_character_,
+          native_status_flag = "status_unavailable",
+          stringsAsFactors   = FALSE
+        )
+        species_df_s1  <- assign_confidence_tiers(NULL, occ_df_s1)
+        anchor_result  <- check_anchor_species(species_df_s1)
+        rv$anchor_result <- anchor_result
+        rv$session_log <- build_session_log(poly, source_label, 0L, nrow(species_df_s1), anchor_result)
+        rv$species_df  <- species_df_s1
+      }
+      rv$status <- "listing"   # signal UI: Stage 2 is now running
     }) %...!% (function(e) {
-      rv$status <- "error"
-      progress$close()
-      showNotification(paste("Analysis error:", e$message), type = "error", duration = NULL)
+      # Stage 1 failure is non-fatal: Stage 2 will supply occurrence-based species
+      warning("Stage 1 BIEN_list_sf failed: ", e$message)
+      rv$status <- "listing"
     })
+
+    # ---- Stage 2 (Worker 2): full occurrence records — always runs ------------
+    # BIEN_occurrence_sf() performs a server-side PostGIS polygon intersection,
+    # returning all occurrence records inside the user's polygon.
+    # This is the authoritative spatial refinement step. It overwrites the
+    # Stage 1 table with per-species occurrence counts, heatmap points,
+    # and occurrence-based confidence tiers.
+    promises::future_promise({
+      options(bien_cfg = cfg_snap)  # restore CFG in worker session
+      fetch_bien_occurrences_raw(poly)
+    }, seed = TRUE) %...>% (function(occ_raw) {
+      progress$set(value = 0.65, message = "Occurrence records ready. Processing\u2026", detail = "")
+      occ_counts    <- query_bien_occurrences(occ_raw)   # deduplicate + summarise per-species
+      rv$occ_raw    <- occ_raw
+      rv$occ_counts <- occ_counts
+      rv$occ_points <- get_bien_occurrence_points(occ_raw)  # ≤5000 pts for heatmap
+      species_df    <- assign_confidence_tiers(NULL, occ_counts)
+      anchor_result <- check_anchor_species(species_df)
+      rv$anchor_result <- anchor_result
+      rv$session_log   <- build_session_log(poly, source_label, 0L, nrow(species_df), anchor_result)
+      rv$species_df    <- species_df
+      if (include_ranges) {
+        rv$status <- "enriching"  # Stage 3 will update table further
+        progress$set(value = 0.75,
+                     message = "Occurrence tiers shown. Range maps running\u2026",
+                     detail  = "Stage 3 of 3: table updates with overlap columns when complete.")
+      } else {
+        rv$status <- "done"
+        progress$close()
+      }
+    }) %...!% (function(e) {
+      # Stage 2 failure: keep Stage 1 table visible if it exists; otherwise error state.
+      if (is.null(rv$species_df)) rv$status <- "error"
+      else if (!rv$status %in% c("enriching", "done")) rv$status <- "done"
+      if (!include_ranges) progress$close()
+      showNotification(paste("Occurrence query failed:", e$message), type = "error", duration = NULL)
+    })
+
+    # ---- Stage 3 (Worker 3): range overlap — optional, user-activated ----------
+    # BIEN_ranges_sf() returns SDM-derived range polygons via a PostGIS intersection.
+    # Client-side st_intersection() then computes overlap_pct_polygon (fraction of
+    # the AOI predicted suitable) and overlap_pct_range (fraction of species total
+    # range inside the AOI — an endemism indicator).
+    # This stage is slow (20–60 min) because it downloads range geometries for
+    # potentially thousands of species. Users must explicitly opt in.
+    if (include_ranges) {
+      promises::future_promise({
+        options(bien_cfg = cfg_snap)  # restore CFG in worker session
+        query_bien_ranges(poly)
+      }, seed = TRUE) %...>% (function(ranges_sf) {
+        # Use the most current occurrence counts available when Stage 3 completes.
+        # Stage 2 may have finished before or concurrently with Stage 3.
+        occ_counts <- if (!is.null(rv$occ_counts)) {
+          rv$occ_counts
+        } else if (!is.null(rv$occ_raw)) {
+          query_bien_occurrences(rv$occ_raw)  # re-summarise if rv$occ_counts not yet set
+        } else {
+          data.frame(species = character(), n_occurrences = integer(),
+                     family  = character(), native_status_flag = character(),
+                     stringsAsFactors = FALSE)
+        }
+        species_df    <- assign_confidence_tiers(ranges_sf, occ_counts)
+        anchor_result <- check_anchor_species(species_df)
+        rv$anchor_result <- anchor_result
+        n_bbox  <- if (!is.null(ranges_sf)) nrow(ranges_sf) else 0L
+        rv$session_log <- build_session_log(poly, source_label, n_bbox, nrow(species_df), anchor_result)
+        rv$species_df  <- species_df
+        rv$status      <- "done"
+        progress$close()
+      }) %...!% (function(e) {
+        # Stage 3 failure is non-fatal: occurrence-based tiers from Stage 2 remain.
+        if (rv$status %in% c("enriching", "partial")) rv$status <- "done"
+        progress$close()
+        showNotification(
+          paste("Range analysis failed; occurrence-based results remain.", e$message),
+          type = "warning", duration = 20
+        )
+      })
+    }
   }
 
   observeEvent(input$run_query, {
