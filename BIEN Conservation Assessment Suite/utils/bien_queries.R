@@ -4,7 +4,7 @@
 # calling stage can degrade gracefully rather than crash the app.
 #
 # BIEN query architecture:
-#   query_species_list_fast()  — Stage 1: country-level checklist (seconds)
+#   query_species_list_fast()  — Stage 1: polygon-specific checklist via BIEN_list_sf
 #   fetch_bien_occurrences_raw() — Stage 2: full occurrences via PostGIS (minutes)
 #   query_bien_occurrences()   — Stage 2: summarise raw occurrences to per-species counts
 #   get_bien_occurrence_points() — Stage 2: subsample for heatmap (≤5000 pts)
@@ -321,7 +321,40 @@ fetch_bien_occurrences_raw <- function(polygon_sf,
     NULL
   })
 
-  # BIEN_occurrence_sf returns server-side polygon-clipped occurrences;
-  # no client-side bbox-then-clip step required.
+  # Client-side polygon clip: BIEN_occurrence_sf nominally performs a server-side
+  # PostGIS spatial intersection, but the BIEN API has historically queried against
+  # the bounding box of the polygon in some versions, returning records outside the
+  # exact polygon boundary. We apply a client-side st_within filter as a defensive
+  # safeguard to guarantee only records inside the drawn polygon are returned.
+  if (!is.null(raw) && nrow(raw) > 0 &&
+      "latitude" %in% names(raw) && "longitude" %in% names(raw)) {
+    valid_coords <- !is.na(raw$latitude) & !is.na(raw$longitude)
+    if (any(valid_coords)) {
+      pts <- tryCatch({
+        sf::st_as_sf(raw[valid_coords, ],
+                     coords = c("longitude", "latitude"),
+                     crs    = 4326,
+                     remove = FALSE)
+      }, error = function(e) NULL)
+      if (!is.null(pts)) {
+        inside <- tryCatch(
+          as.logical(sf::st_within(pts, sf::st_union(polygon_sf), sparse = FALSE)[, 1]),
+          error = function(e) rep(TRUE, nrow(pts))  # on error, keep all rather than drop all
+        )
+        n_before  <- nrow(raw)
+        raw_valid  <- raw[valid_coords, ][inside, ]
+        raw_invld  <- raw[!valid_coords, ]   # rows with NA coords pass through unchanged
+        raw       <- rbind(raw_valid, raw_invld)
+        n_dropped <- n_before - nrow(raw)
+        if (n_dropped > 0) {
+          message(sprintf(
+            "[fetch_bien_occurrences_raw] Client-side polygon clip removed %d record(s) outside the polygon boundary.",
+            n_dropped
+          ))
+        }
+      }
+    }
+  }
+
   raw
 }

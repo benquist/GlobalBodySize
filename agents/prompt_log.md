@@ -2526,3 +2526,36 @@ Action: Delegated to coder → wrote 6 files (app.R, global.R, bien_queries.R, c
 ## 2026-05-15 — BIEN app hang diagnosis: F1+F2+F3
 User: App hangs after Run Analysis. Requested step-back diagnosis: 5 hypotheses, 5 fixes, consensus. Then approved.
 Action: code-checker tested 5 hypotheses. Root causes: (H1) app.R bootstrap omitted plan(multisession) → silent fallback to sequential → sync hang; (H2) no timeout on BIEN_*_box() calls; (H3) no upper-area guard. Applied F1 (re-set plan + startup log), F2 (R.utils::withTimeout 180s on both BIEN calls), F3 (MAX_POLYGON_AREA_KM2=50000 hard block in validate_polygon). Code-checker: PASS. App relaunched on port 7780; startup log confirms async is active: "[BIEN-app] Active future plan: FutureStrategy / tweaked | workers requested: 2". Pending user retest.
+
+
+---
+## 2025 Session — BIEN Flora Explora GitHub Publication
+
+**Prompt:** Continue from prior session: comment all source code files (app.R, global.R, bien_queries.R, confidence_utils.R, spatial_utils.R, mod_map.R), write a GitHub-quality README modeled after BIEN-SpeciesShinyApp/README.md with BIEN icon, and push the project to https://github.com/benquist/BIEN_Flora_Explora.
+
+**Actions completed:**
+- Commented all source files: global.R, app.R (key sections), bien_queries.R, confidence_utils.R, spatial_utils.R, mod_map.R
+- Wrote full README.md (architecture, tiers, anchor species, data limitations, citations)
+- Copied www/bien.png icon
+- Created .gitignore (excludes shapefiles, data/, worldclim_data/)
+- Added git remote flora_explora → https://github.com/benquist/BIEN_Flora_Explora.git
+- Committed and pushed via git subtree push to BIEN_Flora_Explora master branch
+- Project live at: https://github.com/benquist/BIEN_Flora_Explora
+
+---
+
+**Date:** 2026-05-15
+**Agent:** always (gate check)
+**Project:** BIEN Conservation Assessment Suite
+
+**Prompt:** Fix Stage 1 polygon query — replace BIEN_list_country() with BIEN_list_sf() so Stage 1 returns only species within the drawn polygon, not all species for the entire country.
+
+**Actions completed:**
+- Replaced BIEN_list_country() with BIEN_list_sf() in utils/bien_queries.R (Stage 1 query)
+- Updated app/app.R to pass the sf polygon object to the corrected query function
+- All 5 source files parsed OK (global.R, app.R, bien_queries.R, spatial_utils.R, confidence_utils.R)
+- git push origin master: succeeded (86ad6a0)
+- git subtree push flora_explora master: succeeded (09e9fa4)
+- App running on port 7780, listening confirmed, workers=3
+
+2026-05-15 | "For the shiny app http://127.0.0.1:7780/ are we sure that we are querying just occurrence records within the polygon? Large number of species are showing up even in sparse regions like Greenland." — Investigated and fixed BIEN Conservation Assessment Suite spatial filtering. Root causes: (1) stale comments in bien_queries.R and app.R described an obsolete country-level Stage 1 approach, though BIEN_list_sf() was already in use; (2) fetch_bien_occurrences_raw() had no client-side polygon clip — BIEN_occurrence_sf() nominally does server-side PostGIS clipping but has historically returned bounding-box results in some API versions. Fixes: added defensive client-side st_within clip in fetch_bien_occurrences_raw() (logs n_dropped records outside polygon boundary; on error keeps all rather than drops all); corrected all stale "country-level" comments in bien_queries.R and app.R to accurately reflect polygon-specific BIEN_list_sf() approach; noted Greenland polygons (centroid >55°N) are blocked by validate_polygon() hard error before any BIEN query runs. All 5 source files parsed OK. — Files: BIEN Conservation Assessment Suite/utils/bien_queries.R, BIEN Conservation Assessment Suite/app/app.R, agents/prompt_log.md.

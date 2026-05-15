@@ -128,3 +128,90 @@
 **Deferred:** F4 (Cancel button) and F5 (geojsonsf for draw parsing) — only re-evaluate if F1–F3 don't resolve.
 
 **Status:** Live at http://127.0.0.1:7780. Pending user retest.
+
+---
+
+## 2026-05-15 — Block 1: RBIEN sf-polygon migration + silent-failure guards + science framing
+
+**User:** Brian Enquist  
+**Request:** "If our agent team thinks that the workflow user uses shiny app to upload or draw a polygon -> shiny app then queries BIEN database using RBIEN functions that take a polygon to then extract species list then yes we should go for this and develop. I think it would be more efficient." → approve and implement Block 1 of the previously-vetted 3-block plan (consensus APPROVE-WITH-CHANGES from merow-ecology, stats-specialist/Telford lens, bio-units-specialist, enhanced-theory).
+
+**Workflow now in code:** user draws or uploads polygon (GeoJSON / shapefile-zip / **KML/KMZ — new**) → AOI validated → polygon handed directly to PostGIS-backed RBIEN sf functions → results into existing tier/SDM pipeline. No more bbox-fetch + client-side clip.
+
+### Block A — RBIEN sf migration (`utils/bien_queries.R`, `app/app.R`)
+- A1: `BIEN_ranges_box(bbox)` → `BIEN::BIEN_ranges_sf(sf=poly, species.names.only=TRUE, return.species.list=TRUE, crop.ranges=FALSE, include.gid=FALSE)` + `BIEN_ranges_load_species(species=...)`.
+- A2: `BIEN_occurrence_box(bbox)` → `BIEN::BIEN_occurrence_sf(sf=poly, cultivated=FALSE, new.world=NULL, native.status=TRUE, natives.only=FALSE, only.geovalid=TRUE, ...)`. Removed client-side bbox-then-clip.
+- A3: KML / KMZ upload added to UI (`fileInput("kml_file")` + conditionalPanel) and to `get_polygon()` reactive (KMZ unzipped with Zip Slip mitigation, first .kml taken, `sf::st_read()`).
+- A4: Removed dead `session$sendCustomMessage("toggleRunBtn", ...)` calls in `run_analysis` (start, success, error paths).
+
+### Block B — silent-failure guards (`utils/bien_queries.R`, `utils/spatial_utils.R`, `app/global.R`)
+- B1: `sf::sf_use_s2(TRUE)` enforced at startup in `global.R`; re-asserted in `.prepare_aoi_for_bien()` helper.
+- B2: `sf::st_make_valid()` before every BIEN call.
+- B3: Antimeridian refusal — stops if longitude span > 180°.
+- B4: 5,000-vertex cap; auto-simplify with `sf::st_simplify(dTolerance = sqrt(area_m2)/1000)` + `showNotification()`.
+- B5: `units::set_units(sum(sf::st_area(poly)), "km^2")` for area math in `validate_polygon()` (replaces unitless arithmetic).
+- B6: CRS reproject to EPSG:4326 only with explicit `showNotification("Transformed AOI from EPSG:N to EPSG:4326")`.
+- B7: Multi-feature centroid-distance check; warning if disjoint pieces > 25 km apart before silent union.
+
+### Block E — science framing (`www/disclaimer.html`)
+- E1: New disclaimer item — "Range Overlap Is Geometric, Not Probabilistic" — names `BIEN_ranges_sf()` / `BIEN_occurrence_sf()` and cites Maitner et al. 2018, *Methods in Ecology and Evolution* 9:373–379, DOI 10.1111/2041-210X.12861.
+- E2: New disclaimer item — "Amazonian Range Maps Are Coarse" — cites ter Steege et al. 2011 (*Ecography* 34:737–747) and ter Steege et al. 2020 (*Scientific Reports* 10:10130); frames the species list as a lower-bound expectation.
+
+### Pre-existing bug fixed in passing
+- `app/app.R:45` — `tags$style(HTML("..."))` contained a CSS comment with literal embedded double-quotes (`/* Visible "analysis running" indicators */`) that terminated the outer R string and broke `parse()`. Replaced inner `"` with `'`. Bug predated this session.
+
+### Validation
+- `parse()` clean on all four edited files: `utils/bien_queries.R`, `utils/spatial_utils.R`, `app/global.R`, `app/app.R`. → **PARSE OK**.
+- Local Shiny instance still running on `:7780` is the **stale pre-edit process** (PID 13104, started 2:38 PM) — needs kill + relaunch to actually exercise Block 1. No shinyapps.io deploy yet.
+
+### Why "more efficient" (per user's framing)
+- PostGIS does `ST_Intersects` server-side; no oversize bbox payload over the wire.
+- One round trip instead of bbox-fetch + client-clip.
+- Lower Shiny-session memory; no large intermediate to discard.
+- Returned species list now matches "ranges that intersect this polygon" exactly, not "ranges that intersect the bbox, then clipped."
+- Caveat (already in disclaimer): server-side intersection does not improve the underlying coarse range-map resolution — Maitner 2018 + ter Steege 2011/2020.
+
+### Deferred within Block 1
+- E3 (`only.geovalid` as user toggle, default TRUE) — not yet wired to UI; currently hardcoded TRUE.
+- E4 (native / introduced / cultivated / unknown count breakdown in `output$native_status_summary`) — current output still only surfaces `likely_introduced` and `status_unavailable`.
+
+### Status
+- Block 1 code edits complete and parse-clean.
+- Pending: E3 + E4 finish, code-checker subagent review of diffs, kill-and-relaunch local smoke test (draw + GeoJSON + KML/KMZ + shapefile), then Block 2 (parity test, CSV header metadata, UCUM units) and Block 3 (debounce, cancel-prior, bounded queue, cost pre-flight), then provenance + commit + push + always gate.
+
+## 2026-05-15 — Performance optimization: eliminate 80+ min query bottlenecks
+
+**Prompt**: Review BIEN conservation app for performance bottlenecks causing 80+ min runtimes on large polygons (e.g., Alto Japurá ~250,000 km²).
+
+**Changes made**:
+- `app/global.R`: `MAX_POLYGON_AREA_KM2` raised 50,000 → 500,000 km²; `plan(multisession, workers=2)` now explicit.
+- `utils/bien_queries.R` `query_bien_ranges`: Replaced two-step `BIEN_ranges_sf(species.names.only=TRUE)` + `BIEN_ranges_load_species(species_vec)` with single `BIEN_ranges_sf(species.names.only=FALSE)` call — eliminates per-species shapefile download loop (primary bottleneck).
+- `utils/bien_queries.R` `query_bien_occurrences`: Deduplication changed from `!duplicated(data.frame(...))` to `!duplicated(paste(..., sep="\x1f"))` — avoids full N-row object allocation on 1M+ records. Modal family changed from `sort(table(fam_vals))[1]` to `fam_vals[1L]` — O(1) vs O(n) per species group.
+- `app/app.R` `run_analysis` fast future: Eliminated `query_species_list_fast(poly)` (redundant `BIEN_list_sf` PostGIS scan). Worker 1 now runs only `fetch_bien_occurrences_raw`; species universe derived directly from `occ_raw`. `rv$occ_counts` cached so slow future callback reuses it without recomputing.
+- `utils/spatial_utils.R`: Updated validation comment to reflect new area cap.
+
+**Agent**: optimizer mode (GitHub Copilot / Claude Sonnet 4.6)
+
+---
+
+## 2026-05-15 — Spatial filtering audit: polygon clip correctness fix
+
+**User prompt:** "For the shiny app http://127.0.0.1:7780/ are we sure that we are querying just occurrence records within the polygon? Large number of species are showing up even in sparse regions like Greenland."
+
+**Agents involved:** @m (supervisor), direct file edits
+
+**Root causes identified:**
+1. **Stale comments** in `app.R` and `bien_queries.R` still described an obsolete country-level Stage 1 approach (`BIEN_list_country`), even though the actual `query_species_list_fast()` function already used `BIEN_list_sf()` (polygon-specific PostGIS intersection). These misleading comments could cause future developers to misjudge the filtering approach.
+2. **No client-side polygon clip in Stage 2**: `fetch_bien_occurrences_raw()` relied entirely on BIEN server-side clipping via `BIEN_occurrence_sf()`. The BIEN API has historically returned bounding-box results in some versions, potentially including records outside the exact polygon boundary.
+
+**Changes made:**
+- `utils/bien_queries.R`: Added defensive client-side `st_within` polygon clip inside `fetch_bien_occurrences_raw()`. After `BIEN_occurrence_sf()` returns, occurrence lat/lon are converted to sf points and checked with `sf::st_within(pts, sf::st_union(polygon_sf))`. Drops records outside the polygon; NA-coord rows pass through unchanged. Logs the count of dropped records. On clip error, retains all records rather than silently discarding everything.
+- `utils/bien_queries.R` line 7: Corrected file-header comment from "Stage 1: country-level checklist" to "Stage 1: polygon-specific checklist via BIEN_list_sf".
+- `app/app.R` header: Corrected Stage 1/2 description lines to reflect actual approach.
+- `app/app.R` lines 385–393: Corrected Stage 1 architecture comment block in `run_analysis()` to say "Uses BIEN_list_sf() — a PostGIS spatial intersection against the drawn polygon" and to mention the Stage 2 `st_within` safeguard.
+
+**Greenland note:** True Greenland polygons (centroid ~72°N) are blocked by `validate_polygon()` in `spatial_utils.R` (Americas bbox ymax = 55°N). The validator raises a hard error modal before any BIEN query runs, so Greenland species inflation cannot originate from Greenland polygons specifically. The complaint about "sparse regions like Greenland" likely referred to high-latitude or BIEN-data-poor regions where bounding-box vs. exact-polygon clipping makes a material difference.
+
+**Verification:** All 5 source files parsed clean (`global.R`, `app.R`, `bien_queries.R`, `spatial_utils.R`, `confidence_utils.R`).
+
+**Agent:** @m mode (GitHub Copilot / Claude Sonnet 4.6)
