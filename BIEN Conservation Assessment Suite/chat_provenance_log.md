@@ -215,3 +215,124 @@
 **Verification:** All 5 source files parsed clean (`global.R`, `app.R`, `bien_queries.R`, `spatial_utils.R`, `confidence_utils.R`).
 
 **Agent:** @m mode (GitHub Copilot / Claude Sonnet 4.6)
+
+---
+
+## 2026-05-15 — BIEN PostGIS performance diagnosis: out-of-domain guard added
+
+**User prompt:** Performance diagnosis request. `fetch_bien_occurrences_raw()` via `BIEN_occurrence_sf()` hanging for 5+ minutes on a 1388 km² polygon in western Greenland. Questions: (1) why does a sparse region still cause a slow PostGIS scan? (2) Is `BIEN_occurrence_sf()` the right function? (3) Is bbox+clip faster? (4) Are other BIEN API functions faster? (5) Correct scientific approach?
+
+**Agent:** biodiversity-science-guard mode (GitHub Copilot / Claude Sonnet 4.6)
+
+### Root cause analysis
+
+1. **PostGIS GIST index traversal is query-dependent, not result-dependent.** The server must walk the R-tree index to find all records whose bboxes intersect the query polygon, then apply `ST_Intersects()` as an exact predicate for every candidate. Even 0 results require the full scan. Additionally, `native_status=TRUE` adds a secondary JOIN after spatial filtering.
+
+2. **Critical: western Greenland (~68°N) is above BIEN's Americas domain (ymax=55°N) in `CFG$BIEN_AMERICAS_BBOX`.** The `validate_polygon()` UI gate in `spatial_utils.R` catches this via centroid check and generates a hard-block error modal. However, this was a **UI-only gate** — if any code path (future worker, direct API test, bypass) reached `fetch_bien_occurrences_raw()`, no domain check existed at the function level. The query was sent to vegbiendev and guaranteed to return 0 results after a 5+ minute scan.
+
+3. **`BIEN_occurrence_sf()` is correct for in-domain polygons** but heavyweight for checklist purposes. `BIEN_list_sf()` uses the same PostGIS scan path and offers no server-side speed advantage. `BIEN_occurrence_box()` + client-side `sf::st_intersects()` clip is 2–5× faster for in-domain compact polygons because the server uses a simple `&&` bbox operator instead of `ST_Intersects()`.
+
+4. **`BIEN_list_country()` is the only genuinely fast BIEN Stage 1 option** — it uses pre-indexed political-unit tables. But it returns a country-level superset, not a polygon-specific list, and Greenland would return empty.
+
+5. **Bbox-first-then-clip is scientifically equivalent** to direct polygon query if client-side clip uses `sf_use_s2(TRUE)` + EPSG:4326 (both enforced in this app). Direct polygon query remains more defensible for peer-review contexts.
+
+### Fix implemented
+
+- `utils/bien_queries.R` `.prepare_aoi_for_bien()`: Added guard **B5 — BIEN Americas domain check** (bbox overlap against `CFG$BIEN_AMERICAS_BBOX`). If the AOI bounding box has no overlap with the declared Americas domain (xmin/xmax/ymin/ymax), the function `stop()`s immediately with a detailed error message: `"AOI bounding box [...] has no overlap with the BIEN Americas domain. BIEN does not contain occurrence data for this region."` This is a defense-in-depth check below the UI validation layer — it fires regardless of how `fetch_bien_occurrences_raw()` is called.
+- Uses bbox overlap (not centroid) for the domain check, making it more robust than the centroid-based UI validator for edge cases (e.g., polygons straddling the 55°N boundary).
+- File-header comment for Block B guards updated to include B5.
+- `utils/bien_queries.R` docstring updated to list B5 in the guard list.
+
+**Verification:** `parse("../utils/bien_queries.R")` → PARSE OK.
+
+**Files changed:** `utils/bien_queries.R`
+
+---
+
+## 2026-05-15 (late) — Critical bug fix: BIEN_occurrence_box() invalid parameters causing silent 0-species returns
+
+**User:** Brian Enquist  
+**Request:** "Still on step 1" — running the Alto Japurá example still produced no species results after the bbox switch.
+
+**Agent:** @m (GitHub Copilot / Claude Sonnet 4.6)
+
+### Diagnosis
+
+Inspected `BIEN_occurrence_box()` source via `print(BIEN_occurrence_box)`. Found two bugs in the call in `fetch_bien_occurrences_raw()`:
+
+**Bug 1 (CRITICAL — root cause of all 0-species returns):** `only.geovalid=TRUE` was passed as a named argument. `BIEN_occurrence_box()` does not accept this parameter — its formal argument list is `min.lat, max.lat, min.long, max.long, species, genus, cultivated, new.world, all.taxonomy, native.status, natives.only, observation.type, political.boundaries, collection.info, ...`. The call raised `"unused argument (only.geovalid = TRUE)"`, caught by the surrounding `tryCatch()`, which returned `NULL` silently. Every query returned 0 species. The BIEN function's SQL already hardcodes `AND is_geovalid = 1` in its `WHERE` clause — geo-validity is always enforced server-side regardless.
+
+**Bug 2 (CORRECTNESS):** `min.lon` / `max.lon` were used. The BIEN function uses `min.long` / `max.long` (note `.long` not `.lon`). R partial-matching was successfully resolving these, but explicit correct names are required for clarity and future-proofing.
+
+**Bug 3 (PERFORMANCE):** `native.status=TRUE` was passed even when `natives_only=TRUE`. The `native.status=TRUE` flag triggers an additional server-side JOIN to append the native status column. When `natives_only=TRUE`, the `WHERE` clause already guarantees all returned records are native — the JOIN is redundant. Skipping it (setting `native.status=FALSE`) eliminates an unnecessary DB join on every occurrence query.
+
+### Fix implemented
+
+`utils/bien_queries.R` `fetch_bien_occurrences_raw()`:
+- Removed `only.geovalid` argument entirely
+- Corrected `min.lon`/`max.lon` → `min.long`/`max.long`
+- Added `need_native_status_col <- !natives_only` gate: `native.status=FALSE` when `natives_only=TRUE`, `native.status=TRUE` only when querying all species (non-native included)
+- When `natives_only=TRUE` and `native.status=FALSE`, a synthetic `native_status="native"` column is added to the returned data frame so `query_bien_occurrences()` majority-vote logic still labels all records as `"likely_native"` without schema changes downstream
+
+### Process monitoring findings (logged for tomorrow's investigation)
+
+Workers 98783, 98784, 98785 (PIDs from `plan(multisession, workers=3)`) were confirmed running via `ps -ef`. All worker output is routed to `OUT=/dev/null` in the `workRSOCK()` startup command — this is standard `parallel` package behavior. Future worker output (including BIEN "Getting page 1 of records" messages and errors) is **never visible in `/tmp/bien_shiny.log`**. The main app log only shows the Shiny session layer.
+
+`lsof` TCP inspection confirmed three `R` worker PIDs (49049, 49050, 49051) each holding a **persistent ESTABLISHED connection to `vegbiendev.nceas.ucsb.edu:postgresql` (port 5432)**. These are connection-pool workers kept alive between queries. This is expected `parallel`/`future` behavior — connections are not opened per-query.
+
+`netstat` confirmed `tcp4 ... 192.168.1.196.63978 -> 128.111.85.31.5432 ESTABLISHED` — active PostgreSQL connection to the BIEN vegbiendev server.
+
+**Workers at 0% CPU before query submission was explained:** the "Run Analysis" button had not been clicked yet when monitoring started. Workers are idle (0% CPU) when waiting for a task, even with an open DB connection.
+
+### Commits
+- `aba4f5b` → origin/master (`biodiversity-agents-lab`)
+- `6920f00` → flora_explora/master (`BIEN_Flora_Explora`)
+
+**Verification:** All 5 files parse clean. App restarted on port 7780.
+
+**Files changed:** `utils/bien_queries.R`, `agents/prompt_log.md`
+
+---
+
+## 2026-05-15/16 (overnight) — Overnight diagnostic summary and plan for tomorrow
+
+**Status at end of session:** The `only.geovalid` bug was fixed. The app was confirmed running on port 7780 with the fix applied. The Alto Japurá example was loaded (polygon validation: 17,930 km², 0 errors, 0 warnings). The query had not yet been submitted to the BIEN server at the time session ended — the user went to bed before the Run Analysis button was clicked.
+
+### Open questions for tomorrow
+
+**Q1: Does the fixed app actually return species for Alto Japurá?**  
+The `only.geovalid` fix eliminates the silent-null bug. The first test tomorrow should be: select "Pilot: Alto Japurá (example)", click Run Analysis, wait for results. Expected: species list populates within 2–10 minutes (BIEN occurrence bbox query for a ~18,000 km² tropical polygon). If still 0 species, investigate further.
+
+**Q2: What is the actual query time for Alto Japurá?**  
+The benchmark test (`BIEN_occurrence_box` for a 1°×1° Colombian Andes bbox without the broken params) was running at session end but did not complete before timeout. We do not yet have a confirmed elapsed time for a valid in-domain occurrence query. Tomorrow: run the benchmark Rscript separately, record elapsed time.
+
+**Q3: Can we add per-worker logging?**  
+Worker output goes to `OUT=/dev/null` by `parallel`'s design — not configurable from R. Options to get worker-level diagnostics:
+- Add `message(sprintf("[worker] Starting BIEN query at %s", Sys.time()))` calls inside the `future_promise({...})` block — these appear as conditions in the promise result, catchable with `%...!%`
+- Use `cat(..., file="/tmp/bien_worker.log", append=TRUE)` inside the worker closure — direct file write bypasses the suppress-output mechanism
+- Use `furrr::future_map()` with `.progress=TRUE` if converting to a map pattern
+
+**Q4: Are `input$include_nonnative` and `input$include_geounvalidated` UI toggles wired correctly?**  
+The `natives_only_snap` and `geo_valid_only_snap` are snapped from `input$` values in `run_analysis()`. Verify these inputs exist in the UI and that their default values produce `natives_only=TRUE, geo_valid_only=TRUE` (i.e., checkboxes unchecked = native-only + geo-valid-only). Check `app.R` UI definition for these two inputs.
+
+**Q5: Is `geo_valid_only` used anywhere after the fix?**  
+After removing `only.geovalid` from the `BIEN_occurrence_box()` call, the `geo_valid_only` parameter of `fetch_bien_occurrences_raw()` is no longer passed to BIEN (geo-validity is hardcoded server-side). The parameter is still accepted by the function for API compatibility. This is correct behavior — no action needed — but should be documented in the function signature comment.
+
+### Known remaining issues
+
+1. **No per-worker logging** — future worker errors (BIEN API errors, PostGIS errors) silently disappear into `/dev/null`. Need to add `cat(..., file="/tmp/bien_worker.log", append=TRUE)` inside every `future_promise({})` block.
+
+2. **Progress message still says "BIEN_occurrence_sf"** — `app.R` line ~424: `progress$set(detail = "BIEN_occurrence_sf — polygon-specific PostGIS query.")` is stale. Should say `BIEN_occurrence_box` after the bbox switch.
+
+3. **`geo_valid_only` parameter is silently ignored** — `fetch_bien_occurrences_raw(polygon_sf, natives_only, geo_valid_only)` accepts `geo_valid_only` but never uses it (BIEN hardcodes `is_geovalid=1`). The parameter name implies it has an effect. Should add a comment making clear it's a no-op (BIEN enforces server-side) or remove the parameter entirely.
+
+4. **`input$include_nonnative` and `input$include_geounvalidated` not verified** — these UI toggles control the `natives_only` and `geo_valid_only` arguments. Their existence and default values in the UI definition should be confirmed before next test.
+
+5. **Benchmark timing not recorded** — we still don't know how long a valid Alto Japurá bbox query takes. Need a timed standalone Rscript test.
+
+### Priority order for tomorrow
+1. Run the app with fixed code → confirm species appear for Alto Japurá
+2. Record query timing
+3. Add worker-level file logging so errors are visible
+4. Fix stale "BIEN_occurrence_sf" progress message
+5. Clarify/remove `geo_valid_only` no-op parameter
