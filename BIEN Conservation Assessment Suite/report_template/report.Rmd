@@ -142,22 +142,26 @@ if (!is.null(sp_df) && nrow(sp_df) > 0) {
 ## Reproducibility Block
 
 ```{r repro-block}
-scalar_fields <- sl[!names(sl) %in% "anchor_check"]
-scalar_df <- data.frame(
-  Field = names(unlist(scalar_fields)),
-  Value = as.character(unlist(scalar_fields)),
-  stringsAsFactors = FALSE
-)
+if (!is.null(sl)) {
+  scalar_fields <- sl[!names(sl) %in% "anchor_check"]
+  scalar_df <- data.frame(
+    Field = names(unlist(scalar_fields)),
+    Value = as.character(unlist(scalar_fields)),
+    stringsAsFactors = FALSE
+  )
 
-anchor_df <- data.frame(
-  Field = paste0("anchor_check.", names(sl$anchor_check)),
-  Value = as.character(sl$anchor_check),
-  stringsAsFactors = FALSE
-)
+  anchor_df <- data.frame(
+    Field = paste0("anchor_check.", names(sl$anchor_check)),
+    Value = as.character(sl$anchor_check),
+    stringsAsFactors = FALSE
+  )
 
-repro_df <- rbind(scalar_df, anchor_df)
-knitr::kable(repro_df, col.names = c("Field", "Value"),
-             caption = "Full session provenance log")
+  repro_df <- rbind(scalar_df, anchor_df)
+  knitr::kable(repro_df, col.names = c("Field", "Value"),
+               caption = "Full session provenance log")
+} else {
+  cat("Session log not available (report rendered outside Shiny context).")
+}
 ```
 
 ---
