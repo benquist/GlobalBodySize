@@ -8,14 +8,29 @@
 query_bien_ranges <- function(polygon_sf) {
   bbox <- sf::st_bbox(polygon_sf)
 
+  # F2: bounded BIEN call. Falls back to no-timeout if R.utils unavailable.
+  timeout_sec <- if (exists("BIEN_API_TIMEOUT_SEC")) BIEN_API_TIMEOUT_SEC else 180
+
   ranges <- tryCatch({
-    BIEN::BIEN_ranges_box(
-      min.lat = bbox["ymin"],
-      max.lat = bbox["ymax"],
-      min.lon = bbox["xmin"],
-      max.lon = bbox["xmax"]
-    )
+    if (requireNamespace("R.utils", quietly = TRUE)) {
+      R.utils::withTimeout({
+        BIEN::BIEN_ranges_box(
+          min.lat = bbox["ymin"], max.lat = bbox["ymax"],
+          min.lon = bbox["xmin"], max.lon = bbox["xmax"]
+        )
+      }, timeout = timeout_sec, onTimeout = "error")
+    } else {
+      BIEN::BIEN_ranges_box(
+        min.lat = bbox["ymin"], max.lat = bbox["ymax"],
+        min.lon = bbox["xmin"], max.lon = bbox["xmax"]
+      )
+    }
+  }, TimeoutException = function(e) {
+    stop(sprintf("BIEN range query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
   }, error = function(e) {
+    if (inherits(e, "TimeoutException") || grepl("timeout", conditionMessage(e), ignore.case = TRUE)) {
+      stop(sprintf("BIEN range query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
+    }
     warning("BIEN_ranges_box failed: ", conditionMessage(e))
     return(NULL)
   })
@@ -187,17 +202,35 @@ get_bien_occurrence_points <- function(occ_raw) {
 fetch_bien_occurrences_raw <- function(polygon_sf) {
   bbox <- sf::st_bbox(polygon_sf)
 
+  # F2: bounded BIEN call. Falls back to no-timeout if R.utils unavailable.
+  timeout_sec <- if (exists("BIEN_API_TIMEOUT_SEC")) BIEN_API_TIMEOUT_SEC else 180
+
   raw <- tryCatch({
-    BIEN::BIEN_occurrence_box(
-      min.lat       = bbox["ymin"],
-      max.lat       = bbox["ymax"],
-      min.lon       = bbox["xmin"],
-      max.lon       = bbox["xmax"],
-      cultivated    = FALSE,
-      native.status = TRUE,   # retain for native_status_flag
-      natives.only  = FALSE   # must be FALSE — native_status NA for most Amazonian records
-    )
+    if (requireNamespace("R.utils", quietly = TRUE)) {
+      R.utils::withTimeout({
+        BIEN::BIEN_occurrence_box(
+          min.lat       = bbox["ymin"], max.lat = bbox["ymax"],
+          min.lon       = bbox["xmin"], max.lon = bbox["xmax"],
+          cultivated    = FALSE,
+          native.status = TRUE,
+          natives.only  = FALSE
+        )
+      }, timeout = timeout_sec, onTimeout = "error")
+    } else {
+      BIEN::BIEN_occurrence_box(
+        min.lat       = bbox["ymin"], max.lat = bbox["ymax"],
+        min.lon       = bbox["xmin"], max.lon = bbox["xmax"],
+        cultivated    = FALSE,
+        native.status = TRUE,
+        natives.only  = FALSE
+      )
+    }
+  }, TimeoutException = function(e) {
+    stop(sprintf("BIEN occurrence query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
   }, error = function(e) {
+    if (inherits(e, "TimeoutException") || grepl("timeout", conditionMessage(e), ignore.case = TRUE)) {
+      stop(sprintf("BIEN occurrence query exceeded %d s. Try a smaller polygon or retry later.", timeout_sec))
+    }
     warning("BIEN_occurrence_box failed: ", conditionMessage(e))
     NULL
   })

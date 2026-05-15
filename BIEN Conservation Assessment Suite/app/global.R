@@ -16,6 +16,8 @@ plan(multisession)
 APP_VERSION <- "1.0.0"
 BIEN_AMERICAS_BBOX <- list(xmin = -170, xmax = -34, ymin = -55, ymax = 55)
 MIN_POLYGON_AREA_KM2 <- 100
+MAX_POLYGON_AREA_KM2 <- 50000   # F3: ~2x Alto Japura; blocks hemisphere-sized queries
+BIEN_API_TIMEOUT_SEC <- 180     # F2: per-call deadline for BIEN_*_box() calls
 
 # Anchor species for plausibility gate.
 # Three wide-ranging Amazonian species (high BIEN coverage):

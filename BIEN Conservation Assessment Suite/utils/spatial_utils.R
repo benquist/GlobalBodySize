@@ -20,6 +20,16 @@ validate_polygon <- function(polygon_sf) {
     ))
   }
 
+  # F3: hard upper-area guard prevents accidental hemisphere-spanning queries
+  # that would stall BIEN's PostgreSQL backend. MAX_POLYGON_AREA_KM2 is set in global.R.
+  if (!is.na(area_km2) && exists("MAX_POLYGON_AREA_KM2") && area_km2 > MAX_POLYGON_AREA_KM2) {
+    errors_out <- c(errors_out, sprintf(
+      "Study area is %s km\u00b2, above the maximum supported size of %s km\u00b2. Split the area into smaller regions and run them separately. Very large polygons stall the BIEN API and produce unreliable richness estimates.",
+      formatC(area_km2, format = "d", big.mark = ","),
+      formatC(MAX_POLYGON_AREA_KM2, format = "d", big.mark = ",")
+    ))
+  }
+
   if (!is.na(centroid[1, "X"])) {
     lon <- centroid[1, "X"]
     lat <- centroid[1, "Y"]

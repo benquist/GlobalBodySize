@@ -10,10 +10,19 @@ library(jsonlite)
 library(digest)
 library(promises)
 library(future)
+if (!requireNamespace("R.utils", quietly = TRUE)) {
+  warning("R.utils not installed; BIEN call timeouts will be disabled.")
+}
 
 for (.f in list.files("../modules", pattern = "\\.R$", full.names = TRUE)) source(.f)
 for (.f in list.files("../utils",   pattern = "\\.R$", full.names = TRUE)) source(.f)
 rm(.f)
+
+## F1: ensure async plan is active even if global.R partially failed.
+## Re-declaring plan() is idempotent and cheap.
+future::plan(future::multisession, workers = 2)
+message("[BIEN-app] Active future plan: ", paste(class(future::plan())[1:2], collapse = " / "),
+        " | workers requested: 2")
 ## ─────────────────────────────────────────────────────────────────────────────
 
 ui <- fluidPage(

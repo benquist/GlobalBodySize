@@ -106,3 +106,25 @@
 **Syntax check:** All 5 R files pass `parse()` with no errors.
 **Runtime check:** App starts cleanly on port 7781 (confirmed "Listening on http://127.0.0.1:7781").
 **Status:** COMPLETE — ready for git commit.
+
+---
+
+## 2026-05-15 — Hang diagnosis: F1+F2+F3 fixes
+
+**User reported:** App hangs forever after drawing polygon and clicking Run Analysis.
+
+**Diagnosis (code-checker agent):** Tested 5 hypotheses. Three strong root causes found:
+- H1: app.R defensive bootstrap re-sourced utils/modules but did NOT re-call `plan(multisession)`. If global.R partially failed, plan defaulted to `sequential` → `future_promise()` ran synchronously → identical hang to Phase 1.
+- H2: BIEN API calls had no timeout. If BIEN server slow or bbox huge, calls stall indefinitely.
+- H3: No upper-area guard. User could draw hemisphere-sized polygons triggering unbounded BIEN queries.
+
+**Fixes applied (consensus from code-checker):**
+- **F1** (app.R): added `future::plan(future::multisession, workers=2)` to bootstrap block AND a startup `message()` logging the active plan class. Verified live at startup: `[BIEN-app] Active future plan: FutureStrategy / tweaked | workers requested: 2` — proves async is engaged.
+- **F2** (utils/bien_queries.R + global.R): added `BIEN_API_TIMEOUT_SEC <- 180` constant; wrapped both `BIEN_ranges_box()` and `BIEN_occurrence_box()` with `R.utils::withTimeout(..., onTimeout="error")` + tryCatch(TimeoutException=...) to surface a clear "BIEN query exceeded N s — try a smaller polygon" error via `showNotification` instead of silent infinite wait.
+- **F3** (utils/spatial_utils.R + global.R): added `MAX_POLYGON_AREA_KM2 <- 50000` constant (~2× Alto Japurá); `validate_polygon()` now adds an error (hard block, not warning) for polygons over the cap. The modal shows only Cancel (no Proceed Anyway).
+
+**Code-checker review:** PASS WITH SUGGESTIONS. No critical bugs. Minor: dead code in unreachable inherits()/grepl() fallback paths in tryCatch (harmless), double `plan()` call (wasteful at boot, correct behavior), `BIEN_API_TIMEOUT_SEC` reachability in worker via `globals` recursive scan (works today, theoretically fragile).
+
+**Deferred:** F4 (Cancel button) and F5 (geojsonsf for draw parsing) — only re-evaluate if F1–F3 don't resolve.
+
+**Status:** Live at http://127.0.0.1:7780. Pending user retest.
