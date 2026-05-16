@@ -1,7 +1,7 @@
 # app.R — BIEN Flora Explora: Conservation Assessment Suite
 # Main Shiny UI + server. Implements the three-stage async query architecture:
 #   Stage 1 — BIEN_list_sf: polygon-specific species checklist (seconds)
-#   Stage 2 — BIEN_occurrence_sf: full occurrence records + client-side polygon clip (minutes)
+#   Stage 2 — BIEN_occurrence_box: full occurrence records + client-side polygon clip (minutes)
 #   Stage 3 — BIEN_ranges_sf: range overlap analysis (slow, optional)
 #
 # Stages 1 and 2 run concurrently in separate future workers.
@@ -222,7 +222,7 @@ server <- function(input, output, session) {
     polygon         = NULL,   # validated sf polygon from user input
     species_df      = NULL,   # current species data.frame (updated by each stage)
     session_log     = NULL,   # provenance metadata for CSV/HTML export
-    occ_raw         = NULL,   # raw BIEN_occurrence_sf output (Stage 2)
+    occ_raw         = NULL,   # raw BIEN_occurrence_box output (Stage 2)
     occ_counts      = NULL,   # per-species occurrence summary from Stage 2
     occ_points      = NULL,   # subsampled points for heatmap (≤5000 rows)
     anchor_result   = NULL,   # named logical vector from check_anchor_species()
@@ -266,7 +266,7 @@ server <- function(input, output, session) {
     msg <- switch(rv$status,
       running   = list(
         strong  = "Stage 1 of 2: Querying BIEN occurrence records\u2026",
-        detail  = "BIEN_occurrence_sf \u2014 polygon-specific PostGIS query. Results will appear when complete."
+        detail  = "BIEN_occurrence_box \u2014 lat/lon bounding box query + client-side polygon clip. Results will appear when complete."
       ),
       enriching = list(
         strong  = "Stage 2 of 2: Range overlap analysis running\u2026",
@@ -381,12 +381,12 @@ server <- function(input, output, session) {
   #   Uses BIEN_list_sf() — a PostGIS spatial intersection against the drawn polygon.
   #   Returns only species documented within the polygon boundary (not a country superset).
   #   Populates an immediate species table so the user sees something fast.
-  #   Stage 2 (BIEN_occurrence_sf) overwrites this with occurrence counts and confidence tiers;
+    #   Stage 2 (BIEN_occurrence_box) overwrites this with occurrence counts and confidence tiers;
   #   a client-side st_within clip in fetch_bien_occurrences_raw() further guarantees
   #   that all returned records fall inside the polygon.
   #
   # Stage 2 (Worker 2): fetch_bien_occurrences_raw() → query_bien_occurrences()
-  #   Full BIEN_occurrence_sf() call — server-side polygon intersection (minutes).
+  #   Full BIEN_occurrence_box() call — lat/lon bounding box query + client-side polygon clip.
   #   Provides spatially precise occurrence counts and enables the heatmap.
   #   Overwrites Stage 1 table with occurrence-based confidence tiers.
   #
@@ -419,13 +419,14 @@ server <- function(input, output, session) {
     progress$set(
       message = "Stage 1 of 2: Querying occurrence records\u2026",
       value   = 0.05,
-      detail  = "BIEN_occurrence_sf \u2014 polygon-specific PostGIS query."
+      detail  = "BIEN_occurrence_box \u2014 lat/lon bounding box query + client-side polygon clip."
     )
 
     # ---- Stage 1 (Worker 1): full occurrence records — always runs ------------
-    # BIEN_occurrence_sf() performs a server-side PostGIS polygon intersection,
-    # returning occurrence records inside the user's polygon with native-status
-    # and geo-validation filters applied. This is the sole species-list source.
+    # BIEN_occurrence_box() performs a server-side lat/lon bounding box query;
+    # fetch_bien_occurrences_raw() then clips results to the polygon boundary
+    # client-side via sf::st_within(). Geo-validity is enforced server-side.
+    # This is the sole species-list source.
     promises::future_promise({
       options(bien_cfg = cfg_snap)  # restore CFG in worker session
       fetch_bien_occurrences_raw(poly,
