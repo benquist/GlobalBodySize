@@ -1,5 +1,48 @@
 # Chat Provenance Log — BIEN Conservation Assessment Suite
 
+## 2026-05-27 — @M multi-agent diagnostic: Alto Japurá hang investigation + fixes
+
+**Request:** Multi-agent review (coder, code-checker, optimizer, merow-ecology) of why the app hangs for many minutes on the Pilot: Alto Japurá example.
+
+**Findings:** Stage 1 fast checklist and optimizer spatial fixes were already applied in the prior session. The `run_analysis()` function was already launching `query_species_list_fast()` concurrently with `fetch_bien_occurrences_raw()`. The root cause of the actual hang is server-side BIEN PostGIS query latency (beyond client control) and potential worker pool starvation (7 concurrent browser sessions, only 3 multisession workers).
+
+**Fixes applied:**
+
+1. **`global.R` — `MAX_POLYGON_AREA_KM2` (CRITICAL):** Value was `50000` but `spatial_utils.R` and the design intent specified `500000` to support full-watershed conservation units (Alto Japurá ~250,000 km²). Corrected to `500000`.
+
+2. **`app.R` — `progress$close()` double-call (WARNING):** When Stage 2 fails while Stage 3 is already running, both error handlers called `progress$close()` sending orphaned WebSocket messages. Added `safe_close_progress()` guard function using a local `progress_closed <<-` flag; all `progress$close()` call sites inside `run_analysis()` replaced.
+
+3. **`global.R` — Anchor species (ECOLOGICAL — merow-ecology agent):** `Swietenia macrophylla` (big-leaf mahogany) removed from `ANCHOR_SPECIES`. BIEN records for this species reflect historical distribution (heavily logged); a FAIL is uninterpretable and misleading. Replaced with `Oenocarpus bataua` (pataua palm) — abundant, widespread western Amazonian species with strong BIEN coverage.
+
+4. **`global.R` — Worker comment:** Stale function names corrected (`BIEN_list_country` → `BIEN_list_sf`, `BIEN_occurrence_sf` → `BIEN_occurrence_box`).
+
+**Merow-ecology UI documentation recommendations (Phase 2 — not yet implemented):**
+- `overlap_pct_polygon` tooltip: add note that binary SDM threshold is undocumented via BIEN API.
+- `overlap_pct_range` column: add non-identifiability caveat (data deficiency artifacts mimic endemism).
+- `Native Status` column: flag heterogeneous BIEN sources; unsuitable for regulatory use as-is.
+- `Iriartea deltoidea` in ANCHOR_SPECIES: note that BIEN records are sparser near the Colombian/Brazilian border in the Alto Japurá; a FAIL may not indicate error.
+
+**Scalability concern (architectural — not fixed):** `workers = 3` is a global pool shared across all Shiny sessions. With 7 concurrent users each running Stage 1 + Stage 2, the pool can be exhausted and new analyses queue silently. Consider increasing workers or adding a user-visible queue-position message.
+
+---
+
+## 2026-05-18 — Optimizer: three client-side spatial performance fixes
+
+
+**Request:** Profile `bien_queries.R` for performance bottlenecks causing many-minutes wait on the Alto Japurá pilot (~250,000 km² Amazon polygon).
+
+**Changes to `utils/bien_queries.R`:**
+
+1. **`query_bien_ranges()` — coarse filter (HIGH):** `sf::st_intersects(ranges, polygon_sf, sparse = FALSE)[, 1]` replaced with `which(lengths(sf::st_intersects(ranges, polygon_sf)) > 0L)`. `sparse = FALSE` forced GEOS to allocate a dense `n×1` logical matrix for every BIEN range polygon; sparse list + `lengths()` avoids that allocation. Error fallback changed from "drop all" (`rep(FALSE,...)`) to "keep all" (`seq_len(nrow(ranges))`) so a transient coarse-filter failure doesn't silently return NULL.
+
+2. **`query_bien_ranges()` — redundant `st_union` (MEDIUM):** `poly_union <- sf::st_union(polygon_sf)` replaced with `poly_union <- sf::st_geometry(polygon_sf)`. `polygon_sf` is already a single-feature union from `.prepare_aoi_for_bien()`; calling `st_union` again triggered a redundant GEOS computation.
+
+3. **`fetch_bien_occurrences_raw()` — point clip (MEDIUM/LOW):** `lengths(sf::st_within(pts, sf::st_union(polygon_sf))) > 0L` replaced with `lengths(sf::st_intersects(pts, polygon_sf)) > 0L`. Removes the same redundant `st_union` pattern; `st_intersects` is marginally faster than `st_within` for point-in-polygon and is semantically more correct (boundary points are retained rather than excluded).
+
+**Assessment:** The dominant bottleneck for the Alto Japurá pilot remains the server-side `BIEN_occurrence_box()` PostGIS query at NCEAS/vegbiendev — this is shared infrastructure with no client-side fix available. The three changes above reduce client-side overhead for Stage 2 polygon clipping and Stage 3 range pre-filtering.
+
+---
+
 ## 2026-05-15 — Project inception: three app design concepts
 
 **User:** Brian Enquist (benquist@arizona.edu)  

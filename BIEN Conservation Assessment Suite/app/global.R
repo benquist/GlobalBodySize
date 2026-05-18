@@ -31,11 +31,11 @@ if (!isTRUE(sf::sf_use_s2())) {
 
 # ── Async worker pool ─────────────────────────────────────────────────────────
 # Three workers support the three-stage concurrent query design:
-#   Worker 1 — Stage 1: BIEN_list_country (fast species checklist, seconds)
-#   Worker 2 — Stage 2: BIEN_occurrence_sf (occurrence records, minutes)
+#   Worker 1 — Stage 1: BIEN_list_sf (fast species checklist, seconds)
+#   Worker 2 — Stage 2: BIEN_occurrence_box (occurrence records, minutes)
 #   Worker 3 — Stage 3: BIEN_ranges_sf (range overlap, slow, optional)
-# Workers 1 and 2 always run; Worker 3 is activated only when the user
-# checks "Include range overlap analysis."
+# Workers 1 and 2 always run concurrently; Worker 3 is activated only when the
+# user checks "Include range overlap analysis."
 plan(multisession, workers = 3)
 
 # ── Application configuration ─────────────────────────────────────────────────
@@ -50,10 +50,11 @@ CFG <- list(
 
   # Polygon area limits. Polygons below MIN are likely erroneous uploads.
   # Polygons above MAX stall the BIEN PostGIS server and produce unreliable
-  # richness estimates. MAX is set to ~2× the Alto Japurá pilot study area
-  # (~250,000 km²) to accommodate large conservation units.
+  # richness estimates. MAX is set to 500,000 km² to support large legitimate
+  # conservation units (e.g. entire Alto Japurá watershed ~250,000 km²).
+  # The antimeridian check in .prepare_aoi_for_bien() backstops truly pathological polygons.
   MIN_POLYGON_AREA_KM2 = 100,
-  MAX_POLYGON_AREA_KM2 = 50000,
+  MAX_POLYGON_AREA_KM2 = 500000,
 
   # Per-call deadline (seconds) for BIEN_*_sf() API calls.
   BIEN_API_TIMEOUT_SEC = 180,
@@ -63,11 +64,13 @@ CFG <- list(
   # appear in any correctly geocoded query of the Alto Japurá basin.
   # A FAIL indicates a spatial, CRS, or BIEN coverage issue, not true absence.
   ANCHOR_SPECIES = c(
-    "Mauritia flexuosa",      # aguaje palm — ubiquitous in flooded várzea
-    "Iriartea deltoidea",     # huacrapona — dominant terra firme canopy palm
-    "Euterpe precatoria",     # açaí — widespread understory palm
-    "Cedrelinga cateniformis",# tornillo — common Amazonian timber tree
-    "Swietenia macrophylla"   # big-leaf mahogany — flagship conservation species
+    "Mauritia flexuosa",   # aguaje palm — ubiquitous in flooded várzea
+    "Iriartea deltoidea",  # huacrapona — dominant terra firme canopy palm
+    "Euterpe precatoria",  # açaí — widespread understory palm
+    "Cedrelinga cateniformis", # tornillo — common Amazonian timber tree
+    "Oenocarpus bataua"    # pataua palm — abundant western Amazonian indicator with strong BIEN coverage
+    # NOTE: Swietenia macrophylla was removed — BIEN records reflect historical
+    # distribution and FAIL is uninterpretable (may mean absence, depletion, or data gap).
   )
 )
 assign("CFG", CFG, envir = globalenv())   # lexical lookup by sourced functions

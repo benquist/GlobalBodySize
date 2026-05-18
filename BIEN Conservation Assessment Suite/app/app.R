@@ -243,8 +243,9 @@ server <- function(input, output, session) {
   output$status_text <- renderText({
     switch(rv$status,
       idle      = "Ready. Load a polygon and click Run Analysis.",
-      running   = "Querying occurrence records within polygon\u2026",
-      enriching = paste0(nrow(rv$species_df), " species found. Range overlap analysis running\u2026"),
+      running     = "Querying species checklist and occurrence records\u2026",
+      stage1_done = paste0(nrow(rv$species_df), " species found (initial list). Querying occurrence records\u2026"),
+      enriching   = paste0(nrow(rv$species_df), " species found. Range overlap analysis running\u2026"),
       partial   = paste0(nrow(rv$species_df), " species. Range overlap analysis still running\u2026"),
       done      = paste0("Complete. ", nrow(rv$species_df), " species."),
       error     = "Analysis failed. Check inputs and try again."
@@ -252,21 +253,25 @@ server <- function(input, output, session) {
   })
 
   # Expose running state to UI conditionalPanel + JS
-  output$is_running <- reactive({ rv$status %in% c("running", "enriching", "partial") })
+  output$is_running <- reactive({ rv$status %in% c("running", "stage1_done", "enriching", "partial") })
   outputOptions(output, "is_running", suspendWhenHidden = FALSE)
 
   # Prominent running banner with live elapsed-time counter
   output$running_banner <- renderUI({
-    if (!rv$status %in% c("running", "enriching", "partial")) return(NULL)
+    if (!rv$status %in% c("running", "stage1_done", "enriching", "partial")) return(NULL)
     elapsed_tick()  # take a dependency so this re-renders every second
     secs <- if (!is.null(rv$started_at))
       as.integer(difftime(Sys.time(), rv$started_at, units = "secs"))
     else 0L
     mm <- sprintf("%02d:%02d", secs %/% 60, secs %% 60)
     msg <- switch(rv$status,
-      running   = list(
-        strong  = "Stage 1 of 2: Querying BIEN occurrence records\u2026",
-        detail  = "BIEN_occurrence_box \u2014 lat/lon bounding box query + client-side polygon clip. Results will appear when complete."
+      running     = list(
+        strong  = "Stage 1 of 2: Querying species checklist\u2026",
+        detail  = "BIEN_list_sf \u2014 fast PostGIS intersection. Species list will appear in seconds."
+      ),
+      stage1_done = list(
+        strong  = "Stage 2 of 2: Querying occurrence records\u2026",
+        detail  = "BIEN_occurrence_box \u2014 bounding box + polygon clip. Initial checklist shown below; table will update when complete."
       ),
       enriching = list(
         strong  = "Stage 2 of 2: Range overlap analysis running\u2026",
@@ -404,6 +409,7 @@ server <- function(input, output, session) {
     rv$occ_raw    <- NULL
     rv$occ_counts <- NULL
     rv$occ_points <- NULL
+    rv$species_df <- NULL
 
     include_ranges        <- isTRUE(input$include_ranges)
     natives_only_snap     <- !isTRUE(input$include_nonnative)    # default TRUE (native only)
@@ -417,16 +423,55 @@ server <- function(input, output, session) {
 
     progress <- shiny::Progress$new(session, min = 0, max = 1)
     progress$set(
-      message = "Stage 1 of 2: Querying occurrence records\u2026",
+      message = "Stage 1 of 2: Fast species checklist\u2026",
       value   = 0.05,
-      detail  = "BIEN_occurrence_box \u2014 lat/lon bounding box query + client-side polygon clip."
+      detail  = "BIEN_list_sf \u2014 PostGIS spatial intersection. Species list will appear in seconds while occurrence query runs."
     )
+    # Guard against double-close when Stage 2 fails while Stage 3 is still running.
+    # Closing a Shiny Progress object twice sends orphaned WebSocket messages.
+    progress_closed <- FALSE
+    safe_close_progress <- function() {
+      if (!progress_closed) {
+        progress_closed <<- TRUE
+        progress$close()
+      }
+    }
 
-    # ---- Stage 1 (Worker 1): full occurrence records — always runs ------------
+    # ---- Stage 1 (Worker 1): fast species checklist via BIEN_list_sf ----------
+    # Returns a character vector of species names in seconds. Populates rv$species_df
+    # with Very Low confidence tiers immediately so the user sees results quickly.
+    # Stage 2 (occurrence query) runs concurrently and overwrites rv$species_df
+    # with occurrence-based confidence tiers when complete.
+    promises::future_promise({
+      options(bien_cfg = cfg_snap)  # restore CFG in worker session
+      query_species_list_fast(poly)
+    }, seed = TRUE) %...>% (function(species_vec) {
+      # Guard: if Stage 2 already wrote rv$species_df, do not overwrite with Very Low data.
+      if (!is.null(species_vec) && length(species_vec) > 0 && is.null(rv$species_df)) {
+        stage1_df <- data.frame(
+          species            = as.character(species_vec),
+          n_occurrences      = 0L,
+          family             = NA_character_,
+          native_status_flag = "status_unavailable",
+          stringsAsFactors   = FALSE
+        )
+        rv$species_df  <- assign_confidence_tiers(NULL, stage1_df)
+        rv$session_log <- build_session_log(poly, source_label, 0L, nrow(rv$species_df), NULL)
+        rv$status      <- "stage1_done"
+      }
+      progress$set(value = 0.20,
+                   message = "Species list ready. Querying occurrence records\u2026",
+                   detail  = "BIEN_occurrence_box \u2014 bounding box + polygon clip. Table will update when complete.")
+    }) %...!% (function(e) {
+      # Stage 1 failure is non-fatal: Stage 2 will still populate the table.
+      warning("Stage 1 (BIEN_list_sf) failed (Stage 2 continues): ", conditionMessage(e))
+    })
+
+    # ---- Stage 2 (Worker 2): full occurrence records — always runs ------------
     # BIEN_occurrence_box() performs a server-side lat/lon bounding box query;
     # fetch_bien_occurrences_raw() then clips results to the polygon boundary
     # client-side via sf::st_within(). Geo-validity is enforced server-side.
-    # This is the sole species-list source.
+    # Overwrites the Stage 1 Very Low tier table with occurrence-based tiers.
     promises::future_promise({
       options(bien_cfg = cfg_snap)  # restore CFG in worker session
       fetch_bien_occurrences_raw(poly,
@@ -450,16 +495,20 @@ server <- function(input, output, session) {
                      detail  = "Stage 3 of 3: table updates with overlap columns when complete.")
       } else {
         rv$status <- "done"
-        progress$close()
+        safe_close_progress()
       }
     }) %...!% (function(e) {
-      # Stage 1 failure: no species data available — set error state.
-      rv$status <- "error"
-      progress$close()
+      # Stage 2 failure: if Stage 1 populated a table, keep it as a partial result.
+      if (!is.null(rv$species_df)) {
+        rv$status <- "done"
+      } else {
+        rv$status <- "error"
+      }
+      safe_close_progress()
       showNotification(paste("Occurrence query failed:", e$message), type = "error", duration = NULL)
     })
 
-    # ---- Stage 2 (Worker 2): range overlap — optional, user-activated ----------
+    # ---- Stage 3 (Worker 3): range overlap — optional, user-activated ----------
     # BIEN_ranges_sf() returns SDM-derived range polygons via a PostGIS intersection.
     # Client-side st_intersection() then computes overlap_pct_polygon (fraction of
     # the AOI predicted suitable) and overlap_pct_range (fraction of species total
@@ -489,11 +538,11 @@ server <- function(input, output, session) {
         rv$session_log <- build_session_log(poly, source_label, n_bbox, nrow(species_df), anchor_result)
         rv$species_df  <- species_df
         rv$status      <- "done"
-        progress$close()
+        safe_close_progress()
       }) %...!% (function(e) {
         # Stage 3 failure is non-fatal: occurrence-based tiers from Stage 2 remain.
         if (rv$status %in% c("enriching", "partial")) rv$status <- "done"
-        progress$close()
+        safe_close_progress()
         showNotification(
           paste("Range analysis failed; occurrence-based results remain.", e$message),
           type = "warning", duration = 20
@@ -503,7 +552,7 @@ server <- function(input, output, session) {
   }
 
   observeEvent(input$run_query, {
-    if (rv$status %in% c("running", "enriching", "partial")) {
+    if (rv$status %in% c("running", "stage1_done", "enriching", "partial")) {
       showNotification("Analysis already in progress. Please wait.", type = "warning")
       return()
     }
@@ -559,7 +608,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$confirm_proceed, {
     removeModal()
-    if (rv$status %in% c("running", "enriching", "partial")) {
+    if (rv$status %in% c("running", "stage1_done", "enriching", "partial")) {
       showNotification("Analysis already in progress. Please wait.", type = "warning")
       return()
     }
