@@ -244,7 +244,7 @@ server <- function(input, output, session) {
     switch(rv$status,
       idle      = "Ready. Load a polygon and click Run Analysis.",
       running     = "Querying species checklist and occurrence records\u2026",
-      stage1_done = paste0(nrow(rv$species_df), " species found (initial list). Querying occurrence records\u2026"),
+      stage1_done = paste0(if (!is.null(rv$species_df)) nrow(rv$species_df) else "0", " species found (initial list). Querying occurrence records\u2026"),
       enriching   = paste0(nrow(rv$species_df), " species found. Range overlap analysis running\u2026"),
       partial   = paste0(nrow(rv$species_df), " species. Range overlap analysis still running\u2026"),
       done      = paste0("Complete. ", nrow(rv$species_df), " species."),
@@ -271,7 +271,7 @@ server <- function(input, output, session) {
       ),
       stage1_done = list(
         strong  = "Stage 2 of 2: Querying occurrence records\u2026",
-        detail  = "BIEN_occurrence_box \u2014 bounding box + polygon clip. Initial checklist shown below; table will update when complete."
+        detail  = "BIEN_occurrence_box \u2014 bounding box + polygon clip. Table will update when complete."
       ),
       enriching = list(
         strong  = "Stage 2 of 2: Range overlap analysis running\u2026",
@@ -457,14 +457,19 @@ server <- function(input, output, session) {
         )
         rv$species_df  <- assign_confidence_tiers(NULL, stage1_df)
         rv$session_log <- build_session_log(poly, source_label, 0L, nrow(rv$species_df), NULL)
-        rv$status      <- "stage1_done"
       }
+      # Always advance the banner: if Stage 2 hasn't completed yet (status still "running"),
+      # move to "stage1_done" so the UI shows "Stage 2 of 2: Querying occurrence records…"
+      # rather than the misleading "Stage 1 of 2: Species list will appear in seconds"
+      # (which persists for minutes while Stage 2 runs even when Stage 1 returned NULL).
+      if (rv$status == "running") rv$status <- "stage1_done"
       progress$set(value = 0.20,
-                   message = "Species list ready. Querying occurrence records\u2026",
-                   detail  = "BIEN_occurrence_box \u2014 bounding box + polygon clip. Table will update when complete.")
+                   message = "Querying occurrence records…",
+                   detail  = "BIEN_occurrence_box — bounding box + polygon clip. Table will update when complete.")
     }) %...!% (function(e) {
-      # Stage 1 failure is non-fatal: Stage 2 will still populate the table.
+      # Stage 1 rejection is non-fatal: Stage 2 will still populate the table.
       warning("Stage 1 (BIEN_list_sf) failed (Stage 2 continues): ", conditionMessage(e))
+      if (rv$status == "running") rv$status <- "stage1_done"
     })
 
     # ---- Stage 2 (Worker 2): full occurrence records — always runs ------------
