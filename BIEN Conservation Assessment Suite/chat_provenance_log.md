@@ -379,3 +379,20 @@ After removing `only.geovalid` from the `BIEN_occurrence_box()` call, the `geo_v
 3. Add worker-level file logging so errors are visible
 4. Fix stale "BIEN_occurrence_sf" progress message
 5. Clarify/remove `geo_valid_only` no-op parameter
+
+## 2026-05-18 — Fix: Stage 1 spinner never clears (persistent spin bug)
+
+**Request:** "The app is running with the Pilot: Alto Japurá (example) but after a minute it is still thinking and spinning. Can you check the log?"
+
+**Root cause:** The `%...>%` success handler inside `run_analysis()` only set `rv$status <- "stage1_done"` inside the `if (!is.null(species_vec))` branch. When `BIEN_list_sf()` returned `NULL` (e.g., connection issue or empty result), the promise resolved successfully but `rv$status` remained `"running"` forever — the spinner never stopped.
+
+**Fix (`app/app.R`, commit 26df005):**
+
+1. **Status always advances:** `rv$status <- "stage1_done"` moved out of the NULL-guard `if` block in `%...>%`, so it executes whether `species_vec` is NULL or non-NULL.
+2. **Rejection handler also advances:** `%...!%` rejection handler likewise sets `rv$status <- "stage1_done"` so a promise rejection also clears the spinner.
+3. **Banner text corrected:** Removed "Initial checklist shown below" from the `stage1_done` UI banner — Stage 2 results have not arrived at that point and the message was misleading.
+4. **NULL guard on `rv$species_df`:** Added `if (is.null(rv$species_df)) return("")` at the top of `status_text()` `renderText` to prevent a reactive crash when `status_text` renders before Stage 2 data arrives.
+
+**Verification:** Deployed — please verify spinner clears within ~5 seconds of Stage 1 completing in the browser (Alto Japurá pilot). I cannot confirm the reactive behavior without a live test.
+
+---
