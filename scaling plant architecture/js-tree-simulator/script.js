@@ -55,7 +55,13 @@ const UI = {
   alloMaxPath:       document.getElementById("alloMaxPath"),
   alloMeanPath:      document.getElementById("alloMeanPath"),
   alloTotalLen:      document.getElementById("alloTotalLen"),
-  alloPF:            document.getElementById("alloPF")
+  alloPF:            document.getElementById("alloPF"),
+  alloStemVol2:      document.getElementById("alloStemVol2"),
+  alloHeight2:       document.getElementById("alloHeight2"),
+  alloMaxPath2:      document.getElementById("alloMaxPath2"),
+  alloMeanPath2:     document.getElementById("alloMeanPath2"),
+  alloTotalLen2:     document.getElementById("alloTotalLen2"),
+  alloPF2:           document.getElementById("alloPF2")
 };
 
 const state = {
@@ -163,6 +169,8 @@ function snapToWbe() {
 // ── Tree simulation ───────────────────────────────────────────
 function simulateTree(params, targetTips, seedOffset) {
   const rand = mulberry32(((params.seed + (seedOffset | 0)) >>> 0));
+  const baseLength = Number.isFinite(params.baseLength) ? params.baseLength : 1;
+  const baseRadius = Number.isFinite(params.baseRadius) ? params.baseRadius : 0.1;
 
   const nodes = [{ id: 1, x: 0, y: 0, depth: 0 }];
   const edges = [];
@@ -170,8 +178,8 @@ function simulateTree(params, targetTips, seedOffset) {
 
   // Enforce single trunk (no base furcation)
   const trunkAngle  = 90 + randNorm(rand, 0, 3);
-  const trunkLen    = 1.0;
-  const trunkRad    = 0.1;
+  const trunkLen    = baseLength;
+  const trunkRad    = baseRadius;
   const tn = {
     id: nextId++,
     x: trunkLen * Math.cos(trunkAngle * Math.PI / 180),
@@ -259,8 +267,14 @@ function computeTreeMetrics(tree, sizeIdx) {
   const { nodes, edges, pathStats } = tree;
 
   // Structural volumes and lengths
-  const stemVolume   = edges.reduce((s, e) => s + Math.PI * e.radius * e.radius * e.length, 0);
+  const networkVolume = edges.reduce((s, e) => s + Math.PI * e.radius * e.radius * e.length, 0);
   const totalStemLen = edges.reduce((s, e) => s + e.length, 0);
+  const trunkRadius   = edges.length > 0 ? edges[0].radius : 1e-6;
+  const trunkDiameter = Math.max(1e-6, 2 * trunkRadius);
+  const trunkLength   = edges.length > 0 ? edges[0].length : 1e-6;
+  const stemVolume    = Math.PI * trunkRadius * trunkRadius * trunkLength;
+  const leafCount     = Math.max(1, pathStats.length);
+  const totalBiomass  = networkVolume + 0.02 * leafCount;
 
   // Height: vertical extent of crown
   const ys    = nodes.map(n => n.y);
@@ -268,7 +282,7 @@ function computeTreeMetrics(tree, sizeIdx) {
 
   // Path lengths
   const pathLens   = pathStats.map(p => p.pathLength);
-  const nTips      = Math.max(1, pathStats.length);
+  const nTips      = leafCount;
   const maxPathLen = pathLens.length ? Math.max(...pathLens) : 1e-6;
   const meanPathLen = pathLens.length ? pathLens.reduce((s, v) => s + v, 0) / pathLens.length : 1e-6;
 
@@ -276,8 +290,18 @@ function computeTreeMetrics(tree, sizeIdx) {
   const meanPathFrac = pathStats.reduce((s, p) => s + p.pathFraction, 0) / nTips;
 
   return {
-    nTips, stemVolume, totalStemLen, height,
-    maxPathLen, meanPathLen, meanPathFrac,
+    nTips,
+    leafCount,
+    trunkDiameter,
+    trunkRadius,
+    stemVolume,
+    networkVolume,
+    totalBiomass,
+    totalStemLen,
+    height,
+    maxPathLen,
+    meanPathLen,
+    meanPathFrac,
     targetTips: tree.targetTips,
     sizeIdx: sizeIdx || 0
   };
@@ -294,8 +318,14 @@ function buildAllometryPoints(params) {
   for (let i = 0; i < nCls; i++) {
     const t      = i / (nCls - 1);
     const target = Math.max(4, Math.round(minT * Math.pow(maxT / minT, t)));
+    const sizeFactor = target / minT;
+    const scaledParams = {
+      ...params,
+      baseLength: (Number.isFinite(params.baseLength) ? params.baseLength : 1) * Math.pow(sizeFactor, 1 / 3),
+      baseRadius: (Number.isFinite(params.baseRadius) ? params.baseRadius : 0.1) * Math.pow(sizeFactor, 1 / 2)
+    };
     for (let rep = 0; rep < reps; rep++) {
-      const tree = simulateTree(params, target, rep * 137 + i * 23);
+      const tree = simulateTree(scaledParams, target, rep * 137 + i * 23);
       pts.push(computeTreeMetrics(tree, i));
     }
   }
@@ -479,14 +509,14 @@ function sup(n) {
  * @param {string}            title
  * @param {boolean}           linearY   if true, y axis is linear (for path fraction [0–1])
  */
-function drawScatter(canvas, points, xKey, yKey, xLabel, yLabel, title, linearY) {
+function drawScatter(canvas, points, xKey, yKey, xLabel, yLabel, title, linearY, expectedSlope) {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const valid = points.filter(p => p[xKey] > 0 && (linearY ? p[yKey] >= 0 : p[yKey] > 0));
   if (valid.length < 3) return;
 
-  const pad = { l: 46, r: 10, t: 16, b: 28 };
+  const pad = { l: 56, r: 14, t: 22, b: 30 };
   const cw  = canvas.width;
   const ch  = canvas.height;
   const w   = cw - pad.l - pad.r;
@@ -534,11 +564,24 @@ function drawScatter(canvas, points, xKey, yKey, xLabel, yLabel, title, linearY)
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Slope label
+  // Slope label: boxed so the fitted exponent stays readable on the compact canvases.
+  const slopeText = `fit b = ${slope.toFixed(2)}   WBE ${expectedSlope.toFixed(2)}`;
+  ctx.font = "bold 11px sans-serif";
+  const slopeWidth = ctx.measureText(slopeText).width;
+  const boxX = pad.l + w - slopeWidth - 18;
+  const boxY = pad.t + 4;
+  const boxW = slopeWidth + 12;
+  const boxH = 18;
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.strokeStyle = "#c0392b";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 4);
+  ctx.fill();
+  ctx.stroke();
   ctx.fillStyle = "#c0392b";
-  ctx.font      = "bold 10px sans-serif";
-  ctx.textBaseline = "top";
-  ctx.fillText(`b = ${slope.toFixed(2)}`, pad.l + w - 60, pad.t + 2);
+  ctx.textBaseline = "middle";
+  ctx.fillText(slopeText, boxX + 6, boxY + boxH / 2 + 0.5);
 
   // Data points
   for (const p of valid) {
@@ -588,34 +631,15 @@ function drawScatter(canvas, points, xKey, yKey, xLabel, yLabel, title, linearY)
 
   // Axis labels
   ctx.fillStyle = "#33404a";
-  ctx.font      = "9px sans-serif";
+  ctx.font      = "bold 10px sans-serif";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(xLabel, pad.l + w / 2 - 18, ch - 3);
+  const xLabelWidth = ctx.measureText(xLabel).width;
+  ctx.fillText(xLabel, pad.l + w / 2 - xLabelWidth / 2, ch - 4);
   ctx.save();
-  ctx.translate(10, pad.t + h / 2 + 14);
+  ctx.translate(14, pad.t + h / 2 + 14);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
-}
-
-/**
- * Render all 6 allometric scatter plots.
- *
- * Expected WBE slopes (binary, n=2):
- *   Stem volume vs N_tips  → b ≈ 1.0  (area-preserving network)
- *   Height vs N_tips       → b ≈ 0.33 (l ~ n^(-1/3))
- *   Max path vs N_tips     → b ≈ 0.33 (path ~ height)
- *   Mean path vs N_tips    → b ≈ 0.33
- *   Total stem len vs N    → b ≈ 1.0  (wiring cost)
- *   Mean path fraction vs N → b ≈ 0   (self-similar; plotted on linear-y)
- */
-function drawAllometries(pts) {
-  drawScatter(UI.alloStemVol,  pts, "nTips", "stemVolume",  "N tips", "Stem vol.",      "Stem volume vs N tips",     false);
-  drawScatter(UI.alloHeight,   pts, "nTips", "height",      "N tips", "Height",         "Height vs N tips",          false);
-  drawScatter(UI.alloMaxPath,  pts, "nTips", "maxPathLen",  "N tips", "Max path len",   "Max path length vs N tips", false);
-  drawScatter(UI.alloMeanPath, pts, "nTips", "meanPathLen", "N tips", "Mean path len",  "Mean path len vs N tips",   false);
-  drawScatter(UI.alloTotalLen, pts, "nTips", "totalStemLen","N tips", "Total stem len", "Total stem len vs N tips",  false);
-  drawScatter(UI.alloPF,       pts, "nTips", "meanPathFrac","N tips", "Mean path frac", "Path fraction vs N tips",   true);
 }
 
 // ── Size class cards ──────────────────────────────────────────
@@ -659,7 +683,9 @@ function renderSizeCards() {
 function updateTreeMeta(m) {
   UI.treeMeta.textContent = [
     `Tips: ${m.nTips}`,
-    `Vol: ${m.stemVolume.toFixed(3)}`,
+    `D: ${m.trunkDiameter.toFixed(3)}`,
+    `Stem vol: ${m.stemVolume.toFixed(3)}`,
+    `Net vol: ${m.networkVolume.toFixed(3)}`,
     `H: ${m.height.toFixed(2)}`,
     `Max path: ${m.maxPathLen.toFixed(2)}`,
     `Mean path: ${m.meanPathLen.toFixed(2)}`,
@@ -676,6 +702,36 @@ function initTabs() {
       btn.classList.add("active");
       document.getElementById("tab-" + btn.dataset.tab).classList.remove("hidden");
     });
+  });
+}
+
+function drawDiameterAllometries(pts) {
+  const plots = [
+    { canvas: UI.alloStemVol,  yKey: "stemVolume",   yLabel: "log10(stem volume)",     title: "Trunk diameter vs stem volume",   expected: 2.67 },
+    { canvas: UI.alloHeight,   yKey: "totalBiomass",  yLabel: "log10(total biomass)",    title: "Trunk diameter vs total biomass",  expected: 2.67 },
+    { canvas: UI.alloMaxPath,  yKey: "leafCount",    yLabel: "log10(leaf number)",      title: "Trunk diameter vs leaf number",    expected: 2.00 },
+    { canvas: UI.alloMeanPath, yKey: "networkVolume", yLabel: "log10(network volume)",   title: "Trunk diameter vs network volume",  expected: 2.67 },
+    { canvas: UI.alloTotalLen, yKey: "height",       yLabel: "log10(height)",           title: "Trunk diameter vs height",          expected: 0.67 },
+    { canvas: UI.alloPF,       yKey: "maxPathLen",   yLabel: "log10(max path length)",  title: "Trunk diameter vs max path length", expected: 0.67 }
+  ];
+
+  plots.forEach(plot => {
+    drawScatter(plot.canvas, pts, "trunkDiameter", plot.yKey, "log10(trunk diameter)", plot.yLabel, plot.title, false, plot.expected);
+  });
+}
+
+function drawLeafAllometries(pts) {
+  const plots = [
+    { canvas: UI.alloStemVol2,  yKey: "stemVolume",   yLabel: "log10(stem volume)",      title: "Leaf number vs stem volume",        expected: 1.33 },
+    { canvas: UI.alloHeight2,   yKey: "totalBiomass",  yLabel: "log10(total biomass)",     title: "Leaf number vs total biomass",      expected: 1.33 },
+    { canvas: UI.alloMaxPath2,  yKey: "trunkDiameter", yLabel: "log10(trunk diameter)",   title: "Leaf number vs trunk diameter",     expected: 0.50 },
+    { canvas: UI.alloMeanPath2, yKey: "networkVolume", yLabel: "log10(network volume)",    title: "Leaf number vs network volume",     expected: 1.33 },
+    { canvas: UI.alloTotalLen2, yKey: "height",        yLabel: "log10(height)",            title: "Leaf number vs height",             expected: 0.33 },
+    { canvas: UI.alloPF2,       yKey: "maxPathLen",    yLabel: "log10(max path length)",   title: "Leaf number vs max path length",    expected: 0.33 }
+  ];
+
+  plots.forEach(plot => {
+    drawScatter(plot.canvas, pts, "leafCount", plot.yKey, "log10(leaf number)", plot.yLabel, plot.title, false, plot.expected);
   });
 }
 
@@ -699,7 +755,8 @@ function runSimulation() {
 
   // Allometry: wider size range with replicates for meaningful scatter
   state.alloPoints = buildAllometryPoints(params);
-  drawAllometries(state.alloPoints);
+  drawDiameterAllometries(state.alloPoints);
+  drawLeafAllometries(state.alloPoints);
 }
 
 // ── Event listeners & init ────────────────────────────────────

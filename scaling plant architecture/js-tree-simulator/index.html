@@ -152,7 +152,8 @@
 
         <div class="tab-bar">
           <button class="tab-btn active" data-tab="paths"    type="button">Path Distributions</button>
-          <button class="tab-btn"        data-tab="allometry" type="button">Allometries</button>
+          <button class="tab-btn"        data-tab="diameter" type="button">Diameter-based</button>
+          <button class="tab-btn"        data-tab="leaf" type="button">Leaf-based</button>
         </div>
 
         <!-- Tab: path distributions -->
@@ -169,8 +170,8 @@
           </div>
         </div>
 
-        <!-- Tab: allometries (6 log-log scatter plots) -->
-        <div class="tab-content hidden" id="tab-allometry">
+        <!-- Tab: diameter-based allometries -->
+        <div class="tab-content hidden" id="tab-diameter">
           <div class="allometry-grid">
             <div class="chart-box"><canvas id="alloStemVol"     width="400" height="165"></canvas></div>
             <div class="chart-box"><canvas id="alloHeight"      width="400" height="165"></canvas></div>
@@ -178,6 +179,18 @@
             <div class="chart-box"><canvas id="alloMeanPath"    width="400" height="165"></canvas></div>
             <div class="chart-box"><canvas id="alloTotalLen"    width="400" height="165"></canvas></div>
             <div class="chart-box"><canvas id="alloPF"          width="400" height="165"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Tab: leaf-based allometries -->
+        <div class="tab-content hidden" id="tab-leaf">
+          <div class="allometry-grid">
+            <div class="chart-box"><canvas id="alloStemVol2"    width="400" height="165"></canvas></div>
+            <div class="chart-box"><canvas id="alloHeight2"     width="400" height="165"></canvas></div>
+            <div class="chart-box"><canvas id="alloMaxPath2"    width="400" height="165"></canvas></div>
+            <div class="chart-box"><canvas id="alloMeanPath2"   width="400" height="165"></canvas></div>
+            <div class="chart-box"><canvas id="alloTotalLen2"   width="400" height="165"></canvas></div>
+            <div class="chart-box"><canvas id="alloPF2"         width="400" height="165"></canvas></div>
           </div>
         </div>
 
