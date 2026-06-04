@@ -216,3 +216,52 @@
 - Re-ran `scripts/merge_tier1.R` → **58,541 rows, 13 providers** (added sealifebase_froese2024: 616 rows, marine_other group).
 
 **Agents consulted:** @M (supervisor), coder.
+
+---
+
+## 2026-06-04 — README + analysis refresh (current project status)
+
+**Prompt:** Revisit the GlobalBodySize project and update README/analyses with the latest progress, including plant size estimation context (growth habit, diameter, height) and other new data.
+
+**Actions completed:**
+- Re-ran `scripts/merge_linear_size.R` to refresh the merged linear table from all currently available providers.
+- Updated `data/compiled/tier1_linear_size_combined.csv` to **225,120 rows** across 5 providers (MOBS, ReptTraits linear, SeaLifeBase linear, DISPERSE linear, LizardTraits linear).
+- Verified current mass-table status from `data/compiled/tier1_combined.csv`: **58,541 rows** across 13 providers.
+- Updated `README.md` to align with current merged outputs:
+  - badges and inventory counts updated (58,541 mass; 225,120 linear)
+  - reptile and marine-non-fish coverage updated
+  - project-structure row-count comments updated
+  - priority table updated to mark ReptTraits/SeaLifeBase/DISPERSE runs as done
+  - added a new "Plant Size Companion Data" section linking to `../Global_Plant_BodySize` and summarizing growth-habit + height/DBH status (333,778 species roster; 78,110 with traits; 1,978 allometric-ready; 91,939 with integrated growth-habit assignment)
+- Updated `science_summary.Rmd`:
+  - narrative counts updated from 47,456/11 providers to current 58,541/13 providers
+  - load logic now avoids stale reconciliation by selecting the reconciled file only when it is at least as complete as `tier1_combined.csv`
+  - known-limitations and next-steps sections updated for completed expansion providers
+  - fixed a rendering bug in the confidence table by coercing blank `mass_confidence` values to `unknown` before `pivot_wider()`
+- Re-rendered `science_summary.html` successfully.
+
+**Files changed:**
+- `README.md`
+- `science_summary.Rmd`
+- `science_summary.html`
+- `data/compiled/tier1_linear_size_combined.csv`
+- `output/merge_linear_size_log.txt`
+
+---
+
+## 2026-06-04 — Plant summary added to science_summary.html
+
+**Prompt:** "Do we have a generated summary for the plant data that we can put in the science_summary.html?"
+
+**Actions completed:**
+- Added a generated "Plant Companion Snapshot" section to `science_summary.Rmd`.
+- New section reads companion outputs when present:
+  - `../Global_Plant_BodySize/output/plant_bodysize_final.csv`
+  - `../Global_Plant_BodySize/output/habit_integration_report.csv`
+- Section computes and reports plant roster totals (species, any trait coverage, allometric-ready species) and renders a habit-source summary table.
+- Added graceful fallback text when companion files are absent (for GitHub-only contexts).
+- Re-rendered `science_summary.html` successfully.
+
+**Files changed:**
+- `science_summary.Rmd`
+- `science_summary.html`
