@@ -6,6 +6,8 @@
 
 # Output files (keep source, ignore large binary outputs)
 *.html
+# Allow HTML source files in the js-tree-simulator
+!"scaling plant architecture/js-tree-simulator/index.html"
 *.tif
 worldclim_data/
 
