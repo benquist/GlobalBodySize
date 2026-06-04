@@ -565,13 +565,14 @@ function drawScatter(canvas, points, xKey, yKey, xLabel, yLabel, title, linearY,
   ctx.setLineDash([]);
 
   // Slope label: boxed so the fitted exponent stays readable on the compact canvases.
-  const slopeText = `fit b = ${slope.toFixed(2)}   WBE ${expectedSlope.toFixed(2)}`;
+  const fitText = `fit b = ${slope.toFixed(2)}`;
+  const wbeText = `WBE b = ${expectedSlope.toFixed(2)}`;
   ctx.font = "bold 11px sans-serif";
-  const slopeWidth = ctx.measureText(slopeText).width;
-  const boxX = pad.l + w - slopeWidth - 18;
-  const boxY = pad.t + 4;
-  const boxW = slopeWidth + 12;
-  const boxH = 18;
+  const labelWidth = Math.max(ctx.measureText(fitText).width, ctx.measureText(wbeText).width);
+  const boxX = pad.l + 6;
+  const boxY = pad.t + 6;
+  const boxW = labelWidth + 12;
+  const boxH = 30;
   ctx.fillStyle = "rgba(255,255,255,0.92)";
   ctx.strokeStyle = "#c0392b";
   ctx.lineWidth = 1;
@@ -579,9 +580,11 @@ function drawScatter(canvas, points, xKey, yKey, xLabel, yLabel, title, linearY,
   ctx.roundRect(boxX, boxY, boxW, boxH, 4);
   ctx.fill();
   ctx.stroke();
+  ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#c0392b";
-  ctx.textBaseline = "middle";
-  ctx.fillText(slopeText, boxX + 6, boxY + boxH / 2 + 0.5);
+  ctx.fillText(fitText, boxX + 6, boxY + 12);
+  ctx.fillStyle = "#b85900";
+  ctx.fillText(wbeText, boxX + 6, boxY + 24);
 
   // Data points
   for (const p of valid) {
