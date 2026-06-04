@@ -131,18 +131,14 @@
     <!-- ── Right: main area ── -->
     <div class="main-col">
 
-      <!-- Top row: tree SVG + size-class cards -->
+      <!-- Tree panel with base-aligned size strip -->
       <div class="top-row">
 
         <section class="panel tree-panel" aria-labelledby="tree-title">
           <h2 id="tree-title">Selected Tree</h2>
           <div class="tree-meta" id="treeMeta"></div>
           <svg id="treeSvg" viewBox="0 0 900 480" role="img" aria-label="Simulated branching tree"></svg>
-        </section>
-
-        <section class="panel size-panel" aria-labelledby="size-title">
-          <h2 id="size-title">Size Classes</h2>
-          <div id="sizeClassCards" class="cards"></div>
+          <div id="treeStrip" class="tree-strip" role="group" aria-label="Size class comparison"></div>
         </section>
 
       </div>

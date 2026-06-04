@@ -47,7 +47,7 @@ const UI = {
   wbeSnapBtn:        document.getElementById("wbeSnapBtn"),
   treeSvg:           document.getElementById("treeSvg"),
   treeMeta:          document.getElementById("treeMeta"),
-  sizeClassCards:    document.getElementById("sizeClassCards"),
+  treeStrip:         document.getElementById("treeStrip"),
   withinHist:        document.getElementById("withinHist"),
   acrossHist:        document.getElementById("acrossHist"),
   alloStemVol:       document.getElementById("alloStemVol"),
@@ -645,28 +645,69 @@ function drawScatter(canvas, points, xKey, yKey, xLabel, yLabel, title, linearY,
   ctx.restore();
 }
 
-// ── Size class cards ──────────────────────────────────────────
+// ── Baseline-aligned strip tree renderer ─────────────────────
+// All trees share the same root y-position (strip bottom);
+// taller trees grow further up — giving an instant size comparison.
+function drawStripTree(svgEl, tree, maxTreeH) {
+  svgEl.innerHTML = "";
+  const vbW = 70, vbH = 90, margin = 3;
+  const rootSvgY = vbH - margin;
+
+  const xs   = tree.nodes.map(n => n.x);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const xMid = (xMin + xMax) / 2;
+  const xSpan = Math.max(xMax - xMin, 1e-9);
+  const ref   = Math.max(maxTreeH, 1e-9);
+
+  const scaleY = (vbH - margin * 2) / ref;
+  const scaleX = Math.min(scaleY, (vbW - margin * 2) / xSpan);
+
+  const tx = x => vbW / 2 + (x - xMid) * scaleX;
+  const ty = y => rootSvgY - y * scaleY;
+
+  const nb = new Map(tree.nodes.map(n => [n.id, n]));
+  for (const e of tree.edges) {
+    const from = nb.get(e.from), to = nb.get(e.to);
+    if (!from || !to) continue;
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", tx(from.x)); line.setAttribute("y1", ty(from.y));
+    line.setAttribute("x2", tx(to.x));   line.setAttribute("y2", ty(to.y));
+    line.setAttribute("stroke", e.isMain ? "#1f252a" : "#7f9298");
+    line.setAttribute("stroke-width", Math.max(0.4, Math.sqrt(e.radius) * 4));
+    line.setAttribute("stroke-linecap", "round");
+    svgEl.appendChild(line);
+  }
+}
+
+// ── Size class tree strip ─────────────────────────────────────
 function renderSizeCards() {
-  UI.sizeClassCards.innerHTML = "";
+  UI.treeStrip.innerHTML = "";
+  if (!state.classes.length) return;
+
+  const maxTreeH = Math.max(...state.classes.map(c =>
+    Math.max(...c.tree.nodes.map(n => n.y), 1e-6)
+  ));
+
   state.classes.forEach((item, idx) => {
-    const m    = computeTreeMetrics(item.tree, idx);
-    const card = document.createElement("article");
-    card.className = "card" + (idx === state.selectedIndex ? " selected" : "");
-    card.setAttribute("role", "button");
-    card.setAttribute("tabindex", "0");
+    const m = computeTreeMetrics(item.tree, idx);
 
-    const h3   = document.createElement("h3");
-    h3.textContent = `${item.targetTips} tips`;
-
-    const meta = document.createElement("div");
-    meta.className  = "card-meta";
-    meta.textContent = `pf=${m.meanPathFrac.toFixed(2)}  h=${m.height.toFixed(1)}`;
+    const div = document.createElement("div");
+    div.className = "strip-item" + (idx === state.selectedIndex ? " selected" : "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.title = `${item.targetTips} tips  ·  h=${m.height.toFixed(1)}  pf=${m.meanPathFrac.toFixed(2)}`;
 
     const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svgEl.setAttribute("viewBox", "0 0 180 72");
+    svgEl.setAttribute("viewBox", "0 0 70 90");
+    svgEl.setAttribute("width", "70");
+    svgEl.setAttribute("height", "90");
     svgEl.setAttribute("aria-hidden", "true");
 
-    card.append(h3, meta, svgEl);
+    const label = document.createElement("div");
+    label.className = "strip-label";
+    label.textContent = item.targetTips;
+
+    div.append(svgEl, label);
 
     function select() {
       state.selectedIndex = idx;
@@ -675,11 +716,11 @@ function renderSizeCards() {
       drawWithinHistogram(item.tree);
       updateTreeMeta(m);
     }
-    card.addEventListener("click", select);
-    card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") select(); });
+    div.addEventListener("click", select);
+    div.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") select(); });
 
-    UI.sizeClassCards.appendChild(card);
-    requestAnimationFrame(() => drawMiniTree(svgEl, item.tree));
+    UI.treeStrip.appendChild(div);
+    requestAnimationFrame(() => drawStripTree(svgEl, item.tree, maxTreeH));
   });
 }
 
@@ -723,18 +764,26 @@ function drawDiameterAllometries(pts) {
   });
 }
 
+// Leaf-based tab: leaf number on y-axis, structural metric on x.
+// WBE expected slopes (x → leaf number):
+//   trunk diameter → N: b ≈ 2.00  (area-preserving: N ∝ D²)
+//   height         → N: b ≈ 3.00  (volume-filling:  H ∝ N^(1/3))
+//   network volume → N: b ≈ 0.75  (N ∝ V^(3/4))
+//   stem volume    → N: b ≈ 0.75
+//   total biomass  → N: b ≈ 0.75
+//   max path len   → N: b ≈ 3.00  (path ∝ height)
 function drawLeafAllometries(pts) {
   const plots = [
-    { canvas: UI.alloStemVol2,  yKey: "stemVolume",   yLabel: "log10(stem volume)",      title: "Leaf number vs stem volume",        expected: 1.33 },
-    { canvas: UI.alloHeight2,   yKey: "totalBiomass",  yLabel: "log10(total biomass)",     title: "Leaf number vs total biomass",      expected: 1.33 },
-    { canvas: UI.alloMaxPath2,  yKey: "trunkDiameter", yLabel: "log10(trunk diameter)",   title: "Leaf number vs trunk diameter",     expected: 0.50 },
-    { canvas: UI.alloMeanPath2, yKey: "networkVolume", yLabel: "log10(network volume)",    title: "Leaf number vs network volume",     expected: 1.33 },
-    { canvas: UI.alloTotalLen2, yKey: "height",        yLabel: "log10(height)",            title: "Leaf number vs height",             expected: 0.33 },
-    { canvas: UI.alloPF2,       yKey: "maxPathLen",    yLabel: "log10(max path length)",   title: "Leaf number vs max path length",    expected: 0.33 }
+    { canvas: UI.alloStemVol2,  xKey: "stemVolume",    xLabel: "log10(stem volume)",      title: "Stem volume → leaf number",    expected: 0.75 },
+    { canvas: UI.alloHeight2,   xKey: "totalBiomass",  xLabel: "log10(total biomass)",    title: "Total biomass → leaf number",  expected: 0.75 },
+    { canvas: UI.alloMaxPath2,  xKey: "trunkDiameter", xLabel: "log10(trunk diameter)",   title: "Trunk diameter → leaf number", expected: 2.00 },
+    { canvas: UI.alloMeanPath2, xKey: "networkVolume", xLabel: "log10(network volume)",   title: "Network volume → leaf number", expected: 0.75 },
+    { canvas: UI.alloTotalLen2, xKey: "height",        xLabel: "log10(height)",           title: "Height → leaf number",         expected: 3.00 },
+    { canvas: UI.alloPF2,       xKey: "maxPathLen",    xLabel: "log10(max path length)",  title: "Max path → leaf number",       expected: 3.00 }
   ];
 
   plots.forEach(plot => {
-    drawScatter(plot.canvas, pts, "leafCount", plot.yKey, "log10(leaf number)", plot.yLabel, plot.title, false, plot.expected);
+    drawScatter(plot.canvas, pts, plot.xKey, "leafCount", plot.xLabel, "log10(leaf number)", plot.title, false, plot.expected);
   });
 }
 
