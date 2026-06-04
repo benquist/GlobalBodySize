@@ -1,3 +1,33 @@
+[26] Date: 2026-05-31
+Source: user prompt in @m orchestrator mode
+Request summary: Comprehensive BIEN observation data inventory and phased export plan for the MacroecologyLab biodiversity monorepo.
+Files affected: BIEN_observation_inventory.Rmd, BIEN_observation_inventory.html, BIEN_export_plan_review.md, agents/prompt_log.md, agents/agent_chat_provenance_log.txt, chat_provenance_log.md
+Agents invoked: ecology-user, biodiversity-science-guard, biodiversity-informatics-checker, code-checker, stats-specialist
+Action taken:
+  M orchestrator inventoried all data sources (Tier 1: Literature_Data_To_BIENdb 176k records, sPlotOpen ~10M, cacti ~2k; Tier 2: BAAD ~50k, tree-longevity ~500k+, ForestGEO ~15k; Tier 3: DryadPlantTraits ~2.3M, GlobalBodySize ~18k, Literatura supplementals ~100k+). Created BIEN_observation_inventory.Rmd with 9 sections: Executive Summary, Project Inventory (DT datatable), Ecological Scope Analysis (geo/taxonomic/trait/temporal), Taxonomic QA, DwC Compliance Audit, Phased Export Plan (4 phases + R code for QA pipeline + TNRS reconciliation + coordinate validation + chunked sPlotOpen upload), Provenance & Citations, Outstanding Issues, and Agent Review Panel.
+  ecology-user: BLOCKED — sPlotOpen/ForestGEO plot data must use BIEN plot ingestion path, not be flattened to occurrence rows; also flagged road bias, cultivated garden bias, observer bias.
+  biodiversity-science-guard: BLOCKED — native_status IS NULL ≠ native (same error pattern as BIEN Species App audit); TPL deprecated in BAAD; Wikidata cacti need basisOfRecord; sPlotOpen CC BY attribution must be in BIEN record-level metadata.
+  biodiversity-informatics-checker: BLOCKED — basisOfRecord absent in most projects; occurrenceID hash must use source identifiers not derived fields; taxonRank inconsistency in DryadPlantTraits; add MeasurementOrFact extension for trait records.
+  code-checker: PASS WITH SUGGESTIONS — readLines chunked reader for sPlotOpen is fragile (replace with fread skip/nrows); TNRS batch loop needs tryCatch; harmonize_trait_units by-reference semantics need documentation.
+  stats-specialist: PASS WITH NOTES — TNRS score threshold not specified (recommend ≥0.9); outlier detection unreliable for <10 records per species; sPlotOpen representativeness caveat required in all downstream analyses.
+  Document rendered cleanly: rmarkdown::render('BIEN_observation_inventory.Rmd') → BIEN_observation_inventory.html.
+  BIEN_export_plan_review.md created as companion with consolidated action items table.
+Outcome: COMPLETE WITH NOTES — 6 CRITICAL issues block actual submission; documentation and render complete.
+
+[25] Date: 2026-05-21
+Source: user prompt (direct agent creation request)
+Request summary: Create llm-systems-skeptic.agent.md — specialist coding agent for LLM engineering, transformer internals, ML systems, AI tools, evaluation, and the limits of language models.
+Files affected: agents/llm-systems-skeptic.agent.md, agents/prompt_log.md, agents/agent_chat_provenance_log.txt
+Agents invoked: none (direct file creation)
+Action taken: Created agents/llm-systems-skeptic.agent.md with full specification including: transformer implementation knowledge (tokenization through deployment); operating principles (model behavior ≠ capability; fluency ≠ truth; retrieval ≠ reasoning); required architecture stance (deterministic code first, LLM last); transformer code review checklist (6 sections); RAG rules (evidence selection, citation validation); agentic system rules (explicit tools/permissions/stopping conditions); evaluation rules by task type; prompt engineering rules; tool-use security; security/privacy requirements. Canonical sources anchored to Vaswani 2017, Brown 2020, Ouyang 2022, Bender 2021, Goodfellow et al., Jurafsky & Martin, Sutton & Barto, Stanford CS336, nanoGPT, LLMs-from-scratch, HuggingFace, PyTorch.
+
+[24] Date: 2026-05-20
+Source: user prompt in @m mode
+Request summary: Create new agent fixed-income-rates.agent.md covering fixed income, rates, credit, and currency markets as traded markets.
+Files affected: agents/fixed-income-rates.agent.md, agents/prompt_log.md, agents/agent_chat_provenance_log.txt
+Agents invoked: none (direct file creation)
+Action taken: Created agents/fixed-income-rates.agent.md with full rates market structure, credit market structure, trading mechanics, return drivers, risk measures, valuation conventions, FX-as-rates-market, macro drivers, and pricing/risk/narrative taxonomy. Strict conceptual distinctions enforced (yield≠return, forward≠forecast, carry≠alpha, etc.).
+
 [23] Date: 2026-05-09
 Source: overnight autonomous execution (@m supervisor agent mode; user asleep)
 Request summary: Complete overnight pipeline for BIEN Species Shiny app multi-agent design sprint: run code-checker → fix all issues → run optimizer → implement optimization → run code-verifier → commit + push.
@@ -1256,3 +1286,11 @@ Action: Created GlobalBodySize/BIODIVERSITY_INFORMATICS_AUDIT.md. 8 Critical Iss
 Prompt: Start GlobalBodySize — programmatic body mass harvest across all major animal/plant groups. Overnight work session.
 Agents: ecology-user, merow-ecology, taxonomy-reconciliation, biodiversity-informatics-checker, m (orchestrator)
 Action: Full project scaffold created at GlobalBodySize/. Strategy documents, 6 R library files, 2 pipeline scripts, 3 provider intake scripts, PROJECT_PLAN.md, README.md.
+
+[27] Date: 2026-06-04
+Source: active chat request
+Request summary: Register enhanced-theory.agent.md as a callable subagent.
+Files affected: .github/agents/enhanced-theory.agent.md, agents/prompt_log.md, agents/agent_chat_provenance_log.txt
+Agents invoked: none (direct registration)
+Action taken: Mirrored agents/enhanced-theory.agent.md into .github/agents/enhanced-theory.agent.md so the agent is discoverable in the standard callable agent location for this workspace.
+Outcome: Registration file added in .github/agents; prompt and agent provenance logs updated.
