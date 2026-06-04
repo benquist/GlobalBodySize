@@ -2770,3 +2770,4 @@ Actions:
 2026-06-04 – JS tree simulator: fix layout chain (top-row flex container, tree-panel fills it, chart grids scroll rather than clip, canvas height auto).
 2026-06-04 - Registered enhanced-theory as callable by adding .github/agents/enhanced-theory.agent.md (mirrored from agents/enhanced-theory.agent.md).
 2026-06-04 - JS tree simulator: audited WBE/allometry math with enhanced-theory; made expected slopes and trunk pre-scaling parameter-dependent on lengthDecay/radiusDecay (with WBE fallback constants).
+2026-06-04 | "Run always gate for this session. Changed files: scaling plant architecture/js-tree-simulator/script.js and agents/prompt_log.md. Commit 8c50942 was pushed to origin/master. Verify prompt log entry exists, Rmd/package checks are not applicable for this change set, and git push is confirmed." - Always-gate run requested.
