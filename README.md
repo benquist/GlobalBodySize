@@ -3,7 +3,7 @@
 **A reproducible, provenance-rich, cross-taxon animal body mass database.**
 
 [![Phase](https://img.shields.io/badge/Phase-1%20Tier--1%20Intake-blue)]()
-[![Rows](https://img.shields.io/badge/Rows-47%2C456-green)]()
+[![Rows](https://img.shields.io/badge/Rows-58%2C541-green)]()
 [![Groups](https://img.shields.io/badge/Taxa-mammals%20%7C%20birds%20%7C%20fish%20%7C%20amphibians%20%7C%20reptiles-orange)]()
 
 Body mass is the central ecological trait — it determines metabolic rate, population density, home range, generation time, and extinction risk across all animal life. This project assembles a unified, Darwin Core-compatible body mass database from authoritative curated sources, designed for macroecological synthesis, scaling law tests, and trait-based biodiversity analyses.
@@ -127,7 +127,7 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 
 > **Grady et al. 2014 mass:** `final_adult_mass_g` from the growth curve asymptote (von Bertalanffy or logistic fits to mass-at-age data), flagged `mass_measurement_type = "literature_asymptote"`. Covers 348 extant species from 11 groups (Crocodylia, Placental Mammals, Marsupials, Monotremata, Neornithes, Sharks, Squamata, Teleost Fish, Testudines). Data extracted from Table S1 of the PDF supplement — no open deposit. Full growth (Gmax g/d) and metabolic rate (W) columns are in `output/grady2014_growth_compiled.csv` for use in scaling law analyses.
 
-**Phase 1 + AnimalTraits + LizardTraits + Grady 2014 total (as of 2026-05-11): 47,456 rows across 11 completed providers.**
+**Phase 1 + expansion providers total (as of 2026-06-04): 58,541 rows across 13 completed providers.**
 
 ### Taxonomic Group Breakdown
 
@@ -135,15 +135,16 @@ All Tier 1 sources were ingested programmatically with full field-level provenan
 |---|---|---|
 | Birds | 22,121 | EltonTraits (Birds), AVONET, AnimalTraits, Grady 2014 |
 | Mammals | 11,270 | PanTHERIA, EltonTraits (Mammals), AnAge, NEON, AnimalTraits, Grady 2014 |
-| Reptiles | 6,773 | Lizard Traits of the World (Meiri 2018), AnAge, AnimalTraits, Grady 2014 |
+| Reptiles | 17,242 | ReptTraits 2024, Lizard Traits of the World (Meiri 2018), AnAge, AnimalTraits, Grady 2014 |
 | Fish | 5,739 | FishBase, AnimalTraits, Grady 2014 |
+| Marine non-fish | 616 | SeaLifeBase |
 | Insects | 772 | AnimalTraits |
 | Arachnids | 131 | AnimalTraits |
 | Amphibians | 619 | AmphiBIO, AnAge, AnimalTraits |
 | Crustaceans | 28 | AnimalTraits |
 | Myriapods / Annelids / Gastropods | 3 | AnimalTraits |
 
-> **Reptile note:** 6,633 of the 6,741 reptile rows are lizard species from Meiri (2018) with allometric (LW-modeled) mass estimates; 108 rows from AnAge and AnimalTraits carry literature means. ReptTraits (Meiri et al. 2024) with directly measured maximum body masses for 12,060 reptile species is the next priority intake.
+> **Reptile note:** Reptile coverage now includes both allometric and directly measured sources: Lizard Traits of the World (Meiri 2018; 6,633 LW-modeled lizard rows) plus ReptTraits (Meiri et al. 2024; 10,469 literature maximum mass rows) with additional smaller contributions from AnAge, AnimalTraits, and Grady 2014.
 
 > **Deduplication note:** Mammals, birds, reptiles, and amphibians are now multi-provider and require GBIF-reconciled deduplication before species richness or coverage estimates are made. Invertebrate groups (insect, arachnid, crustacean, myriapod, annelid, gastropod) are sourced from AnimalTraits only — no deduplication required yet.
 
@@ -192,8 +193,8 @@ GlobalBodySize/
 │   ├── taxon_reconciliation.R
 │   └── zenodo_api.R
 ├── data/compiled/
-│   ├── tier1_combined.csv          # Merged Tier 1 mass (47,456 rows, 11 providers)
-│   ├── tier1_linear_size_combined.csv  # Merged linear size (183k+ rows, NEW)
+│   ├── tier1_combined.csv          # Merged Tier 1 mass (58,541 rows, 13 providers)
+│   ├── tier1_linear_size_combined.csv  # Merged linear size (225,120 rows, 5 providers)
 │   ├── tier1_reconciled.csv        # + GBIF reconciliation columns
 │   └── taxon_match_cache.csv       # GBIF match cache (21,696 rows)
 ├── output/                         # Per-provider compiled CSVs
@@ -225,7 +226,7 @@ GlobalBodySize/
 │   └── sealifebase/load_sealifebase.R  # NEW — marine non-fish
 ├── scripts/                        # Pipeline orchestration
 │   ├── discover_body_mass_datasets.R
-│   ├── merge_tier1.R                   # Mass merge (11 providers)
+│   ├── merge_tier1.R                   # Mass merge (13 providers)
 │   ├── merge_linear_size.R             # Linear size merge (NEW)
 │   ├── run_taxon_reconciliation.R
 │   ├── run_fishbase_intake.sh
@@ -290,18 +291,31 @@ Rscript scripts/discover_body_mass_datasets.R \
 
 ## Current Data Inventory
 
-As of 2026-05-11:
+As of 2026-06-04:
 
 | Statistic | Value |
 |---|---|
-| Total rows — mass table (tier1_combined.csv) | 47,456 |
-| Total rows — linear size table (tier1_linear_size_combined.csv) | 183,142+ (MOBS only; others pending) |
-| Providers completed (mass) | 11 |
-| Providers with scripts ready but not yet run | 3 (ReptTraits, SeaLifeBase, DISPERSE) |
+| Total rows — mass table (tier1_combined.csv) | 58,541 |
+| Total rows — linear size table (tier1_linear_size_combined.csv) | 225,120 |
+| Providers completed (mass) | 13 |
+| Providers completed (linear size) | 5 |
 | GBIF EXACT match rate | 97.7% |
 | Body size range | ~0.07 g (amphibians) to ~150,000,000 g (blue whale) |
 | Range in orders of magnitude | ~9.3 log₁₀ decades |
 | Discovery candidates (Dryad + Figshare) | 1,043 |
+
+## Plant Size Companion Data
+
+Recent plant size estimation work (growth habit + height + stem diameter/DBH) is tracked in the companion project `../Global_Plant_BodySize`:
+
+| Statistic (Global_Plant_BodySize) | Value |
+|---|---|
+| Species in final roster (`plant_bodysize_final.csv`) | 333,778 |
+| Species with any size trait | 78,110 |
+| Species with both height + DBH (`allometric_ready`) | 1,978 |
+| Species with integrated growth-habit assignments (primary + diversity + woodiness) | 91,939 |
+
+Key files: `../Global_Plant_BodySize/output/plant_bodysize_final.csv`, `../Global_Plant_BodySize/output/habit_integration_report.csv`, `../Global_Plant_BodySize/plant_bodysize_summary.html`.
 
 ---
 
@@ -399,16 +413,17 @@ rmarkdown::render("science_summary.Rmd", output_file = "science_summary.html")
 | 3 | ~~Add Lizard Traits of the World (Meiri 2018)~~ | ✅ Done (6,633 spp, allometric LW-modeled, 2026-05-11) |
 | 4 | ~~Add MOBS 1.0 marine linear size (McClain et al. 2025)~~ | ✅ Done (183,175 rows, 2026-05-11) |
 | 4b | ~~Extract Grady et al. 2014 Table S1 from PDF~~ | ✅ Done (381 taxa parsed; 348 extant mass rows + 381 growth rows; 2026-05-11) |
-| 5 | ~~Merge Grady 2014 mass into tier1_combined.csv~~ | ✅ Done (47,456 rows, 11 providers, 2026-05-11) |
-| 6 | Run ReptTraits intake (Meiri et al. 2024, Sci Data, 12,060 reptile spp) | Script ready (`providers/repttraits/load_repttraits.R`) |
-| 7 | Run SeaLifeBase intake (rfishbase) | Script ready (`providers/sealifebase/load_sealifebase.R`) |
-| 8 | Run DISPERSE intake (Sarremejane et al. 2020, aquatic macroinvertebrates) | Script ready (`providers/disperse/load_disperse.R`) |
+| 5 | ~~Merge Grady 2014 mass into tier1_combined.csv~~ | ✅ Done (58,541 rows, 13 providers, latest merge 2026-06-04) |
+| 6 | ~~Run ReptTraits intake (Meiri et al. 2024, Sci Data, 12,060 reptile spp)~~ | ✅ Done (10,469 mass rows, 2026-05-11) |
+| 7 | ~~Run SeaLifeBase intake (rfishbase)~~ | ✅ Done (616 mass rows, 2026-05-11) |
+| 8 | ~~Run DISPERSE intake (Sarremejane et al. 2020, aquatic macroinvertebrates)~~ | ✅ Done for linear size (145 retained rows in merged linear table, 2026-06-04) |
 | 9 | Integrate Grady 2014 growth + metabolic rate data into Animal_scaling_data | Gmax + metabolic_rate_W columns in `grady2014_growth_compiled.csv` |
-| 10 | Deduplicate species across providers (mammals/birds multi-counted) | Requires reconciliation first |
-| 11 | Retry Zenodo discovery with `--min-score=3` | API stability |
-| 12 | Populate DwC `measurementID` | Design decision needed |
-| 13 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
-| 14 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
+| 10 | Re-run GBIF reconciliation for full 58,541-row mass table | No |
+| 11 | Deduplicate species across providers (mammals/birds/reptiles multi-counted) | Requires updated reconciliation |
+| 12 | Retry Zenodo discovery with `--min-score=3` | API stability |
+| 13 | Populate DwC `measurementID` | Design decision needed |
+| 14 | Verify NEON DOI `10.48443/s4ph-2z37` on NEON Data Portal | Before publication |
+| 15 | Submit to GBIF IPT or Zenodo for public archiving | After DwC compliance |
 
 ---
 
