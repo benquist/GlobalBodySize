@@ -2769,3 +2769,4 @@ Actions:
 2026-06-04 – JS tree simulator: replaced right-side card panel with base-aligned tree strip; flipped leaf allometry to put leaf number on y-axis.
 2026-06-04 – JS tree simulator: fix layout chain (top-row flex container, tree-panel fills it, chart grids scroll rather than clip, canvas height auto).
 2026-06-04 - Registered enhanced-theory as callable by adding .github/agents/enhanced-theory.agent.md (mirrored from agents/enhanced-theory.agent.md).
+2026-06-04 - JS tree simulator: audited WBE/allometry math with enhanced-theory; made expected slopes and trunk pre-scaling parameter-dependent on lengthDecay/radiusDecay (with WBE fallback constants).

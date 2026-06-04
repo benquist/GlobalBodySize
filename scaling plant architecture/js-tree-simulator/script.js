@@ -307,6 +307,54 @@ function computeTreeMetrics(tree, sizeIdx) {
   };
 }
 
+// ── Theory-derived allometric exponents (binary branching) ───
+// eta   = daughter/parent length ratio  (lengthDecay)
+// gamma = daughter/parent radius ratio  (radiusDecay)
+function computeExpectedExponents(eta, gamma) {
+  if (!(eta > 0 && eta < 1 && gamma > 0 && gamma < 1)) return null;
+
+  const ln2 = Math.log(2);
+  const aL = -Math.log(eta) / ln2;   // trunk length exponent vs N
+  const aD = -Math.log(gamma) / ln2; // trunk diameter exponent vs N
+  if (!(Number.isFinite(aL) && Number.isFinite(aD) && aL > 0 && aD > 0)) return null;
+
+  const aStem = 2 * aD + aL;
+  const q = 2 * gamma * gamma * eta;
+  const tol = 1e-6;
+
+  // Total vascular volume regime by geometric ratio q = 2*gamma^2*eta.
+  let aNet;
+  if (q < 1 - tol) {
+    aNet = aStem;           // proximal-dominated: same power as trunk stem volume
+  } else if (q > 1 + tol) {
+    aNet = 1;               // distal-dominated: finest levels dominate, scales ~ N
+  } else {
+    aNet = aStem;           // critical: power law with multiplicative log(N) correction
+  }
+
+  // totalBiomass in this simulator = networkVolume + c * leafCount.
+  const aBio = Math.max(aNet, 1);
+
+  return {
+    aL,
+    aD,
+    // Diameter tab (y vs D)
+    bStemVsD: aStem / aD,
+    bBiomassVsD: aBio / aD,
+    bLeafVsD: 1 / aD,
+    bNetVsD: aNet / aD,
+    bHeightVsD: aL / aD,
+    bMaxPathVsD: aL / aD,
+    // Leaf tab (N vs x)
+    bLeafVsStem: 1 / aStem,
+    bLeafVsBiomass: 1 / aBio,
+    bLeafVsD: 1 / aD,
+    bLeafVsNet: 1 / aNet,
+    bLeafVsHeight: 1 / aL,
+    bLeafVsMaxPath: 1 / aL
+  };
+}
+
 // Build allometry dataset: 12 log-spaced size classes × 4 replicates
 function buildAllometryPoints(params) {
   const minT = Math.max(4, params.minTips);
@@ -314,6 +362,9 @@ function buildAllometryPoints(params) {
   const nCls = 12;
   const reps = 4;
   const pts  = [];
+  const ex = computeExpectedExponents(params.lengthDecay, params.radiusDecay);
+  const lenExp = ex ? ex.aL : (1 / 3);
+  const radExp = ex ? ex.aD : (1 / 2);
 
   for (let i = 0; i < nCls; i++) {
     const t      = i / (nCls - 1);
@@ -321,8 +372,8 @@ function buildAllometryPoints(params) {
     const sizeFactor = target / minT;
     const scaledParams = {
       ...params,
-      baseLength: (Number.isFinite(params.baseLength) ? params.baseLength : 1) * Math.pow(sizeFactor, 1 / 3),
-      baseRadius: (Number.isFinite(params.baseRadius) ? params.baseRadius : 0.1) * Math.pow(sizeFactor, 1 / 2)
+      baseLength: (Number.isFinite(params.baseLength) ? params.baseLength : 1) * Math.pow(sizeFactor, lenExp),
+      baseRadius: (Number.isFinite(params.baseRadius) ? params.baseRadius : 0.1) * Math.pow(sizeFactor, radExp)
     };
     for (let rep = 0; rep < reps; rep++) {
       const tree = simulateTree(scaledParams, target, rep * 137 + i * 23);
@@ -749,14 +800,15 @@ function initTabs() {
   });
 }
 
-function drawDiameterAllometries(pts) {
+function drawDiameterAllometries(pts, params) {
+  const ex = computeExpectedExponents(params.lengthDecay, params.radiusDecay);
   const plots = [
-    { canvas: UI.alloStemVol,  yKey: "stemVolume",   yLabel: "log10(stem volume)",     title: "Trunk diameter vs stem volume",   expected: 2.67 },
-    { canvas: UI.alloHeight,   yKey: "totalBiomass",  yLabel: "log10(total biomass)",    title: "Trunk diameter vs total biomass",  expected: 2.67 },
-    { canvas: UI.alloMaxPath,  yKey: "leafCount",    yLabel: "log10(leaf number)",      title: "Trunk diameter vs leaf number",    expected: 2.00 },
-    { canvas: UI.alloMeanPath, yKey: "networkVolume", yLabel: "log10(network volume)",   title: "Trunk diameter vs network volume",  expected: 2.67 },
-    { canvas: UI.alloTotalLen, yKey: "height",       yLabel: "log10(height)",           title: "Trunk diameter vs height",          expected: 0.67 },
-    { canvas: UI.alloPF,       yKey: "maxPathLen",   yLabel: "log10(max path length)",  title: "Trunk diameter vs max path length", expected: 0.67 }
+    { canvas: UI.alloStemVol,  yKey: "stemVolume",    yLabel: "log10(stem volume)",      title: "Trunk diameter vs stem volume",   expected: ex ? ex.bStemVsD : 2.67 },
+    { canvas: UI.alloHeight,   yKey: "totalBiomass",  yLabel: "log10(total biomass)",    title: "Trunk diameter vs total biomass",  expected: ex ? ex.bBiomassVsD : 2.67 },
+    { canvas: UI.alloMaxPath,  yKey: "leafCount",     yLabel: "log10(leaf number)",      title: "Trunk diameter vs leaf number",    expected: ex ? ex.bLeafVsD : 2.00 },
+    { canvas: UI.alloMeanPath, yKey: "networkVolume", yLabel: "log10(network volume)",   title: "Trunk diameter vs network volume", expected: ex ? ex.bNetVsD : 2.67 },
+    { canvas: UI.alloTotalLen, yKey: "height",        yLabel: "log10(height)",           title: "Trunk diameter vs height",         expected: ex ? ex.bHeightVsD : 0.67 },
+    { canvas: UI.alloPF,       yKey: "maxPathLen",    yLabel: "log10(max path length)",  title: "Trunk diameter vs max path length", expected: ex ? ex.bMaxPathVsD : 0.67 }
   ];
 
   plots.forEach(plot => {
@@ -772,14 +824,15 @@ function drawDiameterAllometries(pts) {
 //   stem volume    → N: b ≈ 0.75
 //   total biomass  → N: b ≈ 0.75
 //   max path len   → N: b ≈ 3.00  (path ∝ height)
-function drawLeafAllometries(pts) {
+function drawLeafAllometries(pts, params) {
+  const ex = computeExpectedExponents(params.lengthDecay, params.radiusDecay);
   const plots = [
-    { canvas: UI.alloStemVol2,  xKey: "stemVolume",    xLabel: "log10(stem volume)",      title: "Stem volume → leaf number",    expected: 0.75 },
-    { canvas: UI.alloHeight2,   xKey: "totalBiomass",  xLabel: "log10(total biomass)",    title: "Total biomass → leaf number",  expected: 0.75 },
-    { canvas: UI.alloMaxPath2,  xKey: "trunkDiameter", xLabel: "log10(trunk diameter)",   title: "Trunk diameter → leaf number", expected: 2.00 },
-    { canvas: UI.alloMeanPath2, xKey: "networkVolume", xLabel: "log10(network volume)",   title: "Network volume → leaf number", expected: 0.75 },
-    { canvas: UI.alloTotalLen2, xKey: "height",        xLabel: "log10(height)",           title: "Height → leaf number",         expected: 3.00 },
-    { canvas: UI.alloPF2,       xKey: "maxPathLen",    xLabel: "log10(max path length)",  title: "Max path → leaf number",       expected: 3.00 }
+    { canvas: UI.alloStemVol2,  xKey: "stemVolume",    xLabel: "log10(stem volume)",      title: "Stem volume → leaf number",    expected: ex ? ex.bLeafVsStem : 0.75 },
+    { canvas: UI.alloHeight2,   xKey: "totalBiomass",  xLabel: "log10(total biomass)",    title: "Total biomass → leaf number",  expected: ex ? ex.bLeafVsBiomass : 0.75 },
+    { canvas: UI.alloMaxPath2,  xKey: "trunkDiameter", xLabel: "log10(trunk diameter)",   title: "Trunk diameter → leaf number", expected: ex ? ex.bLeafVsD : 2.00 },
+    { canvas: UI.alloMeanPath2, xKey: "networkVolume", xLabel: "log10(network volume)",   title: "Network volume → leaf number", expected: ex ? ex.bLeafVsNet : 0.75 },
+    { canvas: UI.alloTotalLen2, xKey: "height",        xLabel: "log10(height)",           title: "Height → leaf number",         expected: ex ? ex.bLeafVsHeight : 3.00 },
+    { canvas: UI.alloPF2,       xKey: "maxPathLen",    xLabel: "log10(max path length)",  title: "Max path → leaf number",       expected: ex ? ex.bLeafVsMaxPath : 3.00 }
   ];
 
   plots.forEach(plot => {
@@ -807,8 +860,8 @@ function runSimulation() {
 
   // Allometry: wider size range with replicates for meaningful scatter
   state.alloPoints = buildAllometryPoints(params);
-  drawDiameterAllometries(state.alloPoints);
-  drawLeafAllometries(state.alloPoints);
+  drawDiameterAllometries(state.alloPoints, params);
+  drawLeafAllometries(state.alloPoints, params);
 }
 
 // ── Event listeners & init ────────────────────────────────────
