@@ -181,7 +181,10 @@ body {
 /* ── Top row: tree panel now spans full width ──────────────── */
 .top-row {
   flex: 0 0 38vh;
-  min-height: 240px;
+  min-height: 260px;
+  display: flex;           /* tree-panel must fill this container */
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── Shared panel ─────────────────────────────────────────── */
@@ -204,6 +207,9 @@ body {
 .tree-panel {
   display: flex;
   flex-direction: column;
+  flex: 1;           /* fill .top-row */
+  min-height: 0;
+  overflow: hidden;
 }
 
 .tree-meta {
@@ -345,11 +351,11 @@ body {
 .tab-content.hidden { display: none; }
 
 /* ── Path distribution charts ─────────────────────────────── */
+/* No height:100% — let tab-content scroll when viewport is short */
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.45rem;
-  height: 100%;
 }
 
 /* ── Allometry scatter grid (3 columns) ───────────────────── */
@@ -357,12 +363,10 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.35rem;
-  height: 100%;
 }
 
 /* ── Shared chart box ─────────────────────────────────────── */
 .chart-box {
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -375,13 +379,14 @@ body {
   flex-shrink: 0;
 }
 
+/* Canvas: width fills the column; height proportional to the
+   draw buffer (165 / 400 ≈ 41.25%) so nothing is clipped. */
 .chart-box canvas {
-  width: 100%;
-  flex: 1;
   display: block;
+  width: 100%;
+  height: auto;
   border-radius: 5px;
   border: 1px solid #dde8e3;
-  height: 124px;
 }
 
 @media (max-width: 1060px) {
